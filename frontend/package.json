@@ -10,7 +10,9 @@
     "i18n:build": "node scripts/build-i18n.mjs",
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:e2e": "playwright test",
-    "test:api": "node scripts/test-api-paging.mjs"
+    "test:api": "node scripts/test-api-paging.mjs",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "test:http": "node scripts/test-http-client.mjs"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.24.0",

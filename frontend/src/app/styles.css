@@ -1,0 +1,22 @@
+/* Ordered composition preserves the existing cascade. Feature styles remain globally ordered. */
+@import "../shared/styles/foundation.css";
+@import "layout/shell.css";
+@import "../features/dashboard/dashboard.css";
+@import "../features/buildings/buildings.css";
+@import "../features/rooms/directory.css";
+@import "../features/readings/readings.css";
+@import "../features/invoices/invoices.css";
+@import "../features/payments/payments.css";
+@import "../features/admin/admin.css";
+@import "../features/auth/auth.css";
+@import "../features/subscription/status.css";
+@import "../features/tenant/portal.css";
+@import "../shared/styles/controls.css";
+@import "../shared/styles/business-states.css";
+@import "../features/invoices/corrections.css";
+@import "../features/buildings/archive.css";
+@import "../features/reports/reports.css";
+@import "../features/rooms/lifecycle.css";
+@import "../shared/styles/responsive-states.css";
+@import "../features/tenant/checkout.css";
+@import "../shared/styles/brand.css";

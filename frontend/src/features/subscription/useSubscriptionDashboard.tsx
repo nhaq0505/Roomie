@@ -1,0 +1,83 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { App } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { t } from '../../shared/i18n/runtime';
+import { useAuth } from '../auth/session';
+import { type TenantCheckout } from '../payments/index';
+import { subscriptionApi } from './index';
+
+
+export function useSubscriptionDashboard() {
+  const { message } = App.useApp();
+  const { refresh: refreshUser } = useAuth();
+  const client = useQueryClient();
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('pro_1m');
+  const [checkout, setCheckout] = useState<TenantCheckout | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const pollingRef = useRef<number | null>(null);
+
+  const subQuery = useQuery({
+    queryKey: ['subscription'],
+    queryFn: subscriptionApi.getStatus,
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: (packageId: string) => subscriptionApi.upgrade(packageId),
+    onSuccess: (data) => {
+      setCheckout(data);
+      setPaymentSuccess(false);
+    },
+    onError: (err: Error) => message.error(err.message),
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: (orderCode: number) => subscriptionApi.reconcile(orderCode),
+    onSuccess: async (data) => {
+      if (data.isPro) {
+        setPaymentSuccess(true);
+        message.success(t("Nâng cấp gói Pro thành công!"));
+        await Promise.all([
+          subQuery.refetch(),
+          refreshUser(),
+          client.invalidateQueries({ queryKey: ['rooms'] }),
+        ]);
+        if (pollingRef.current) {
+          window.clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      }
+    },
+  });
+
+  // Setup auto-reconciliation polling when modal is open
+  useEffect(() => {
+    if (checkout && checkout.orderCode && !paymentSuccess) {
+      pollingRef.current = window.setInterval(() => {
+        reconcileMutation.mutate(checkout.orderCode);
+      }, 5000);
+    }
+    return () => {
+      if (pollingRef.current) {
+        window.clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [checkout?.orderCode, paymentSuccess]);
+
+  const copyToClipboard = async (text: string, msg: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(msg);
+    } catch {
+      message.info(text);
+    }
+  };
+
+  const status = subQuery.data;
+  const isPro = status?.isPro ?? false;
+  const currentRooms = status?.currentRooms ?? 0;
+  const maxRooms = status?.maxRooms ?? 5;
+  const isLimitReached = !isPro && currentRooms >= maxRooms;
+
+  return { message, selectedPackageId, setSelectedPackageId, checkout, setCheckout, paymentSuccess, setPaymentSuccess, upgradeMutation, reconcileMutation, copyToClipboard, status, isPro, currentRooms, maxRooms, isLimitReached };
+}

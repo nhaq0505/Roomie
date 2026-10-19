@@ -71,6 +71,7 @@ Assert(result.WebhookStatus == "Failed" && result.WebhookUrl == null && handler.
 Assert(await db.Receipts.CountAsync() == 0, "confirmation never creates financial receipts");
 
 await OperationalHardeningTests.RunAsync();
+await SharedSupportTests.RunAsync();
 await MigrationTests.RunAsync();
 await PayOsPaymentTests.RunAsync();
 await TenantLinkHttpTests.RunAsync();

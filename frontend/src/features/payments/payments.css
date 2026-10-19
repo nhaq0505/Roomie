@@ -1,0 +1,36 @@
+
+/* Payment setup */
+.settings-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, .8fr); align-items: start; gap: 18px; }
+.settings-main-column { display: flex; flex-direction: column; gap: 17px; }
+.settings-card, .settings-side-card { border: 1px solid #e6edeb; border-radius: 16px; box-shadow: 0 2px 10px rgba(19,48,55,.025); }
+.settings-card .ant-card-body { padding: 25px; }
+.settings-card-heading { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
+.settings-heading-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; color: #117f6e; background: #e8f6f1; font-size: 17px; }
+.settings-card-heading h4.ant-typography { margin: 0 0 4px; font-size: 15px; }
+.settings-card-heading .ant-typography-secondary { font-size: 13px; }
+.configured-alert { margin-bottom: 20px; border-radius: 11px; }
+.configured-alert .ant-alert-message { font-size: 13px; font-weight: 650; }
+.configured-alert .ant-alert-description { font-size: 13px; line-height: 1.55; }
+.payment-settings-form { padding-top: 2px; }
+.payment-settings-form .ant-form-item { margin-bottom: 17px; }
+.settings-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 14px; margin-top: 4px; border-top: 1px solid #edf1f0; }
+.settings-form-footer > span { display: flex; gap: 6px; align-items: center; color: #7d8c90; font-size: 12px; }
+.settings-form-footer .anticon { color: #188a72; font-size: 13px; }
+.payment-how-it-works { padding: 18px 20px; border: 1px solid #e7eeec; border-radius: 15px; background: white; }
+.how-steps { display: flex; gap: 13px; margin-top: 13px; }
+.how-steps > div { display: flex; flex: 1; gap: 8px; }
+.how-steps > div > span { display: grid; flex: 0 0 23px; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: #108b75; background: #e8f6f1; font-size: 12px; font-weight: 700; }
+.how-steps p { display: flex; flex-direction: column; gap: 5px; margin: 0; }
+.how-steps strong { color: #445b60; font-size: 12px; }
+.how-steps small { color: #879699; font-size: 12px; line-height: 1.5; }
+.settings-side-card { position: relative; overflow: hidden; }
+.settings-side-card .ant-card-body { padding: 22px; }
+.side-shield { display: grid; place-items: center; width: 43px; height: 43px; margin-bottom: 14px; border-radius: 14px; color: #15876f; background: #eaf7f2; font-size: 19px; }
+.settings-side-card h4.ant-typography { margin: 0 0 8px; font-size: 14px; }
+.settings-side-card > .ant-card-body > .ant-typography { color: #7c8b90; font-size: 13px; line-height: 1.65; }
+.security-checks { display: flex; flex-direction: column; gap: 10px; padding: 14px 0; border-top: 1px solid #edf1f0; border-bottom: 1px solid #edf1f0; }
+.security-checks span { display: flex; align-items: center; gap: 7px; color: #5e7478; font-size: 12px; }
+.security-checks .anticon { color: #2b986e; font-size: 14px; }
+.settings-state { display: flex; align-items: center; gap: 7px; padding-top: 14px; color: #74868a; font-size: 12px; }
+.connected-dot, .disconnected-dot { width: 7px; height: 7px; border-radius: 50%; background: #20a77e; }
+.disconnected-dot { background: #c7ceca; }

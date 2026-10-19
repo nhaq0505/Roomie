@@ -1,0 +1,24 @@
+
+/* Rooms and tables */
+.room-overview-strip { gap: 20px; padding: 14px 19px; margin-bottom: 18px; }
+.room-overview-strip > div { display: flex; align-items: center; gap: 7px; color: #7b8b8f; font-size: 13px; }
+.room-overview-strip > div strong { color: #344d53; font-family: Manrope, sans-serif; font-size: 18px; }
+.room-overview-strip > i { width: 1px; height: 25px; background: #e9efed; }
+.room-overview-strip .overview-total { margin-left: auto; }
+.rooms-card .section-card-header { margin-bottom: 14px; }
+.room-name-cell, .tenant-cell, .owner-name-cell { display: flex; align-items: center; gap: 10px; }
+.room-name-cell > div:last-child, .tenant-cell, .owner-name-cell > div:last-child { display: flex; flex-direction: column; gap: 4px; }
+.room-name-cell strong, .tenant-cell strong, .owner-name-cell strong { color: #40565b; font-size: 13px; font-weight: 650; }
+.room-name-cell span, .tenant-cell span, .owner-name-cell span { color: #8a989b; font-size: 12px; }
+.room-avatar { width: 34px; height: 34px; flex-basis: 34px; border-radius: 11px; }
+.room-tag { margin: 0; padding: 4px 9px; border: 0; border-radius: 20px; font-size: 12px; }
+.room-tag-occupied { color: #227856; background: #eaf6ef; }
+.room-tag-vacant { color: #687b80; background: #eff3f2; }
+.ant-table-wrapper .ant-table { color: #52666b; font-size: 13px; }
+.ant-table-wrapper .ant-table-thead > tr > th { color: #8c999c; background: #fbfcfc; font-size: 12px; font-weight: 700; letter-spacing: .7px; border-bottom: 1px solid #e9efed; }
+.ant-table-wrapper .ant-table-tbody > tr > td { padding-top: 14px; padding-bottom: 14px; border-bottom: 1px solid #f0f3f2; }
+.ant-table-wrapper .ant-table-tbody > tr:hover > td { background: #fbfdfc !important; }
+.ant-table-wrapper .ant-pagination { margin-bottom: 0; }
+.ant-pagination .ant-pagination-item-active { border-color: #0f9d83; }
+.ant-pagination .ant-pagination-item-active a { color: #0e927b; }
+.owner-avatar { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 11px; color: #3d7690; background: #eaf2f7; }

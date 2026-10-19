@@ -1,0 +1,166 @@
+
+/* Tenant invoice portal */
+.tenant-page { min-height: 100vh; background: #f4f7f6; }
+.tenant-header { position: relative; height: 76px; padding: 0 max(24px, calc((100% - 920px)/2)); border-bottom: 1px solid #e5ece9; background: white; }
+.tenant-header .brand-mark { width: 39px; height: 39px; flex-basis: 39px; font-size: 24px; }
+.tenant-header strong { color: #20434a; font-size: 19px; }
+.tenant-brand-copy > span { color: #91a09f; font-size: 7px; }
+.tenant-header-secure { display: flex; align-items: center; gap: 6px; margin-left: auto; color: #819194; font-size: 12px; }
+.tenant-header-secure .anticon { color: #319275; }
+.tenant-main { width: min(680px, calc(100% - 32px)); margin: 0 auto; padding: 37px 0 50px; }
+.tenant-welcome { display: flex; align-items: center; gap: 13px; }
+.tenant-house-mark { display: grid; place-items: center; width: 49px; height: 49px; border-radius: 15px; color: #098d77; background: #e2f4ed; font-size: 21px; }
+.tenant-welcome h2.ant-typography { margin: 3px 0 2px; color: #233d43; font-size: 22px; font-weight: 750; letter-spacing: -.5px; }
+.tenant-welcome .ant-typography-secondary, .tenant-welcome > div > .ant-typography { color: #849296; font-size: 13px; }
+.tenant-summary { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 23px; padding: 17px 19px; border: 1px solid #d9ede6; border-radius: 15px; background: linear-gradient(120deg,#f7fcf9,#eef8f3); }
+.tenant-summary > div:first-child { display: flex; flex-direction: column; gap: 5px; }
+.tenant-summary span { color: #72868a; font-size: 12px; }
+.tenant-summary strong { font-family: Manrope, sans-serif; font-size: 20px; }
+.tenant-summary-lock { display: flex; align-items: center; gap: 5px; color: #558878; font-size: 12px; }
+.tenant-section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+.tenant-section-heading h4.ant-typography { margin: 0 0 4px; font-size: 15px; }
+.tenant-section-heading > div > span { color: #879598; font-size: 12px; }
+.tenant-count { color: #93a0a1; font-size: 12px; }
+.tenant-invoice-list { display: flex; flex-direction: column; gap: 12px; }
+.tenant-invoice-card { border: 1px solid #e6edeb; border-radius: 15px; box-shadow: 0 2px 11px rgba(19,48,55,.025); }
+.tenant-invoice-card .ant-card-body { padding: 17px 19px 14px; }
+.tenant-invoice-top { display: flex; align-items: center; justify-content: space-between; }
+.tenant-invoice-top > div:first-child { display: flex; align-items: center; gap: 9px; }
+.tenant-invoice-period { color: #334c52; font-size: 13px; font-weight: 700; }
+.tenant-total { color: #27434a; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 750; }
+.tenant-invoice-card .ant-collapse { margin: 8px -4px 1px; border: 0; background: transparent; }
+.tenant-invoice-card .ant-collapse-header { align-items: center !important; padding: 6px 4px !important; }
+.tenant-detail-toggle { color: #74878b; font-size: 12px; }
+.tenant-detail-toggle .anticon { margin-left: 3px; font-size: 12px; }
+.tenant-invoice-card .ant-collapse-content-box { padding: 4px 4px 12px !important; }
+.tenant-breakdown { display: flex; flex-direction: column; gap: 8px; padding: 5px 0 2px; }
+.tenant-breakdown > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.tenant-breakdown span { color: #7b8b8f; font-size: 12px; }
+.tenant-breakdown span small { display: inline-block; margin-left: 3px; color: #a0adad; font-size: 12px; }
+.tenant-breakdown strong { color: #4a6165; font-size: 12px; }
+.tenant-breakdown .tenant-meter { padding-top: 8px; border-top: 1px solid #edf1ef; }
+.tenant-payment-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 13px; border-top: 1px solid #edf1ef; }
+.tenant-payment-line > div { display: flex; flex-direction: column; gap: 4px; }
+.tenant-payment-line > div span { color: #849295; font-size: 12px; }
+.tenant-payment-line > div strong { font-size: 14px; }
+.tenant-payment-line .ant-btn { font-size: 13px; }
+.tenant-payment-actions { display: flex; align-items: center; gap: 4px; }
+.tenant-payment-actions .ant-btn-link { padding: 0 7px; font-size: 12px; }
+.tenant-paid-label { display: flex; align-items: center; gap: 5px; color: #2c8666; font-size: 12px; }
+.tenant-secure-note { display: flex; justify-content: center; align-items: center; gap: 7px; margin-top: 19px; color: #9aa6a7; font-size: 12px; }
+.tenant-secure-note .anticon { color: #45a486; }
+.tenant-footer { display: flex; justify-content: space-between; gap: 12px; width: min(920px, calc(100% - 40px)); padding: 17px 0 20px; margin: 0 auto; border-top: 1px solid #e4ebe8; color: #99a4a5; font-size: 12px; }
+.tenant-empty { display: flex; min-height: 180px; align-items: center; justify-content: center; border: 1px solid #e6edeb; border-radius: 15px; text-align: center; }
+.tenant-empty .ant-card-body { display: flex; align-items: center; flex-direction: column; gap: 9px; }
+.tenant-empty .anticon { color: #94aaa5; font-size: 22px; }
+.tenant-empty strong { color: #53686b; font-size: 13px; }
+.tenant-empty span { max-width: 300px; color: #92a0a1; font-size: 12px; line-height: 1.6; }
+.tenant-loading, .tenant-error { width: min(680px, calc(100% - 32px)); padding: 35px; margin: 44px auto; border: 1px solid #e6edeb; border-radius: 17px; background: white; }
+.tenant-error { padding: 8px; }
+.tenant-payment-error { margin-bottom: 17px; border-radius: 11px; }
+.tenant-payment-error .ant-alert-message { font-size: 13px; }
+.tenant-payment-error .ant-alert-description { font-size: 12px; }
+
+@media (max-width: 1200px) {
+  .page-content { padding-right: 25px; padding-left: 25px; }
+  .topbar.ant-layout-header { padding-right: 25px; padding-left: 25px; }
+}
+@media (max-width: 991px) {
+  .app-sider { display: none; }
+  .main-layout { margin-left: 0; }
+  .mobile-menu-button { display: inline-flex; }
+  .settings-grid { grid-template-columns: minmax(0, 1.4fr) minmax(240px, .8fr); }
+  .page-content { padding-top: 28px; }
+}
+@media (max-width: 767px) {
+  .page-content { padding: 23px 16px 40px; }
+  .topbar.ant-layout-header { height: 63px; padding: 0 16px; }
+  .page-heading { align-items: flex-start; flex-direction: column; gap: 15px; margin-bottom: 19px; }
+  .page-heading-extra { width: 100%; justify-content: flex-start; }
+  .page-heading h2.ant-typography { font-size: 23px; }
+  .page-subtitle { font-size: 13px; }
+  .section-card { padding: 17px 15px; margin-bottom: 14px; }
+  .section-card-header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .section-card-header h4.ant-typography { font-size: 14px; }
+  .section-card-header > .ant-space { width: 100%; }
+  .section-card-header > .ant-space .ant-select { flex: 1; }
+  .profile-text, .notice-button, .topbar-left .breadcrumb-label { display: none; }
+  .mobile-menu-button { margin: 0; }
+  .topbar-left { flex: 1; }
+  .topbar > .ant-space { margin-left: auto; }
+  .stat-card { min-height: 139px; }
+  .stat-card .ant-card-body { padding: 17px; }
+  .recent-invoice-row { gap: 8px; }
+  .recent-invoice-period { display: none; }
+  .recent-invoice-amount { min-width: 110px; }
+  .building-summary-strip { padding: 13px; }
+  .building-summary-strip > a { max-width: 100px; text-align: right; }
+  .building-tip { align-items: flex-start; flex-wrap: wrap; }
+  .building-tip > div:nth-child(2) { min-width: calc(100% - 58px); }
+  .building-tip > .ant-btn { margin-left: 56px; }
+  .room-overview-strip { gap: 10px; padding: 12px; }
+  .room-overview-strip > div { gap: 5px; font-size: 12px; }
+  .room-overview-strip > div strong { font-size: 16px; }
+  .room-overview-strip > i { height: 20px; }
+  .reading-progress-card { flex-wrap: wrap; }
+  .reading-progress-copy { min-width: calc(100% - 55px); }
+  .reading-progress-meter { width: 100%; margin-left: 50px; }
+  .invoice-totals-row { margin-bottom: 12px; }
+  .invoice-total-tile { min-height: 70px; padding: 13px 15px; }
+  .invoice-total-tile strong { font-size: 15px; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .settings-card .ant-card-body { padding: 18px; }
+  .how-steps { flex-direction: column; }
+  .settings-form-footer { align-items: flex-start; flex-direction: column; }
+  .settings-form-footer .ant-btn { width: 100%; }
+  .admin-summary-card { padding: 12px; }
+  .admin-summary-note { max-width: 120px; text-align: right; line-height: 1.5; }
+  .auth-page { display: block; min-height: 100vh; background: white; }
+  .auth-aside { display: none; }
+  .auth-main { min-height: 100vh; align-items: flex-start; padding: 28px 24px 35px; }
+  .auth-form-wrap { width: min(430px, 100%); margin: auto; }
+  .auth-small-brand { display: flex; }
+  .auth-legal { margin-top: 22px; }
+  .tenant-header { height: 65px; padding: 0 17px; }
+  .tenant-header .brand-mark { width: 35px; height: 35px; flex-basis: 35px; }
+  .tenant-header strong { font-size: 17px; }
+  .tenant-main { padding-top: 25px; }
+  .tenant-summary { padding: 14px; }
+  .tenant-summary strong { font-size: 17px; }
+  .tenant-footer { flex-direction: column; align-items: center; text-align: center; }
+}
+@media (max-width: 480px) {
+  .page-content { padding-right: 12px; padding-left: 12px; }
+  .topbar.ant-layout-header { padding-right: 12px; padding-left: 12px; }
+  .profile-button { gap: 0; }
+  .profile-avatar { width: 32px !important; height: 32px !important; line-height: 32px !important; }
+  .page-heading-extra { align-items: stretch; flex-direction: column; }
+  .page-heading-extra > .ant-btn, .page-heading-extra > .ant-space { width: 100%; }
+  .page-heading-extra > .ant-space { flex-direction: row; }
+  .page-heading-extra > .ant-space .ant-picker { flex: 1; }
+  .page-heading-extra > .ant-space .ant-btn { flex: 1; }
+  .building-summary-strip > a { font-size: 0; }
+  .building-summary-strip > a .anticon { font-size: 13px; }
+  .room-overview-strip { justify-content: space-between; gap: 6px; }
+  .room-overview-strip > div { gap: 4px; }
+  .room-overview-strip > div strong { font-size: 14px; }
+  .room-overview-strip > div span:last-child { font-size: 12px; }
+  .tenant-header-secure { font-size: 0; }
+  .tenant-header-secure .anticon { font-size: 13px; }
+  .tenant-main { width: calc(100% - 24px); }
+  .tenant-invoice-card .ant-card-body { padding: 14px; }
+  .tenant-total { font-size: 14px; }
+  .tenant-payment-line .ant-btn { padding: 0 11px; }
+  .tenant-payment-actions { align-items: flex-end; flex-direction: column-reverse; gap: 0; }
+  .tenant-payment-actions .ant-btn-link { padding: 2px 0; }
+  .tenant-summary-lock { font-size: 0; }
+  .tenant-summary-lock .anticon { font-size: 13px; }
+  .invoice-drawer .ant-drawer-body { padding-right: 16px; padding-left: 16px; }
+  .invoice-period-box { flex-wrap: wrap; }
+}
+
+.webhook-setting { display: flex; flex-direction: column; gap: 9px; padding: 13px 14px; margin-bottom: 19px; border: 1px solid #e8efec; border-radius: 11px; background: #fafcfb; }
+.webhook-setting > div:first-child { display: flex; flex-direction: column; gap: 4px; }
+.webhook-setting > div:first-child strong { color: #4b6267; font-size: 13px; }
+.webhook-setting > div:first-child span { color: #879598; font-size: 12px; line-height: 1.55; }
+.webhook-setting .ant-input { font-size: 12px; }

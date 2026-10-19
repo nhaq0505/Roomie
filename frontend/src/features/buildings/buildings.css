@@ -1,0 +1,45 @@
+
+/* Buildings */
+.building-summary-strip, .room-overview-strip, .reading-progress-card, .admin-summary-card { display: flex; align-items: center; border: 1px solid #e5eeeb; border-radius: 15px; background: #fff; box-shadow: 0 2px 10px rgba(19,48,55,.025); }
+.building-summary-strip { gap: 13px; margin-bottom: 20px; padding: 15px 18px; }
+.summary-icon { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #108c76; background: #e8f6f1; font-size: 16px; }
+.building-summary-strip > div:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 4px; }
+.building-summary-strip strong { color: #354c53; font-size: 14px; }
+.building-summary-strip span { color: #8b999d; font-size: 13px; }
+.building-summary-strip > a { font-size: 13px; font-weight: 600; }
+.building-card { overflow: hidden; height: 100%; border-radius: 16px; border: 1px solid #e6edeb; box-shadow: 0 2px 10px rgba(19,48,55,.03); }
+.building-card .ant-card-body { padding: 0; }
+.building-art { position: relative; height: 135px; overflow: hidden; background: linear-gradient(135deg,#d9eee8,#c2e2db); }
+.building-art-1 { background: linear-gradient(135deg,#e7e4d7,#d7d8c5); }
+.building-art-2 { background: linear-gradient(135deg,#dce7ef,#c7dbe4); }
+.building-art-3 { background: linear-gradient(135deg,#f0e3d6,#e5d4c1); }
+.building-art-grid { position: absolute; right: 40px; bottom: -1px; display: grid; grid-template-columns: repeat(3, 31px); gap: 7px; transform: perspective(230px) rotateX(0deg) skewY(-6deg); }
+.building-art-grid span { width: 31px; height: 43px; border-radius: 6px 6px 0 0; background: rgba(255,255,255,.65); box-shadow: 0 0 0 1px rgba(74, 124, 115, .07); }
+.building-art-grid span:nth-child(2n) { height: 55px; background: rgba(255,255,255,.82); }
+.building-art-grid span:nth-child(3n) { height: 36px; }
+.building-art-1 .building-art-grid span { background: rgba(255,255,255,.62); }
+.building-art-2 .building-art-grid span { background: rgba(255,255,255,.7); }
+.building-art-3 .building-art-grid span { background: rgba(255,255,255,.7); }
+.building-art-tag { position: absolute; top: 14px; left: 15px; color: rgba(35,85,77,.52); font-family: Manrope, sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
+.building-art-icon { position: absolute; right: 20px; bottom: 20px; display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid rgba(255,255,255,.6); border-radius: 13px; color: #267b69; background: rgba(255,255,255,.62); backdrop-filter: blur(4px); }
+.building-card-body { padding: 17px 17px 14px; }
+.building-card-title { display: flex; justify-content: space-between; gap: 10px; min-height: 62px; }
+.building-card-title h4.ant-typography { margin: 0 0 8px; font-size: 14px; }
+.building-card-title > div:first-child > span { display: flex; align-items: flex-start; gap: 5px; color: #87969a; font-size: 13px; line-height: 1.5; }
+.building-room-count { display: flex; flex: 0 0 auto; align-items: center; flex-direction: column; gap: 1px; min-width: 42px; padding: 5px 7px; align-self: flex-start; border-radius: 10px; color: #168b75; background: #eaf7f3; }
+.building-room-count strong { font-family: Manrope, sans-serif; font-size: 17px; line-height: 1; }
+.building-room-count small { font-size: 12px; }
+.building-card-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; margin-top: 10px; border-top: 1px solid #eef2f1; color: #94a0a2; font-size: 12px; }
+.building-card-footer a { font-size: 13px; font-weight: 600; }
+.building-tip-card { margin-top: 18px; padding: 14px 19px; }
+.building-tip { display: flex; align-items: center; gap: 13px; }
+.tip-illustration { display: grid; flex: 0 0 43px; place-items: center; width: 43px; height: 43px; border-radius: 14px; color: #15957d; background: #e8f6f1; }
+.building-tip > div:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 4px; }
+.building-tip strong { color: #3a5358; font-size: 13px; }
+.building-tip span { color: #849398; font-size: 13px; line-height: 1.45; }
+.empty-building-banner { margin-bottom: 17px; border: 1px solid #e8eeec; border-radius: 15px; }
+.empty-building-content { display: flex; align-items: center; gap: 13px; }
+.empty-building-content > div:nth-child(2) { flex: 1; }
+.empty-building-content .ant-typography { margin: 0; }
+.empty-building-content .ant-typography:first-child { font-size: 14px; }
+.empty-building-content .ant-typography:last-child { margin-top: 4px; color: #819094; font-size: 13px; }

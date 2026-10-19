@@ -8,7 +8,7 @@ const dist = new URL('../dist/', import.meta.url);
 const escape = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 let template = await readFile(new URL('index.html', dist), 'utf8');
 const manifest = JSON.parse(await readFile(new URL('.vite/manifest.json', dist), 'utf8'));
-const publicCss = manifest['src/pages/LandingPage.tsx']?.css ?? [];
+const publicCss = manifest['src/features/marketing/LandingPage.tsx']?.css ?? [];
 if (!manifest['index.html']?.css?.length) throw new Error('Entry CSS missing from build manifest');
 // The private SPA must never inherit the public page's content/canonical.
 await writeFile(new URL('app.html', dist), template.replace('</head>', '    <meta name="robots" content="noindex, follow" />\n  </head>'));
@@ -16,7 +16,7 @@ await writeFile(new URL('app.html', dist), template.replace('</head>', '    <met
 // Bundle the build-only renderer so Node never needs browser ESM package shims.
 await build({
   root, configFile: false, plugins: [react()], logLevel: 'warn',
-  build: { ssr: 'src/seo/prerender.tsx', outDir: 'dist/.prerender', emptyOutDir: true },
+  build: { ssr: 'src/app/seo/prerender.tsx', outDir: 'dist/.prerender', emptyOutDir: true },
   ssr: { noExternal: true, resolve: { conditions: ['module', 'module-sync', 'node'] } },
 });
 try {

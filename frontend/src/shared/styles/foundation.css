@@ -1,0 +1,34 @@
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #19333b;
+  background: #f4f7f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #19333b;
+  --muted: #71838a;
+  --teal: #109d83;
+  --roomie-brand-color: #18a589;
+  --teal-dark: #0a796a;
+  --navy: #15343e;
+  --line: #e6edeb;
+  --canvas: #f4f7f6;
+  --amber: #cb8b37;
+  --red: #c95854;
+  --green: #248364;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); }
+button, input, textarea { font: inherit; }
+a { color: var(--teal-dark); }
+.ant-typography { color: var(--ink); }
+.ant-typography h1, .ant-typography h2, .ant-typography h3, .ant-typography h4 { font-family: Manrope, 'DM Sans', sans-serif; color: var(--ink); }
+.ant-btn { box-shadow: none; }
+.ant-btn-primary { box-shadow: 0 5px 13px rgba(16, 157, 131, .12); }
+.ant-input-affix-wrapper, .ant-input, .ant-input-number, .ant-picker, .ant-select-selector { box-shadow: none !important; }
+.ant-input:focus, .ant-input-affix-wrapper-focused, .ant-input-number-focused, .ant-picker-focused, .ant-select-focused .ant-select-selector { border-color: #64c7b3 !important; }
+.ant-form-item-label > label { color: #435960 !important; font-size: 13px; font-weight: 600; }
+.ant-form-item-explain-error, .ant-form-item-extra { font-size: 14px; }
+.screen-center, .center-page { min-height: 100vh; display: grid; place-items: center; background: var(--canvas); }
+.center-page .ant-result { padding: 36px; }

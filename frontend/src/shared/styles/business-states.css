@@ -1,0 +1,3 @@
+
+/* Issuance state, archived history, and owner reporting use the existing navy and teal palette. */
+.draft-state-tag, .archived-state-tag, .building-archived-tag { color: #765b21 !important; background: #fff7df !important; border-color: #f2dfa9 !important; }

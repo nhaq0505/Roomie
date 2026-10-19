@@ -1,0 +1,45 @@
+
+/* Tenant QR checkout page; keep its controls scoped to the private tenant portal. */
+.tenant-page .tenant-checkout-page { padding-top: 25px; }
+.tenant-page .tenant-checkout-back { margin: -8px 0 13px -9px; color: #4d696d; }
+.tenant-page .tenant-checkout-heading { margin: 0 0 18px; }
+.tenant-page .tenant-checkout-heading .ant-typography { margin: 0; }
+.tenant-page .tenant-checkout-heading h2 { margin: 5px 0 4px; color: #24464b; font-size: 26px; }
+.tenant-page .tenant-checkout-panel { border: 1px solid #e2ece8; border-radius: 16px; box-shadow: 0 8px 24px rgb(35 67 63 / 5%); }
+.tenant-page .tenant-checkout-panel .ant-card-body { display: flex; min-width: 0; flex-direction: column; gap: 13px; padding: 20px; }
+.tenant-page .tenant-checkout-status { border-radius: 11px; }
+.tenant-page .tenant-checkout-status .ant-alert-message { font-size: 14px; font-weight: 650; }
+.tenant-page .tenant-checkout-status .ant-alert-description { font-size: 12px; line-height: 1.55; }
+.tenant-page .tenant-checkout-amount { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 4px; padding: 13px 15px; border: 1px solid #d9ede6; border-radius: 12px; background: #f4faf7; text-align: center; }
+.tenant-page .tenant-checkout-amount > span, .tenant-page .tenant-checkout-amount > small { color: #60777a; font-size: 12px; }
+.tenant-page .tenant-checkout-amount > strong { max-width: 100%; color: #21494a; font-family: Manrope, sans-serif; font-size: 24px; line-height: 1.25; overflow-wrap: anywhere; }
+.tenant-page .tenant-checkout-qr { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 10px; padding: 13px 12px; border: 1px solid #e4ece9; border-radius: 12px; background: #fff; text-align: center; }
+.tenant-page .tenant-checkout-qr .ant-qrcode { max-width: 100%; }
+.tenant-page .tenant-checkout-qr > .ant-typography { max-width: 270px; color: #667c7e; font-size: 12px; line-height: 1.55; }
+.tenant-page .tenant-checkout-no-qr { border-radius: 11px; }
+.tenant-page .tenant-checkout-no-qr .ant-alert-message, .tenant-page .tenant-checkout-no-qr .ant-alert-description { font-size: 12px; line-height: 1.55; }
+.tenant-page .tenant-checkout-details { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid #e6edeb; border-radius: 11px; background: #fbfdfc; }
+.tenant-page .tenant-checkout-details > div, .tenant-page .tenant-checkout-order { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tenant-page .tenant-checkout-details span, .tenant-page .tenant-checkout-order span, .tenant-page .tenant-checkout-expiry { color: #718588; font-size: 12px; }
+.tenant-page .tenant-checkout-details strong, .tenant-page .tenant-checkout-order strong { min-width: 0; color: #38565b; font-size: 12px; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
+.tenant-page .tenant-checkout-transfer { min-width: 0; padding: 11px 13px; border: 1px solid #e6edeb; border-radius: 11px; background: #fbfdfc; }
+.tenant-page .tenant-checkout-transfer-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; color: #718588; font-size: 12px; }
+.tenant-page .tenant-checkout-transfer-label .ant-btn { min-height: 32px; padding: 3px 7px; }
+.tenant-page .tenant-checkout-transfer code { display: block; color: #2d4c50; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; user-select: all; }
+.tenant-page .tenant-checkout-expiry { display: flex; align-items: flex-start; gap: 7px; }
+.tenant-page .tenant-checkout-expiry .anticon { flex: 0 0 auto; margin-top: 2px; }
+.tenant-page .tenant-checkout-order { padding-top: 10px; border-top: 1px solid #edf2f0; }
+.tenant-page .tenant-checkout-error { border-radius: 10px; }
+.tenant-page .tenant-checkout-error .ant-alert-message { font-size: 12px; line-height: 1.55; }
+.tenant-page .tenant-checkout-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.tenant-page .tenant-checkout-actions .ant-btn, .tenant-page .tenant-checkout-retry { min-height: 42px; max-width: 100%; white-space: normal; }
+.tenant-page .tenant-checkout-hosted { width: 100%; min-height: 42px; white-space: normal; }
+@media (max-width: 480px) {
+  .tenant-page .tenant-checkout-page { padding-top: 17px; }
+  .tenant-page .tenant-checkout-panel .ant-card-body { gap: 10px; padding: 14px; }
+  .tenant-page .tenant-checkout-heading h2 { font-size: 22px; }
+  .tenant-page .tenant-checkout-amount > strong { font-size: 21px; }
+  .tenant-page .tenant-checkout-qr .ant-qrcode { width: min(224px, 100%) !important; height: auto !important; aspect-ratio: 1; }
+  .tenant-page .tenant-checkout-qr .ant-qrcode svg { display: block; width: 100%; height: auto; }
+  .tenant-page .tenant-checkout-details > div { gap: 8px; }
+}

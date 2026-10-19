@@ -1,0 +1,22 @@
+
+/* Reading entry */
+.reading-progress-card { gap: 13px; padding: 16px 19px; margin-bottom: 18px; }
+.reading-progress-mark { display: grid; flex: 0 0 37px; place-items: center; width: 37px; height: 37px; border-radius: 12px; color: #a87730; background: #fbf3e7; }
+.reading-progress-copy { display: flex; min-width: 220px; flex: 1; flex-direction: column; gap: 4px; }
+.reading-progress-copy strong { color: #41575c; font-size: 13px; }
+.reading-progress-copy strong span { padding: 0 4px; color: #abb6b4; }
+.reading-progress-copy > span { color: #8a999d; font-size: 12px; }
+.reading-progress-meter { width: 160px; height: 7px; overflow: hidden; border-radius: 9px; background: #edf2f0; }
+.reading-progress-meter > div { height: 100%; border-radius: inherit; background: #19a185; transition: width .2s ease; }
+.reading-section .section-card-header { margin-bottom: 14px; }
+.reading-notice { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; padding: 11px 13px; border: 1px solid #f2e6cf; border-radius: 10px; color: #8c6b37; background: #fffaf0; font-size: 13px; line-height: 1.6; }
+.reading-notice > .anticon { flex: 0 0 auto; margin-top: 2px; color: #be8b3a; }
+.reading-notice strong { color: #75572c; }
+.meter-value { color: #53696d; font-size: 13px; }
+.meter-value small, .saved-reading small { color: #91a0a2; font-size: 12px; }
+.saved-reading { display: flex; align-items: center; gap: 8px; }
+.saved-reading strong { color: #405a5d; font-size: 13px; }
+.submitted-tag { color: #2b805f; background: #eaf6ef; border: 0; border-radius: 20px; font-size: 12px; }
+.consumption-value { color: #53696e; font-size: 13px; }
+.already-done { color: #328365; font-size: 12px; }
+.all-readings-done { display: flex; align-items: center; gap: 7px; padding-top: 15px; color: #388465; border-top: 1px solid #edf2f0; font-size: 13px; }

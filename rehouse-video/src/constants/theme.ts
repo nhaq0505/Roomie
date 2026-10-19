@@ -1,5 +1,5 @@
 export const REHOUSE_THEME = {
-  // Brand colors extracted from frontend/src/styles.css & roomTheme.ts
+  // Brand colors extracted from frontend/src/shared/styles/foundation.css & frontend/src/features/rooms/theme.ts
   teal: '#109d83',
   tealDark: '#0a796a',
   tealHover: '#086454',

@@ -1,0 +1,27 @@
+import type { Invoice } from '../invoices';
+export interface PaymentSettings {
+  webhookUrl: string | null;
+  webhookStatus: 'NotConfigured' | 'Unverified' | 'Verified' | 'Failed';
+  webhookVerifiedAt: string | null;
+  webhookError: string | null;
+  configured: boolean;
+  clientId?: string;
+}
+
+export interface PaymentReconcileResult {
+  status: string;
+  invoice: Invoice;
+}
+
+export interface TenantCheckout {
+  checkoutUrl: string;
+  qrCode: string | null;
+  amount: number;
+  orderCode: number;
+  accountName: string | null;
+  accountNumber: string | null;
+  bankBin: string | null;
+  description: string | null;
+  status: string;
+  expiresAt: number | null;
+}

@@ -1,0 +1,3 @@
+
+/* Roomie door mark scales with its existing brand container. */
+.brand-mark > .roomie-mark { display: block; width: 68.421%; height: 68.421%; }

@@ -1,5 +1,7 @@
 # Roomie — Quản lý phòng trọ
 
+Cấu trúc mã nguồn và quy tắc thêm tính năng: [hướng dẫn kiến trúc codebase](docs/codebase-architecture.md).
+
 **Agent tiếp tục dự án: đọc [kế hoạch và tài liệu bàn giao](docs/PROJECT_HANDOFF.md) trước.**
 
 SEO: xem [kế hoạch 8 tuần](docs/SEO_PLAN.md). **Sau mỗi đợt thay đổi SEO, cập nhật [nhật ký SEO](docs/SEO_LOG.md)** với công việc thực tế, kiểm thử, trạng thái phát hành và kết quả quan sát được; không ghi dự kiến thành đã hoàn thành.

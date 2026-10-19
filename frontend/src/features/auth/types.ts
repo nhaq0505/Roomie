@@ -1,0 +1,29 @@
+import type { SubscriptionTier } from '../subscription';
+export type Role = 'Admin' | 'Owner';
+
+export type AccountStatus = 'Approved' | 'Pending' | 'Rejected' | 'Suspended';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  mfaEnabled?: boolean;
+  mfaRequired?: boolean;
+  status?: AccountStatus;
+  phone?: string;
+  rejectionReason?: string | null;
+  subscriptionTier?: SubscriptionTier;
+  subscriptionExpiresAt?: string | null;
+  isPro?: boolean;
+  roomCount?: number;
+  maxRooms?: number | null;
+}
+
+export interface RegistrationVerification {
+  verificationRequired: true;
+  challengeToken: string;
+  email: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+}

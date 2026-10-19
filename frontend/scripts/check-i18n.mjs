@@ -3,9 +3,9 @@ import ts from 'typescript';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { build } from 'esbuild';
-const source=JSON.parse(fs.readFileSync('src/i18n/source.json','utf8'));
+const source=JSON.parse(fs.readFileSync('src/shared/i18n/source.json','utf8'));
 for(const lang of ['en','zh','ko','hi']){
- const catalog=JSON.parse(fs.readFileSync(`src/i18n/${lang}.json`,'utf8'));
+ const catalog=JSON.parse(fs.readFileSync(`src/shared/i18n/${lang}.json`,'utf8'));
  assert.deepEqual(Object.keys(catalog).sort(),[...source].sort(),`${lang} keys`);
  for(const key of source){
   assert.ok(catalog[key].trim(),`${lang} empty: ${key}`);
@@ -13,7 +13,14 @@ for(const lang of ['en','zh','ko','hi']){
   assert.deepEqual(placeholders(catalog[key]),placeholders(key),`${lang} placeholders: ${key}`);
  }
 }
-const files=['api.ts',...['pages','components'].flatMap(dir=>fs.readdirSync(`src/${dir}`).filter(f=>f.endsWith('.tsx')).map(f=>`${dir}/${f}`))];
+function sourceFiles(dir) {
+ return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+  const file = `${dir}/${entry.name}`;
+  return entry.isDirectory() ? sourceFiles(file) : /\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [file.slice(4)] : [];
+ });
+}
+// Catalog implementation and static Vietnamese SEO metadata are not localized UI.
+const files = sourceFiles('src').filter(file => !file.startsWith('shared/i18n/') && !file.startsWith('app/seo/'));
 for(const file of files){
  const ast=ts.createSourceFile(file,fs.readFileSync(`src/${file}`,'utf8'),ts.ScriptTarget.Latest,true,file.endsWith('tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS);
  const walk=n=>{
@@ -26,7 +33,7 @@ for(const file of files){
  };
  walk(ast);
 }
-const result=await build({ stdin:{contents:'export * from "./src/i18n/runtime"; export * from "./src/i18n/errors"; export {ApiError,formatVnd,periodLabel} from "./src/api";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'cjs',platform:'node' });
+const result=await build({ stdin:{contents:'export * from "./src/shared/i18n/runtime"; export * from "./src/shared/i18n/errors"; export {ApiError,formatVnd,periodLabel} from "./src/api";',resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'cjs',platform:'node' });
 function runtime(search='',saved=null,blocked=false){
  const storage=new Map(saved?[['rehouse.language',saved]]:[]);
  const document={ documentElement:{ lang:'' } };
