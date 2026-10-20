@@ -7,8 +7,8 @@ import { App, Avatar, Button, Drawer, Dropdown, Layout, Menu, Space, Typography 
 import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  AppstoreOutlined, BankOutlined, CalculatorOutlined, CreditCardOutlined, BarChartOutlined,
-  MessageOutlined, CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
+  AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined,
+  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -23,6 +23,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [openKeys, setOpenKeys] = useState<string[]>(location.pathname.startsWith('/settings/') ? ['settings'] : []);
+  useEffect(() => {
+    if (location.pathname.startsWith('/settings/')) setOpenKeys(keys => keys.includes('settings') ? keys : [...keys, 'settings']);
+  }, [location.pathname]);
+  const settingsItems = [
+    { key: '/settings/payment', label: t("Thanh toán") },
+    { key: '/settings/zalo', label: 'Zalo' },
+  ];
   useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [location.pathname]);
 const ownerItems = [
   { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
@@ -33,14 +41,13 @@ const ownerItems = [
   { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
   { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
   { type: 'divider' as const },
-  { key: '/settings/zalo', icon: <MessageOutlined />, label: t("Nhắc hóa đơn qua Zalo") },
-  { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Cấu hình") },
+  { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
   { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
 ];
 const adminItems = [{ key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") }];
   const isAdmin = user?.role === 'Admin';
   const items = isAdmin ? adminItems : ownerItems;
-  const title = items.find((item) => item.key === location.pathname)?.label ?? 'Roomie';
+  const title = settingsItems.find((item) => item.key === location.pathname)?.label ?? items.find((item) => item.key === location.pathname)?.label ?? 'Roomie';
 
   const userMenu: MenuProps['items'] = [
     { key: 'account', label: <div className="user-menu-info"><strong>{user?.name}</strong><span>{user?.email}</span></div>, disabled: true },
@@ -54,7 +61,7 @@ const adminItems = [{ key: '/admin/owners', icon: <UserOutlined />, label: t("Ch
     if (key === 'password') setPasswordOpen(true);
     if (key === 'logout') void signOut().then(() => navigate('/login')).catch((error: Error) => message.error(error.message));
   };
-  const menu = <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
+  const menu = <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
 
   return <Layout className="app-layout">
     <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
@@ -69,7 +76,11 @@ const adminItems = [{ key: '/admin/owners', icon: <UserOutlined />, label: t("Ch
     </Drawer>
     <Layout className="main-layout">
       <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}>{t("Menu")}</Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : t("Chủ trọ")}</small></span><Typography.Text type="secondary">⌄</Typography.Text></Button></Dropdown></Space></Header>
-      <nav className="compact-navigation" aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => <Link key={item.key} to={item.key!} aria-current={location.pathname === item.key ? 'page' : undefined}>{item.icon}<span>{item.label}</span></Link>)}</nav>
+      <nav className="compact-navigation" aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => item.key === 'settings'
+        ? <Dropdown key={item.key} trigger={['click']} menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
+          <button type="button" aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span>{item.label} <DownOutlined /></span></button>
+        </Dropdown>
+        : <Link key={item.key} to={item.key!} aria-current={location.pathname === item.key ? 'page' : undefined}>{item.icon}<span>{item.label}</span></Link>)}</nav>
       <Content className="page-content"><div className="page-content-inner">{children}</div></Content>
     </Layout>
   </Layout>;

@@ -10,7 +10,7 @@
 .brand span, .tenant-brand-copy > span, .auth-brand span { display: block; margin-top: 5px; color: rgba(233, 246, 243, .56); font-size: 12px; font-weight: 700; letter-spacing: 1.1px; }
 .sider-label { margin: 0 11px 10px; color: #9db5b2; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; }
 .app-sider .ant-menu { flex: 0 0 auto; border-inline-end: 0 !important; color: #c5d7d5; background: transparent !important; font-size: 13px; }
-.app-sider .ant-menu-item, .mobile-menu-drawer .ant-menu-item { height: 46px; line-height: 46px; margin: 4px 0; width: 100%; border-radius: 10px; }
+.app-sider .ant-menu-item, .mobile-menu-drawer .ant-menu-item, .app-sider .ant-menu-submenu-title, .mobile-menu-drawer .ant-menu-submenu-title { height: 46px; line-height: 46px; margin: 4px 0; width: 100%; border-radius: 10px; }
 .app-sider .ant-menu-item .ant-menu-item-icon { font-size: 17px; }
 .app-sider .ant-menu-item-selected { color: #eafff9 !important; background: rgba(29, 164, 139, .2) !important; box-shadow: inset 3px 0 #35c3a6; }
 .app-sider .ant-menu-item-selected .ant-menu-item-icon { color: #67d7bf; }
@@ -81,3 +81,8 @@
 .modal-intro { color: #73848a; font-size: 14px; line-height: 1.6; }
 .loading-placeholder { min-height: 220px; border-radius: 12px; background: linear-gradient(90deg, #f5f8f7 25%, #edf3f1 50%, #f5f8f7 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
+
+.app-sider .ant-menu-submenu-title, .mobile-menu-drawer .ant-menu-submenu-title { color: #d8e8e5; }
+.app-sider .ant-menu-submenu-title:hover, .mobile-menu-drawer .ant-menu-submenu-title:hover { color: #fff; background: rgba(255,255,255,.06); }
+.app-sider .ant-menu-submenu-title .ant-menu-item-icon { font-size: 17px; }
+.app-sider .ant-menu-submenu-selected > .ant-menu-submenu-title, .mobile-menu-drawer .ant-menu-submenu-selected > .ant-menu-submenu-title { color: #67d7bf; }

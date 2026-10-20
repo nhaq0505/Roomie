@@ -26,8 +26,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 .section-card-header a { font-size: 14px; }
 @media (max-width: 991px) {
   .compact-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid #dce7e3; }
-  .compact-navigation > a { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px; text-decoration: none; color: #405b63; background: #f3f7f5; border: 1px solid #e0e9e5; border-radius: 9px; font-size: 13px; text-align: center; }
-  .compact-navigation > a[aria-current="page"] { color: #fff; background: #087c69; border-color: #087c69; font-weight: 600; }
+  .compact-navigation > :is(a, button) { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px; text-decoration: none; color: #405b63; background: #f3f7f5; border: 1px solid #e0e9e5; border-radius: 9px; font-size: 13px; text-align: center; }
+  .compact-navigation > :is(a, button)[aria-current="page"] { color: #fff; background: #087c69; border-color: #087c69; font-weight: 600; }
   .quick-actions { grid-template-columns: 1fr; }
   .topbar.ant-layout-header { height: 64px; }
   .topbar-left .breadcrumb-label { display: flex; }
@@ -56,7 +56,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 }
 @media (max-width: 480px) {
   .compact-navigation { gap: 6px; padding: 10px 12px; }
-  .compact-navigation > a { flex-direction: column; gap: 4px; font-size: 12px; }
+  .compact-navigation > :is(a, button) { flex-direction: column; gap: 4px; font-size: 12px; }
   .stat-card .ant-statistic-content { font-size: 17px; }
   .quick-actions > a { padding: 13px; }
   .room-overview-strip > div span:last-child { font-size: 12px; }
@@ -96,7 +96,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 /* Text inside controls must inherit the control's contrast, not nearby helper labels. */
 .ant-btn.ant-btn > span, .ant-btn.ant-btn .anticon { color: inherit; }
 .brand-mark > span { color: inherit; font-size: inherit; letter-spacing: 0; margin: 0; }
-.compact-navigation > a > span { color: inherit; }
+.compact-navigation > :is(a, button) > span { color: inherit; }
 .room-name-cell > div:last-child, .owner-name-cell > div:last-child, .tenant-cell { min-width: 0; overflow-wrap: anywhere; }
 .owner-avatar { flex-shrink: 0; }
 .ant-table-cell { overflow-wrap: anywhere; }
@@ -129,3 +129,5 @@ html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'DM Sans', system-ui,
 .tenant-link-language { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .tenant-link-language label { font-weight: 600; }
 .tenant-link-language > span { color: var(--muted); font-size: 12px; }
+
+.compact-navigation > button { font-family: inherit; cursor: pointer; }

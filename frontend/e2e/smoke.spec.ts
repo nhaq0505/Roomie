@@ -121,7 +121,7 @@ test('mobile payment header keeps its title above navigation',async({page})=>{
     await page.setViewportSize({width,height:812});
     await page.goto('/settings/payment');
     const title=page.locator('.breadcrumb-label strong');
-    await expect(title).toHaveText('Cấu hình');
+    await expect(title).toHaveText('Thanh toán');
     const headerBox=await page.locator('.topbar').boundingBox();
     const titleBox=await title.boundingBox();
     const navBox=await page.locator('.compact-navigation').boundingBox();

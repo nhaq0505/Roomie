@@ -50,3 +50,37 @@ test('unavailable gateway and errors expose retry without showing a fake QR', as
   await expect(page.getByRole('img', { name: 'QR đăng nhập Zalo', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Thử lại$/ })).toBeVisible({ timeout: 10000 });
 });
+
+for (const width of [375, 1280]) test(`settings menu groups payment and Zalo at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await setup(page, 'Connected');
+  await page.route('**/api/settings/payment', route => route.fulfill({ json: { clientId: '', webhookStatus: 'NotConfigured', confirmationMode: 'Automatic' } }));
+  await page.route('**/api/settings/payment/banks', route => route.fulfill({ json: [] }));
+  await page.goto('/settings/zalo');
+  if (width > 991) {
+    const menu = page.locator('.app-sider');
+    await expect(menu.getByRole('menuitem', { name: 'Zalo', exact: true })).toBeVisible();
+    const settings = menu.locator('.ant-menu-submenu-title').filter({ hasText: 'Cấu hình' });
+    await settings.click();
+    await expect(menu.getByRole('menuitem', { name: 'Zalo', exact: true })).not.toBeVisible();
+    await expect(page).toHaveURL(/settings\/zalo$/);
+    await settings.click();
+    await menu.getByRole('menuitem', { name: 'Thanh toán', exact: true }).click();
+    await expect(page).toHaveURL(/settings\/payment$/);
+    await menu.getByRole('menuitem', { name: 'Zalo', exact: true }).click();
+  } else {
+    const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+    await expect(nav.getByRole('link', { name: 'Zalo', exact: true })).toHaveCount(0);
+    await nav.getByRole('button', { name: /Cấu hình/ }).click();
+    await page.locator('.ant-dropdown:visible').getByRole('menuitem', { name: 'Thanh toán', exact: true }).click();
+    await expect(page).toHaveURL(/settings\/payment$/);
+    await page.getByRole('button', { name: 'Mở menu', exact: true }).click();
+    const drawer = page.locator('.mobile-menu-drawer');
+    await drawer.getByRole('menuitem', { name: 'Zalo', exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+  }
+  await expect(page).toHaveURL(/settings\/zalo$/);
+  await expect(page.locator('.breadcrumb-label strong')).toHaveText('Zalo');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  await page.screenshot({ path: `test-results/settings-menu-${width}.png`, fullPage: true });
+});
