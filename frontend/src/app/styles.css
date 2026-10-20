@@ -9,6 +9,7 @@
 @import "../features/payments/payments.css";
 @import "../features/zalo/zalo.css";
 @import "../features/admin/admin.css";
+@import "../features/admin/monitoring.css";
 @import "../features/auth/auth.css";
 @import "../features/subscription/status.css";
 @import "../features/tenant/portal.css";

@@ -1,0 +1,76 @@
+/* Admin Monitoring Styles */
+.admin-monitoring-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.monitoring-filters-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e8eeec;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(19, 48, 55, 0.02);
+}
+
+.monitoring-tabs .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
+.monitoring-tabs .ant-tabs-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.monitoring-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #17a486 !important;
+}
+
+.monitoring-tabs .ant-tabs-ink-bar {
+  background: #17a486 !important;
+}
+
+.monitoring-stat-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.monitoring-stat-card:hover {
+  box-shadow: 0 4px 14px rgba(19, 48, 55, 0.05);
+}
+
+.host-stat-mini-card {
+  background: #fbfdfc;
+  border: 1px solid #eef2f1;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.integration-card {
+  background: #ffffff;
+  border: 1px solid #e8eeec;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.native-bar-element {
+  transition: fill 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.native-bar-element:hover {
+  opacity: 0.85;
+}
+
+.unknown-metric-value {
+  color: #8c9ea2;
+  font-family: inherit;
+}
+
+.stale-tag {
+  font-size: 11px;
+  border-radius: 4px;
+}

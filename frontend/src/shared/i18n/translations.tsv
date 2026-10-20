@@ -1152,3 +1152,111 @@
 1151|Send invoice details and a payment link from your Zalo.|通过您的 Zalo 发送账单信息和付款链接。|내 Zalo에서 청구서 정보와 결제 링크를 보내세요.|अपने Zalo से बिल की जानकारी और भुगतान लिंक भेजें।
 1152|The tenant link is no longer valid. Check or renew it on the rooms page.|租客链接已失效，请在房间页面检查或重新生成。|세입자 링크가 유효하지 않습니다. 객실 페이지에서 확인하거나 재발급하세요.|किरायेदार का लिंक अब मान्य नहीं है। कमरे के पेज पर जाँचें या नया लिंक बनाएँ।
 1153|New invoices are queued automatically when issued. Use the button above to remind tenants about outstanding invoices.|新账单发布时会自动加入队列。使用上方按钮可再次提醒未付账单。|새 청구서는 발행 시 자동으로 대기열에 추가됩니다. 위 버튼으로 미납 청구서를 다시 알릴 수 있습니다.|नए बिल जारी होने पर अपने आप कतार में जुड़ जाते हैं। बकाया बिलों की याद दिलाने के लिए ऊपर का बटन उपयोग करें।
+1154|Monitoring|监控|모니터링|निगरानी
+1155|System Monitoring|系统监控|시스템 모니터링|सिस्टम निगरानी
+1156|Growth & Usage|增长与使用|성장 및 사용량|वृद्धि और उपयोग
+1157|Revenue|收入|수익|राजस्व
+1158|Operations|运维|운영|परिचालन
+1159|Awaiting backend connection (Task T2)|等待后端接入 (Task T2)|백엔드 연결 대기 중 (Task T2)|बैकएंड कनेक्शन की प्रतीक्षा (Task T2)
+1160|Monitoring UI shell is ready. Live data will be connected after API contract alignment in Task T2.|监控界面外壳已就绪。实际数据将在 Task T2 接口契约完成后接入。|모니터링 UI 셸이 준비되었습니다. 실제 데이터는 Task T2 API 계약 완료 후 연결됩니다.|निगरानी यूआई शेल तैयार है। वास्तविक डेटा Task T2 एपीआई अनुबंध के बाद जोड़ा जाएगा।
+1161|No data available|暂无数据|데이터 없음|कोई डेटा उपलब्ध नहीं
+1162|Stale data ({0})|陈旧数据 ({0})|지연된 데이터 ({0})|पुराना डेटा ({0})
+1163|Unknown|未确定|알 수 없음|अज्ञात
+1164|Filter by time|按时间筛选|시간별 필터|समय के अनुसार फ़िल्टर
+1165|7 days|7天|7일|7 दिन
+1166|30 days|30天|30일|30 दिन
+1167|90 days|90天|90일|90 दिन
+1168|Custom|自定义|사용자 지정|कस्टम
+1169|Source / Channel|来源 / 渠道|출처 / 채널|स्रोत / चैनल
+1170|All sources|全部来源|모든 출처|सभी स्रोत
+1171|Operations window|运维时间窗|운영 시간 범위|ऑपरेशंस विंडो
+1172|1 hour|1小时|1시간|1 घंटा
+1173|6 hours|6小时|6시간|6 घंटे
+1174|24 hours|24小时|24시간|24 घंटे
+1175|Sessions|会话数|세션 수|सत्र
+1176|Unique visitors|独立访客|순 방문자|अद्वितीय आगंतुक
+1177|Bounce rate|跳出率|이탈률|बाउंस दर
+1178|Avg duration|平均时长|평균 시간|औसत अवधि
+1179|Source & UTM stats|来源与 UTM 统计|출처 및 UTM 통계|स्रोत और UTM सांख्यिकी
+1180|Source|来源|출처|स्रोत
+1181|Channel|渠道|채널|चैनल
+1182|Campaign|推广活动|캠페인|अभियान
+1183|Views|浏览量|조회수|व्यूज
+1184|Conversion rate|转化率|전환율|रूपांतरण दर
+1185|CTA engagement|CTA 点击互动|CTA 클릭 반응|CTA सहभागिता
+1186|Placement|位置|위치|स्थान
+1187|Clicks|点击次数|클릭 수|क्लिक
+1188|Active users|活跃用户|활성 사용자|सक्रिय उपयोगकर्ता
+1189|Meaningful owner actions (excluding Admin/System)|房东有效操作 (排除管理员/系统)|의미 있는 임대인 활동 (관리자/시스템 제외)|सार्थक मकान मालिक क्रियाएं (व्यवस्थापक/सिस्टम को छोड़कर)
+1190|Active 7-day (WAU7)|7日活跃 (WAU7)|7일 활성 (WAU7)|7-दिवसीय सक्रिय (WAU7)
+1191|Active 30-day (MAU30)|30日活跃 (MAU30)|30일 활성 (MAU30)|30-दिवसीय सक्रिय (MAU30)
+1192|Activation cohort maturity|激活熟化 (Activation)|활성화 성숙도 (Activation)|सक्रियण परिपक्वता (Activation)
+1193|First monthly invoice entering Issued status|首张月度账单进入已发布状态|첫 월별 청구서 발행 완료 기준|पहला मासिक बिल जारी होने की स्थिति में
+1194|Activation cohort|激活周期|활성화 코호트|सक्रियण कोहोर्ट
+1195|Cohort size|规模|규모|आकार
+1196|7-day activation|7天激活|7일 활성화|7-दिवसीय सक्रियण
+1197|Maturity|成熟度|성숙도|परिपक्वता
+1198|Next-month retention|次月留存|익월 유지율|अगले महीने का प्रतिधारण
+1199|Pro revenue|Pro 收入|Pro 수익|Pro राजस्व
+1200|Server-confirmed Pro payments only (deduped, excluding admin-granted Pro and tenant rent)|仅统计网关确认支付的 Pro 订阅 (已对账，排除管理员赠送与房租)|게이트웨이 결제 확인된 Pro 요금만 집계 (대사 완료, 관리자 지급 및 월세 제외)|केवल सर्वर द्वारा पुष्ट Pro भुगतान (सत्यापित, व्यवस्थापक उपहार और किराये को छोड़कर)
+1201|Monthly recurring revenue (MRR)|月经常性收入 (MRR)|월간 반복 수익 (MRR)|मासिक आवर्ती राजस्व (MRR)
+1202|Paid Pro subscriptions|Pro 成功支付次数|Pro 결제 완료 건수|सफल Pro भुगतान संख्या
+1203|Customer acquisition cost (CAC30)|房东获客成本 (CAC30)|임대인 획득 비용 (CAC30)|ग्राहक अधिग्रहण लागत (CAC30)
+1204|Cohort spend / New first-paid owners within 30 days|当期营销成本 / 30天内新付费房东数|코호트 비용 / 30일 이내 신규 결제 임대인 수|अवधि लागत / 30 दिनों में नए भुगतान करने वाले मकान मालिक
+1205|Missing cost data|尚未录入成本|비용 데이터 누락|लागत डेटा उपलब्ध नहीं
+1206|Zero first-paid owners|尚无付费房东|유료 결제 임대인 없음|कोई भुगतानकर्ता मकान मालिक नहीं
+1207|Cohort maturity pending (< 30 days)|尚未达到30天成熟周期|30일 미만 미성숙 코호트|30-दिवसीय परिपक्वता लंबित
+1208|Add campaign cost|添加营销活动成本|캠페인 비용 추가|अभियान लागत जोड़ें
+1209|Manual campaign costs|手工营销成本管理|수동 캠페인 비용 관리|मैनुअल अभियान लागत प्रबंधन
+1210|Cash expense (VND)|现金支出 (VND)|현금 지출 (VND)|नकद खर्च (VND)
+1211|Person-hours|工时数|공수 (시간)|कार्य घंटे
+1212|Hourly rate (VND/hour)|工时单价 (VND/小时)|시간당 단가 (VND/시간)|प्रति घंटा दर (VND/घंटा)
+1213|Total cost|总成本|총비용|कुल लागत
+1214|Updated by|更新人|수정자|अपडेटकर्ता
+1215|Recorded date|记录日期|기록 일자|दर्ज तिथि
+1216|Save cost|保存成本|비용 저장|लागत सहेजें
+1217|Campaign name|活动名称|캠페인 이름|अभियान का नाम
+1218|Host infrastructure (Systemd)|主机基础设施 (Systemd)|호스트 인프라 (Systemd)|होस्ट इंफ्रास्ट्रक्चर (Systemd)
+1219|Minute collection: CPU, RAM, disk, containers via host JSON|每分钟采集: CPU, RAM, 磁盘, 容器 (来自主机 JSON)|매분 수집: CPU, RAM, 디스크, 컨테이너 (호스트 JSON)|प्रति मिनट संग्रह: CPU, RAM, डिस्क, कंटेनर (होस्ट JSON से)
+1220|CPU usage|CPU 使用率|CPU 사용량|CPU उपयोग
+1221|RAM usage|RAM 使用率|RAM 사용량|RAM उपयोग
+1222|Disk usage|磁盘用量|디스크 사용량|डिस्क उपयोग
+1223|Container status|容器状态|컨테이너 상태|कंटेनर स्थिति
+1224|/api/health check|/api/health 检查|/api/health 확인|/api/health जांच
+1225|API & Database performance|API 与数据库性能|API 및 데이터베이스 성능|एपीआई और डेटाबेस प्रदर्शन
+1226|Latency histogram (p95)|延迟直方图 (p95)|지연 시간 히스토그램 (p95)|विलंबता हिस्टोग्राम (p95)
+1227|p95 latency|p95 延迟|p95 지연 시간|p95 विलंबता
+1228|5xx error rate|5xx 错误率|5xx 오류율|5xx त्रुटि दर
+1229|Total requests|总请求数|총 요청 수|कुल अनुरोध
+1230|DB latency|数据库延迟|DB 지연 시간|डीबी विलंबता
+1231|Integrations & Queues|集成服务与队列|연동 서비스 및 대기열|एकीकरण और कतारें
+1232|SMTP email (Accepted / Delivered)|SMTP 邮件 (已接收 / 已发送)|SMTP 이메일 (접수 / 발송)|SMTP ईमेल (स्वीकृत / वितरित)
+1233|payOS reconciliation & errors|payOS 对账与错误|payOS 대사 및 오류|payOS मिलान और त्रुटियां
+1234|Zalo reminder queue (07:00-21:00 window)|Zalo 提醒队列 (07:00-21:00 时间段)|Zalo 알림 대기열 (07:00-21:00 시간대)|Zalo अनुस्मारक कतार (07:00-21:00 समय)
+1235|Background workers|后台工作进程|백그라운드 워커|पृष्ठभूमि कार्यकर्ता
+1236|Backup watchdog (27h)|备份看门狗 (27h)|백업 감시견 (27시간)|बैकअप वॉचडॉग (27 घंटे)
+1237|Incidents & Alerts|故障与告警|장애 및 알림|घटनाएं और चेतावनियां
+1238|Triggered at|触发时间|발생 시간|ट्रिगर समय
+1239|Severity|严重程度|심각도|गंभीरता
+1240|Cooldown remaining|提醒静默剩余时间|재알림 대기 시간|कूलडाउन शेष
+1241|Normal|正常|정상|सामान्य
+1242|Warning|警告|경고|चेतावनी
+1243|Critical|严重|치명적|गंभीर
+1244|Resolved|已恢复|해결됨|समाधानित
+1245|In cooldown|冷却中|대기 중|कूलडाउन में
+1246|No active incidents|当前无活动故障|진행 중인 장애 없음|कोई सक्रिय घटना नहीं
+1247|Please enter campaign name.|请输入活动名称。|캠페인 이름을 입력하세요.|कृपया अभियान का नाम दर्ज करें।
+1248|Please enter updater name.|请输入更新人。|수정자를 입력하세요.|कृपया अपडेटकर्ता का नाम दर्ज करें।
+1249|Campaign cost saved successfully.|已成功保存活动成本信息。|캠페인 비용 정보가 저장되었습니다.|अभियान लागत जानकारी सफलतापूर्वक सहेजी गई।
+1250|Total cost equals cash expense plus person-hours multiplied by hourly rate.|总成本等于现金支出加上工时乘以单价。|총비용은 현금 지출에 공수 곱하기 단가를 더한 금액입니다.|कुल लागत नकद खर्च प्लस कार्य घंटे गुणा प्रति घंटा दर के बराबर है।
+1251|Hours (h)|工时 (小时)|공수 (시간)|घंटे (h)
+1252|No campaign costs recorded yet|暂无活动成本记录|기록된 비용 내역이 없습니다|अभी तक कोई लागत दर्ज नहीं की गई
+1253|Valid backup completed within the last 27 hours|最近27小时内有有效备份|최근 27시간 이내 유효한 백업 확인됨|पिछले 27 घंटों में वैध बैकअप पूरा हुआ
+1254|Backup requires inspection|需要检查系统备份|시스템 백업 확인 필요|सिस्टम बैकअप की जांच आवश्यक है
+1255|Worker|工作进程|워커|वर्कर
+1256|Last run|上次运行|최근 실행|अंतिम रन
+1257|Last success|上次成功|최근 성공|अंतिम सफलता
+1258|Last error|上次错误|최근 오류|अंतिम त्रुटि
+1259|Route template|路由模板|경로 템플릿|रूट टेम्पलेट
+1260|Method|请求方法|메서드|विधि
+1261|Avg latency|平均延迟|평균 지연|औसत विलंबता

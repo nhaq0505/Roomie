@@ -16,6 +16,7 @@ export const privatePageTitles: Record<string, string> = {
   '/buildings': 'Dãy trọ', '/rooms': 'Phòng & người thuê', '/readings': 'Lập hóa đơn',
   '/invoices': 'Hóa đơn', '/reports': 'Báo cáo',
   '/settings/zalo': 'Nhắc hóa đơn qua Zalo', '/settings/payment': 'Cấu hình', '/admin/owners': 'Quản lý chủ trọ',
+  '/admin/monitoring': 'Giám sát hệ thống',
 };
 
 export function metadataFor(pathname: string) {

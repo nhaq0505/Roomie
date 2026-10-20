@@ -44,7 +44,10 @@ const ownerItems = [
   { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
   { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
 ];
-const adminItems = [{ key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") }];
+const adminItems = [
+  { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") },
+  { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Giám sát") },
+];
   const isAdmin = user?.role === 'Admin';
   const items = isAdmin ? adminItems : ownerItems;
   const title = settingsItems.find((item) => item.key === location.pathname)?.label ?? items.find((item) => item.key === location.pathname)?.label ?? 'Roomie';
