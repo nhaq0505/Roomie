@@ -1,0 +1,15 @@
+[Unit]
+Description=Roomie Host Monitoring Collector
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/rehouse-host-collector
+TimeoutStartSec=45s
+ProtectSystem=strict
+ReadWritePaths=/var/lib/rehouse/monitoring /var/lib/rehouse
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

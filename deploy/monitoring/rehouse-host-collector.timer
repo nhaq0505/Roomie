@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Roomie Host Monitoring Collector every minute
+
+[Timer]
+OnBootSec=1m
+OnUnitActiveSec=1m
+Unit=rehouse-host-collector.service
+
+[Install]
+WantedBy=timers.target
