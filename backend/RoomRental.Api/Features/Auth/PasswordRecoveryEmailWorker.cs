@@ -41,7 +41,7 @@ public sealed class PasswordRecoveryEmailWorker(IServiceScopeFactory scopes, Tim
             {
                 using var scope = scopes.CreateScope();
                 var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 await DeliverPendingAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(),
                     scope.ServiceProvider.GetRequiredService<IPasswordRecoveryEmailSender>(),

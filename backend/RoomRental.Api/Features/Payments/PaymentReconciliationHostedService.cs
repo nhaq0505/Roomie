@@ -24,7 +24,7 @@ public sealed class PaymentReconciliationHostedService(IServiceScopeFactory scop
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 var payOsService = scope.ServiceProvider.GetRequiredService<PayOsService>();
                 await payOsService.ReconcilePendingBatchAsync(stoppingToken);

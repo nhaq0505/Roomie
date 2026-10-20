@@ -217,7 +217,7 @@ public sealed class InvoiceSweepService(IServiceScopeFactory scopeFactory, ILogg
             {
                 using var scope = scopeFactory.CreateScope();
                 var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var service = scope.ServiceProvider.GetRequiredService<InvoiceService>();

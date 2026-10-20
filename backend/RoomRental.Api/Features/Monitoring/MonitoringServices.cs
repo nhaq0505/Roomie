@@ -1817,12 +1817,17 @@ public sealed class DefaultWorkerStateTracker(AppDbContext db, TimeProvider cloc
             worker.IsEnabled = isEnabled;
             worker.Status = status;
             worker.UpdatedAt = now;
-            if (status == "Healthy")
+            if (status.Equals("Running", StringComparison.OrdinalIgnoreCase))
+            {
+                worker.LastStartedAt = now;
+            }
+            else if (status.Equals("Healthy", StringComparison.OrdinalIgnoreCase))
             {
                 worker.LastSuccessAt = now;
                 worker.ConsecFailures = 0;
+                worker.LastErrorMessage = null;
             }
-            else if (status == "Failed")
+            else if (status.Equals("Failed", StringComparison.OrdinalIgnoreCase))
             {
                 worker.LastErrorAt = now;
                 worker.LastErrorMessage = errorMessage;

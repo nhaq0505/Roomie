@@ -56,18 +56,32 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
         lock (state.SyncRoot)
         {
             state.IsEnabled = isEnabled;
-            state.Status = status;
             state.UpdatedAt = now;
-            if (status == "Healthy")
+
+            if (status.Equals("Running", StringComparison.OrdinalIgnoreCase))
             {
+                state.Status = "Running";
+                state.LastStartedAt = now;
+                // LastSuccessAt must NOT be modified
+            }
+            else if (status.Equals("Healthy", StringComparison.OrdinalIgnoreCase))
+            {
+                state.Status = "Healthy";
                 state.LastSuccessAt = now;
+                state.LastErrorMessage = null;
                 state.ConsecutiveFailures = 0;
             }
-            else if (status == "Failed")
+            else if (status.Equals("Failed", StringComparison.OrdinalIgnoreCase))
             {
+                state.Status = "Failed";
                 state.LastErrorAt = now;
                 state.LastErrorMessage = errorMessage;
                 state.ConsecutiveFailures++;
+                // LastSuccessAt must NOT be modified
+            }
+            else
+            {
+                state.Status = status;
             }
         }
     }
@@ -79,8 +93,10 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
 
         lock (state.SyncRoot)
         {
+            state.Status = "Running";
             state.LastStartedAt = now;
             state.UpdatedAt = now;
+            // LastSuccessAt must NOT be modified
         }
     }
 
@@ -111,6 +127,7 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
             state.LastErrorMessage = errorMessage;
             state.ConsecutiveFailures++;
             state.UpdatedAt = now;
+            // LastSuccessAt must NOT be modified
         }
     }
 
@@ -127,16 +144,16 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
                 {
                     isStale = false;
                 }
-                else if (w.LastSuccessAt == null && w.LastStartedAt == null)
+                else if (w.LastSuccessAt == null)
                 {
-                    var elapsed = now - _trackerCreatedAt;
+                    // Startup grace period: 10 minutes from creation or first start before marking stale
+                    var elapsed = now - (w.LastStartedAt ?? _trackerCreatedAt);
                     isStale = elapsed > TimeSpan.FromMinutes(10);
                 }
                 else
                 {
                     var sla = GetWorkerSla(w.WorkerName);
-                    var referenceTime = w.LastSuccessAt ?? w.UpdatedAt;
-                    isStale = (now - referenceTime) > sla;
+                    isStale = (now - w.LastSuccessAt.Value) > sla;
                 }
 
                 return new WorkerExecutionStatus(

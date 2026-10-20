@@ -32,7 +32,7 @@ public sealed class DataMaintenanceService(IServiceScopeFactory scopes, TimeProv
             {
                 using var scope = scopes.CreateScope();
                 var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 await CleanAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), clock.GetUtcNow(), stoppingToken);
 

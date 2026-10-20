@@ -20,7 +20,7 @@ public sealed class OpsMinuteFlushWorker(
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var tracker = scope.ServiceProvider.GetRequiredService<IWorkerStateTracker>();
 
-                await tracker.RecordWorkerHeartbeatAsync("ops-aggregation", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                await tracker.RecordWorkerHeartbeatAsync("ops-aggregation", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 // Drain completed buckets from previous minute
                 var currentMinuteEpoch = clock.GetUtcNow().ToUnixTimeSeconds() / 60;

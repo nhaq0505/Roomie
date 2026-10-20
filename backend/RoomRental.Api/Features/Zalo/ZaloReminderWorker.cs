@@ -14,7 +14,7 @@ public sealed class ZaloReminderWorker(IServiceScopeFactory scopes, TimeProvider
             {
                 using var listScope = scopes.CreateScope();
                 var tracker = listScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 var db = listScope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var owners = await db.ZaloSettings.AsNoTracking().Select(x => x.OwnerId).ToListAsync(stoppingToken);
