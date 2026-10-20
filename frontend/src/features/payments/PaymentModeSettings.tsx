@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Card, Form, Input, Radio, Select, Typography } from 'antd';
 import { useEffect } from 'react';
+import type { FormInstance } from 'antd';
 import { t } from '../../shared/i18n/runtime';
 import { LoadError } from '../../shared/ui/Ui';
 import { paymentSettingsApi } from './api';
 import type { PaymentPreferences, PaymentSettings } from './types';
 
-export function PaymentModeSettings({ settings }: { settings: PaymentSettings }) {
-  const [form] = Form.useForm<PaymentPreferences>();
+export function PaymentModeSettings({ settings, form }: { settings: PaymentSettings; form: FormInstance<PaymentPreferences> }) {
   const client = useQueryClient(); const { message } = App.useApp();
   const mode = Form.useWatch('confirmationMode', form);
   const banks = useQuery({ queryKey: ['payment-banks'], queryFn: paymentSettingsApi.banks, enabled: mode === 'Manual' });

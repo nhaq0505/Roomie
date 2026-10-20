@@ -32,6 +32,14 @@ test('owner saves manual bank details separately from payOS credentials', async 
   });
   await page.goto('/settings/payment');
   await page.getByRole('radio', { name: 'Xác nhận thanh toán thủ công', exact: true }).check();
+  await expect(page.getByLabel('Client ID', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Hướng dẫn thiết lập', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Cấu hình payOS', exact: true })).toHaveCount(0);
+  expect(saves).toBe(0);
+  await page.getByRole('radio', { name: 'Tự động xác nhận thanh toán', exact: true }).check();
+  await expect(page.getByLabel('Client ID', { exact: true })).toBeVisible();
+  await page.getByRole('radio', { name: 'Xác nhận thanh toán thủ công', exact: true }).check();
+  await expect(page.getByLabel('Client ID', { exact: true })).toHaveCount(0);
   await page.getByLabel('Ngân hàng nhận tiền', { exact: true }).click();
   await page.getByTitle('VCB — Vietcombank', { exact: true }).click();
   await page.getByLabel('Số tài khoản', { exact: true }).fill('12345678');

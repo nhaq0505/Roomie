@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { errorText } from '../../shared/i18n/errors';
 import { t } from '../../shared/i18n/runtime';
 import { LoadError, PageTitle } from '../../shared/ui/Ui';
-import { paymentSettingsApi, type PaymentSettings } from './index';
+import { paymentSettingsApi, type PaymentSettings, type PaymentPreferences } from './index';
 
 import { PaymentModeSettings } from './PaymentModeSettings';
 
@@ -16,6 +16,8 @@ export default function PaymentSettingsPage() {
   const client = useQueryClient();
   const [guideOpen, setGuideOpen] = useState(false);
   const [form] = Form.useForm<PaymentForm>();
+  const [modeForm] = Form.useForm<PaymentPreferences>();
+  const selectedMode = Form.useWatch('confirmationMode', modeForm);
   const settingsQuery = useQuery({ queryKey: ['payment-settings'], queryFn: paymentSettingsApi.get });
   useEffect(() => { if (settingsQuery.data) form.setFieldsValue({ clientId: settingsQuery.data.clientId ?? '' }); }, [settingsQuery.data, form]);
   const showVerificationResult = (settings: PaymentSettings) => {
@@ -35,7 +37,8 @@ export default function PaymentSettingsPage() {
   });
   const submit = (values: PaymentForm) => updateMutation.mutate(values);
   const webhookUrl = settingsQuery.data?.webhookUrl || '';
-  const isManual = settingsQuery.data?.confirmationMode === 'Manual';
+  const isManual = (selectedMode ?? settingsQuery.data?.confirmationMode) === 'Manual';
+  useEffect(() => { if (isManual) setGuideOpen(false); }, [isManual]);
   const verified = settingsQuery.data?.webhookStatus === 'Verified';
   const busy = updateMutation.isPending || verifyMutation.isPending;
   const copyWebhook = async () => {
@@ -59,7 +62,7 @@ export default function PaymentSettingsPage() {
         </Button>
       )}
     />
-    {settingsQuery.isError ? <LoadError error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} /> : settingsQuery.isPending ? <div className="content-card"><Skeleton active paragraph={{ rows: 6 }} /></div> : <><PaymentModeSettings settings={settingsQuery.data} />{isManual ? null : <div className="settings-grid">
+    {settingsQuery.isError ? <LoadError error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} /> : settingsQuery.isPending ? <div className="content-card"><Skeleton active paragraph={{ rows: 6 }} /></div> : <><PaymentModeSettings settings={settingsQuery.data} form={modeForm} />{isManual ? null : <div className="settings-grid">
       <div className="settings-main-column">
         <Card className="settings-card" bordered={false}>
           <div className="settings-card-heading"><div className="settings-heading-icon"><CreditCardOutlined /></div><div><Typography.Title level={4}>{t("Cấu hình payOS")}</Typography.Title><Typography.Text type="secondary">{t("Thông tin kết nối được mã hóa và lưu an toàn.")}</Typography.Text></div></div>
@@ -104,7 +107,7 @@ export default function PaymentSettingsPage() {
 
     <Drawer
       title={<Space><CreditCardOutlined style={{ color: 'var(--teal)' }} /><span>{t("Hướng dẫn thiết lập payOS")}</span></Space>}
-      open={guideOpen}
+      open={!isManual && guideOpen}
       onClose={() => setGuideOpen(false)}
       width={520}
       extra={

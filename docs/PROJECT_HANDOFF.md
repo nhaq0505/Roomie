@@ -894,3 +894,9 @@ CI38845852582 passed verify/publish/deploy, live revision4f3d1bce01ef3a7482d8597
 - User clarified that reminders must link to the existing `/t/{token}` tenant portal, where tenants review invoices and choose Thanh toán before QR appears. Removed the direct per-invoice checkout suffix and changed the message prompt to Xem hóa đơn. Links remain scoped to each invoice's active occupancy; no hardcoded customer token, new token or payment order.
 - Regression assertions require the exact overview URL followed by a newline and reject `/invoices/` or `/checkout` in sent messages; rotation/revocation rules remain active. Includes the already tested settings-menu grouping in this release.
 - Validation: all41service assertions and12gateway tests PASS with fixture tokens only; existing menu build/i18n and15browser checks passed before commit. CI/CD will verify the combined release. No real tenant link was opened or shared during QA.
+
+### 20/10/2026 — Hide payOS immediately on manual-mode selection
+
+- User reported payOS setup still appearing beneath manual confirmation. The parent used persisted settings while the radio form held an unsaved choice. Shared the mode form with the parent so payOS configuration, setup buttons and guide visibility follow the selected mode immediately; switching back to Automatic restores setup. Existing save/validation and payment behavior remain.
+- Frontend build/i18n1153×4 and all5payment-mode browser checks PASS. Regression checks select Manual before saving, require the Client ID/setup UI to disappear, and restore it on Automatic. Mocked ui-ux probe/screenshots inspected at375/1280px; no overflow. Probe P1 is the pre-existing low-contrast breadcrumb separator, outside this targeted visibility fix. No customer settings or payments changed during QA.
+- Prior overview-link/menu release8bb36e8 completed CI/CD successfully before this follow-up.
