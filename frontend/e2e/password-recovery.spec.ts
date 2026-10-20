@@ -35,8 +35,13 @@ test('email recovery requires OTP proof before accepting a new password', async 
   await page.getByRole('button', { name: 'Xác minh mã OTP', exact: true }).click();
   await expect(page.getByText('Mã khôi phục không hợp lệ hoặc đã hết hạn.', { exact: true })).toBeVisible();
   expect(completes).toBe(0);
+  // Ant Design's loading icon changes the button's accessible name while the
+  // failed request settles. Wait for the form to unlock before editing/retrying.
+  const verifySubmit = page.locator('#recovery-code button[type="submit"]');
+  await expect(verifySubmit).toBeEnabled();
+  await expect(page.getByLabel('Mã xác nhận', { exact: true })).toBeEnabled();
   await page.getByLabel('Mã xác nhận', { exact: true }).fill('123456');
-  await page.getByRole('button', { name: 'Xác minh mã OTP', exact: true }).click();
+  await verifySubmit.click();
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill('12345678');
   await page.getByLabel('Xác nhận mật khẩu mới', { exact: true }).fill('12345678');
   await page.getByRole('button', { name: 'Lưu mật khẩu', exact: true }).click();

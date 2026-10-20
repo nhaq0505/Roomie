@@ -130,6 +130,14 @@ jobs:
           mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
           sh -ec 'npm ci && npm run build && npm run test:e2e'
 
+      - name: Upload browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failure-traces
+          path: frontend/test-results
+          retention-days: 3
+
   integration:
     name: API integration suite and image verification
     runs-on: ubuntu-24.04
@@ -207,7 +215,8 @@ jobs:
           GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          image_name="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          # Keep the image identity accepted by the VPS after repository renames.
+          image_name="ghcr.io/nhaq0505/rehouse"
           image_tag="${image_name}:${GITHUB_SHA}"
 
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
