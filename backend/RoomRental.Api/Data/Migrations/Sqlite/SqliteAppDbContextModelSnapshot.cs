@@ -188,6 +188,141 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("Buildings");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.ClientAnalyticsEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BrowserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ClientTimestamp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CtaId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReferrerPath")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ServerTimestamp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SessionId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UtmContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UtmTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerTimestamp");
+
+                    b.HasIndex("BrowserId", "ServerTimestamp");
+
+                    b.HasIndex("EventType", "ServerTimestamp");
+
+                    b.HasIndex("OwnerId", "ServerTimestamp");
+
+                    b.HasIndex("SessionId", "ServerTimestamp");
+
+                    b.ToTable("AnalyticsEvents");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.DailyAggregateMetric", b =>
+                {
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ActivatedOwners")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActiveOwnersMau")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActiveOwnersWau")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CalculatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DistinctVisitors")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MarketingHours")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("MarketingSpendVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Registrations")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("SubscriptionRevenueVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Total5xxErrors")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TotalRequests")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalSessions")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("DailyAggregateMetrics");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.DepositSettlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -226,6 +361,51 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .IsUnique();
 
                     b.ToTable("DepositSettlements");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.HostMetricsRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CollectedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ContainerCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContainerStatusJson")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("CpuPercent")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("DiskPercent")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("HealthEndpointStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HostStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("MemoryPercent")
+                        .HasColumnType("REAL");
+
+                    b.Property<long>("RecordedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.ToTable("HostMetrics");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.Invoice", b =>
@@ -524,6 +704,131 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("ManualPaymentRequests");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.MarketingCampaignCost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Campaign")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("CashVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("HourlyRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PersonHours")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedByName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("Date", "Campaign");
+
+                    b.ToTable("CampaignCosts");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.MonitoringIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("AcknowledgedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IncidentKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastNotifiedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("NotificationCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("ResolvedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RuleName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("StartedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("IncidentKey", "State");
+
+                    b.HasIndex("State", "UpdatedAt");
+
+                    b.ToTable("MonitoringIncidents");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.MonthlyReading", b =>
                 {
                     b.Property<Guid>("Id")
@@ -706,6 +1011,178 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.HasIndex("RoomId", "IsActive");
 
                     b.ToTable("Occupancies");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OperationalEventCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Count")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MetricName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("PeriodStart")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PeriodStart", "Category", "MetricName");
+
+                    b.ToTable("OperationalCounters");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OperationalRouteMinuteBucket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LatencyGt2000ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe1000ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe100ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe2000ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe250ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe500ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LatencyLe50ms")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("MaxLatencyMs")
+                        .HasColumnType("REAL");
+
+                    b.Property<long>("MinuteTimestamp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RequestCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RouteTemplate")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("TotalLatencyMs")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MinuteTimestamp");
+
+                    b.HasIndex("MinuteTimestamp", "RouteTemplate", "StatusCode");
+
+                    b.ToTable("RouteMinuteBuckets");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerDailyActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ActivityDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AdminActionCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("FirstActionAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasOwnerAction")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LastActionAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastActionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OwnerActionCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SystemActionCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityDate", "HasOwnerAction");
+
+                    b.HasIndex("OwnerId", "ActivityDate")
+                        .IsUnique();
+
+                    b.ToTable("OwnerDailyActivities");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerMilestone", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ActivatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("FirstActivatedInvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("FirstPaidAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("FirstPaidOrderCode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("RegisteredAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OwnerId");
+
+                    b.HasIndex("ActivatedAt");
+
+                    b.HasIndex("FirstPaidAt");
+
+                    b.ToTable("OwnerMilestones");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerPaymentSettings", b =>
@@ -1056,6 +1533,85 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("ProcessedWebhooks");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.RegistrationAttribution", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AutoApproved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BrowserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("FirstTouchAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FirstTouchCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstTouchContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstTouchLandingPage")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstTouchMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstTouchSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstTouchTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastTouchAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastTouchCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastTouchContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastTouchLandingPage")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastTouchMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastTouchSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastTouchTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RegisteredAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("VerificationMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OwnerId");
+
+                    b.ToTable("RegistrationAttributions");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.RegistrationVerification", b =>
                 {
                     b.Property<string>("Email")
@@ -1178,6 +1734,47 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("Rooms");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.WorkerHeartbeatState", b =>
+                {
+                    b.Property<string>("WorkerName")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ConsecFailures")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("LastCompletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("LastErrorAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastStartedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("LastSuccessAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("WorkerName");
+
+                    b.ToTable("WorkerHeartbeats");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.ZaloReminder", b =>
                 {
                     b.Property<Guid>("InvoiceId")
@@ -1247,7 +1844,34 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerDailyActivity", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerMilestone", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.RegistrationAttribution", b =>
                 {
                     b.HasOne("RoomRental.Api.Domain.AppUser", null)
                         .WithMany()

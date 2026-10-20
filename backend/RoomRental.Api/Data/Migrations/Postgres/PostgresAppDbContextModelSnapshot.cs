@@ -193,6 +193,141 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("Buildings");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.ClientAnalyticsEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BrowserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ClientTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CtaId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("EventName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ReferrerPath")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("RequestFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("ServerTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SessionId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerTimestamp");
+
+                    b.HasIndex("BrowserId", "ServerTimestamp");
+
+                    b.HasIndex("EventType", "ServerTimestamp");
+
+                    b.HasIndex("OwnerId", "ServerTimestamp");
+
+                    b.HasIndex("SessionId", "ServerTimestamp");
+
+                    b.ToTable("AnalyticsEvents");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.DailyAggregateMetric", b =>
+                {
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("ActivatedOwners")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ActiveOwnersMau")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ActiveOwnersWau")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CalculatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DistinctVisitors")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MarketingHours")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal>("MarketingSpendVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Registrations")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("SubscriptionRevenueVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<long>("Total5xxErrors")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("TotalRequests")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TotalSessions")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("DailyAggregateMetrics");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.DepositSettlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -231,6 +366,51 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .IsUnique();
 
                     b.ToTable("DepositSettlements");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.HostMetricsRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CollectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ContainerCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContainerStatusJson")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<double>("CpuPercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("DiskPercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("HealthEndpointStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("HostStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<double>("MemoryPercent")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.ToTable("HostMetrics");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.Invoice", b =>
@@ -529,6 +709,131 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("ManualPaymentRequests");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.MarketingCampaignCost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Campaign")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("CashVnd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("HourlyRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("PersonHours")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UpdatedByName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("Date", "Campaign");
+
+                    b.ToTable("CampaignCosts");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.MonitoringIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IncidentKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("LastNotifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("NotificationCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RuleName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("IncidentKey", "State");
+
+                    b.HasIndex("State", "UpdatedAt");
+
+                    b.ToTable("MonitoringIncidents");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.MonthlyReading", b =>
                 {
                     b.Property<Guid>("Id")
@@ -711,6 +1016,178 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasIndex("RoomId", "IsActive");
 
                     b.ToTable("Occupancies");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OperationalEventCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<long>("Count")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MetricName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("PeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PeriodStart", "Category", "MetricName");
+
+                    b.ToTable("OperationalCounters");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OperationalRouteMinuteBucket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int>("LatencyGt2000ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe1000ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe100ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe2000ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe250ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe500ms")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LatencyLe50ms")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("MaxLatencyMs")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset>("MinuteTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RequestCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RouteTemplate")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("TotalLatencyMs")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MinuteTimestamp");
+
+                    b.HasIndex("MinuteTimestamp", "RouteTemplate", "StatusCode");
+
+                    b.ToTable("RouteMinuteBuckets");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerDailyActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ActivityDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("AdminActionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("FirstActionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("HasOwnerAction")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("LastActionAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastActionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("OwnerActionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SystemActionCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityDate", "HasOwnerAction");
+
+                    b.HasIndex("OwnerId", "ActivityDate")
+                        .IsUnique();
+
+                    b.ToTable("OwnerDailyActivities");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerMilestone", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FirstActivatedInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("FirstPaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("FirstPaidOrderCode")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("RegisteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OwnerId");
+
+                    b.HasIndex("ActivatedAt");
+
+                    b.HasIndex("FirstPaidAt");
+
+                    b.ToTable("OwnerMilestones");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerPaymentSettings", b =>
@@ -1061,6 +1538,85 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("ProcessedWebhooks");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.RegistrationAttribution", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BrowserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("FirstTouchAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FirstTouchCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FirstTouchContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FirstTouchLandingPage")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("FirstTouchMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FirstTouchSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FirstTouchTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("LastTouchAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastTouchCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastTouchContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastTouchLandingPage")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("LastTouchMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastTouchSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LastTouchTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("RegisteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerificationMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("OwnerId");
+
+                    b.ToTable("RegistrationAttributions");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.RegistrationVerification", b =>
                 {
                     b.Property<string>("Email")
@@ -1183,6 +1739,47 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("Rooms");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.WorkerHeartbeatState", b =>
+                {
+                    b.Property<string>("WorkerName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("ConsecFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastCompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastErrorAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("LastStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("WorkerName");
+
+                    b.ToTable("WorkerHeartbeats");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.ZaloReminder", b =>
                 {
                     b.Property<Guid>("InvoiceId")
@@ -1252,7 +1849,34 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerDailyActivity", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerMilestone", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.RegistrationAttribution", b =>
                 {
                     b.HasOne("RoomRental.Api.Domain.AppUser", null)
                         .WithMany()

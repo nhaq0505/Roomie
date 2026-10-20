@@ -6,7 +6,7 @@ public sealed record AdminSubscriptionRequest(string Tier, int? Days = null, Dat
 public sealed record SubscriptionPackageDto(string Id, string Name, int Days, decimal Price, string Description);
 public sealed record SubscriptionStatusDto(string Tier, bool IsPro, DateTimeOffset? ExpiresAt, int RoomCount, int MaxRooms, IReadOnlyList<SubscriptionPackageDto> AvailablePackages);
 public sealed record CreateSubscriptionCheckoutRequest(string? PackageId = null);
-public sealed record RegisterRequest(string Name, string Email, string Password, string? Phone);
+public sealed record RegisterRequest(string Name, string Email, string Password, string? Phone, RegistrationAttributionDto? Attribution = null);
 public sealed record RegistrationVerificationDto(bool VerificationRequired, string ChallengeToken, string Email, DateTimeOffset ExpiresAt, DateTimeOffset ResendAvailableAt);
 public sealed record VerifyRegistrationRequest(string ChallengeToken, string Code);
 public sealed record ResendRegistrationRequest(string ChallengeToken);

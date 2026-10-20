@@ -86,6 +86,7 @@ await AuthSecurityHttpTests.RunAsync();
 await RoomTenantLifecycleHttpTests.RunAsync();
 await AccountingBillingHttpTests.RunAsync();
 await PayOsOperationsHttpTests.RunAsync();
+await MonitoringFoundationTests.RunAsync();
 
 sealed class FakeHandler : HttpMessageHandler, IHttpClientFactory
 {

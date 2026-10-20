@@ -78,6 +78,7 @@ if (!bool.TryParse(builder.Configuration["EnableInvoiceSweep"], out var enableIn
 if (!bool.TryParse(builder.Configuration["EnablePaymentReconciliation"], out var enablePaymentReconciliation) || enablePaymentReconciliation)
     builder.Services.AddHostedService<PaymentReconciliationHostedService>();
 builder.Services.AddHttpClient("payOS", client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddMonitoringCore(builder.Configuration);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
 {
     options.Cookie.Name = "phongtro.session";
@@ -118,6 +119,13 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("tenant-payment", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
     {
         PermitLimit = 12,
+        Window = TimeSpan.FromMinutes(1),
+        QueueLimit = 0,
+        AutoReplenishment = true
+    }));
+    options.AddPolicy("analytics", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
+    {
+        PermitLimit = builder.Environment.IsDevelopment() ? 600 : 120,
         Window = TimeSpan.FromMinutes(1),
         QueueLimit = 0,
         AutoReplenishment = true
@@ -193,6 +201,7 @@ app.MapPaymentEndpoints();
 app.MapZaloEndpoints();
 app.MapPaymentPreferencesEndpoints();
 app.MapManualPaymentEndpoints();
+app.MapMonitoringEndpoints();
 
 app.MapFallback("{*path:nonfile}", async context =>
 {

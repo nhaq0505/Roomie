@@ -32,6 +32,18 @@ public class AppDbContext : DbContext
     public DbSet<OwnerZaloSettings> ZaloSettings => Set<OwnerZaloSettings>();
     public DbSet<ZaloReminder> ZaloReminders => Set<ZaloReminder>();
 
+    public DbSet<ClientAnalyticsEvent> AnalyticsEvents => Set<ClientAnalyticsEvent>();
+    public DbSet<RegistrationAttribution> RegistrationAttributions => Set<RegistrationAttribution>();
+    public DbSet<OwnerMilestone> OwnerMilestones => Set<OwnerMilestone>();
+    public DbSet<OwnerDailyActivity> OwnerDailyActivities => Set<OwnerDailyActivity>();
+    public DbSet<MarketingCampaignCost> CampaignCosts => Set<MarketingCampaignCost>();
+    public DbSet<OperationalRouteMinuteBucket> RouteMinuteBuckets => Set<OperationalRouteMinuteBucket>();
+    public DbSet<WorkerHeartbeatState> WorkerHeartbeats => Set<WorkerHeartbeatState>();
+    public DbSet<HostMetricsRecord> HostMetrics => Set<HostMetricsRecord>();
+    public DbSet<MonitoringIncident> MonitoringIncidents => Set<MonitoringIncident>();
+    public DbSet<OperationalEventCounter> OperationalCounters => Set<OperationalEventCounter>();
+    public DbSet<DailyAggregateMetric> DailyAggregateMetrics => Set<DailyAggregateMetric>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OwnerZaloSettings>(e =>
@@ -291,6 +303,137 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.OwnerId, x.Reference }).IsUnique();
             entity.Property(x => x.Reference).HasMaxLength(160);
+        });
+
+        modelBuilder.Entity<ClientAnalyticsEvent>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.BrowserId).HasMaxLength(64);
+            entity.Property(x => x.SessionId).HasMaxLength(64);
+            entity.Property(x => x.EventType).HasMaxLength(50);
+            entity.Property(x => x.EventName).HasMaxLength(100);
+            entity.Property(x => x.Path).HasMaxLength(256);
+            entity.Property(x => x.ReferrerPath).HasMaxLength(256);
+            entity.Property(x => x.CtaId).HasMaxLength(64);
+            entity.Property(x => x.UtmSource).HasMaxLength(64);
+            entity.Property(x => x.UtmMedium).HasMaxLength(64);
+            entity.Property(x => x.UtmCampaign).HasMaxLength(64);
+            entity.Property(x => x.UtmContent).HasMaxLength(64);
+            entity.Property(x => x.UtmTerm).HasMaxLength(64);
+            entity.Property(x => x.RequestFingerprint).HasMaxLength(64);
+            entity.HasIndex(x => new { x.BrowserId, x.ServerTimestamp });
+            entity.HasIndex(x => new { x.SessionId, x.ServerTimestamp });
+            entity.HasIndex(x => new { x.OwnerId, x.ServerTimestamp });
+            entity.HasIndex(x => x.ServerTimestamp);
+            entity.HasIndex(x => new { x.EventType, x.ServerTimestamp });
+        });
+
+        modelBuilder.Entity<RegistrationAttribution>(entity =>
+        {
+            entity.HasKey(x => x.OwnerId);
+            entity.Property(x => x.BrowserId).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchSource).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchMedium).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchCampaign).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchContent).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchTerm).HasMaxLength(64);
+            entity.Property(x => x.FirstTouchLandingPage).HasMaxLength(256);
+            entity.Property(x => x.LastTouchSource).HasMaxLength(64);
+            entity.Property(x => x.LastTouchMedium).HasMaxLength(64);
+            entity.Property(x => x.LastTouchCampaign).HasMaxLength(64);
+            entity.Property(x => x.LastTouchContent).HasMaxLength(64);
+            entity.Property(x => x.LastTouchTerm).HasMaxLength(64);
+            entity.Property(x => x.LastTouchLandingPage).HasMaxLength(256);
+            entity.Property(x => x.VerificationMethod).HasMaxLength(20);
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OwnerMilestone>(entity =>
+        {
+            entity.HasKey(x => x.OwnerId);
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.ActivatedAt);
+            entity.HasIndex(x => x.FirstPaidAt);
+        });
+
+        modelBuilder.Entity<OwnerDailyActivity>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.LastActionType).HasMaxLength(50);
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.ActivityDate }).IsUnique();
+            entity.HasIndex(x => new { x.ActivityDate, x.HasOwnerAction });
+        });
+
+        modelBuilder.Entity<MarketingCampaignCost>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Campaign).HasMaxLength(100);
+            entity.Property(x => x.Channel).HasMaxLength(100);
+            entity.Property(x => x.Source).HasMaxLength(100);
+            entity.Property(x => x.CashVnd).HasPrecision(18, 2);
+            entity.Property(x => x.PersonHours).HasPrecision(10, 2);
+            entity.Property(x => x.HourlyRate).HasPrecision(18, 2);
+            entity.Property(x => x.Note).HasMaxLength(500);
+            entity.Property(x => x.UpdatedByName).HasMaxLength(160);
+            entity.HasIndex(x => new { x.Date, x.Campaign });
+            entity.HasIndex(x => x.Date);
+        });
+
+        modelBuilder.Entity<OperationalRouteMinuteBucket>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.RouteTemplate).HasMaxLength(200);
+            entity.Property(x => x.HttpMethod).HasMaxLength(10);
+            entity.HasIndex(x => new { x.MinuteTimestamp, x.RouteTemplate, x.StatusCode });
+            entity.HasIndex(x => x.MinuteTimestamp);
+        });
+
+        modelBuilder.Entity<WorkerHeartbeatState>(entity =>
+        {
+            entity.HasKey(x => x.WorkerName);
+            entity.Property(x => x.WorkerName).HasMaxLength(64);
+            entity.Property(x => x.Status).HasMaxLength(20);
+            entity.Property(x => x.LastErrorMessage).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<HostMetricsRecord>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.HealthEndpointStatus).HasMaxLength(20);
+            entity.Property(x => x.HostStatus).HasMaxLength(20);
+            entity.Property(x => x.ContainerStatusJson).HasMaxLength(1000);
+            entity.HasIndex(x => x.RecordedAt);
+        });
+
+        modelBuilder.Entity<MonitoringIncident>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IncidentKey).HasMaxLength(100);
+            entity.Property(x => x.RuleName).HasMaxLength(100);
+            entity.Property(x => x.Severity).HasMaxLength(20);
+            entity.Property(x => x.State).HasMaxLength(20);
+            entity.Property(x => x.Summary).HasMaxLength(255);
+            entity.Property(x => x.Details).HasColumnType("text");
+            entity.HasIndex(x => new { x.IncidentKey, x.State });
+            entity.HasIndex(x => x.StartedAt);
+            entity.HasIndex(x => new { x.State, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<OperationalEventCounter>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Category).HasMaxLength(50);
+            entity.Property(x => x.MetricName).HasMaxLength(100);
+            entity.HasIndex(x => new { x.PeriodStart, x.Category, x.MetricName });
+        });
+
+        modelBuilder.Entity<DailyAggregateMetric>(entity =>
+        {
+            entity.HasKey(x => x.Date);
+            entity.Property(x => x.SubscriptionRevenueVnd).HasPrecision(18, 2);
+            entity.Property(x => x.MarketingSpendVnd).HasPrecision(18, 2);
+            entity.Property(x => x.MarketingHours).HasPrecision(10, 2);
         });
     }
 }
