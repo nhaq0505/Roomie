@@ -1,0 +1,6 @@
+node_modules
+.local-data
+.env*
+*.enc
+*.enc.tmp
+test

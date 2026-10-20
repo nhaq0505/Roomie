@@ -1,0 +1,181 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using RoomRental.Api.Data;
+using RoomRental.Api.Domain;
+using RoomRental.Api.Services;
+
+var clock = new FakeClock(DateTimeOffset.Parse("2026-10-20T01:00:00Z")); // 08:00 Vietnam
+using var connection = new SqliteConnection("Data Source=:memory:");
+await connection.OpenAsync();
+var postgres = Environment.GetEnvironmentVariable("ZALO_TEST_POSTGRES");
+if (postgres is not null && (!postgres.Contains("Database=roomie_qa_zalo") || !postgres.Contains("Host=127.0.0.1;")))
+    throw new InvalidOperationException("Use an isolated loopback roomie_qa_zalo database only.");
+if (postgres is not null)
+{
+    await using var migrations = new PostgresAppDbContext(new DbContextOptionsBuilder<PostgresAppDbContext>().UseNpgsql(postgres).Options);
+    await migrations.Database.MigrateAsync();
+}
+var options = postgres is null ? new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options :
+    new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(postgres).Options;
+await using var db = new AppDbContext(options);
+await db.Database.EnsureCreatedAsync();
+var gateway = new FakeGateway();
+var service = new ZaloReminderService(db, gateway, clock);
+var checks = 0;
+void Assert(bool yes, string name) { if (!yes) throw new Exception(name); checks++; Console.WriteLine("PASS: " + name); }
+
+Assert(!ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-19T23:59:59Z")), "before 07:00 blocked");
+Assert(ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T00:00:00Z")), "07:00 allowed");
+Assert(ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T13:59:59Z")), "20:59:59 allowed");
+Assert(!ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T14:00:00Z")), "21:00 blocked");
+Assert(ZaloReminderService.NormalizePhone("+84 912 345 678") == "0912345678" && ZaloReminderService.NormalizePhone("84912345678") == "0912345678", "Vietnam phone normalization");
+Assert(ZaloReminderService.NormalizePhone("123") == null && ZaloReminderService.NormalizePhone("19001234") == null, "invalid phones rejected");
+var schedule = new OwnerZaloSettings { ScheduleEnabled = true, DayOfMonth = 31, Hour = 8, Minute = 30 };
+Assert(!ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2028-02-29T01:29:59Z")), "schedule respects minute in leap month");
+Assert(ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2028-02-29T01:30:00Z")), "day 31 clamps to leap-month last day");
+schedule.LastScheduledPeriod = "2028-02";
+Assert(!ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2028-02-29T02:00:00Z")), "schedule once per month");
+schedule.LastScheduledPeriod = "";
+Assert(ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2027-02-28T01:30:00Z")), "non-leap month clamps to day 28");
+schedule.ScheduleEnabled = false;
+Assert(!ZaloReminderService.ScheduleDue(schedule, clock.GetUtcNow()), "disabled schedule does not run");
+
+var owner = new AppUser { Name = "Fixture Owner", Email = "zalo@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved };
+var other = new AppUser { Name = "Other Owner", Email = "other@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved };
+db.Users.AddRange(owner, other);
+var setting = new OwnerZaloSettings { OwnerId = owner.Id, BankBin = "970436", BankAccount = "123456789", BankAccountName = "FIXTURE OWNER" };
+db.ZaloSettings.Add(setting);
+await db.SaveChangesAsync();
+Invoice AddInvoice(string room, Guid ownerId, string? phone = "0912345678", decimal paid = 0, bool active = true, bool draft = false)
+{
+    var occupancy = new Occupancy { RoomId = Guid.NewGuid(), TenantName = "Tenant", Phone = phone, IsActive = active, StartDate = new(2026, 1, 1) };
+    db.Occupancies.Add(occupancy);
+    var invoice = new Invoice { OwnerId = ownerId, RoomId = occupancy.RoomId, BuildingId = Guid.NewGuid(), OccupancyId = occupancy.Id,
+        RoomName = room, BuildingName = "Building", TenantName = "Tenant", Period = "2026-10", Total = 100000, Paid = paid,
+        Rent = 100000, DueDate = new(2026, 10, 25), LifecycleState = draft ? InvoiceLifecycleState.Draft : InvoiceLifecycleState.Issued };
+    db.Invoices.Add(invoice); return invoice;
+}
+var invoice = AddInvoice("101", owner.Id, paid: 25000);
+AddInvoice("invalid", owner.Id, phone: "123");
+AddInvoice("paid", owner.Id, paid: 100000);
+AddInvoice("inactive", owner.Id, active: false);
+AddInvoice("draft", owner.Id, draft: true);
+AddInvoice("other", other.Id);
+await db.SaveChangesAsync();
+Assert(await service.QueueAsync(owner.Id, default) == 1, "queue filters draft, paid, invalid phone, inactive and other owner");
+Assert(await service.QueueAsync(owner.Id, default) == 0, "double enqueue does not duplicate");
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Amount == 75000 && gateway.Sends[0].Phone == "0912345678", "send remaining amount and normalized number");
+Assert(gateway.Sends[0].Message.Contains("75.000") && gateway.Sends[0].TransferContent.Length <= 25, "invoice details and bounded transfer reference");
+db.ChangeTracker.Clear();
+Assert((await db.ZaloReminders.SingleAsync()).Status == "Sent", "successful send persisted");
+Assert(await service.QueueAsync(owner.Id, default) == 0, "sent invoice blocked for 20 hours");
+clock.Advance(TimeSpan.FromHours(20).Subtract(TimeSpan.FromMilliseconds(1)));
+Assert(await service.QueueAsync(owner.Id, default) == 0, "20-hour boundary minus one ms blocked");
+clock.Advance(TimeSpan.FromMilliseconds(1));
+Assert(await service.QueueAsync(owner.Id, default) == 1, "20-hour boundary permits explicit requeue");
+var job = await db.ZaloReminders.SingleAsync();
+clock.Set(DateTimeOffset.Parse("2026-10-21T01:00:00Z"));
+var current = await db.Invoices.SingleAsync(x => x.Id == invoice.Id); current.Paid = current.Total;
+await db.SaveChangesAsync();
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == 1 && job.Status == "Skipped", "payment received while queued stops reminder");
+current.Paid = 0; await db.SaveChangesAsync();
+await service.QueueAsync(owner.Id, default);
+clock.Advance(TimeSpan.FromSeconds(5));
+gateway.Connection = "Disconnected";
+await service.DispatchAsync(owner.Id, default);
+Assert(job.Status == "Pending" && gateway.Sends.Count == 1, "lost session retains queued work");
+gateway.Connection = "Connected";
+clock.Advance(TimeSpan.FromSeconds(5));
+gateway.Result = "Disconnected";
+var oldAttempt = job.LastAttemptAtMs;
+await service.DispatchAsync(owner.Id, default);
+Assert(job.Status == "Pending" && job.LastAttemptAtMs == oldAttempt, "disconnect before submission permits resume without cooldown");
+gateway.Result = "Deferred";
+clock.Advance(TimeSpan.FromSeconds(5));
+await service.DispatchAsync(owner.Id, default);
+Assert(job.Status == "Pending", "gateway window or spacing deferral retains pending work");
+gateway.Result = "Unknown";
+clock.Advance(TimeSpan.FromSeconds(5));
+await service.DispatchAsync(owner.Id, default);
+Assert(job.Status == "Unknown" && job.Detail == "DeliveryUnknown", "ambiguous delivery never reported as sent");
+Assert(await service.QueueAsync(owner.Id, default) == 0, "unknown delivery protected by cooldown");
+var before = gateway.Sends.Count;
+clock.Advance(TimeSpan.FromSeconds(5));
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == before, "unknown deliveries are never automatically retried");
+job.Status = "Sending"; await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+clock.Advance(TimeSpan.FromSeconds(5));
+await service.DispatchAsync(owner.Id, default);
+Assert((await db.ZaloReminders.SingleAsync()).Status == "Unknown", "interrupted sending state recovers conservatively");
+clock.Set(DateTimeOffset.Parse("2026-10-22T01:00:00Z"));
+await service.QueueAsync(owner.Id, default);
+job = await db.ZaloReminders.SingleAsync();
+var lease = clock.GetUtcNow().ToUnixTimeMilliseconds() + 60000;
+await db.ZaloSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.DispatchLeaseUntilMs, lease));
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == before && job.Status == "Pending", "database lease prevents concurrent worker send");
+await db.ZaloSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.DispatchLeaseUntilMs, 0L));
+clock.Set(DateTimeOffset.Parse("2026-10-22T14:00:00Z"));
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == before && job.Status == "Pending", "queued work waits outside send window");
+clock.Set(DateTimeOffset.Parse("2026-10-23T01:00:00Z"));
+await db.Users.Where(x => x.Id == owner.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, OwnerStatus.Suspended));
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == before, "suspended owner cannot send in background");
+await db.Users.Where(x => x.Id == owner.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, OwnerStatus.Approved));
+clock.Advance(TimeSpan.FromSeconds(5));
+gateway.ThrowOnSend = true;
+await service.DispatchAsync(owner.Id, default);
+Assert(job.Status == "Unknown", "transport failure has unknown delivery outcome");
+
+db.ChangeTracker.Clear();
+var monthlySettings = await db.ZaloSettings.SingleAsync();
+monthlySettings.ScheduleEnabled = true; monthlySettings.DayOfMonth = 23; monthlySettings.Hour = 8; monthlySettings.Minute = 0;
+var scheduledInvoice = AddInvoice("Scheduled", owner.Id);
+await db.SaveChangesAsync();
+Assert(await service.QueueScheduledAsync(owner.Id, default) == 1, "monthly run queues an issued outstanding invoice");
+Assert(monthlySettings.LastScheduledPeriod == "2026-10" && await db.ZaloReminders.AnyAsync(x => x.InvoiceId == scheduledInvoice.Id), "scheduled marker and queue commit together");
+Assert(await service.QueueScheduledAsync(owner.Id, default) == 0, "repeated worker tick does not rerun the monthly schedule");
+monthlySettings.ScheduleEnabled = false; monthlySettings.LastScheduledPeriod = "";
+AddInvoice("DisabledSchedule", owner.Id); await db.SaveChangesAsync();
+Assert(await service.QueueScheduledAsync(owner.Id, default) == 0 && monthlySettings.LastScheduledPeriod == "", "disabled schedule retains no run marker or new queue item");
+
+// Both generated migration sets must build and SQLite migration must preserve existing business data.
+var migratedPath = Path.Combine(Path.GetTempPath(), $"roomie-zalo-migration-{Guid.NewGuid():N}.db");
+try
+{
+    var migrationOptions = new DbContextOptionsBuilder<SqliteAppDbContext>().UseSqlite($"Data Source={migratedPath}").Options;
+    await using var migrated = new SqliteAppDbContext(migrationOptions);
+    await migrated.Database.MigrateAsync();
+    migrated.Users.Add(new() { Name = "Keep", Email = "keep@example.invalid", PasswordHash = "fixture" });
+    await migrated.SaveChangesAsync();
+    await migrated.Database.MigrateAsync();
+    Assert(await migrated.Users.CountAsync() == 1 && await migrated.ZaloReminders.CountAsync() == 0, "SQLite migrations and rerun preserve data");
+}
+finally { SqliteConnection.ClearAllPools(); File.Delete(migratedPath); }
+Console.WriteLine($"PASS: {checks} Zalo assertions; no external provider calls.");
+
+sealed class FakeClock(DateTimeOffset initial) : TimeProvider
+{
+    private DateTimeOffset value = initial;
+    public override DateTimeOffset GetUtcNow() => value;
+    public void Advance(TimeSpan span) => value += span;
+    public void Set(DateTimeOffset instant) => value = instant;
+}
+sealed class FakeGateway : IZaloGateway
+{
+    public bool Enabled => true;
+    public string Connection = "Connected";
+    public string Result = "Sent";
+    public bool ThrowOnSend;
+    public List<ZaloSendRequest> Sends = [];
+    public Task<ZaloConnection> ConnectionAsync(Guid ownerId, string action, CancellationToken ct) => Task.FromResult(new ZaloConnection(Connection));
+    public Task<ZaloSendResult> SendAsync(Guid ownerId, ZaloSendRequest request, CancellationToken ct)
+    {
+        Sends.Add(request);
+        if (ThrowOnSend) throw new HttpRequestException("fixture timeout");
+        return Task.FromResult(new ZaloSendResult(Result));
+    }
+}

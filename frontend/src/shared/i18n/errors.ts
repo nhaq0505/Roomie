@@ -1,4 +1,48 @@
 import { getLanguage, hasMessage, t, translateMessage } from './runtime';
+const zaloMessages: Record<string, readonly string[]> = {
+  "Zalo gateway is not configured.": [
+    "Dịch vụ Zalo chưa được bật. Liên hệ quản trị viên để cấu hình.",
+    "Zalo is not enabled. Contact your administrator.",
+    "Zalo 尚未启用，请联系管理员。",
+    "Zalo가 활성화되지 않았습니다. 관리자에게 문의하세요.",
+    "Zalo चालू नहीं है। व्यवस्थापक से संपर्क करें।"
+  ],
+  "Zalo gateway is unavailable. Try again shortly.": [
+    "Chưa kết nối được dịch vụ Zalo. Vui lòng thử lại sau.",
+    "Zalo service is unavailable. Try again shortly.",
+    "Zalo 服务不可用，请稍后重试。",
+    "Zalo 서비스에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
+    "Zalo सेवा उपलब्ध नहीं है। कुछ देर बाद फिर प्रयास करें।"
+  ],
+  "Choose a monthly day from 1 to 31 and a time between 07:00 and 20:59.": [
+    "Chọn ngày từ 1 đến 31 và giờ từ 07:00 đến 20:59.",
+    "Choose a day from 1 to 31 and a time from 07:00 to 20:59.",
+    "请选择 1 至 31 日，时间为 07:00 至 20:59。",
+    "날짜는 1~31일, 시간은 07:00~20:59로 선택하세요.",
+    "1 से 31 के बीच दिन और 07:00 से 20:59 के बीच समय चुनें।"
+  ],
+  "Enter a six-digit bank BIN, a valid account number and the account holder name.": [
+    "Nhập BIN ngân hàng 6 chữ số, số tài khoản hợp lệ và tên chủ tài khoản.",
+    "Enter a six-digit bank BIN, valid account number and holder name.",
+    "请输入 6 位银行 BIN、有效账号和户名。",
+    "6자리 은행 BIN, 유효한 계좌번호와 예금주를 입력하세요.",
+    "6 अंकों का बैंक BIN, मान्य खाता संख्या और खाताधारक का नाम दर्ज करें।"
+  ],
+  "Save the receiving bank account before queuing reminders.": [
+    "Lưu tài khoản nhận tiền trước khi thêm hóa đơn vào hàng đợi.",
+    "Save the receiving bank account before queuing reminders.",
+    "请先保存收款账户，再加入提醒队列。",
+    "알림을 추가하기 전에 입금 계좌를 저장하세요.",
+    "अनुस्मारक कतार में जोड़ने से पहले प्राप्तकर्ता खाता सहेजें।"
+  ],
+  "Connect Zalo before queuing reminders.": [
+    "Kết nối Zalo trước khi thêm hóa đơn vào hàng đợi.",
+    "Connect Zalo before queuing reminders.",
+    "请先连接 Zalo，再加入提醒队列。",
+    "알림을 추가하기 전에 Zalo를 연결하세요.",
+    "अनुस्मारक कतार में जोड़ने से पहले Zalo जोड़ें।"
+  ]
+};
 // Known server messages map to localized recovery guidance. Provider messages never become UI HTML.
 const messages: Record<string, readonly [string, string, string, string, string]> = {
  passwordLength: ["Mật khẩu mới cần từ 8 đến 256 ký tự.", "The new password must contain 8 to 256 characters.", "新密码须包含 8 至 256 个字符。", "새 비밀번호는 8~256자여야 합니다.", "नया पासवर्ड 8 से 256 अक्षरों का होना चाहिए।"],
@@ -68,6 +112,7 @@ const rules: readonly [RegExp, string][] = [
 ];
 const languageIndex = () => ({ vi: 0, en: 1, zh: 2, ko: 3, hi: 4 })[getLanguage()];
 export function errorText(source: string, status = 400) {
+  if (zaloMessages[source]) return zaloMessages[source][languageIndex()];
   const known = translateMessage(source);
   if (hasMessage(source)) return known;
   // Also refresh previously displayed localized error messages when the language changes.

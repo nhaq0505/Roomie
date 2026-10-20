@@ -89,3 +89,8 @@ File ghi toàn bộ quá trình SEO. Mỗi đợt bổ sung một mục; sửa k
 - Kết quả quan sát được (nguồn, khoảng thời gian):
 - Tồn đọng và bước tiếp theo:
 ```
+
+## 20/10/2026 — Trang riêng nhắc hóa đơn Zalo
+
+- Đăng ký `/settings/zalo` vào danh sách trang riêng của backend và metadata frontend để truy cập trực tiếp nhận app shell, `noindex` và không có canonical công khai. Sitemap/robots không đổi.
+- Frontend build và kiểm tra SEO HTTP trong suite SQLite dùng thử: PASS. Chỉ cập nhật mã nguồn/local, chưa push/deploy; không có thao tác Search Console hay thay đổi trạng thái index.

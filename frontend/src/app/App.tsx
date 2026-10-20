@@ -20,6 +20,7 @@ const RoomsPage = lazy(() => import('../features/rooms/RoomsPage'));
 const ReadingsPage = lazy(() => import('../features/readings/ReadingsPage'));
 const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage'));
+const ZaloSettingsPage = lazy(() => import('../features/zalo/ZaloSettingsPage'));
 const PaymentSettingsPage = lazy(() => import('../features/payments/PaymentSettingsPage'));
 const AdminOwnersPage = lazy(() => import('../features/admin/AdminOwnersPage'));
 const TenantPage = lazy(() => import('../features/tenant/TenantPage'));
@@ -71,6 +72,7 @@ export default function App() {
     <Route path="/readings" element={<Gate><AppShell><ReadingsPage /></AppShell></Gate>} />
     <Route path="/invoices" element={<Gate><AppShell><InvoicesPage /></AppShell></Gate>} />
     <Route path="/reports" element={<Gate><AppShell><ReportsPage /></AppShell></Gate>} />
+    <Route path="/settings/zalo" element={<Gate><AppShell><ZaloSettingsPage /></AppShell></Gate>} />
     <Route path="/settings/payment" element={<Gate><AppShell><PaymentSettingsPage /></AppShell></Gate>} />
     <Route path="/admin/owners" element={<Gate admin><AppShell><AdminOwnersPage /></AppShell></Gate>} />
     <Route path="*" element={<NotFoundPage />} />

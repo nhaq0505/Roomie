@@ -9,7 +9,7 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     {
         "/login", "/register", "/reset-password", "/change-password", "/account-status",
         "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/reports",
-        "/settings/payment", "/admin/owners"
+        "/settings/payment", "/settings/zalo", "/admin/owners"
     };
 
     [GeneratedRegex(@"^/(t|tenant)/[^/]+(?:/invoices/[^/]+/checkout)?$", RegexOptions.IgnoreCase)]

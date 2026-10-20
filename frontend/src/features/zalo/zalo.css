@@ -1,0 +1,8 @@
+.zalo-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-bottom: 24px; }
+.zalo-full-width { width: 100%; }
+.zalo-qr { display: flex; justify-content: center; padding: 16px; }
+.zalo-qr img { max-width: 100%; height: auto; object-fit: contain; }
+.zalo-history-detail { max-width: 360px; white-space: normal; color: var(--muted); font-size: 13px; }
+.zalo-guide { padding-left: 24px; line-height: 1.7; }
+.zalo-guide li { margin-bottom: 12px; }
+

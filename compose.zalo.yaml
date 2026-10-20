@@ -1,0 +1,21 @@
+# docker compose -f compose.yaml -f compose.zalo.yaml up --build -d
+services:
+  zalo:
+    build: ./zalo-gateway
+    environment:
+      ZALO_GATEWAY_TOKEN: ${ZALO_GATEWAY_TOKEN:?Set a random gateway token}
+      ZALO_SESSION_KEY: ${ZALO_SESSION_KEY:?Set a 32-byte base64 encryption key}
+    volumes:
+      - zalo_sessions:/app/data
+    restart: unless-stopped
+    # Internal only: no published port. Run exactly one gateway per session volume.
+  app:
+    environment:
+      Zalo__Enabled: "true"
+      Zalo__GatewayUrl: http://zalo:5090
+      Zalo__GatewayToken: ${ZALO_GATEWAY_TOKEN:?Set a random gateway token}
+    depends_on:
+      zalo:
+        condition: service_started
+volumes:
+  zalo_sessions:

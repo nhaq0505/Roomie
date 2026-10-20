@@ -50,3 +50,7 @@ playwright-report
 **/runtime.env
 **/backup.env
 **/database-admin.env
+
+# Zalo encrypted session and delivery state.
+**/*.enc
+**/*.enc.tmp

@@ -44,6 +44,21 @@ jobs:
           node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
           sh -ec 'npm ci && npm run build && npm run i18n:check && npm run check:architecture && npm run test:api && npm run test:http'
 
+  test-zalo-gateway:
+    name: Zalo gateway tests (no provider calls)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test encrypted sessions, VietQR and delivery replay
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE/zalo-gateway:/workspace" --workdir /workspace
+          node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+          sh -ec 'npm ci && npm test'
+
   test-backend:
     name: Backend tests and migration checks
     runs-on: ubuntu-24.04
@@ -89,6 +104,14 @@ jobs:
           mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa
           dotnet run --project tests/RoomRental.WebhookTests/RoomRental.WebhookTests.csproj
           --configuration Release
+
+      - name: Run Zalo reminder service tests
+        run: >-
+          docker run --rm
+          --volume "$HOME/.nuget/packages:/root/.nuget/packages"
+          --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace
+          mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa
+          dotnet run --project tests/RoomRental.ZaloTests --configuration Release
 
       - name: Check migration snapshots for both providers
         run: >-
@@ -189,7 +212,7 @@ jobs:
 
   publish:
     name: Publish immutable image
-    needs: [lint-and-typecheck, test-backend, test-e2e, integration]
+    needs: [lint-and-typecheck, test-backend, test-zalo-gateway, test-e2e, integration]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     permissions:

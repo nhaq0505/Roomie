@@ -67,6 +67,11 @@ if (!builder.Configuration.GetValue("EmailVerification:Enabled", true) && !build
 if (!builder.Configuration.GetValue("RequireVerifiedPaymentForTenantLink", true) && !builder.Environment.IsDevelopment())
     throw new InvalidOperationException("RequireVerifiedPaymentForTenantLink cannot be disabled outside Development.");
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpClient("Zalo", client => client.Timeout = TimeSpan.FromSeconds(40));
+builder.Services.AddScoped<IZaloGateway, ZaloGateway>();
+builder.Services.AddScoped<ZaloReminderService>();
+if (builder.Configuration.GetValue("Zalo:Enabled", false))
+    builder.Services.AddHostedService<ZaloReminderWorker>();
 builder.Services.AddHostedService<DataMaintenanceService>();
 if (!bool.TryParse(builder.Configuration["EnableInvoiceSweep"], out var enableInvoiceSweep) || enableInvoiceSweep)
     builder.Services.AddHostedService<InvoiceSweepService>();
@@ -185,6 +190,7 @@ app.MapBillingEndpoints();
 app.MapDepositEndpoints();
 app.MapMoveoutEndpoints();
 app.MapPaymentEndpoints();
+app.MapZaloEndpoints();
 
 app.MapFallback("{*path:nonfile}", async context =>
 {

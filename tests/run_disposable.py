@@ -38,7 +38,7 @@ def main():
         env = {**os.environ, 'ASPNETCORE_ENVIRONMENT':'Development','DatabaseProvider':'SQLite',
             'ConnectionStrings__DefaultConnection':f'Data Source={db}', 'DataProtection__KeysPath':str(temp/'keys'),
             'ASPNETCORE_URLS':base,'PublicBaseUrl':base,'WebhookBaseUrl':base,'SeedDemo':'true',
-            'EnableInvoiceSweep':'false','EnablePaymentReconciliation':'false','EmailVerification__Enabled':'false',
+            'Zalo__Enabled':'false','EnableInvoiceSweep':'false','EnablePaymentReconciliation':'false','EmailVerification__Enabled':'false',
             'RequireVerifiedPaymentForTenantLink':'false','Seo__AllowIndexing':'true','AuthRequestsPerMinute':'1000',
             'HTTP_PROXY':'http://127.0.0.1:9','HTTPS_PROXY':'http://127.0.0.1:9','ALL_PROXY':'http://127.0.0.1:9','NO_PROXY':'127.0.0.1,localhost',
             'API_BASE_URL':base,'API_ORIGIN':base,'SEO_BASE_URL':base,'TEST_SQLITE_DB':str(db)}
@@ -76,7 +76,7 @@ def main():
                 wait(base,api)
                 if args.provider == 'otp': names=['test_registration_otp','test_password_recovery']
                 elif args.provider == 'otp-postgres': names=['test_registration_otp.RegistrationOtpHttpTests','test_password_recovery']
-                else: names=['test_api_integration','test_billing_upgrade','test_reports_archive','test_account_occupancy_dashboard','test_operational_hardening']
+                else: names=['test_api_integration','test_billing_upgrade','test_reports_archive','test_account_occupancy_dashboard','test_operational_hardening','test_zalo_http']
                 if args.provider == 'sqlite': names += ['test_payos_fixture','test_seo_http']
                 # Explicit suite selection, explicit skip accounting. No silent all-skipped gate.
                 env['PYTHONPATH']=str(ROOT/'tests')

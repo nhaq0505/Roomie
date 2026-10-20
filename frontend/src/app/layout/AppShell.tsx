@@ -8,7 +8,7 @@ import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, CalculatorOutlined, CreditCardOutlined, BarChartOutlined,
-  CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
+  MessageOutlined, CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -33,6 +33,7 @@ const ownerItems = [
   { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
   { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
   { type: 'divider' as const },
+  { key: '/settings/zalo', icon: <MessageOutlined />, label: t("Nhắc hóa đơn qua Zalo") },
   { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán trực tuyến") },
   { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
 ];

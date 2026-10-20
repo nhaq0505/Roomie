@@ -357,3 +357,5 @@ New passwords require9–256characters; no composition rules. Boundary service t
 The disposable `otp` provider runs registration and password-recovery HTTP tests against SQLite and a local SMTP sink. `otp-postgres` runs provider-independent registration tests and the same recovery tests against a runner-owned temporary PostgreSQL database. Both retain external-service guards; never supply a production connection. See `python3 tests/run_disposable.py --help` for runner arguments and [password recovery](../docs/password-recovery.md) for behavior.
 
 C# coverage is included in `dotnet run --project tests/RoomRental.WebhookTests`; frontend coverage is in `frontend/e2e/password-recovery.spec.ts`.
+
+Zalo reminder tests (fake provider, no real messages): `dotnet run --project tests/RoomRental.ZaloTests`, `npm --prefix zalo-gateway test`, and `npm --prefix frontend run test:e2e -- zalo.spec.ts --workers=2`. See [Zalo setup](../docs/zalo-setup.md) for disposable PostgreSQL test configuration.

@@ -97,3 +97,7 @@ Hóa đơn bổ sung: **Phòng & người thuê → ⋯ → Tạo hóa đơn b�
 Trả phòng: **Phòng & người thuê → ⋯ → Trả phòng & quyết toán**. Xem hóa đơn còn nợ và tiền cọc đang giữ, nhập số tiền hoàn thủ công rồi xác nhận để kết thúc lượt thuê, thu hồi link khách và trả phòng về trống. Hệ thống ghi nhận khoản hoàn và phần cọc còn giữ trong lịch sử quyết toán; không chuyển tiền ngân hàng. Không chốt công tơ cuối kỳ hoặc lập hóa đơn cuối tại bước này. Cần thanh toán hết hóa đơn đã phát hành (kể cả hóa đơn cọc), xử lý Draft và giao dịch payOS đang chờ trước khi trả phòng. Ngày kết thúc là ngày Việt Nam hiện tại.
 
 Luồng quên mật khẩu, giới hạn OTP và yêu cầu triển khai: [khôi phục mật khẩu](docs/password-recovery.md).
+
+## Nhắc hóa đơn qua Zalo
+
+Đã có tính năng tùy chọn kết nối Zalo cá nhân bằng QR, hàng đợi nhắc hóa đơn kèm VietQR và lịch gửi hằng tháng. Cần chạy gateway riêng và bật cấu hình trước khi dùng. Xem [hướng dẫn Zalo](docs/zalo-setup.md) để cài đặt, hiểu giới hạn phiên Zalo Web và cách ghi nhận thanh toán.

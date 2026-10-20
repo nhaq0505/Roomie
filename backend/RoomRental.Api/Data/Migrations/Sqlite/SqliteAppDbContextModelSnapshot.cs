@@ -661,6 +661,54 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("PaymentSettings");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankAccount")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankAccountName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankBin")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("DispatchLeaseUntilMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Hour")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastScheduledPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Minute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("NextSendAtMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ScheduleEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OwnerId");
+
+                    b.ToTable("ZaloSettings");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.PasswordRecovery", b =>
                 {
                     b.Property<string>("Email")
@@ -1051,6 +1099,42 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("Rooms");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.ZaloReminder", b =>
+                {
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("LastAttemptAtMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QueuedAtMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SentAtMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("InvoiceId");
+
+                    b.HasIndex("OwnerId", "Status", "QueuedAtMs");
+
+                    b.ToTable("ZaloReminders");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.DepositSettlement", b =>
                 {
                     b.HasOne("RoomRental.Api.Domain.Invoice", null)
@@ -1061,6 +1145,24 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.InvoiceRevision", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.Invoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.ZaloReminder", b =>
                 {
                     b.HasOne("RoomRental.Api.Domain.Invoice", null)
                         .WithMany()

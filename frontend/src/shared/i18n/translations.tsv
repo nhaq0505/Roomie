@@ -1054,3 +1054,65 @@
 1054|Recover by email|通过邮箱找回|이메일로 복구|ईमेल से पुनर्प्राप्त करें
 1055|The recovery code is invalid or has expired.|恢复验证码无效或已过期。|복구 코드가 유효하지 않거나 만료되었습니다.|पुनर्प्राप्ति कोड अमान्य है या उसकी समय-सीमा समाप्त हो गई है।
 1040|Building updated.|已更新楼栋。|건물이 업데이트되었습니다.|भवन अपडेट किया गया।
+1056|Connected to Zalo|已连接 Zalo|Zalo 연결됨|Zalo से जुड़ा है
+1057|Scan the QR in the Zalo app|使用 Zalo 应用扫码|Zalo 앱으로 QR 스캔|Zalo ऐप से QR स्कैन करें
+1058|Confirm sign-in on your phone|在手机上确认登录|휴대폰에서 로그인 확인|फ़ोन पर लॉगिन की पुष्टि करें
+1059|Connecting to Zalo…|正在连接 Zalo…|Zalo 연결 중…|Zalo से जुड़ रहा है…
+1060|QR expired. Generate a new code.|二维码已过期，请重新生成。|QR이 만료되었습니다. 새 코드를 생성하세요.|QR की अवधि समाप्त हुई। नया कोड बनाएं।
+1061|This Zalo account is linked to another landlord.|此 Zalo 账号已连接其他房东。|다른 임대인이 사용하는 Zalo 계정입니다.|यह Zalo खाता दूसरे मकान मालिक से जुड़ा है।
+1062|Zalo service is unavailable|Zalo 服务暂不可用|Zalo 서비스를 사용할 수 없음|Zalo सेवा उपलब्ध नहीं है
+1063|Zalo is disconnected|尚未连接 Zalo|Zalo 연결 안 됨|Zalo जुड़ा नहीं है
+1064|Queued|等待发送|전송 대기|कतार में है
+1065|Sending|正在发送|전송 중|भेजा जा रहा है
+1066|Sent|已发送|전송됨|भेजा गया
+1067|Skipped|已跳过|건너뜀|छोड़ दिया गया
+1068|Could not send|发送失败|전송 실패|भेजा नहीं जा सका
+1069|Reconnect required|需要重新连接|재연결 필요|फिर से जोड़ना ज़रूरी है
+1070|Delivery unknown|发送结果未知|전송 결과 알 수 없음|भेजने का परिणाम अज्ञात है
+1071|The message may have been sent. Check Zalo before requeuing after 20 hours.|消息可能已发送。20 小时后重新加入队列前请先检查 Zalo。|전송되었을 수 있습니다. 20시간 후 다시 추가하기 전에 Zalo를 확인하세요.|संदेश भेजा गया हो सकता है। 20 घंटे बाद फिर जोड़ने से पहले Zalo जांचें।
+1072|This phone number could not be found or contacted.|找不到此号码或无法发送消息。|이 전화번호를 찾을 수 없거나 메시지를 보낼 수 없습니다.|यह फ़ोन नंबर नहीं मिला या इसे संदेश नहीं भेजा जा सकता।
+1073|Scan a new QR to reconnect.|重新扫码以连接。|새 QR을 스캔하여 다시 연결하세요.|फिर जोड़ने के लिए नया QR स्कैन करें।
+1074|The invoice is paid, not issued, or the tenant is no longer eligible.|账单已付清、尚未开具或租客已不符合条件。|청구서가 완납되었거나 미발행 상태이거나 세입자 조건이 맞지 않습니다.|बिल चुकाया जा चुका है, जारी नहीं हुआ है या किरायेदार अब योग्य नहीं है।
+1075|Stopped after you disconnected.|已按您的断开连接请求停止。|연결 해제 요청으로 중지되었습니다.|आपके कनेक्शन हटाने पर रोक दिया गया।
+1076|Zalo settings saved.|Zalo 设置已保存。|Zalo 설정이 저장되었습니다.|Zalo सेटिंग सहेजी गईं।
+1077|Added {0} invoices to the queue.|已将 {0} 张账单加入队列。|청구서 {0}건을 대기열에 추가했습니다.|{0} बिल कतार में जोड़े गए।
+1078|Period|账期|청구 기간|अवधि
+1079|Latest processing time|最近处理时间|최근 처리 시간|अंतिम प्रोसेसिंग समय
+1080|Zalo invoice reminders|Zalo 账单提醒|Zalo 청구서 알림|Zalo पर बिल अनुस्मारक
+1081|Send invoices and transfer QR codes from your Zalo account.|通过您的 Zalo 发送账单和转账二维码。|내 Zalo 계정에서 청구서와 송금 QR을 보냅니다.|अपने Zalo से बिल और भुगतान QR भेजें।
+1082|User guide|使用指南|사용 안내|उपयोग गाइड
+1083|Connect Zalo|连接 Zalo|Zalo 연결|Zalo जोड़ें
+1084|Zalo is not enabled on the server. Contact your administrator.|服务器尚未启用 Zalo，请联系管理员。|서버에서 Zalo가 활성화되지 않았습니다. 관리자에게 문의하세요.|सर्वर पर Zalo चालू नहीं है। व्यवस्थापक से संपर्क करें।
+1085|Zalo sign-in QR|Zalo 登录二维码|Zalo 로그인 QR|Zalo लॉगिन QR
+1086|This connection appears as a “Zalo Web” device on your phone. Signing it out stops Roomie messages; scan a new QR to reconnect.|此连接在手机上显示为“Zalo Web”设备。退出该设备后 Roomie 会停止发送；请重新扫码连接。|휴대폰에 “Zalo Web” 기기로 표시됩니다. 해당 기기에서 로그아웃하면 Roomie 전송이 중지됩니다. 새 QR로 다시 연결하세요.|फ़ोन पर यह कनेक्शन “Zalo Web” डिवाइस दिखता है। उससे लॉगआउट करने पर Roomie संदेश रुकेंगे; फिर जोड़ने के लिए नया QR स्कैन करें।
+1087|Generate connection QR|生成连接二维码|연결 QR 생성|जोड़ने के लिए QR बनाएं
+1088|Disconnect and stop the automatic schedule?|断开连接并停止自动计划？|연결을 해제하고 자동 일정을 중지할까요?|कनेक्शन हटाकर स्वचालित शेड्यूल रोकें?
+1089|Disconnect|断开连接|연결 해제|कनेक्शन हटाएं
+1090|Read and reply to tenants in Zalo as usual.|租客回复后，您可正常在 Zalo 阅读和回复。|세입자의 답장은 평소처럼 Zalo에서 읽고 답하세요.|किरायेदार के जवाब Zalo में सामान्य रूप से पढ़ें और उत्तर दें।
+1091|Receiving account & schedule|收款账户与发送计划|입금 계좌 및 일정|प्राप्तकर्ता खाता और शेड्यूल
+1092|Bank BIN (6 digits)|银行 BIN（6 位数字）|은행 BIN(6자리)|बैंक BIN (6 अंक)
+1093|Enter a six-digit bank BIN.|请输入 6 位银行 BIN。|6자리 은행 BIN을 입력하세요.|6 अंकों का बैंक BIN दर्ज करें।
+1094|Examples: Vietcombank 970436, BIDV 970418, Techcombank 970407.|例如：Vietcombank 970436、BIDV 970418、Techcombank 970407。|예: Vietcombank 970436, BIDV 970418, Techcombank 970407.|उदाहरण: Vietcombank 970436, BIDV 970418, Techcombank 970407।
+1095|Receiving account number|收款账号|입금 계좌번호|प्राप्तकर्ता खाता संख्या
+1096|Enter a valid account number.|请输入有效账号。|유효한 계좌번호를 입력하세요.|मान्य खाता संख्या दर्ज करें।
+1097|Account holder name|账户持有人姓名|예금주 이름|खाताधारक का नाम
+1098|The QR uses the outstanding amount. Record or reconcile transfers to update the invoice.|二维码使用未付金额。请登记收款或对账后更新账单。|QR에는 미납 금액이 적용됩니다. 입금을 기록하거나 대사해야 청구서가 갱신됩니다.|QR में बकाया राशि होती है। बिल अपडेट करने के लिए प्राप्त भुगतान दर्ज करें या मिलान करें।
+1099|Send automatically each month|每月自动发送|매월 자동 전송|हर महीने अपने आप भेजें
+1100|Day of month|每月日期|매월 날짜|महीने का दिन
+1101|Hour|小时|시|घंटा
+1102|Minute|分钟|분|मिनट
+1103|Vietnam time. Short months use the last day. Runs once each month for issued, unpaid invoices.|越南时间。短月使用月底。每月对已开具且未付清的账单执行一次。|베트남 시간입니다. 날짜가 없는 달은 말일에 실행됩니다. 발행된 미납 청구서에 대해 매월 한 번 실행됩니다.|वियतनाम समय। छोटे महीने में अंतिम दिन भेजा जाएगा। जारी किए गए बकाया बिलों के लिए हर महीने एक बार चलता है।
+1104|Save settings|保存设置|설정 저장|सेटिंग सहेजें
+1105|Invoice reminder queue|账单提醒队列|청구서 알림 대기열|बिल अनुस्मारक कतार
+1106|Queue reminders for outstanding invoices?|将未付清账单加入提醒队列？|미납 청구서를 알림 대기열에 추가할까요?|बकाया बिल कतार में जोड़ें?
+1107|Add to queue|加入队列|대기열에 추가|कतार में जोड़ें
+1108|Remind outstanding invoices|提醒未付账单|미납 청구서 알림|बकाया बिल याद दिलाएं
+1109|Sends at least 5 seconds apart, from 07:00 to before 21:00. At most one attempt per invoice in 20 hours; fully paid invoices are skipped. Only current tenants with valid Vietnamese mobile numbers are contacted.|发送间隔至少 5 秒，时段为 7 点至 21 点前。每张账单 20 小时内最多尝试一次，已付清则跳过。仅发送给有有效越南手机号的在住租客。|오전 7시부터 오후 9시 전까지 최소 5초 간격으로 보냅니다. 청구서별 20시간당 최대 1회 시도하며 완납 건은 제외됩니다. 유효한 베트남 휴대폰 번호가 있는 현재 세입자에게만 보냅니다.|सुबह 7 से रात 9 बजे से पहले कम से कम 5 सेकंड के अंतर पर भेजता है। प्रति बिल 20 घंटे में अधिकतम एक प्रयास; चुकाए गए बिल छोड़ दिए जाते हैं। केवल वर्तमान किरायेदारों के मान्य वियतनामी मोबाइल नंबरों पर भेजता है।
+1110|No invoices in the queue|队列中暂无账单|대기열에 청구서 없음|कतार में कोई बिल नहीं है
+1111|Zalo invoice reminder guide|Zalo 账单提醒指南|Zalo 청구서 알림 안내|Zalo बिल अनुस्मारक गाइड
+1112|Generate a QR, scan it in the Zalo app and confirm sign-in on your phone.|生成二维码，使用 Zalo 扫码并在手机上确认登录。|QR을 생성하고 Zalo 앱에서 스캔한 뒤 휴대폰에서 로그인을 확인하세요.|QR बनाएं, Zalo ऐप में स्कैन करें और फ़ोन पर लॉगिन की पुष्टि करें।
+1113|Enter the receiving bank and verify the account number and holder name before saving.|填写收款银行，保存前核实账号和户名。|입금 은행을 입력하고 저장하기 전에 계좌번호와 예금주를 확인하세요.|प्राप्तकर्ता बैंक दर्ज करें और सहेजने से पहले खाता संख्या व नाम जांचें।
+1114|Choose a monthly day/time or remind outstanding invoices manually. Messages contain invoice details and a transfer QR image.|选择每月日期和时间，或手动提醒未付账单。消息包含账单详情和转账二维码图片。|매월 날짜와 시간을 선택하거나 미납 알림을 직접 추가하세요. 메시지에는 청구 내역과 송금 QR 이미지가 포함됩니다.|मासिक दिन/समय चुनें या बकाया बिलों के लिए मैन्युअल अनुस्मारक भेजें। संदेश में बिल विवरण और भुगतान QR की तस्वीर होगी।
+1115|Keep the Zalo Web device signed in. If signed out, return here and scan a new QR.|保持 Zalo Web 设备登录。退出后请回到此处重新扫码。|Zalo Web 기기를 로그인 상태로 유지하세요. 로그아웃되면 여기에서 새 QR을 스캔하세요.|Zalo Web डिवाइस लॉगिन रखें। लॉगआउट होने पर यहां आकर नया QR स्कैन करें।
+1116|Personal Zalo connections use an unofficial library and may be interrupted or restricted by Zalo.|个人 Zalo 连接使用非官方库，可能中断或受到 Zalo 账号限制。|개인 Zalo 연결은 비공식 라이브러리를 사용하며 중단되거나 Zalo에서 계정이 제한될 수 있습니다.|व्यक्तिगत Zalo कनेक्शन अनौपचारिक लाइब्रेरी का उपयोग करता है; कनेक्शन बाधित हो सकता है या Zalo खाते पर प्रतिबंध लग सकता है।
+1117|Avoid opening another Zalo Web session for this account while Roomie is connected. Disconnecting here deletes the saved Roomie session and disables scheduling; you can sign out the Zalo Web device on your phone.|Roomie 连接时请勿为同一账号另开 Zalo Web。此处断开会删除 Roomie 保存的会话并关闭计划；您也可在手机上退出 Zalo Web 设备。|Roomie 연결 중에는 같은 계정의 다른 Zalo Web 세션을 열지 마세요. 여기서 해제하면 저장된 Roomie 세션이 삭제되고 일정이 꺼집니다. 휴대폰에서도 Zalo Web 기기를 로그아웃할 수 있습니다.|Roomie जुड़े होने पर इसी खाते से दूसरा Zalo Web सत्र न खोलें। यहां कनेक्शन हटाने से सहेजा गया सत्र मिटेगा और शेड्यूल बंद होगा; फ़ोन से Zalo Web डिवाइस को भी लॉगआउट कर सकते हैं।

@@ -28,8 +28,28 @@ public class AppDbContext : DbContext
     public DbSet<PayOsAttempt> PayOsAttempts => Set<PayOsAttempt>();
     public DbSet<ProcessedWebhook> ProcessedWebhooks => Set<ProcessedWebhook>();
 
+    public DbSet<OwnerZaloSettings> ZaloSettings => Set<OwnerZaloSettings>();
+    public DbSet<ZaloReminder> ZaloReminders => Set<ZaloReminder>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<OwnerZaloSettings>(e =>
+        {
+            e.HasKey(x => x.OwnerId);
+            e.Property(x => x.BankBin).HasMaxLength(6);
+            e.Property(x => x.BankAccount).HasMaxLength(32);
+            e.Property(x => x.BankAccountName).HasMaxLength(100);
+            e.Property(x => x.LastScheduledPeriod).HasMaxLength(7);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<ZaloReminder>(e =>
+        {
+            e.HasKey(x => x.InvoiceId);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Detail).HasMaxLength(200);
+            e.HasIndex(x => new { x.OwnerId, x.Status, x.QueuedAtMs });
+            e.HasOne<Invoice>().WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<PaymentWebhookRegistration>().HasKey(x => x.OwnerId);
         if (Database.IsSqlite())
         {
