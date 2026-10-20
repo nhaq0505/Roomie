@@ -4,8 +4,11 @@ umask 077
 [[ "$EUID" -eq 0 ]] || { echo 'Run as root' >&2; exit 1; }
 source_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 
-# Create monitoring directories
+# Create monitoring directories:
+# 1. Private monitoring state directory (/var/lib/rehouse/monitoring) - stores collector-state.json (0600)
 install -d -m0755 /var/lib/rehouse/monitoring
+# 2. Dedicated PUBLIC metrics directory (/var/lib/rehouse/monitoring/public) - mounted into app at /app/monitoring-host:ro
+install -d -m0755 /var/lib/rehouse/monitoring/public
 install -d -m0700 /etc/rehouse
 
 # Install collector executable

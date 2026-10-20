@@ -14,26 +14,30 @@ flowchart TD
         Service --> DockerInspect["docker inspect rehouse-app-1 / rehouse-db-1"]
         Service --> LoopbackHealth["GET http://127.0.0.1:8080/api/health"]
         Service --> BackupCheck["Read /var/lib/rehouse/backup-last-success"]
-        Service --> StateFile["/var/lib/rehouse/monitoring/collector-state.json (0600)"]
+        Service --> StateFile["Private State: /var/lib/rehouse/monitoring/collector-state.json (0600)"]
         Service --> AtomicWrite["Atomic Write (tmp + rename)"]
-        AtomicWrite --> HostJson["/var/lib/rehouse/monitoring/host-metrics.json (0644)"]
+        AtomicWrite --> PublicDir["Public Metrics Dir: /var/lib/rehouse/monitoring/public/ (0755)"]
+        PublicDir --> HostJson["/var/lib/rehouse/monitoring/public/host-metrics.json (0644)"]
         Service -.->|3 min fail / 85% sustained| HostSmtp["Independent Host SMTP Alert (1h cooldown)"]
     end
 
     subgraph Container ["Roomie App Container (Unprivileged, read_only: true)"]
-        HostJson -.->|Read-Only Bind Mount| AppMount["/app/monitoring/host-metrics.json:ro"]
-        AppMount --> BackendIngest["ASP.NET Core HostMetricsReader"]
+        PublicDir -.->|Directory Read-Only Bind Mount| AppMount["/app/monitoring-host:ro"]
+        AppMount --> BackendIngest["ASP.NET Core HostMetricsReader (reads /app/monitoring-host/host-metrics.json)"]
         BackendIngest --> AdminApi["Admin API: /api/admin/monitoring/operations"]
         AdminApi --> AdminUi["Frontend /admin/monitoring (Operations Tab)"]
     end
 ```
 
-### Security Invariants
+### Security Invariants & Docker Mount Architecture
 1. **No Docker Socket in App Container**: The ASP.NET Core container does NOT mount `/var/run/docker.sock`. Docker inspection is performed strictly by the host-level collector.
-2. **Read-Only Atomic JSON Mount**: The host writes `/var/lib/rehouse/monitoring/host-metrics.json` atomically via temporary file replacement (`0644`). The container mounts this file read-only (`:ro`).
-3. **Independent Host Alerting**: When the application container or database is down, the app cannot execute code or send alerts. The host collector operates independently via host-level SMTP credentials in `/etc/rehouse/runtime.env` or `/etc/rehouse/monitoring.env`.
-4. **No Secret or PII Leakage**: Container command strings, environment variables, connection strings, and user credentials are scrubbed and never serialized to the metrics JSON or alert emails.
-5. **Backup Alert Authority**: The existing 27-hour watchdog (`rehouse-backup-watchdog.service` / `rehouse-backup-alert.py`) remains the sole authority for backup alerts. The host collector only surfaces backup timestamp and freshness status; it never sends duplicate backup emails.
+2. **Directory Bind Mount (No Inode Pinning)**: The host writes metrics into a dedicated public directory (`/var/lib/rehouse/monitoring/public/host-metrics.json`) atomically via temporary file replacement (`os.replace`, mode `0644`). The container mounts the *containing directory* read-only (`/var/lib/rehouse/monitoring/public:/app/monitoring-host:ro`).
+   > [!IMPORTANT]
+   > **Docker Inode Pinning Regression**: A single-file Docker bind mount (`/path/file.json:/path/file.json`) pins the initial file inode at container start. When the collector writes atomically via temporary file rename (`os.replace`), a new inode is allocated; a single-file mount continues pointing to the old unlinked inode and the container never sees updates. Mounting the containing dedicated directory `/var/lib/rehouse/monitoring/public` to `/app/monitoring-host:ro` allows the container to resolve filenames dynamically, ensuring every atomic replacement is instantly visible inside the container.
+3. **Private Collector State Isolation**: `collector-state.json` (0600) is stored in the parent directory (`/var/lib/rehouse/monitoring/`), strictly outside the public mounted directory. The app container has no visibility into private alert tracking, failure counters, or notification queues.
+4. **Independent Host Alerting & Failure Resilience**: When the application container or database is down, the app cannot execute code or send alerts. The host collector operates independently via host-level SMTP credentials in `/etc/rehouse/monitoring.env` or `/etc/rehouse/runtime.env`.
+5. **No Secret or PII Leakage**: Container command strings, environment variables, connection strings, SMTP passwords, and user credentials are scrubbed and never serialized to the metrics JSON or alert emails.
+6. **Backup Alert Authority**: The existing 27-hour watchdog (`rehouse-backup-watchdog.service` / `rehouse-backup-alert.py`) remains the sole authority for backup alerts. The host collector only surfaces backup timestamp and freshness status; it never sends duplicate backup emails.
 
 ---
 
@@ -42,8 +46,9 @@ flowchart TD
 ### Host Paths
 | Path | Ownership | Permissions | Purpose |
 |------|-----------|-------------|---------|
-| `/var/lib/rehouse/monitoring/host-metrics.json` | `root:root` | `0644` | Atomic bounded metrics JSON for container consumption |
-| `/var/lib/rehouse/monitoring/collector-state.json` | `root:root` | `0600` | Collector state (failure counters, active incidents, history) |
+| `/var/lib/rehouse/monitoring/public/` | `root:root` | `0755` | Dedicated public directory for container read-only bind mount |
+| `/var/lib/rehouse/monitoring/public/host-metrics.json` | `root:root` | `0644` | Atomic bounded metrics JSON for container consumption |
+| `/var/lib/rehouse/monitoring/collector-state.json` | `root:root` | `0600` | Collector state (failure counters, active incidents, notification retry queue) - OUTSIDE public dir |
 | `/var/lib/rehouse/backup-last-success` | `root:root` | `0600` | Existing backup watchdog timestamp marker |
 | `/etc/rehouse/monitoring.env` | `root:root` | `0600` | Optional monitoring-specific SMTP overrides (`MONITORING_ALERT_TO`) |
 | `/etc/rehouse/runtime.env` | `root:root` | `0600` | Standard production runtime environment (fallback SMTP config) |
@@ -55,7 +60,7 @@ services:
   app:
     volumes:
       - app_keys:/app/data
-      - /var/lib/rehouse/monitoring/host-metrics.json:/app/monitoring/host-metrics.json:ro
+      - /var/lib/rehouse/monitoring/public:/app/monitoring-host:ro
 ```
 
 ---
@@ -241,36 +246,40 @@ Sliding window of up to 60 minute-level data points (1 hour) for immediate chart
 
 ## 4. Alerting Thresholds & Lifecycle Rules
 
-| Monitored Target | Threshold Condition | Sustained Duration | Notification Severity | Cooldown | Recovery Notice |
+| Monitored Target | Threshold Condition | Sustained Requirements | Notification Severity | Cooldown | Recovery Notice |
 |---|---|---|---|---|---|
-| `app` (Container + `/api/health`) | Container down/unhealthy OR loopback != 200 | 3 consecutive samples (3 min) | `critical` | 1 hour | Yes (Immediate) |
-| `db` (`rehouse-db-1`) | Container down/unhealthy | 3 consecutive samples (3 min) | `critical` | 1 hour | Yes (Immediate) |
-| `cpu` | Usage >= 85.0% | 10 consecutive samples (10 min) | `warning` | 1 hour | Yes (Immediate) |
-| `ram` | Usage >= 85.0% | 10 consecutive samples (10 min) | `warning` | 1 hour | Yes (Immediate) |
-| `disk` | Usage >= 85.0% | 5 consecutive samples (5 min) | `warning` | 1 hour | Yes (Immediate) |
+| `app` (Container + `/api/health`) | Container stopped/unhealthy OR loopback != 200 | 3 consecutive samples spaced >= 1 min (>= 2 min elapsed) | `critical` | 1 hour | Yes (Immediate) |
+| `db` (`rehouse-db-1`) | Container stopped OR Docker health != healthy | 3 consecutive samples spaced >= 1 min (>= 2 min elapsed) | `critical` | 1 hour | Yes (Immediate) |
+| `cpu` | Usage >= 85.0% | 10 samples spaced >= 1 min, >= 9 min elapsed | `warning` | 1 hour | Yes (Immediate) |
+| `ram` | Usage >= 85.0% | 10 samples spaced >= 1 min, >= 9 min elapsed | `warning` | 1 hour | Yes (Immediate) |
+| `disk` | Usage >= 85.0% | 5 samples spaced >= 1 min, >= 4 min elapsed | `warning` | 1 hour | Yes (Immediate) |
 | `backup` | Age > 27 hours | N/A | Handled by existing watchdog | Handled by watchdog | Handled by watchdog |
 
-### Cooldown and Reminder Policy
-- An incident entering open state triggers an alert email immediately.
-- If the incident persists, reminder emails are gated by a 1-hour cooldown (`now - last_notified_at >= 3600`).
-- When the condition clears, an immediate Recovery notice is dispatched, and the incident moves to `recent_history`.
+### Container Health Evaluation Semantics
+- **App Container (`rehouse-app-1`)**: The existing production `compose.yaml` does not declare a Docker `healthcheck` for `app`. When inspected, Docker returns no `Health` object. A running app container with absent Docker health (`health: "none"`) and a successful loopback probe (`GET http://127.0.0.1:8080/api/health` -> HTTP 200) is evaluated as **healthy**. Explicit alerts fire only when the container is stopped (`running: false`), explicit Docker health fails (`health: "unhealthy"`), or the loopback API fails.
+- **Database Container (`rehouse-db-1`)**: Has a configured Docker healthcheck (`pg_isready`). Must report `health: "healthy"` and `running: true`.
+- **Missing Docker Probe Data**: If `docker inspect` fails (e.g. daemon restart, timeout), container state is reported as `"unknown"` (`running: null`), **never fabricated as healthy nor assumed stopped**.
 
-### Missing Metrics Principle
-- When a metric probe fails (e.g. timeout reading `/proc` or `docker inspect`), the value is set to `null` and status to `"unknown"` or `"stale"`.
-- Missing metrics are **never converted to healthy zero values**.
-- Missing metrics do **not** clear active incidents or reset failure streaks.
+### Elapsed Timing, Spacing, and Gap Handling
+- **Rapid Duplicate Rejection**: Samples with spacing < 55 seconds from the previous sample are rejected as duplicate/rapid runs and do not advance candidate streak counters or sustained durations.
+- **Gap & Unknown Reset**: If a timer gap > 2 minutes (120 seconds) occurs, or if an intermediate sample evaluates to `"unknown"`, any candidate sustained streak is reset.
+- **Open Incident Preservation**: An existing **OPEN** incident remains open during gaps or unknown states; it resolves **only upon proven healthy metrics**.
+- **Bounded State Persistence**: Candidate streaks, start timestamps, active incidents, and notification queues are persisted to `/var/lib/rehouse/monitoring/collector-state.json` (0600) and survive collector process restarts.
 
-### SMTP Reliability Disclaimer
-All alert notifications append the standard operational notice:
-> `Note: SMTP acceptance by server does not guarantee final mailbox delivery (accepted != delivered).`
+### SMTP Delivery, Retry Queue, and Cooldown
+- **Success-Gated Cooldown**: `last_notified_at` is updated **only after verified SMTP delivery**. Temporary SMTP delivery failure does NOT mark notification timestamps and never suppresses retries.
+- **Persistent Pending Notification Queue**: Undelivered alerts and recovery notices are retained in `pending_notifications` with exponential backoff (up to 5 retries). Recovery notices are never dropped on transient email errors.
+- **Systemd 45s Execution Bound**: Notification processing enforces a strict 20-second time budget per collector run, ensuring the overall oneshot execution cleanly completes well within systemd's `TimeoutStartSec=45s`.
+- **Secret Isolation**: SMTP responses, passwords, and private pending notification items are kept strictly inside `collector-state.json` (0600) and are never exposed in the public `host-metrics.json`.
+- **Delivery Disclaimer**: All alert emails append: `Note: SMTP acceptance by server does not guarantee final mailbox delivery (accepted != delivered).`
 
 ---
 
 ## 5. Backend Ingestion Recommendations (For Worker A / Task T3)
 
 1. **File Reading**:
-   - Backend reads `/app/monitoring/host-metrics.json`.
-   - If file does not exist, backend returns `status: "unknown"` with descriptive message.
+   - Backend reads `/app/monitoring-host/host-metrics.json` via the directory read-only bind mount `/var/lib/rehouse/monitoring/public:/app/monitoring-host:ro`.
+   - If the file does not exist, backend returns `status: "unknown"` with descriptive message.
    - If `generated_at` is older than 3 minutes (180 seconds), backend marks host health as `"stale"`.
 2. **DTO Mapping**:
    - Map `host-metrics.json` directly to C# record/class `HostMetricsDto` in `RoomRental.Api/Features/Admin/Monitoring/HostMetricsDto.cs`.

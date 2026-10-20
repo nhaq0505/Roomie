@@ -67,6 +67,7 @@ services:
       SeedDemo: "false"
     volumes:
       - app_keys:/app/data
+      - /var/lib/rehouse/monitoring/public:/app/monitoring-host:ro
     depends_on:
       db:
         condition: service_healthy

@@ -3,11 +3,22 @@
 
 Gathers host resources (CPU, RAM, Disk), container status/restarts for app/db,
 loopback /api/health probe, and backup watchdog age.
-Maintains persisted incident state and sustained duration counters across runs.
-Outputs bounded atomic JSON to /var/lib/rehouse/monitoring/host-metrics.json
-for read-only bind mounting into the ASP.NET Core application container.
-Dispatches independent SMTP email alerts on sustained failures (3m app/db,
-10m CPU/RAM 85%, 5m Disk 85%) with 1h reminder cooldown and immediate recovery notice.
+Maintains persisted incident state, candidate sustained tracking, and notification retry queues.
+Outputs bounded atomic JSON to dedicated public directory:
+  /var/lib/rehouse/monitoring/public/host-metrics.json (0644)
+for read-only bind mounting into the ASP.NET Core container at /app/monitoring-host:ro.
+Maintains private collector state at:
+  /var/lib/rehouse/monitoring/collector-state.json (0600)
+outside the mounted public directory so internal alert queues and credentials stay private.
+
+Dispatches independent SMTP email alerts on sustained failures:
+- 3m app/db (>= 1m spacing)
+- 10m CPU/RAM >= 85% (real elapsed duration)
+- 5m Disk >= 85% (real elapsed duration)
+with 1h reminder cooldown and immediate recovery notice.
+Uses an asynchronous retry queue with exponential backoff on delivery failures,
+marks last_notified_at only after verified successful delivery, and enforces a 20s
+overall execution budget within systemd's 45s service limit.
 Omits secrets and PII.
 """
 
@@ -30,7 +41,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import urllib.error
 import urllib.request
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SCHEMA_VERSION = "1.0"
 
 # Defaults
@@ -40,22 +51,42 @@ DEFAULT_CONFIG_FILES = [
     "/etc/rehouse/backup.env",
 ]
 DEFAULT_STATE_DIR = "/var/lib/rehouse/monitoring"
-DEFAULT_OUTPUT_FILE = "/var/lib/rehouse/monitoring/host-metrics.json"
+DEFAULT_PUBLIC_DIR = "/var/lib/rehouse/monitoring/public"
+DEFAULT_OUTPUT_FILE = "/var/lib/rehouse/monitoring/public/host-metrics.json"
 DEFAULT_STATE_FILE = "/var/lib/rehouse/monitoring/collector-state.json"
 DEFAULT_BACKUP_SUCCESS_FILE = "/var/lib/rehouse/backup-last-success"
 DEFAULT_HEALTH_URL = "http://127.0.0.1:8080/api/health"
 DEFAULT_APP_CONTAINER = "rehouse-app-1"
 DEFAULT_DB_CONTAINER = "rehouse-db-1"
 
-# Alert thresholds
-APP_DB_FAIL_THRESHOLD = 3      # 3 consecutive samples (3 minutes)
-CPU_RAM_SUSTAINED_THRESHOLD = 10  # 10 consecutive samples (10 minutes)
-DISK_SUSTAINED_THRESHOLD = 5     # 5 consecutive samples (5 minutes)
-RESOURCE_HIGH_PERCENT = 85.0   # 85%
-ALERT_COOLDOWN_SECONDS = 3600  # 1 hour reminder cooldown
-BACKUP_STALE_SECONDS = 27 * 3600  # 27 hours
+# Alert thresholds & sample requirements
+APP_DB_FAIL_THRESHOLD = 3          # 3 consecutive samples
+CPU_RAM_SUSTAINED_THRESHOLD = 10   # 10 samples (10 minutes)
+DISK_SUSTAINED_THRESHOLD = 5       # 5 samples (5 minutes)
+
+# Minimum required spacing between accepted samples (seconds)
+# Allows minor timer jitter around 60s while strictly rejecting rapid duplicate runs
+MIN_SAMPLE_SPACING_SECONDS = 55.0
+
+# Maximum allowed gap between samples before candidate sustained period resets (2 minutes)
+MAX_SAMPLE_GAP_SECONDS = 120.0
+
+# Real duration thresholds (seconds) for sustained conditions
+CPU_RAM_SUSTAINED_DURATION_SECONDS = 9 * 60.0   # 9m between sample 1 and 10 (10 samples total)
+DISK_SUSTAINED_DURATION_SECONDS = 4 * 60.0      # 4m between sample 1 and 5 (5 samples total)
+APP_DB_SUSTAINED_DURATION_SECONDS = 2 * 60.0    # 2m between sample 1 and 3 (3 samples total)
+
+RESOURCE_HIGH_PERCENT = 85.0       # 85%
+ALERT_COOLDOWN_SECONDS = 3600      # 1 hour reminder cooldown
+BACKUP_STALE_SECONDS = 27 * 3600   # 27 hours
 MAX_RECENT_INCIDENTS = 50
-MAX_SAMPLE_HISTORY = 60        # 60 minute samples (1 hour window)
+MAX_SAMPLE_HISTORY = 60            # 60 minute samples (1 hour window)
+
+# SMTP Delivery Budget & Queue Constraints (respects systemd 45s service bound)
+SMTP_TIME_BUDGET_SECONDS = 20.0    # Max total seconds spent on SMTP attempts per collector run
+SMTP_PER_CALL_TIMEOUT = 5.0        # Timeout per individual SMTP attempt
+MAX_PENDING_NOTIFICATIONS = 20     # Max bounded pending notification queue
+MAX_NOTIFICATION_RETRIES = 5       # Max delivery attempts before dropping
 
 
 def format_iso_utc(ts: Optional[float] = None) -> str:
@@ -67,7 +98,6 @@ def parse_iso_utc(iso_str: Optional[str]) -> Optional[float]:
     if not iso_str:
         return None
     try:
-        # Python 3.11+ handles Z correctly in fromisoformat
         clean_str = iso_str.replace("Z", "+00:00")
         dt = datetime.datetime.fromisoformat(clean_str)
         return dt.timestamp()
@@ -102,7 +132,6 @@ def read_env_file(path: Path) -> Dict[str, str]:
 def load_config(config_files: Optional[List[str]] = None) -> Dict[str, Any]:
     files = [Path(f) for f in (config_files or DEFAULT_CONFIG_FILES)]
     raw: Dict[str, str] = {}
-    # Read in reverse order so higher-priority files override lower ones
     for p in reversed(files):
         raw.update(read_env_file(p))
 
@@ -126,31 +155,30 @@ def load_config(config_files: Optional[List[str]] = None) -> Dict[str, Any]:
 
 
 def load_state(state_file: Path) -> Dict[str, Any]:
+    default_state: Dict[str, Any] = {
+        "counters": {},
+        "tracking": {},
+        "active_incidents": {},
+        "recent_history": [],
+        "samples": [],
+        "pending_notifications": [],
+        "last_cpu_sample": None,
+    }
     if not state_file.is_file():
-        return {
-            "counters": {},
-            "active_incidents": {},
-            "recent_history": [],
-            "samples": [],
-            "last_cpu_sample": None,
-        }
+        return default_state
     try:
         data = json.loads(state_file.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise ValueError("State root is not a dictionary")
         data.setdefault("counters", {})
+        data.setdefault("tracking", {})
         data.setdefault("active_incidents", {})
         data.setdefault("recent_history", [])
         data.setdefault("samples", [])
+        data.setdefault("pending_notifications", [])
         return data
     except Exception:
-        return {
-            "counters": {},
-            "active_incidents": {},
-            "recent_history": [],
-            "samples": [],
-            "last_cpu_sample": None,
-        }
+        return default_state
 
 
 def save_atomic_json(target_path: Path, data: Any, mode: int = 0o644) -> None:
@@ -160,7 +188,6 @@ def save_atomic_json(target_path: Path, data: Any, mode: int = 0o644) -> None:
         content = json.dumps(data, indent=2) + "\n"
         temp_path.write_text(content, encoding="utf-8")
         os.chmod(temp_path, mode)
-        # Flush to durable storage
         with open(temp_path, "a") as f:
             os.fsync(f.fileno())
         os.replace(temp_path, target_path)
@@ -194,7 +221,7 @@ def collect_cpu(state: Dict[str, Any], proc_stat_path: Path = Path("/proc/stat")
             if line.startswith("cpu "):
                 parts = [int(p) for p in line.split()[1:]]
                 total = sum(parts)
-                idle = parts[3] + (parts[4] if len(parts) > 4 else 0)  # idle + iowait
+                idle = parts[3] + (parts[4] if len(parts) > 4 else 0)
                 last_sample = state.get("last_cpu_sample")
                 now_ts = time.time()
                 if last_sample and isinstance(last_sample, dict):
@@ -210,7 +237,6 @@ def collect_cpu(state: Dict[str, Any], proc_stat_path: Path = Path("/proc/stat")
         except Exception:
             pass
 
-    # Fallback to load average if /proc/stat was unavailable and percent still None
     if percent is None and load_1m is not None:
         percent = round(min(100.0, (load_1m / cores) * 100.0), 1)
         status = "warning" if percent >= RESOURCE_HIGH_PERCENT else "healthy"
@@ -243,7 +269,7 @@ def collect_memory(proc_meminfo_path: Path = Path("/proc/meminfo")) -> Dict[str,
             k, v = line.split(":", 1)
             v_val = v.strip().split()[0]
             if v_val.isdigit():
-                meminfo[k.strip()] = int(v_val) * 1024  # kB to bytes
+                meminfo[k.strip()] = int(v_val) * 1024
 
         total = meminfo.get("MemTotal")
         if total is None or total <= 0:
@@ -257,7 +283,6 @@ def collect_memory(proc_meminfo_path: Path = Path("/proc/meminfo")) -> Dict[str,
 
         available = meminfo.get("MemAvailable")
         if available is None:
-            # Fallback estimation if MemAvailable absent
             free = meminfo.get("MemFree", 0)
             buffers = meminfo.get("Buffers", 0)
             cached = meminfo.get("Cached", 0)
@@ -359,25 +384,30 @@ def collect_container_status(
     try:
         code, stdout, stderr = run(cmd, 5.0)
         if code != 0 or not stdout.strip():
+            # Missing Docker probe data: report unknown, NOT fabricated healthy nor provably stopped!
             return {
                 "name": container_name,
                 "service": service_name,
-                "status": "missing",
-                "health": "unhealthy",
-                "running": False,
-                "restart_count": 0,
+                "status": "unknown",
+                "health": "unknown",
+                "running": None,
+                "restart_count": None,
                 "started_at": None,
-                "state_description": "Container not found or docker inspect failed",
-                "error": "Docker inspection failed",
+                "state_description": f"Container inspect unavailable: {stderr.strip() or 'probe failed'}",
+                "error": "Docker inspection probe unavailable",
             }
 
         state_data = json.loads(stdout.strip())
         running = bool(state_data.get("Running", False))
         status_str = state_data.get("Status", "unknown")
         health_info = state_data.get("Health")
-        health_status = health_info.get("Status") if health_info else ("healthy" if running else "unhealthy")
 
-        # In Docker inspect, RestartCount is on the container root, but can also be retrieved:
+        if health_info and isinstance(health_info, dict):
+            health_status = health_info.get("Status", "unknown")
+        else:
+            # Container has no configured Docker HEALTHCHECK (e.g. app container in compose)
+            health_status = "none"
+
         restart_count = 0
         try:
             rc_code, rc_out, _ = run(["docker", "inspect", "--format", "{{.RestartCount}}", container_name], 3.0)
@@ -395,18 +425,18 @@ def collect_container_status(
             "restart_count": restart_count,
             "started_at": state_data.get("StartedAt"),
             "state_description": f"Status: {status_str}, Health: {health_status}",
-            "error": None if (running and health_status == "healthy") else f"Container state: {status_str}/{health_status}",
+            "error": None,
         }
     except Exception as exc:
         return {
             "name": container_name,
             "service": service_name,
-            "status": "error",
-            "health": "unhealthy",
-            "running": False,
-            "restart_count": 0,
+            "status": "unknown",
+            "health": "unknown",
+            "running": None,
+            "restart_count": None,
             "started_at": None,
-            "state_description": "Inspection error",
+            "state_description": f"Inspection error: {type(exc).__name__}",
             "error": f"Inspect exception: {type(exc).__name__}",
         }
 
@@ -489,7 +519,7 @@ def collect_backup_watchdog(path_str: str, now_ts: Optional[float] = None) -> Di
 
 
 # ---------------------------------------------------------------------------
-# Independent Host SMTP Alerting
+# Independent Host SMTP Alerting & Bounded Delivery Queue
 # ---------------------------------------------------------------------------
 
 def send_alert_email(
@@ -498,6 +528,7 @@ def send_alert_email(
     is_recovery: bool = False,
     is_reminder: bool = False,
     smtp_client_factory: Optional[Callable[..., Any]] = None,
+    timeout: float = SMTP_PER_CALL_TIMEOUT,
 ) -> bool:
     recipient = config.get("MONITORING_ALERT_TO")
     if not recipient:
@@ -528,14 +559,14 @@ def send_alert_email(
         subject = f"[Roomie Alert] {severity}: {title}"
 
     body_lines = [
-        f"Roomie Host Monitoring Alert Notification",
-        f"----------------------------------------",
+        "Roomie Host Monitoring Alert Notification",
+        "----------------------------------------",
         f"Event Type:       {'RECOVERY' if is_recovery else ('REMINDER' if is_reminder else 'NEW INCIDENT')}",
         f"Target:           {target}",
         f"Severity:         {severity}",
         f"Title:            {title}",
         f"Timestamp (UTC):  {format_iso_utc()}",
-        f"Incident ID:      {incident.get('id', 'unknown')}",
+        f"Incident ID:      {incident.get('id') or incident.get('incident_id', 'unknown')}",
         f"Opened At:        {incident.get('opened_at', 'unknown')}",
     ]
 
@@ -563,7 +594,7 @@ def send_alert_email(
 
     try:
         if smtp_client_factory:
-            with smtp_client_factory(host, port, timeout=15) as client:
+            with smtp_client_factory(host, port, timeout=timeout) as client:
                 if security == "StartTls":
                     client.starttls(context=ssl.create_default_context())
                 if username and password:
@@ -574,7 +605,7 @@ def send_alert_email(
                 print("[collector] TLS is required for alert delivery.", file=sys.stderr)
                 return False
             cls = smtplib.SMTP_SSL if security == "SslOnConnect" else smtplib.SMTP
-            with cls(host, port, timeout=15) as client:
+            with cls(host, port, timeout=timeout) as client:
                 if security == "StartTls":
                     client.starttls(context=ssl.create_default_context())
                 if username and password:
@@ -584,6 +615,106 @@ def send_alert_email(
     except Exception as exc:
         print(f"[collector] SMTP alert delivery failed: {type(exc).__name__}", file=sys.stderr)
         return False
+
+
+def enqueue_notification(
+    state: Dict[str, Any],
+    target: str,
+    inc: Dict[str, Any],
+    notif_type: str,
+    now: float,
+) -> None:
+    """Enqueues a pending notification for delivery with retry tracking."""
+    pending: List[Dict[str, Any]] = state.setdefault("pending_notifications", [])
+
+    # Deduplicate pending notifications for the same target
+    for p in pending:
+        if p.get("target") == target:
+            if notif_type in {"new", "reminder"} and p.get("notification_type") in {"new", "reminder"}:
+                p["current_value"] = inc.get("current_value")
+                p["consecutive_samples"] = inc.get("consecutive_samples", 0)
+                return
+            if p.get("notification_type") == notif_type:
+                p["current_value"] = inc.get("current_value")
+                p["consecutive_samples"] = inc.get("consecutive_samples", 0)
+                return
+
+    notif = {
+        "id": f"notif_{target}_{int(now)}_{notif_type}",
+        "target": target,
+        "incident_id": inc.get("id"),
+        "notification_type": notif_type,
+        "severity": inc.get("severity", "warning"),
+        "title": inc.get("title", ""),
+        "opened_at": inc.get("opened_at"),
+        "resolved_at": inc.get("resolved_at"),
+        "duration_seconds": inc.get("duration_seconds"),
+        "resolved_value": inc.get("resolved_value"),
+        "current_value": inc.get("current_value"),
+        "consecutive_samples": inc.get("consecutive_samples", 0),
+        "enqueued_at": now,
+        "attempts": 0,
+        "next_retry_at": now,
+    }
+    pending.append(notif)
+    if len(pending) > MAX_PENDING_NOTIFICATIONS:
+        pending[:] = pending[-MAX_PENDING_NOTIFICATIONS:]
+
+
+def process_pending_notifications(
+    state: Dict[str, Any],
+    config: Dict[str, Any],
+    now_ts: float,
+    smtp_client_factory: Optional[Callable[..., Any]] = None,
+    time_budget_seconds: float = SMTP_TIME_BUDGET_SECONDS,
+) -> None:
+    """Processes enqueued alert notifications while honoring execution time budget and backoff."""
+    pending: List[Dict[str, Any]] = state.setdefault("pending_notifications", [])
+    if not pending:
+        return
+
+    start_wall = time.time()
+    active_incidents = state.setdefault("active_incidents", {})
+    remaining_pending: List[Dict[str, Any]] = []
+
+    for notif in list(pending):
+        # Honor overall time budget to respect systemd 45s service bound
+        if time.time() - start_wall >= time_budget_seconds:
+            remaining_pending.append(notif)
+            continue
+
+        # Respect retry backoff schedule
+        next_retry = notif.get("next_retry_at", 0)
+        if now_ts < next_retry:
+            remaining_pending.append(notif)
+            continue
+
+        success = send_alert_email(
+            incident=notif,
+            config=config,
+            is_recovery=(notif.get("notification_type") == "recovery"),
+            is_reminder=(notif.get("notification_type") == "reminder"),
+            smtp_client_factory=smtp_client_factory,
+        )
+
+        if success:
+            target = notif.get("target")
+            # Mark last_notified_at only AFTER verified successful delivery
+            if notif.get("notification_type") in {"new", "reminder"} and target in active_incidents:
+                active_incidents[target]["last_notified_at"] = format_iso_utc(now_ts)
+        else:
+            attempts = notif.get("attempts", 0) + 1
+            notif["attempts"] = attempts
+            if attempts < MAX_NOTIFICATION_RETRIES:
+                backoff = min(300.0, 30.0 * (2 ** (attempts - 1)))
+                notif["next_retry_at"] = now_ts + backoff
+                remaining_pending.append(notif)
+            else:
+                print(f"[collector] Dropping notification {notif.get('id')} after {attempts} failed attempts", file=sys.stderr)
+
+    if len(remaining_pending) > MAX_PENDING_NOTIFICATIONS:
+        remaining_pending = remaining_pending[-MAX_PENDING_NOTIFICATIONS:]
+    state["pending_notifications"] = remaining_pending
 
 
 # ---------------------------------------------------------------------------
@@ -603,128 +734,159 @@ def evaluate_incidents(
     iso_now = format_iso_utc(now)
 
     counters: Dict[str, int] = state.setdefault("counters", {})
+    tracking: Dict[str, Dict[str, Any]] = state.setdefault("tracking", {})
     active_incidents: Dict[str, Dict[str, Any]] = state.setdefault("active_incidents", {})
     recent_history: List[Dict[str, Any]] = state.setdefault("recent_history", [])
 
-    # Monitored Targets and their threshold conditions
-    # 1. App container + loopback health
+    # 1. Monitored Targets Evaluation
+    # --------------------------------------------------
+    # Target 1: app
     app_cont = containers.get("app", {})
     api_health = services.get("api_health", {})
-    app_failed = (
-        not app_cont.get("running", False)
-        or app_cont.get("health") != "healthy"
-        or api_health.get("status") != "healthy"
-    )
-    app_detail = f"Container running={app_cont.get('running')}, health={app_cont.get('health')}, /api/health status={api_health.get('status')}"
+    app_running = app_cont.get("running")
+    app_docker_health = app_cont.get("health")
+    api_status = api_health.get("status")
 
-    # 2. DB container
+    # Explicit failure: container stopped, docker health explicitly unhealthy, or API probe failed
+    app_is_failed = (
+        app_running is False
+        or app_docker_health == "unhealthy"
+        or api_status == "unhealthy"
+    )
+    # Proven healthy: container running, docker health is healthy or absent ("none"), and API probe 200 OK
+    app_is_healthy = (
+        app_running is True
+        and app_docker_health in {"healthy", "none"}
+        and api_status == "healthy"
+    )
+    app_is_unknown = not app_is_failed and not app_is_healthy
+    app_detail = f"Container running={app_running}, health={app_docker_health}, /api/health status={api_status}"
+
+    # Target 2: db (Uses configured actual Docker healthcheck)
     db_cont = containers.get("db", {})
-    db_failed = (
-        not db_cont.get("running", False)
-        or db_cont.get("health") != "healthy"
-    )
-    db_detail = f"Container running={db_cont.get('running')}, health={db_cont.get('health')}"
+    db_running = db_cont.get("running")
+    db_docker_health = db_cont.get("health")
 
-    # 3. CPU >= 85%
+    db_is_failed = (
+        db_running is False
+        or db_docker_health == "unhealthy"
+    )
+    db_is_healthy = (
+        db_running is True
+        and db_docker_health == "healthy"
+    )
+    db_is_unknown = not db_is_failed and not db_is_healthy
+    db_detail = f"Container running={db_running}, health={db_docker_health}"
+
+    # Target 3: cpu (10 minutes sustained, usage >= 85%)
     cpu_percent = host_metrics.get("cpu", {}).get("percent")
-    cpu_failed = (cpu_percent is not None and cpu_percent >= RESOURCE_HIGH_PERCENT)
+    cpu_is_failed = (cpu_percent is not None and cpu_percent >= RESOURCE_HIGH_PERCENT)
+    cpu_is_healthy = (cpu_percent is not None and cpu_percent < RESOURCE_HIGH_PERCENT)
+    cpu_is_unknown = (cpu_percent is None)
     cpu_detail = f"CPU usage {cpu_percent}% (threshold {RESOURCE_HIGH_PERCENT}%)"
 
-    # 4. RAM >= 85%
+    # Target 4: ram (10 minutes sustained, usage >= 85%)
     ram_percent = host_metrics.get("memory", {}).get("percent")
-    ram_failed = (ram_percent is not None and ram_percent >= RESOURCE_HIGH_PERCENT)
+    ram_is_failed = (ram_percent is not None and ram_percent >= RESOURCE_HIGH_PERCENT)
+    ram_is_healthy = (ram_percent is not None and ram_percent < RESOURCE_HIGH_PERCENT)
+    ram_is_unknown = (ram_percent is None)
     ram_detail = f"RAM usage {ram_percent}% (threshold {RESOURCE_HIGH_PERCENT}%)"
 
-    # 5. Disk >= 85%
+    # Target 5: disk (5 minutes sustained, usage >= 85%)
     disk_percent = host_metrics.get("disk", {}).get("percent")
-    disk_failed = (disk_percent is not None and disk_percent >= RESOURCE_HIGH_PERCENT)
+    disk_is_failed = (disk_percent is not None and disk_percent >= RESOURCE_HIGH_PERCENT)
+    disk_is_healthy = (disk_percent is not None and disk_percent < RESOURCE_HIGH_PERCENT)
+    disk_is_unknown = (disk_percent is None)
     disk_detail = f"Disk usage {disk_percent}% (threshold {RESOURCE_HIGH_PERCENT}%)"
 
     targets_specs = [
         {
             "target": "app",
-            "failed": app_failed,
-            "threshold": APP_DB_FAIL_THRESHOLD,
+            "is_failed": app_is_failed,
+            "is_healthy": app_is_healthy,
+            "is_unknown": app_is_unknown,
+            "threshold_count": APP_DB_FAIL_THRESHOLD,
+            "threshold_duration": APP_DB_SUSTAINED_DURATION_SECONDS,
             "severity": "critical",
             "title": "Application container or /api/health failed 3 consecutive checks",
             "detail": app_detail,
-            "is_valid_healthy": not app_failed,
         },
         {
             "target": "db",
-            "failed": db_failed,
-            "threshold": APP_DB_FAIL_THRESHOLD,
+            "is_failed": db_is_failed,
+            "is_healthy": db_is_healthy,
+            "is_unknown": db_is_unknown,
+            "threshold_count": APP_DB_FAIL_THRESHOLD,
+            "threshold_duration": APP_DB_SUSTAINED_DURATION_SECONDS,
             "severity": "critical",
             "title": "Database container (rehouse-db-1) unhealthy or stopped",
             "detail": db_detail,
-            "is_valid_healthy": not db_failed,
         },
         {
             "target": "cpu",
-            "failed": cpu_failed,
-            "threshold": CPU_RAM_SUSTAINED_THRESHOLD,
+            "is_failed": cpu_is_failed,
+            "is_healthy": cpu_is_healthy,
+            "is_unknown": cpu_is_unknown,
+            "threshold_count": CPU_RAM_SUSTAINED_THRESHOLD,
+            "threshold_duration": CPU_RAM_SUSTAINED_DURATION_SECONDS,
             "severity": "warning",
             "title": "Host CPU utilization >= 85% sustained for 10 minutes",
             "detail": cpu_detail,
-            "is_valid_healthy": (cpu_percent is not None and cpu_percent < RESOURCE_HIGH_PERCENT),
         },
         {
             "target": "ram",
-            "failed": ram_failed,
-            "threshold": CPU_RAM_SUSTAINED_THRESHOLD,
+            "is_failed": ram_is_failed,
+            "is_healthy": ram_is_healthy,
+            "is_unknown": ram_is_unknown,
+            "threshold_count": CPU_RAM_SUSTAINED_THRESHOLD,
+            "threshold_duration": CPU_RAM_SUSTAINED_DURATION_SECONDS,
             "severity": "warning",
             "title": "Host RAM utilization >= 85% sustained for 10 minutes",
             "detail": ram_detail,
-            "is_valid_healthy": (ram_percent is not None and ram_percent < RESOURCE_HIGH_PERCENT),
         },
         {
             "target": "disk",
-            "failed": disk_failed,
-            "threshold": DISK_SUSTAINED_THRESHOLD,
+            "is_failed": disk_is_failed,
+            "is_healthy": disk_is_healthy,
+            "is_unknown": disk_is_unknown,
+            "threshold_count": DISK_SUSTAINED_THRESHOLD,
+            "threshold_duration": DISK_SUSTAINED_DURATION_SECONDS,
             "severity": "warning",
             "title": "Host Disk utilization >= 85% sustained for 5 minutes",
             "detail": disk_detail,
-            "is_valid_healthy": (disk_percent is not None and disk_percent < RESOURCE_HIGH_PERCENT),
         },
     ]
 
     for spec in targets_specs:
         target = spec["target"]
         streak_key = f"{target}_streak"
-        threshold = spec["threshold"]
+        t_track = tracking.setdefault(target, {})
+        last_ts = t_track.get("last_sample_ts")
 
-        if spec["failed"]:
-            current_streak = counters.get(streak_key, 0) + 1
-            counters[streak_key] = current_streak
+        # 1. Reject too-fast duplicate samples (< 55s spacing)
+        if last_ts is not None:
+            elapsed = now - last_ts
+            if elapsed < MIN_SAMPLE_SPACING_SECONDS:
+                # Rapid duplicate sample: skip advancing counters/durations
+                continue
 
-            if current_streak >= threshold:
-                if target not in active_incidents:
-                    # Brand new incident
-                    inc = {
-                        "id": f"inc_{target}_{int(now)}",
-                        "target": target,
-                        "severity": spec["severity"],
-                        "title": spec["title"],
-                        "opened_at": iso_now,
-                        "last_notified_at": iso_now,
-                        "consecutive_samples": current_streak,
-                        "current_value": spec["detail"],
-                    }
-                    active_incidents[target] = inc
-                    send_alert_email(inc, config, is_recovery=False, is_reminder=False, smtp_client_factory=smtp_client_factory)
-                else:
-                    # Already active incident: check reminder cooldown
-                    inc = active_incidents[target]
-                    inc["consecutive_samples"] = current_streak
-                    inc["current_value"] = spec["detail"]
-                    last_notified_ts = parse_iso_utc(inc.get("last_notified_at"))
-                    if last_notified_ts is None or (now - last_notified_ts >= ALERT_COOLDOWN_SECONDS):
-                        inc["last_notified_at"] = iso_now
-                        send_alert_email(inc, config, is_recovery=False, is_reminder=True, smtp_client_factory=smtp_client_factory)
-        elif spec["is_valid_healthy"]:
-            # Recovered / Healthy
+        # 2. Check for timer gaps > 2 minutes (120 seconds)
+        is_gap = (last_ts is not None and (now - last_ts > MAX_SAMPLE_GAP_SECONDS))
+        if is_gap:
+            # Gaps > 2 min reset candidate sustained period (continuous condition broken)
+            t_track["candidate_first_seen_ts"] = None
+            t_track["candidate_count"] = 0
             counters[streak_key] = 0
-            if target in active_incidents:
+
+        # 3. Handle Sample States: Distinguish Active Incident vs Candidate Condition
+        if target in active_incidents:
+            # Incident is already OPEN
+            if spec["is_healthy"]:
+                # Resolves ONLY on proven healthy
+                t_track["candidate_first_seen_ts"] = None
+                t_track["candidate_count"] = 0
+                counters[streak_key] = 0
+
                 inc = active_incidents.pop(target)
                 opened_ts = parse_iso_utc(inc.get("opened_at")) or now
                 duration_sec = round(max(0.0, now - opened_ts))
@@ -732,15 +894,89 @@ def evaluate_incidents(
                 inc["duration_seconds"] = duration_sec
                 inc["resolved_value"] = spec["detail"]
 
-                send_alert_email(inc, config, is_recovery=True, is_reminder=False, smtp_client_factory=smtp_client_factory)
+                enqueue_notification(state, target, inc, "recovery", now)
 
-                # Persist to bounded recent history
                 recent_history.insert(0, inc)
                 if len(recent_history) > MAX_RECENT_INCIDENTS:
                     recent_history[:] = recent_history[:MAX_RECENT_INCIDENTS]
+
+            elif spec["is_failed"]:
+                # Still failing: check reminder cooldown
+                inc = active_incidents[target]
+                inc["current_value"] = spec["detail"]
+                if not is_gap:
+                    t_track["candidate_count"] = t_track.get("candidate_count", 0) + 1
+                else:
+                    t_track["candidate_count"] = 1
+                    t_track["candidate_first_seen_ts"] = now
+                inc["consecutive_samples"] = t_track["candidate_count"]
+                counters[streak_key] = t_track["candidate_count"]
+
+                last_notified_ts = parse_iso_utc(inc.get("last_notified_at"))
+                if last_notified_ts is not None and (now - last_notified_ts >= ALERT_COOLDOWN_SECONDS):
+                    enqueue_notification(state, target, inc, "reminder", now)
+
+            elif spec["is_unknown"]:
+                # Unknown: incident STAYS OPEN; candidate streak resets
+                t_track["candidate_first_seen_ts"] = None
+                t_track["candidate_count"] = 0
+                counters[streak_key] = 0
+
+            t_track["last_sample_ts"] = now
+
         else:
-            # Metric was unknown/missing; do not reset failure streak and do not close active incident
-            pass
+            # Incident is NOT yet active: track candidate sustained condition
+            if spec["is_unknown"]:
+                # Unknown sample resets candidate sustained period
+                t_track["candidate_first_seen_ts"] = None
+                t_track["candidate_count"] = 0
+                counters[streak_key] = 0
+
+            elif spec["is_healthy"]:
+                # Healthy sample resets candidate sustained period
+                t_track["candidate_first_seen_ts"] = None
+                t_track["candidate_count"] = 0
+                counters[streak_key] = 0
+
+            elif spec["is_failed"]:
+                # Accumulate candidate sustained window
+                if t_track.get("candidate_first_seen_ts") is None:
+                    t_track["candidate_first_seen_ts"] = now
+                    t_track["candidate_count"] = 1
+                else:
+                    t_track["candidate_count"] = t_track.get("candidate_count", 0) + 1
+
+                candidate_count = t_track["candidate_count"]
+                candidate_duration = now - t_track["candidate_first_seen_ts"]
+                counters[streak_key] = candidate_count
+
+                threshold_count = spec["threshold_count"]
+                threshold_duration = spec["threshold_duration"]
+
+                # Must satisfy BOTH minimum sample count AND real elapsed duration
+                if candidate_count >= threshold_count and candidate_duration >= threshold_duration:
+                    inc = {
+                        "id": f"inc_{target}_{int(now)}",
+                        "target": target,
+                        "severity": spec["severity"],
+                        "title": spec["title"],
+                        "opened_at": iso_now,
+                        "last_notified_at": None,  # Recorded only after verified delivery success
+                        "consecutive_samples": candidate_count,
+                        "current_value": spec["detail"],
+                    }
+                    active_incidents[target] = inc
+                    enqueue_notification(state, target, inc, "new", now)
+
+            t_track["last_sample_ts"] = now
+
+    # Dispatch pending notifications honoring bounded retry & 45s service budget
+    process_pending_notifications(
+        state=state,
+        config=config,
+        now_ts=now,
+        smtp_client_factory=smtp_client_factory,
+    )
 
     active_list = list(active_incidents.values())
     return active_list, recent_history
@@ -820,13 +1056,23 @@ def run_collection_cycle(
 
     # 5. Sliding Sample History (Bounded to 60 minute samples)
     samples: List[Dict[str, Any]] = state.setdefault("samples", [])
+    app_healthy = bool(
+        app_cont.get("running") is True
+        and app_cont.get("health") in {"healthy", "none"}
+        and api_health.get("status") == "healthy"
+    )
+    db_healthy = bool(
+        db_cont.get("running") is True
+        and db_cont.get("health") == "healthy"
+    )
+
     new_sample = {
         "timestamp": iso_now,
         "cpu_percent": cpu_info.get("percent"),
         "ram_percent": mem_info.get("percent"),
         "disk_percent": disk_info.get("percent"),
-        "app_healthy": (app_cont.get("running") and app_cont.get("health") == "healthy" and api_health.get("status") == "healthy"),
-        "db_healthy": (db_cont.get("running") and db_cont.get("health") == "healthy"),
+        "app_healthy": app_healthy,
+        "db_healthy": db_healthy,
     }
     samples.append(new_sample)
     if len(samples) > MAX_SAMPLE_HISTORY:
@@ -834,7 +1080,7 @@ def run_collection_cycle(
 
     duration_ms = round((time.time() - start_wall) * 1000.0, 1)
 
-    # Compile Final JSON Payload
+    # Compile Final JSON Payload (Omits private notification queue and credentials)
     payload = {
         "version": SCHEMA_VERSION,
         "generated_at": iso_now,
