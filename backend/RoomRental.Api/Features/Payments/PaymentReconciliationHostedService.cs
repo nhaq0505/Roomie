@@ -23,13 +23,25 @@ public sealed class PaymentReconciliationHostedService(IServiceScopeFactory scop
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
+                var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+
                 var payOsService = scope.ServiceProvider.GetRequiredService<PayOsService>();
                 await payOsService.ReconcilePendingBatchAsync(stoppingToken);
+
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception)
+            catch (Exception ex)
             {
                 logger.LogWarning("The scheduled payOS reconciliation pass failed.");
+                try
+                {
+                    await using var errScope = scopeFactory.CreateAsyncScope();
+                    var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Failed", errorMessage: ex.Message, stoppingToken);
+                }
+                catch { }
             }
 
             try { await Task.Delay(TimeSpan.FromMinutes(3), stoppingToken); }

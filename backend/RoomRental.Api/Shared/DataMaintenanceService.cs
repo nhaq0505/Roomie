@@ -31,10 +31,25 @@ public sealed class DataMaintenanceService(IServiceScopeFactory scopes, TimeProv
             try
             {
                 using var scope = scopes.CreateScope();
+                var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+
                 await CleanAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), clock.GetUtcNow(), stoppingToken);
+
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception) { logger.LogError("Data maintenance failed; retrying on next interval."); }
+            catch (Exception ex)
+            {
+                logger.LogError("Data maintenance failed; retrying on next interval.");
+                try
+                {
+                    using var errScope = scopes.CreateScope();
+                    var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Failed", errorMessage: ex.Message, stoppingToken);
+                }
+                catch { }
+            }
             try { await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
         }

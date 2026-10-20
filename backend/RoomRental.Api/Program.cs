@@ -79,6 +79,7 @@ if (!bool.TryParse(builder.Configuration["EnablePaymentReconciliation"], out var
     builder.Services.AddHostedService<PaymentReconciliationHostedService>();
 builder.Services.AddHttpClient("payOS", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddMonitoringCore(builder.Configuration);
+builder.Services.AddMonitoringOperations(builder.Configuration);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
 {
     options.Cookie.Name = "phongtro.session";
@@ -171,6 +172,7 @@ app.UseMiddleware<SeoMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseMiddleware<RoomRental.Api.Features.Monitoring.Operations.RouteLatencyMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<RequestSecurityMiddleware>();

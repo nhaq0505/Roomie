@@ -216,14 +216,29 @@ public sealed class InvoiceSweepService(IServiceScopeFactory scopeFactory, ILogg
             try
             {
                 using var scope = scopeFactory.CreateScope();
+                var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var service = scope.ServiceProvider.GetRequiredService<InvoiceService>();
                 var period = timeProvider.GetUtcNow().ToOffset(VietnamTimeZone.GetUtcOffset(timeProvider.GetUtcNow())).ToString("yyyy-MM");
                 var result = await service.GenerateForAllApprovedOwnersAsync(period, stoppingToken);
                 if (result.Created > 0) logger.LogInformation("Published {Count} invoices for {Period} by daily sweep.", result.Created, period);
+
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception exception) { logger.LogError(exception, "Daily invoice sweep failed."); }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Daily invoice sweep failed.");
+                try
+                {
+                    using var errScope = scopeFactory.CreateScope();
+                    var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Failed", errorMessage: exception.Message, stoppingToken);
+                }
+                catch { }
+            }
 
             try { await Task.Delay(TimeSpan.FromHours(24), stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }

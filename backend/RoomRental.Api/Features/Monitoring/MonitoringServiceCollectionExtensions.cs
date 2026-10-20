@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RoomRental.Api.Features.Monitoring;
+using RoomRental.Api.Features.Monitoring.Operations;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,27 @@ public static class MonitoringServiceCollectionExtensions
         services.TryAddScoped<IHostMetricsReader, DefaultHostMetricsReader>();
         services.TryAddScoped<IIncidentService, DefaultIncidentService>();
         services.TryAddScoped<IIncidentNotifier, NullIncidentNotifier>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddMonitoringOperations(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<HostMetricsOptions>(configuration.GetSection(HostMetricsOptions.SectionName));
+        services.Configure<IncidentNotificationOptions>(configuration.GetSection(IncidentNotificationOptions.SectionName));
+
+        services.AddSingleton<IRouteLatencyAggregator, RouteLatencyAggregator>();
+        services.AddSingleton<IWorkerTelemetryTracker, WorkerTelemetryTracker>();
+        services.AddSingleton<IIncidentAlertNotifier, SmtpIncidentNotifier>();
+        services.AddSingleton<IIncidentEngine, IncidentEngine>();
+
+        services.AddScoped<IHostMetricsReader, LinuxHostCollectorMetricsReader>();
+        services.AddScoped<ILinuxHostCollectorMetricsReader, LinuxHostCollectorMetricsReader>();
+        services.AddScoped<IOperationsMonitoringService, OperationsMonitoringService>();
+        services.AddScoped<IIncidentService, IncidentMonitoringService>();
+        services.AddScoped<IIncidentNotifier, SmtpIncidentAlertNotifier>();
+
+        services.AddHostedService<MonitoringAggregationWorker>();
 
         return services;
     }

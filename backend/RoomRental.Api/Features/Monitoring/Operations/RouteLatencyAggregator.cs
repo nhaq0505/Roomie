@@ -1,0 +1,343 @@
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
+
+namespace RoomRental.Api.Features.Monitoring.Operations;
+
+public sealed record RouteLatencySnapshot(
+    string RouteTemplate,
+    string HttpMethod,
+    int RequestCount,
+    int Status5xxCount,
+    double? P95LatencyMs,
+    double? AvgLatencyMs,
+    double? MaxLatencyMs
+);
+
+public sealed record OperationsOverviewSnapshot(
+    string OverallStatus,
+    double? Api5xxRatePercent,
+    double? LatencyP95Ms,
+    long? TotalRequestsLastHour,
+    bool? DatabaseConnected,
+    string? DatabaseStatus,
+    string? Window = "1h"
+);
+
+public interface IRouteLatencyAggregator
+{
+    void Record(string routeTemplate, string httpMethod, int statusCode, double latencyMs);
+    IReadOnlyList<RouteLatencySnapshot> GetRouteSnapshots(TimeSpan window);
+    OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null);
+    void Reset();
+}
+
+public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
+{
+    private readonly TimeProvider _clock;
+    private readonly ConcurrentDictionary<long, MinuteBucketCollection> _minuteBuckets = new();
+
+    public RouteLatencyAggregator(TimeProvider clock)
+    {
+        _clock = clock;
+    }
+
+    public void Record(string routeTemplate, string httpMethod, int statusCode, double latencyMs)
+    {
+        var now = _clock.GetUtcNow();
+        var minuteEpoch = now.ToUnixTimeSeconds() / 60;
+        var normalizedRoute = NormalizeRoute(routeTemplate);
+        var normalizedMethod = httpMethod.ToUpperInvariant();
+
+        var collection = _minuteBuckets.GetOrAdd(minuteEpoch, _ => new MinuteBucketCollection());
+        collection.Record(normalizedRoute, normalizedMethod, statusCode, latencyMs);
+
+        // Prune buckets older than 120 minutes to prevent unbounded memory growth
+        PruneOldBuckets(minuteEpoch - 120);
+    }
+
+    public IReadOnlyList<RouteLatencySnapshot> GetRouteSnapshots(TimeSpan window)
+    {
+        var now = _clock.GetUtcNow();
+        var currentMinute = now.ToUnixTimeSeconds() / 60;
+        var windowMinutes = (long)Math.Ceiling(window.TotalMinutes);
+        var minMinute = currentMinute - windowMinutes;
+
+        var aggregatedByRoute = new Dictionary<(string Route, string Method), RouteHistogramAccumulator>();
+
+        foreach (var (minute, collection) in _minuteBuckets)
+        {
+            if (minute > minMinute && minute <= currentMinute)
+            {
+                collection.AggregateInto(aggregatedByRoute);
+            }
+        }
+
+        var results = new List<RouteLatencySnapshot>();
+        foreach (var ((route, method), acc) in aggregatedByRoute)
+        {
+            if (acc.RequestCount > 0)
+            {
+                results.Add(new RouteLatencySnapshot(
+                    RouteTemplate: route,
+                    HttpMethod: method,
+                    RequestCount: acc.RequestCount,
+                    Status5xxCount: acc.Status5xxCount,
+                    P95LatencyMs: acc.CalculateP95(),
+                    AvgLatencyMs: acc.RequestCount > 0 ? Math.Round(acc.TotalLatencyMs / acc.RequestCount, 2) : null,
+                    MaxLatencyMs: acc.MaxLatencyMs > 0 ? Math.Round(acc.MaxLatencyMs, 2) : null
+                ));
+            }
+        }
+
+        return results.OrderByDescending(r => r.RequestCount).ToList();
+    }
+
+    public OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null)
+    {
+        var routes = GetRouteSnapshots(window);
+        long totalRequests = 0;
+        long total5xx = 0;
+        var globalAcc = new RouteHistogramAccumulator();
+
+        var now = _clock.GetUtcNow();
+        var currentMinute = now.ToUnixTimeSeconds() / 60;
+        var windowMinutes = (long)Math.Ceiling(window.TotalMinutes);
+        var minMinute = currentMinute - windowMinutes;
+
+        foreach (var (minute, collection) in _minuteBuckets)
+        {
+            if (minute > minMinute && minute <= currentMinute)
+            {
+                collection.AggregateGlobal(globalAcc);
+            }
+        }
+
+        totalRequests = globalAcc.RequestCount;
+        total5xx = globalAcc.Status5xxCount;
+
+        double? rate5xx = null;
+        if (totalRequests > 0)
+        {
+            rate5xx = Math.Round((double)total5xx / totalRequests * 100.0, 2);
+        }
+
+        double? p95 = globalAcc.RequestCount > 0 ? globalAcc.CalculateP95() : null;
+
+        var overallStatus = "Healthy";
+        if (dbConnected == false || (rate5xx != null && rate5xx >= 10.0) || (p95 != null && p95 >= 2000.0))
+        {
+            overallStatus = "Unhealthy";
+        }
+        else if ((rate5xx != null && rate5xx >= 5.0) || (p95 != null && p95 >= 1000.0) || dbStatus == "Degraded")
+        {
+            overallStatus = "Degraded";
+        }
+
+        return new OperationsOverviewSnapshot(
+            OverallStatus: overallStatus,
+            Api5xxRatePercent: rate5xx,
+            LatencyP95Ms: p95,
+            TotalRequestsLastHour: totalRequests,
+            DatabaseConnected: dbConnected,
+            DatabaseStatus: dbStatus ?? (dbConnected == true ? "Healthy" : (dbConnected == false ? "Unhealthy" : null)),
+            Window: $"{windowMinutes / 60}h" == "1h" ? "1h" : $"{windowMinutes}m"
+        );
+    }
+
+    public void Reset()
+    {
+        _minuteBuckets.Clear();
+    }
+
+    private void PruneOldBuckets(long cutoffMinute)
+    {
+        foreach (var minute in _minuteBuckets.Keys)
+        {
+            if (minute < cutoffMinute)
+            {
+                _minuteBuckets.TryRemove(minute, out _);
+            }
+        }
+    }
+
+    public static string NormalizeRoute(string rawPath)
+    {
+        if (string.IsNullOrWhiteSpace(rawPath)) return "/";
+        
+        var normalized = rawPath.Split('?')[0].Trim();
+        if (!normalized.StartsWith('/')) normalized = "/" + normalized;
+
+        // Replace GUIDs: /users/a3b683b5-245c-4d37-8ec9-232a93902f23 -> /users/{id}
+        normalized = GuidRegex().Replace(normalized, "{id}");
+        // Replace numeric IDs: /invoices/12345 -> /invoices/{id}
+        normalized = NumericIdRegex().Replace(normalized, "/{id}");
+
+        return normalized;
+    }
+
+    [GeneratedRegex(@"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", RegexOptions.Compiled)]
+    private static partial Regex GuidRegex();
+
+    [GeneratedRegex(@"/(?:\d+)(?=/|$)", RegexOptions.Compiled)]
+    private static partial Regex NumericIdRegex();
+
+    private sealed class MinuteBucketCollection
+    {
+        private readonly ConcurrentDictionary<(string Route, string Method), RouteHistogramAccumulator> _byRoute = new();
+
+        public void Record(string route, string method, int statusCode, double latencyMs)
+        {
+            var acc = _byRoute.GetOrAdd((route, method), _ => new RouteHistogramAccumulator());
+            acc.Add(statusCode, latencyMs);
+        }
+
+        public void AggregateInto(Dictionary<(string Route, string Method), RouteHistogramAccumulator> target)
+        {
+            foreach (var (key, sourceAcc) in _byRoute)
+            {
+                if (!target.TryGetValue(key, out var acc))
+                {
+                    acc = new RouteHistogramAccumulator();
+                    target[key] = acc;
+                }
+                acc.MergeFrom(sourceAcc);
+            }
+        }
+
+        public void AggregateGlobal(RouteHistogramAccumulator target)
+        {
+            foreach (var sourceAcc in _byRoute.Values)
+            {
+                target.MergeFrom(sourceAcc);
+            }
+        }
+    }
+
+    internal sealed class RouteHistogramAccumulator
+    {
+        private int _requestCount;
+        private int _status5xxCount;
+        private int _le50;
+        private int _le100;
+        private int _le250;
+        private int _le500;
+        private int _le1000;
+        private int _le2000;
+        private int _gt2000;
+        private double _totalLatencyMs;
+        private double _maxLatencyMs;
+        private readonly object _lock = new();
+
+        public int RequestCount => _requestCount;
+        public int Status5xxCount => _status5xxCount;
+        public double TotalLatencyMs => _totalLatencyMs;
+        public double MaxLatencyMs => _maxLatencyMs;
+
+        public void Add(int statusCode, double latencyMs)
+        {
+            lock (_lock)
+            {
+                _requestCount++;
+                if (statusCode >= 500 && statusCode < 600)
+                {
+                    _status5xxCount++;
+                }
+
+                _totalLatencyMs += latencyMs;
+                if (latencyMs > _maxLatencyMs)
+                {
+                    _maxLatencyMs = latencyMs;
+                }
+
+                if (latencyMs <= 50.0) _le50++;
+                else if (latencyMs <= 100.0) _le100++;
+                else if (latencyMs <= 250.0) _le250++;
+                else if (latencyMs <= 500.0) _le500++;
+                else if (latencyMs <= 1000.0) _le1000++;
+                else if (latencyMs <= 2000.0) _le2000++;
+                else _gt2000++;
+            }
+        }
+
+        public void MergeFrom(RouteHistogramAccumulator other)
+        {
+            lock (_lock)
+            {
+                _requestCount += other._requestCount;
+                _status5xxCount += other._status5xxCount;
+                _le50 += other._le50;
+                _le100 += other._le100;
+                _le250 += other._le250;
+                _le500 += other._le500;
+                _le1000 += other._le1000;
+                _le2000 += other._le2000;
+                _gt2000 += other._gt2000;
+                _totalLatencyMs += other._totalLatencyMs;
+                if (other._maxLatencyMs > _maxLatencyMs)
+                {
+                    _maxLatencyMs = other._maxLatencyMs;
+                }
+            }
+        }
+
+        public double? CalculateP95()
+        {
+            lock (_lock)
+            {
+                if (_requestCount == 0) return null;
+                var targetRank = 0.95 * _requestCount;
+                var cum = 0;
+
+                // Bucket 0: <= 50
+                cum += _le50;
+                if (cum >= targetRank)
+                {
+                    return Math.Round((targetRank / _le50) * 50.0, 2);
+                }
+
+                // Bucket 1: 50 - 100
+                var prev = cum;
+                cum += _le100;
+                if (cum >= targetRank)
+                {
+                    return Math.Round(50.0 + ((targetRank - prev) / _le100) * 50.0, 2);
+                }
+
+                // Bucket 2: 100 - 250
+                prev = cum;
+                cum += _le250;
+                if (cum >= targetRank)
+                {
+                    return Math.Round(100.0 + ((targetRank - prev) / _le250) * 150.0, 2);
+                }
+
+                // Bucket 3: 250 - 500
+                prev = cum;
+                cum += _le500;
+                if (cum >= targetRank)
+                {
+                    return Math.Round(250.0 + ((targetRank - prev) / _le500) * 250.0, 2);
+                }
+
+                // Bucket 4: 500 - 1000
+                prev = cum;
+                cum += _le1000;
+                if (cum >= targetRank)
+                {
+                    return Math.Round(500.0 + ((targetRank - prev) / _le1000) * 500.0, 2);
+                }
+
+                // Bucket 5: 1000 - 2000
+                prev = cum;
+                cum += _le2000;
+                if (cum >= targetRank)
+                {
+                    return Math.Round(1000.0 + ((targetRank - prev) / _le2000) * 1000.0, 2);
+                }
+
+                // Bucket 6: > 2000
+                return Math.Round(Math.Max(2000.0, _maxLatencyMs), 2);
+            }
+        }
+    }
+}

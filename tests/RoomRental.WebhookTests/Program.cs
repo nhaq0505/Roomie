@@ -89,6 +89,8 @@ await PayOsOperationsHttpTests.RunAsync();
 await MonitoringFoundationTests.RunAsync();
 await MonitoringBusinessTests.RunAsync();
 
+await RoomRental.WebhookTests.OperationsMonitoringTests.RunAsync();
+
 sealed class FakeHandler : HttpMessageHandler, IHttpClientFactory
 {
     public string Body = "{}";

@@ -40,14 +40,26 @@ public sealed class PasswordRecoveryEmailWorker(IServiceScopeFactory scopes, Tim
             try
             {
                 using var scope = scopes.CreateScope();
+                var tracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+
                 await DeliverPendingAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(),
                     scope.ServiceProvider.GetRequiredService<IPasswordRecoveryEmailSender>(),
                     scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>(), clock, stoppingToken);
+
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
-            catch (Exception) when (!stoppingToken.IsCancellationRequested)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 // No recipient, challenge, OTP, SMTP response or connection string in logs.
                 logger.LogWarning("Password recovery delivery failed; check email service availability.");
+                try
+                {
+                    using var errScope = scopes.CreateScope();
+                    var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Failed", errorMessage: ex.Message, stoppingToken);
+                }
+                catch { }
             }
             await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
         }

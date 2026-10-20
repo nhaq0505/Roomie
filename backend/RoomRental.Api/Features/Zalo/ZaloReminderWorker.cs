@@ -13,6 +13,9 @@ public sealed class ZaloReminderWorker(IServiceScopeFactory scopes, TimeProvider
             try
             {
                 using var listScope = scopes.CreateScope();
+                var tracker = listScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
+
                 var db = listScope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var owners = await db.ZaloSettings.AsNoTracking().Select(x => x.OwnerId).ToListAsync(stoppingToken);
                 foreach (var owner in owners)
@@ -31,9 +34,21 @@ public sealed class ZaloReminderWorker(IServiceScopeFactory scopes, TimeProvider
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
                     catch (Exception ex) { logger.LogWarning("Zalo reminder cycle failed for owner {OwnerId} ({ErrorType}).", owner, ex.GetType().Name); }
                 }
+
+                if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
-            catch (Exception ex) { logger.LogWarning("Zalo reminder worker unavailable ({ErrorType}).", ex.GetType().Name); }
+            catch (Exception ex)
+            {
+                logger.LogWarning("Zalo reminder worker unavailable ({ErrorType}).", ex.GetType().Name);
+                try
+                {
+                    using var errScope = scopes.CreateScope();
+                    var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Failed", errorMessage: ex.Message, stoppingToken);
+                }
+                catch { }
+            }
             try { await Task.Delay(TimeSpan.FromSeconds(5), clock, stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
         }
