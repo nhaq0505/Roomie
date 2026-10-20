@@ -168,7 +168,7 @@ export function MonitoringFiltersBar({
         )}
       </Space>
 
-      <Space size={12}>
+      <Space size={12} wrap>
         {lastUpdatedAt && (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             <ClockCircleOutlined style={{ marginRight: 4 }} />

@@ -13,6 +13,7 @@
     "test:api": "node scripts/test-api-paging.mjs",
     "test:analytics": "node scripts/test-analytics-tracker.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "test:dates": "node scripts/test-monitoring-dates.mjs",
     "test:http": "node scripts/test-http-client.mjs"
   },
   "dependencies": {

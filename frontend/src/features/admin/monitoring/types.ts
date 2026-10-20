@@ -55,7 +55,7 @@ export interface CtaPerformanceDto {
 export interface CohortRetentionRowDto {
   cohortPeriod: string; // e.g. "2026-08"
   cohortSize: number;
-  retentionPercentages: number[];
+  retentionPercentages: (number | null)[];
 }
 
 export interface CohortMaturityDto {

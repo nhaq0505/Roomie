@@ -471,28 +471,34 @@ export function OperationsTab({
       {/* Background Workers Table */}
       <div style={{ marginBottom: 18 }}>
         <SectionCard title={t("Tiến trình nền (Background Workers)")}>
-          <Table
-            size="small"
-            rowKey="workerName"
-            columns={workerColumns}
-            dataSource={workers}
-            pagination={false}
-            locale={{ emptyText: t("Chưa có dữ liệu") }}
-          />
+          <div className="monitoring-table-wrapper">
+            <Table
+              size="small"
+              rowKey="workerName"
+              columns={workerColumns}
+              dataSource={workers}
+              pagination={false}
+              locale={{ emptyText: t("Chưa có dữ liệu") }}
+              scroll={{ x: 600 }}
+            />
+          </div>
         </SectionCard>
       </div>
 
       {/* Route Metrics Table */}
       <div style={{ marginBottom: 18 }}>
         <SectionCard title={t("Hiệu năng API & Cơ sở dữ liệu")}>
-          <Table
-            size="small"
-            rowKey={(r) => `${r.httpMethod}-${r.routeTemplate}`}
-            columns={routeColumns}
-            dataSource={routes}
-            pagination={{ pageSize: 5 }}
-            locale={{ emptyText: t("Chưa có dữ liệu") }}
-          />
+          <div className="monitoring-table-wrapper">
+            <Table
+              size="small"
+              rowKey={(r) => `${r.httpMethod}-${r.routeTemplate}`}
+              columns={routeColumns}
+              dataSource={routes}
+              pagination={{ pageSize: 5 }}
+              locale={{ emptyText: t("Chưa có dữ liệu") }}
+              scroll={{ x: 650 }}
+            />
+          </div>
         </SectionCard>
       </div>
 

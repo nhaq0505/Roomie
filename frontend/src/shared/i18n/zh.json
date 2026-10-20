@@ -1351,5 +1351,6 @@
   "Xác thực hoàn tất": "验证完成",
   "Bỏ qua mã OTP": "跳过验证码",
   "Lượt đăng ký chưa rõ nguồn": "来源未知的注册数",
-  "Chi phí nhân công quy đổi (VND)": "折算人工成本 (VND)"
+  "Chi phí nhân công quy đổi (VND)": "折算人工成本 (VND)",
+  "Dữ liệu thực tế: {0} đến {1}": "实际数据范围：{0} 至 {1}"
 }

@@ -1351,5 +1351,6 @@
   "Xác thực hoàn tất": "인증 완료",
   "Bỏ qua mã OTP": "인증번호 건너뜀",
   "Lượt đăng ký chưa rõ nguồn": "출처 불명 등록 건수",
-  "Chi phí nhân công quy đổi (VND)": "환산 인건비 (VND)"
+  "Chi phí nhân công quy đổi (VND)": "환산 인건비 (VND)",
+  "Dữ liệu thực tế: {0} đến {1}": "실제 데이터 범위: {0} ~ {1}"
 }

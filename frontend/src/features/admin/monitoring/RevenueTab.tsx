@@ -36,6 +36,8 @@ interface RevenueTabProps {
   is501?: boolean;
   onUpsertCampaignCost?: (input: UpsertCampaignCostRequest) => void;
   isSavingCost?: boolean;
+  requestedFromDate?: string;
+  requestedToDate?: string;
 }
 
 export function RevenueTab({
@@ -47,6 +49,8 @@ export function RevenueTab({
   is501,
   onUpsertCampaignCost,
   isSavingCost,
+  requestedFromDate,
+  requestedToDate,
 }: RevenueTabProps) {
   const [costModalOpen, setCostModalOpen] = useState(false);
   const [utmModalOpen, setUtmModalOpen] = useState(false);
@@ -106,14 +110,14 @@ export function RevenueTab({
       dataIndex: 'personHours',
       key: 'hours',
       align: 'right',
-      render: (val: number, r) => `${val}h${r.hourlyRate ? ` @ ${formatVnd(r.hourlyRate)}/h` : ''}`,
+      render: (val: number, r) => `${val}h${r.hourlyRate !== null && r.hourlyRate !== undefined ? ` @ ${formatVnd(r.hourlyRate)}/h` : ''}`,
     },
     {
       title: t("Tổng chi phí"),
       key: 'totalCost',
       align: 'right',
       render: (_, r) => {
-        if (r.personHours > 0 && !r.hourlyRate) {
+        if (r.personHours > 0 && (r.hourlyRate === null || r.hourlyRate === undefined)) {
           return (
             <Space size={4}>
               <strong style={{ color: '#17a486' }}>{formatVnd(r.cashVnd || 0)}</strong>
@@ -173,8 +177,22 @@ export function RevenueTab({
     { name: t("Chi phí tiếp thị"), color: '#9f443b', data: dailySeries.map((d) => d.marketingSpendVnd) },
   ];
 
+  const isClamped = Boolean(
+    (data?.effectiveFromDate && requestedFromDate && data.effectiveFromDate !== requestedFromDate) ||
+    (data?.effectiveToDate && requestedToDate && data.effectiveToDate !== requestedToDate)
+  );
+
   return (
     <div className="revenue-tab-content">
+      {/* Effective date range boundary indicator */}
+      {data?.effectiveFromDate && data?.effectiveToDate && (
+        <div className="monitoring-effective-range" style={{ marginBottom: 14 }}>
+          <Tag color={isClamped ? "warning" : "processing"} style={{ borderRadius: 6, padding: '3px 8px' }}>
+            {t("Dữ liệu thực tế: {0} đến {1}", [data.effectiveFromDate, data.effectiveToDate])}
+          </Tag>
+        </div>
+      )}
+
       <CampaignCostModal
         open={costModalOpen}
         onClose={() => {
@@ -269,7 +287,7 @@ export function RevenueTab({
         <SectionCard
           title={t("Quản lý chi phí thủ công")}
           extra={
-            <Space size={8}>
+            <Space size={8} wrap>
               <Button
                 icon={<LinkOutlined />}
                 onClick={() => setUtmModalOpen(true)}
@@ -290,14 +308,17 @@ export function RevenueTab({
             </Space>
           }
         >
-          <Table
-            size="small"
-            rowKey="id"
-            columns={costColumns}
-            dataSource={campaignCostsList}
-            pagination={{ pageSize: 5 }}
-            locale={{ emptyText: t("Chưa ghi nhận chi phí nào") }}
-          />
+          <div className="monitoring-table-wrapper">
+            <Table
+              size="small"
+              rowKey="id"
+              columns={costColumns}
+              dataSource={campaignCostsList}
+              pagination={{ pageSize: 5 }}
+              locale={{ emptyText: t("Chưa ghi nhận chi phí nào") }}
+              scroll={{ x: 800 }}
+            />
+          </div>
         </SectionCard>
       </div>
 
@@ -310,14 +331,17 @@ export function RevenueTab({
           </span>
         }
       >
-        <Table
-          size="small"
-          rowKey="orderCode"
-          columns={orderColumns}
-          dataSource={orders}
-          pagination={{ pageSize: 5 }}
-          locale={{ emptyText: t("Chưa có dữ liệu") }}
-        />
+        <div className="monitoring-table-wrapper">
+          <Table
+            size="small"
+            rowKey="orderCode"
+            columns={orderColumns}
+            dataSource={orders}
+            pagination={{ pageSize: 5 }}
+            locale={{ emptyText: t("Chưa có dữ liệu") }}
+            scroll={{ x: 550 }}
+          />
+        </div>
       </SectionCard>
     </div>
   );

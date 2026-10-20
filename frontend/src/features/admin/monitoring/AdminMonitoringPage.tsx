@@ -1,5 +1,6 @@
 import { LineChartOutlined, SettingOutlined, WalletOutlined } from '@ant-design/icons';
 import { App, Tabs } from 'antd';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 import { ApiError } from '../../../shared/http/client';
 import { t } from '../../../shared/i18n/runtime';
@@ -19,24 +20,21 @@ import {
 } from './api';
 import type { MonitoringFilters, UpsertCampaignCostRequest } from './types';
 
-function getInitialDates(): [string, string] {
+export function getInitialDates(now: Date = new Date()): [string, string] {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(new Date());
+  }).formatToParts(now);
 
   const year = parts.find((p) => p.type === 'year')?.value ?? '2026';
   const month = parts.find((p) => p.type === 'month')?.value ?? '10';
   const day = parts.find((p) => p.type === 'day')?.value ?? '20';
   const todayStr = `${year}-${month}-${day}`;
 
-  // Default: 30 days
-  const today = new Date(todayStr);
-  const from = new Date(today);
-  from.setDate(from.getDate() - 29);
-  const fromStr = from.toISOString().split('T')[0];
+  // Default: 30 days in Vietnam calendar
+  const fromStr = dayjs(todayStr).subtract(29, 'day').format('YYYY-MM-DD');
   return [fromStr, todayStr];
 }
 
@@ -131,6 +129,8 @@ export default function AdminMonitoringPage() {
           error={growthQuery.error}
           is501={is501Error(growthQuery.error)}
           onRetry={() => void growthQuery.refetch()}
+          requestedFromDate={filters.dateFrom}
+          requestedToDate={filters.dateTo}
         />
       ),
     },
@@ -155,6 +155,8 @@ export default function AdminMonitoringPage() {
           }}
           onUpsertCampaignCost={handleAddCampaignCost}
           isSavingCost={upsertCostMutation.isPending}
+          requestedFromDate={filters.dateFrom}
+          requestedToDate={filters.dateTo}
         />
       ),
     },

@@ -31,9 +31,19 @@ interface GrowthTabProps {
   error?: Error | unknown;
   onRetry?: () => void;
   is501?: boolean;
+  requestedFromDate?: string;
+  requestedToDate?: string;
 }
 
-export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabProps) {
+export function GrowthTab({
+  data,
+  isLoading,
+  error,
+  onRetry,
+  is501,
+  requestedFromDate,
+  requestedToDate,
+}: GrowthTabProps) {
   // Source table columns
   const sourceColumns: TableProps<TrafficSourceStatsDto>['columns'] = [
     { title: t("Nguồn"), dataIndex: 'source', key: 'source', render: (val: string) => <strong>{val}</strong> },
@@ -140,15 +150,29 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
     { name: t("Hoạt động"), color: '#457b9d', data: dailySeries.map((d) => d.activeOwners) },
   ];
 
-  // Funnel stages
+  // Funnel stages (honest null handling, never fabricate 0)
   const funnelStages = [
-    { label: t("Phiên truy cập"), count: summary?.totalSessions ?? 0, color: '#17a486' },
-    { label: t("Đăng ký"), count: summary?.registrations ?? 0, color: '#34757c' },
-    { label: t("Chủ trọ kích hoạt"), count: summary?.activatedOwners ?? 0, color: '#bb8133' },
+    { label: t("Phiên truy cập"), count: summary?.totalSessions ?? null, color: '#17a486' },
+    { label: t("Đăng ký"), count: summary?.registrations ?? null, color: '#34757c' },
+    { label: t("Chủ trọ kích hoạt"), count: summary?.activatedOwners ?? null, color: '#bb8133' },
   ];
+
+  const isClamped = Boolean(
+    (data?.effectiveFromDate && requestedFromDate && data.effectiveFromDate !== requestedFromDate) ||
+    (data?.effectiveToDate && requestedToDate && data.effectiveToDate !== requestedToDate)
+  );
 
   return (
     <div className="growth-tab-content">
+      {/* Effective date range boundary indicator */}
+      {data?.effectiveFromDate && data?.effectiveToDate && (
+        <div className="monitoring-effective-range" style={{ marginBottom: 14 }}>
+          <Tag color={isClamped ? "warning" : "processing"} style={{ borderRadius: 6, padding: '3px 8px' }}>
+            {t("Dữ liệu thực tế: {0} đến {1}", [data.effectiveFromDate, data.effectiveToDate])}
+          </Tag>
+        </div>
+      )}
+
       {/* High-level KPI Row */}
       <Row gutter={[16, 16]} className="stat-grid" style={{ marginBottom: 18 }}>
         <Col xs={24} sm={12} lg={4}>
@@ -239,7 +263,7 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
                   </div>
                 )}
               </div>
-            ) : summary && summary.totalSessions !== null && summary.totalSessions > 0 ? (
+            ) : summary ? (
               <NativeConversionFunnel stages={funnelStages} />
             ) : (
               <MonitoringEmptyState />
@@ -304,26 +328,32 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
       <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
         <Col xs={24} lg={14}>
           <SectionCard title={t("Thống kê nguồn & UTM")}>
-            <Table
-              size="small"
-              rowKey={(r) => `${r.source}-${r.medium || ''}`}
-              columns={sourceColumns}
-              dataSource={sources}
-              pagination={{ pageSize: 5 }}
-              locale={{ emptyText: t("Chưa có dữ liệu") }}
-            />
+            <div className="monitoring-table-wrapper">
+              <Table
+                size="small"
+                rowKey={(r) => `${r.source}-${r.medium || ''}`}
+                columns={sourceColumns}
+                dataSource={sources}
+                pagination={{ pageSize: 5 }}
+                locale={{ emptyText: t("Chưa có dữ liệu") }}
+                scroll={{ x: 600 }}
+              />
+            </div>
           </SectionCard>
         </Col>
         <Col xs={24} lg={10}>
           <SectionCard title={t("Tương tác CTA")}>
-            <Table
-              size="small"
-              rowKey="ctaId"
-              columns={ctaColumns}
-              dataSource={topCtas}
-              pagination={{ pageSize: 5 }}
-              locale={{ emptyText: t("Chưa có dữ liệu") }}
-            />
+            <div className="monitoring-table-wrapper">
+              <Table
+                size="small"
+                rowKey="ctaId"
+                columns={ctaColumns}
+                dataSource={topCtas}
+                pagination={{ pageSize: 5 }}
+                locale={{ emptyText: t("Chưa có dữ liệu") }}
+                scroll={{ x: 380 }}
+              />
+            </div>
           </SectionCard>
         </Col>
       </Row>
@@ -337,14 +367,17 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
           </span>
         }
       >
-        <Table
-          size="middle"
-          rowKey="cohortPeriod"
-          columns={cohortColumns}
-          dataSource={retention}
-          pagination={{ pageSize: 5 }}
-          locale={{ emptyText: t("Chưa có dữ liệu") }}
-        />
+        <div className="monitoring-table-wrapper">
+          <Table
+            size="middle"
+            rowKey="cohortPeriod"
+            columns={cohortColumns}
+            dataSource={retention}
+            pagination={{ pageSize: 5 }}
+            locale={{ emptyText: t("Chưa có dữ liệu") }}
+            scroll={{ x: 500 }}
+          />
+        </div>
       </SectionCard>
     </div>
   );

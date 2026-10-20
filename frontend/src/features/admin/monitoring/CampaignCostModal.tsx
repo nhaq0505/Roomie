@@ -1,4 +1,4 @@
-import { DatePicker, Form, Input, InputNumber, Modal, Space, Typography } from 'antd';
+import { DatePicker, Form, Input, InputNumber, Modal, Space, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { formatVnd } from '../../../shared/format';
@@ -24,13 +24,13 @@ export function CampaignCostModal({
   const [form] = Form.useForm();
   const [cashExpense, setCashExpense] = useState<number>(0);
   const [personHours, setPersonHours] = useState<number>(0);
-  const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const [hourlyRate, setHourlyRate] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     if (initialItem && open) {
       setCashExpense(initialItem.cashVnd || 0);
       setPersonHours(initialItem.personHours || 0);
-      setHourlyRate(initialItem.hourlyRate || 0);
+      setHourlyRate(initialItem.hourlyRate ?? null);
       form.setFieldsValue({
         campaign: initialItem.campaign,
         channel: initialItem.channel,
@@ -38,23 +38,24 @@ export function CampaignCostModal({
         date: dayjs(initialItem.date),
         cashVnd: initialItem.cashVnd || 0,
         personHours: initialItem.personHours || 0,
-        hourlyRate: initialItem.hourlyRate || 0,
+        hourlyRate: initialItem.hourlyRate ?? undefined,
         note: initialItem.note,
       });
     } else if (open) {
       setCashExpense(0);
       setPersonHours(0);
-      setHourlyRate(0);
+      setHourlyRate(undefined);
       form.resetFields();
       form.setFieldsValue({
         date: dayjs(),
         cashVnd: 0,
         personHours: 0,
-        hourlyRate: 0,
+        hourlyRate: undefined,
       });
     }
   }, [initialItem, open, form]);
 
+  const hasMissingValuation = personHours > 0 && (hourlyRate === null || hourlyRate === undefined);
   const totalCost = (cashExpense || 0) + (personHours || 0) * (hourlyRate || 0);
 
   const handleFinish = (values: {
@@ -64,9 +65,15 @@ export function CampaignCostModal({
     date: dayjs.Dayjs;
     cashVnd: number;
     personHours: number;
-    hourlyRate?: number;
+    hourlyRate?: number | string | null;
     note?: string;
   }) => {
+    let parsedRate: number | null = null;
+    if (values.hourlyRate !== undefined && values.hourlyRate !== null && String(values.hourlyRate).trim() !== '') {
+      const n = Number(values.hourlyRate);
+      parsedRate = Number.isFinite(n) ? n : null;
+    }
+
     onSubmit({
       campaign: values.campaign.trim(),
       channel: values.channel?.trim() || null,
@@ -74,7 +81,7 @@ export function CampaignCostModal({
       date: values.date.format('YYYY-MM-DD'),
       cashVnd: values.cashVnd || 0,
       personHours: values.personHours || 0,
-      hourlyRate: values.hourlyRate && values.hourlyRate > 0 ? values.hourlyRate : null,
+      hourlyRate: parsedRate,
       note: values.note?.trim() || null,
     });
     form.resetFields();
@@ -101,7 +108,7 @@ export function CampaignCostModal({
           date: dayjs(),
           cashVnd: 0,
           personHours: 0,
-          hourlyRate: 0,
+          hourlyRate: undefined,
         }}
         onFinish={handleFinish}
       >
@@ -164,7 +171,14 @@ export function CampaignCostModal({
             style={{ width: '100%' }}
             min={0}
             step={10000}
-            onChange={(val) => setHourlyRate(Number(val) || 0)}
+            placeholder={t("Thiếu đơn giá giờ công")}
+            onChange={(val) => {
+              if (val === null || val === undefined || val === '') {
+                setHourlyRate(null);
+              } else {
+                setHourlyRate(Number(val));
+              }
+            }}
           />
         </Form.Item>
 
@@ -182,9 +196,18 @@ export function CampaignCostModal({
           </Typography.Text>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>{t("Tổng chi phí")}:</strong>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#17a486' }}>
-              {formatVnd(totalCost)}
-            </span>
+            {hasMissingValuation ? (
+              <Space size={6}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#17a486' }}>
+                  {formatVnd(cashExpense || 0)}
+                </span>
+                <Tag color="warning">{t("Thiếu đơn giá giờ công")}</Tag>
+              </Space>
+            ) : (
+              <span style={{ fontSize: 18, fontWeight: 700, color: '#17a486' }}>
+                {formatVnd(totalCost)}
+              </span>
+            )}
           </div>
         </div>
 

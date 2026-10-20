@@ -144,21 +144,38 @@ export function NativeBarChart({
 
 export interface FunnelStage {
   label: string;
-  count: number;
+  count: number | null;
   color?: string;
 }
 
 export function NativeConversionFunnel({ stages }: { stages: FunnelStage[] }) {
   if (!stages || stages.length === 0) return null;
 
-  const topCount = stages[0].count || 1;
+  const topStageCount = stages[0]?.count ?? null;
+  const maxKnownCount = stages.reduce<number>(
+    (max, s) => (s.count !== null && s.count !== undefined && s.count > max ? s.count : max),
+    0
+  ) || 1;
 
   return (
     <div className="native-funnel" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {stages.map((stage, idx) => {
-        const percentOfTop = Math.min(Math.round((stage.count / topCount) * 100), 100);
-        const prevCount = idx > 0 ? stages[idx - 1].count || 1 : null;
-        const stepRate = prevCount !== null ? Math.min(Math.round((stage.count / prevCount) * 100), 100) : null;
+        const isCountKnown = stage.count !== null && stage.count !== undefined;
+        const prevStage = idx > 0 ? stages[idx - 1] : null;
+        const prevCountKnown = prevStage !== null && prevStage.count !== null && prevStage.count !== undefined;
+
+        let stepRate: number | null = null;
+        if (isCountKnown && prevCountKnown && prevStage.count! > 0) {
+          stepRate = Math.min(Math.round((stage.count! / prevStage.count!) * 100), 100);
+        }
+
+        let percentOfTop: number | null = null;
+        if (isCountKnown && topStageCount !== null && topStageCount > 0) {
+          percentOfTop = Math.min(Math.round((stage.count! / topStageCount) * 100), 100);
+        }
+
+        const barBasis = topStageCount !== null && topStageCount > 0 ? topStageCount : maxKnownCount;
+        const visualBarWidth = isCountKnown ? Math.min(Math.round((stage.count! / barBasis) * 100), 100) : 0;
         const color = stage.color || (idx === 0 ? '#17a486' : idx === 1 ? '#34757c' : idx === 2 ? '#bb8133' : '#457b9d');
 
         return (
@@ -173,18 +190,24 @@ export function NativeConversionFunnel({ stages }: { stages: FunnelStage[] }) {
                 )}
               </span>
               <span>
-                <strong>{stage.count.toLocaleString()}</strong>
-                <span style={{ marginLeft: 6, color: '#7a8c91', fontSize: 12 }}>
-                  ({percentOfTop}%)
-                </span>
+                <strong>{isCountKnown ? stage.count!.toLocaleString() : '—'}</strong>
+                {percentOfTop !== null ? (
+                  <span style={{ marginLeft: 6, color: '#7a8c91', fontSize: 12 }}>
+                    ({percentOfTop}%)
+                  </span>
+                ) : (
+                  <span style={{ marginLeft: 6, color: '#7a8c91', fontSize: 12 }}>
+                    (—)
+                  </span>
+                )}
               </span>
             </div>
             <div style={{ width: '100%', height: 18, background: '#f0f4f3', borderRadius: 9, overflow: 'hidden' }}>
               <div
                 style={{
-                  width: `${Math.max(percentOfTop, 2)}%`,
+                  width: isCountKnown ? `${Math.max(visualBarWidth, 2)}%` : '0%',
                   height: '100%',
-                  background: color,
+                  background: isCountKnown ? color : 'transparent',
                   borderRadius: 9,
                   transition: 'width 0.3s ease',
                 }}

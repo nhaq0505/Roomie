@@ -1351,5 +1351,6 @@
   "Xác thực hoàn tất": "Verification complete",
   "Bỏ qua mã OTP": "OTP bypassed",
   "Lượt đăng ký chưa rõ nguồn": "Registrations with unknown source",
-  "Chi phí nhân công quy đổi (VND)": "Imputed labor cost (VND)"
+  "Chi phí nhân công quy đổi (VND)": "Imputed labor cost (VND)",
+  "Dữ liệu thực tế: {0} đến {1}": "Effective data range: {0} to {1}"
 }

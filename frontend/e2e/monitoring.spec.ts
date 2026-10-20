@@ -210,6 +210,8 @@ const mockIncidentsData: AdminMonitoringIncidentsResponse = {
   incidents: [],
 };
 
+const SCREENSHOT_DIR = '/Users/nguyenhoanhquan/.gemini/antigravity-cli/brain/985a5e76-afbf-4cc3-aa89-40c9fa28441e/screenshots';
+
 test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/**', async (route) => {
@@ -273,6 +275,31 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
 
     // Traffic sources table
     await expect(page.getByText('facebook').first()).toBeVisible();
+
+    // Desktop 1440px screenshot for Growth
+    const scrollGrowth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollGrowth).toBeLessThanOrEqual(1440);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/desktop-1440-growth.png`, fullPage: true });
+
+    // Revenue Tab Screenshot
+    await page.getByRole('tab', { name: 'Doanh thu' }).click();
+    await expect(page.getByText('Doanh thu Pro').first()).toBeVisible();
+    const scrollRev = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollRev).toBeLessThanOrEqual(1440);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/desktop-1440-revenue.png`, fullPage: true });
+
+    // UTM modal screenshot
+    await page.getByRole('button', { name: 'Tạo liên kết UTM' }).click();
+    await expect(page.getByText('Đường dẫn gốc')).toBeVisible();
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/desktop-1440-utm-modal.png` });
+    await page.getByRole('button', { name: 'Đóng' }).click();
+
+    // Operations Tab Screenshot
+    await page.getByRole('tab', { name: 'Vận hành' }).click();
+    await expect(page.getByText('Trạng thái chung').first()).toBeVisible();
+    const scrollOps = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollOps).toBeLessThanOrEqual(1440);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/desktop-1440-operations.png`, fullPage: true });
   });
 
   test('Revenue Tab: shows Pro Revenue, CAC30, UTM link builder, and campaign costs', async ({ page }) => {
@@ -324,15 +351,154 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin/monitoring');
 
-    // Verify page header on mobile
+    // 1. Mobile Growth Tab
     await expect(page.getByRole('heading', { level: 2, name: 'Giám sát hệ thống' })).toBeVisible();
+    const scrollGrowth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollGrowth).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/mobile-375-growth.png`, fullPage: true });
 
-    // Verify tabs remain interactive
+    // 2. Mobile Revenue Tab
     await page.getByRole('tab', { name: 'Doanh thu' }).click();
     await expect(page.getByText('Doanh thu Pro').first()).toBeVisible();
+    const scrollRev = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollRev).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/mobile-375-revenue.png`, fullPage: true });
 
+    // 3. Mobile Operations Tab
     await page.getByRole('tab', { name: 'Vận hành' }).click();
     await expect(page.getByText('Trạng thái chung').first()).toBeVisible();
+    const scrollOps = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollOps).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/mobile-375-operations.png`, fullPage: true });
+  });
+
+  test('Campaign Cost Modal: preserves null hourlyRate on edit and distinguishes explicit 0', async ({ page }) => {
+    const unvaluedCostItem: AdminCampaignCostItemDto = {
+      id: 'cost-unvalued-qa',
+      date: '2026-10-20',
+      campaign: 'volunteer_recruitment',
+      channel: 'community',
+      source: 'offline',
+      cashVnd: 500000,
+      personHours: 10,
+      hourlyRate: null,
+      note: 'Volunteer labor unvalued',
+      updatedByName: 'Quản Trị Viên',
+      updatedAt: '2026-10-20T08:00:00Z',
+    };
+
+    let submittedPayload: Record<string, unknown> | null = null;
+
+    await page.route('**/api/admin/monitoring/campaigns/costs*', async (route) => {
+      const method = route.request().method();
+      if (method === 'POST') {
+        submittedPayload = route.request().postDataJSON();
+        return route.fulfill({ json: { ...unvaluedCostItem, ...submittedPayload } });
+      }
+      return route.fulfill({ json: [unvaluedCostItem] });
+    });
+
+    await page.goto('/admin/monitoring');
+    await page.getByRole('tab', { name: 'Doanh thu' }).click();
+
+    // Verify warning tag in table for missing valuation
+    const costSection = page.locator('.section-card', { hasText: 'Quản lý chi phí thủ công' });
+    await expect(costSection.getByText('Thiếu đơn giá giờ công')).toBeVisible();
+
+    // Click Edit button
+    await costSection.getByRole('button', { name: 'Sửa' }).click();
+
+    // Verify modal is open
+    const modal = page.locator('.ant-modal', { hasText: 'Sửa chi phí chiến dịch' });
+    await expect(modal).toBeVisible();
+
+    // Verify preview indicates missing valuation
+    await expect(modal.getByText('Thiếu đơn giá giờ công')).toBeVisible();
+
+    // Save without editing hourlyRate
+    await modal.getByRole('button', { name: 'Cập nhật chi phí' }).click();
+    await expect(modal).not.toBeVisible();
+
+    // Crucial check: hourlyRate MUST remain null, not coerced to 0!
+    expect(submittedPayload).not.toBeNull();
+    expect(submittedPayload!['hourlyRate']).toBeNull();
+
+    // Now test explicit 0 hourly rate
+    await costSection.getByRole('button', { name: 'Thêm chi phí chiến dịch' }).click();
+    const createModal = page.locator('.ant-modal', { hasText: 'Thêm chi phí chiến dịch' });
+    await expect(createModal).toBeVisible();
+
+    await createModal.getByLabel('Tên chiến dịch').fill('founder_sweat_equity');
+    await createModal.getByLabel('Số giờ công').fill('8');
+    await createModal.getByLabel('Đơn giá giờ công (VND/giờ)').fill('0');
+
+    // Total preview shows 0 VND (no missing valuation warning)
+    await createModal.getByRole('button', { name: 'Lưu chi phí' }).click();
+    await expect(createModal).not.toBeVisible();
+
+    expect(submittedPayload).not.toBeNull();
+    expect(submittedPayload!['hourlyRate']).toBe(0);
+  });
+
+  test('Clamped Date Window: renders effective date range tag while preserving requested filter intent', async ({ page }) => {
+    const clampedGrowthData: AdminMonitoringGrowthResponse = {
+      ...mockGrowthData,
+      effectiveFromDate: '2026-08-01',
+      effectiveToDate: '2026-10-20',
+    };
+
+    await page.route('**/api/admin/monitoring/growth*', (route) => route.fulfill({ json: clampedGrowthData }));
+
+    await page.goto('/admin/monitoring');
+
+    // Switch to 90 days filter
+    await page.locator('.monitoring-filters-bar label', { hasText: '90 ngày' }).click();
+
+    // Verify effective range banner surfaces server clamped window
+    const effectiveTag = page.locator('.monitoring-effective-range');
+    await expect(effectiveTag).toBeVisible();
+    await expect(effectiveTag.getByText('Dữ liệu thực tế: 2026-08-01 đến 2026-10-20')).toBeVisible();
+
+    // Crucial check: user filter intent '90d' is preserved in the UI
+    const activeRadio = page.locator('.monitoring-filters-bar .ant-radio-button-wrapper-checked');
+    await expect(activeRadio).toContainText('90 ngày');
+  });
+
+  test('Fallback Funnel: renders non-null registration/activation stages when totalSessions is null', async ({ page }) => {
+    const nullSessionsGrowthData: AdminMonitoringGrowthResponse = {
+      ...mockGrowthData,
+      summary: {
+        ...mockGrowthData.summary,
+        totalSessions: null, // Unknown session count (e.g. multi-day window where raw web events pruned)
+        uniqueVisitors: null,
+        registrations: 45,
+        activatedOwners: 28,
+      },
+      funnel: null, // Server funnel missing, forces fallback to summary
+    };
+
+    await page.route('**/api/admin/monitoring/growth*', (route) => route.fulfill({ json: nullSessionsGrowthData }));
+
+    await page.goto('/admin/monitoring');
+
+    const funnelCard = page.locator('.section-card', { hasText: 'Phễu chuyển đổi' });
+    await expect(funnelCard).toBeVisible();
+
+    // Fallback funnel must NOT be suppressed to MonitoringEmptyState ("Chưa có dữ liệu")
+    await expect(funnelCard.getByText('Chưa có dữ liệu')).toHaveCount(0);
+
+    // Phiên truy cập stage renders Unknown ("—")
+    await expect(funnelCard.getByText('Phiên truy cập')).toBeVisible();
+
+    // Registrations and Activations stages render their authentic known values
+    await expect(funnelCard.getByText('Đăng ký')).toBeVisible();
+    await expect(funnelCard.getByText('45')).toBeVisible();
+
+    await expect(funnelCard.getByText('Chủ trọ kích hoạt')).toBeVisible();
+    await expect(funnelCard.getByText('28')).toBeVisible();
+
+    // Step rate from registrations (45) to activations (28) = 62%
+    await expect(funnelCard.getByText('(62% từ bước trước)')).toBeVisible();
   });
 
   test('Gate Security: non-Admin owner is redirected away from /admin/monitoring to /dashboard', async ({ page }) => {
