@@ -1149,5 +1149,7 @@
   "Chọn ngày/giờ gửi tháng hoặc bấm nhắc hóa đơn còn nợ. Tin gồm thông tin hóa đơn và ảnh QR chuyển khoản.": "मासिक दिन/समय चुनें या बकाया बिलों के लिए मैन्युअल अनुस्मारक भेजें। संदेश में बिल विवरण और भुगतान QR की तस्वीर होगी।",
   "Giữ thiết bị Zalo Web đăng nhập. Khi phiên bị đăng xuất, quay lại đây và quét QR mới.": "Zalo Web डिवाइस लॉगिन रखें। लॉगआउट होने पर यहां आकर नया QR स्कैन करें।",
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.": "व्यक्तिगत Zalo कनेक्शन अनौपचारिक लाइब्रेरी का उपयोग करता है; कनेक्शन बाधित हो सकता है या Zalo खाते पर प्रतिबंध लग सकता है।",
-  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie जुड़े होने पर इसी खाते से दूसरा Zalo Web सत्र न खोलें। यहां कनेक्शन हटाने से सहेजा गया सत्र मिटेगा और शेड्यूल बंद होगा; फ़ोन से Zalo Web डिवाइस को भी लॉगआउट कर सकते हैं।"
+  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie जुड़े होने पर इसी खाते से दूसरा Zalo Web सत्र न खोलें। यहां कनेक्शन हटाने से सहेजा गया सत्र मिटेगा और शेड्यूल बंद होगा; फ़ोन से Zalo Web डिवाइस को भी लॉगआउट कर सकते हैं।",
+  "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.": "अपने Zalo से बिल की जानकारी और भुगतान लिंक भेजें।",
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "किरायेदार का लिंक अब मान्य नहीं है। कमरे के पेज पर जाँचें या नया लिंक बनाएँ।"
 }

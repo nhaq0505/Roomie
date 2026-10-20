@@ -5,7 +5,7 @@ namespace RoomRental.Api.Services;
 
 public sealed record ZaloConnection(string Status, string? QrImage = null);
 public sealed record ZaloSendResult(string Status);
-public sealed record ZaloSendRequest(Guid AttemptId, string Phone, string Message, string BankBin, string BankAccount, long Amount, string TransferContent);
+public sealed record ZaloSendRequest(Guid AttemptId, string Phone, string Message);
 
 public interface IZaloGateway
 {

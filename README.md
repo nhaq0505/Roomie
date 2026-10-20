@@ -100,4 +100,4 @@ Luồng quên mật khẩu, giới hạn OTP và yêu cầu triển khai: [khôi
 
 ## Nhắc hóa đơn qua Zalo
 
-Đã có tính năng tùy chọn kết nối Zalo cá nhân bằng QR, hàng đợi nhắc hóa đơn kèm VietQR và lịch gửi hằng tháng. Cần chạy gateway riêng và bật cấu hình trước khi dùng. Xem [hướng dẫn Zalo](docs/zalo-setup.md) để cài đặt, hiểu giới hạn phiên Zalo Web và cách ghi nhận thanh toán.
+Đã có tính năng tùy chọn kết nối Zalo cá nhân bằng QR, hàng đợi nhắc hóa đơn kèm link thanh toán Roomie và lịch gửi hằng tháng. Cần chạy gateway riêng và bật cấu hình trước khi dùng. Xem [hướng dẫn Zalo](docs/zalo-setup.md) để cài đặt, hiểu giới hạn phiên Zalo Web và cách ghi nhận thanh toán.

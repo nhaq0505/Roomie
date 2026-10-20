@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Configuration;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -20,7 +22,12 @@ var options = postgres is null ? new DbContextOptionsBuilder<AppDbContext>().Use
 await using var db = new AppDbContext(options);
 await db.Database.EnsureCreatedAsync();
 var gateway = new FakeGateway();
-var service = new ZaloReminderService(db, gateway, clock);
+var protection = new EphemeralDataProtectionProvider();
+var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+    ["PublicBaseUrl"] = "https://roomie.example" }).Build();
+var tokens = new TenantTokenService(protection, config);
+var payments = new PaymentWebhookService(db, protection, new NoHttp(), config);
+var service = new ZaloReminderService(db, gateway, clock, tokens, payments);
 var checks = 0;
 void Assert(bool yes, string name) { if (!yes) throw new Exception(name); checks++; Console.WriteLine("PASS: " + name); }
 
@@ -40,15 +47,19 @@ Assert(ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2027-02-2
 schedule.ScheduleEnabled = false;
 Assert(!ZaloReminderService.ScheduleDue(schedule, clock.GetUtcNow()), "disabled schedule does not run");
 
-var owner = new AppUser { Name = "Fixture Owner", Email = "zalo@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved };
-var other = new AppUser { Name = "Other Owner", Email = "other@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved };
+var owner = new AppUser { Name = "Fixture Owner", Email = "zalo@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved,
+    PaymentConfirmationMode = PaymentConfirmationMode.Manual, ManualBankBin = "970436", ManualAccountNumber = "123456789", ManualAccountName = "FIXTURE" };
+var other = new AppUser { Name = "Other Owner", Email = "other@example.invalid", PasswordHash = "fixture", Role = UserRole.Owner, Status = OwnerStatus.Approved,
+    PaymentConfirmationMode = PaymentConfirmationMode.Manual, ManualBankBin = "970436", ManualAccountNumber = "123456789", ManualAccountName = "FIXTURE" };
 db.Users.AddRange(owner, other);
-var setting = new OwnerZaloSettings { OwnerId = owner.Id, BankBin = "970436", BankAccount = "123456789", BankAccountName = "FIXTURE OWNER" };
+var setting = new OwnerZaloSettings { OwnerId = owner.Id };
 db.ZaloSettings.Add(setting);
 await db.SaveChangesAsync();
 Invoice AddInvoice(string room, Guid ownerId, string? phone = "0912345678", decimal paid = 0, bool active = true, bool draft = false)
 {
     var occupancy = new Occupancy { RoomId = Guid.NewGuid(), TenantName = "Tenant", Phone = phone, IsActive = active, StartDate = new(2026, 1, 1) };
+    var token = tokens.Create();
+    occupancy.TenantTokenHash = token.Hash; occupancy.ProtectedTenantToken = token.ProtectedToken;
     db.Occupancies.Add(occupancy);
     var invoice = new Invoice { OwnerId = ownerId, RoomId = occupancy.RoomId, BuildingId = Guid.NewGuid(), OccupancyId = occupancy.Id,
         RoomName = room, BuildingName = "Building", TenantName = "Tenant", Period = "2026-10", Total = 100000, Paid = paid,
@@ -65,8 +76,10 @@ await db.SaveChangesAsync();
 Assert(await service.QueueAsync(owner.Id, default) == 1, "queue filters draft, paid, invalid phone, inactive and other owner");
 Assert(await service.QueueAsync(owner.Id, default) == 0, "double enqueue does not duplicate");
 await service.DispatchAsync(owner.Id, default);
-Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Amount == 75000 && gateway.Sends[0].Phone == "0912345678", "send remaining amount and normalized number");
-Assert(gateway.Sends[0].Message.Contains("75.000") && gateway.Sends[0].TransferContent.Length <= 25, "invoice details and bounded transfer reference");
+Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Message.Contains("75.000") && gateway.Sends[0].Phone == "0912345678", "send remaining amount and normalized number");
+var originalToken = tokens.Unprotect(await db.Occupancies.SingleAsync(x => x.Id == invoice.OccupancyId));
+Assert(gateway.Sends[0].Message.Contains($"https://roomie.example/t/{originalToken}/invoices/{invoice.Id:D}/checkout") &&
+    !gateway.Sends[0].Message.Contains("STK:") && !gateway.Sends[0].Message.Contains("Quét QR"), "existing tenant checkout link, no bank or QR required");
 db.ChangeTracker.Clear();
 Assert((await db.ZaloReminders.SingleAsync()).Status == "Sent", "successful send persisted");
 Assert(await service.QueueAsync(owner.Id, default) == 0, "sent invoice blocked for 20 hours");
@@ -142,6 +155,30 @@ monthlySettings.ScheduleEnabled = false; monthlySettings.LastScheduledPeriod = "
 AddInvoice("DisabledSchedule", owner.Id); await db.SaveChangesAsync();
 Assert(await service.QueueScheduledAsync(owner.Id, default) == 0 && monthlySettings.LastScheduledPeriod == "", "disabled schedule retains no run marker or new queue item");
 
+// Current token is read at dispatch time; never reuse a revoked link captured at enqueue.
+clock.Set(DateTimeOffset.Parse("2026-10-24T01:00:00Z"));
+gateway.ThrowOnSend = false; gateway.Result = "Sent";
+await db.ZaloReminders.ExecuteDeleteAsync();
+await db.Invoices.ExecuteUpdateAsync(s => s.SetProperty(x => x.Paid, x => x.Total));
+var rotatedInvoice = AddInvoice("Rotate", owner.Id);
+await db.SaveChangesAsync();
+Assert(await service.QueueAsync(owner.Id, default) == 1, "invoice with a valid tenant link queues without Zalo bank settings");
+var resident = await db.Occupancies.SingleAsync(x => x.Id == rotatedInvoice.OccupancyId);
+var rotated = tokens.Create(); resident.TenantTokenHash = rotated.Hash; resident.ProtectedTenantToken = rotated.ProtectedToken;
+await db.SaveChangesAsync();
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Last().Message.Contains(tokens.Url(rotated.Token)), "dispatch uses current rotated tenant link");
+clock.Set(DateTimeOffset.Parse("2026-10-25T01:00:00Z"));
+await service.QueueAsync(owner.Id, default);
+resident.TenantTokenHash = "revoked"; await db.SaveChangesAsync();
+var sentBeforeRevocation = gateway.Sends.Count;
+await service.DispatchAsync(owner.Id, default);
+Assert(gateway.Sends.Count == sentBeforeRevocation && (await db.ZaloReminders.SingleAsync()).Detail == "TenantLinkUnavailable", "revoked token skipped at send time");
+Assert(await service.QueueAsync(owner.Id, default) == 0, "invalid tenant token excluded from queue");
+await db.Users.Where(x => x.Id == owner.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ManualBankBin, (string?)null));
+try { await service.QueueAsync(owner.Id, default); throw new Exception("payment sharing guard missing"); }
+catch (ApiException) { Assert(true, "existing tenant-link payment setup rule remains enforced"); }
+
 // Both generated migration sets must build and SQLite migration must preserve existing business data.
 var migratedPath = Path.Combine(Path.GetTempPath(), $"roomie-zalo-migration-{Guid.NewGuid():N}.db");
 try
@@ -178,4 +215,9 @@ sealed class FakeGateway : IZaloGateway
         if (ThrowOnSend) throw new HttpRequestException("fixture timeout");
         return Task.FromResult(new ZaloSendResult(Result));
     }
+}
+
+sealed class NoHttp : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => throw new Exception("No provider calls allowed");
 }

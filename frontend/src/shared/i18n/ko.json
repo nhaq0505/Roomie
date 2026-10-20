@@ -1149,5 +1149,7 @@
   "Chọn ngày/giờ gửi tháng hoặc bấm nhắc hóa đơn còn nợ. Tin gồm thông tin hóa đơn và ảnh QR chuyển khoản.": "매월 날짜와 시간을 선택하거나 미납 알림을 직접 추가하세요. 메시지에는 청구 내역과 송금 QR 이미지가 포함됩니다.",
   "Giữ thiết bị Zalo Web đăng nhập. Khi phiên bị đăng xuất, quay lại đây và quét QR mới.": "Zalo Web 기기를 로그인 상태로 유지하세요. 로그아웃되면 여기에서 새 QR을 스캔하세요.",
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.": "개인 Zalo 연결은 비공식 라이브러리를 사용하며 중단되거나 Zalo에서 계정이 제한될 수 있습니다.",
-  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie 연결 중에는 같은 계정의 다른 Zalo Web 세션을 열지 마세요. 여기서 해제하면 저장된 Roomie 세션이 삭제되고 일정이 꺼집니다. 휴대폰에서도 Zalo Web 기기를 로그아웃할 수 있습니다."
+  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie 연결 중에는 같은 계정의 다른 Zalo Web 세션을 열지 마세요. 여기서 해제하면 저장된 Roomie 세션이 삭제되고 일정이 꺼집니다. 휴대폰에서도 Zalo Web 기기를 로그아웃할 수 있습니다.",
+  "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.": "내 Zalo에서 청구서 정보와 결제 링크를 보내세요.",
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "세입자 링크가 유효하지 않습니다. 객실 페이지에서 확인하거나 재발급하세요."
 }

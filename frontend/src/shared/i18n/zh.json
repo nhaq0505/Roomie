@@ -1149,5 +1149,7 @@
   "Chọn ngày/giờ gửi tháng hoặc bấm nhắc hóa đơn còn nợ. Tin gồm thông tin hóa đơn và ảnh QR chuyển khoản.": "选择每月日期和时间，或手动提醒未付账单。消息包含账单详情和转账二维码图片。",
   "Giữ thiết bị Zalo Web đăng nhập. Khi phiên bị đăng xuất, quay lại đây và quét QR mới.": "保持 Zalo Web 设备登录。退出后请回到此处重新扫码。",
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.": "个人 Zalo 连接使用非官方库，可能中断或受到 Zalo 账号限制。",
-  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie 连接时请勿为同一账号另开 Zalo Web。此处断开会删除 Roomie 保存的会话并关闭计划；您也可在手机上退出 Zalo Web 设备。"
+  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie 连接时请勿为同一账号另开 Zalo Web。此处断开会删除 Roomie 保存的会话并关闭计划；您也可在手机上退出 Zalo Web 设备。",
+  "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.": "通过您的 Zalo 发送账单信息和付款链接。",
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "租客链接已失效，请在房间页面检查或重新生成。"
 }

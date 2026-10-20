@@ -6,7 +6,8 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway gateway, TimeProvider clock)
+public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway gateway, TimeProvider clock,
+    TenantTokenService tokens, PaymentWebhookService payments)
 {
     public const long CooldownMs = 20 * 60 * 60 * 1000;
     public static DateTimeOffset VietnamTime(DateTimeOffset utc) => utc.ToOffset(TimeSpan.FromHours(7));
@@ -27,8 +28,11 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
     }
     [GeneratedRegex(@"^0[35789]\d{8}$")]
     private static partial Regex PhonePattern();
-    public static bool BankReady(OwnerZaloSettings s) => Regex.IsMatch(s.BankBin, @"^\d{6}$") &&
-        Regex.IsMatch(s.BankAccount, @"^[A-Za-z0-9]{1,32}$") && s.BankAccountName.Length is > 0 and <= 100;
+    private string? ValidToken(Occupancy occupancy)
+    {
+        var token = tokens.Unprotect(occupancy);
+        return token is not null && TenantTokenService.Hash(token) == occupancy.TenantTokenHash ? token : null;
+    }
 
     public async Task<int> QueueScheduledAsync(Guid ownerId, CancellationToken ct)
     {
@@ -38,7 +42,7 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.DayOfMonth, x => x.DayOfMonth), ct);
         var settings = await db.ZaloSettings.SingleAsync(x => x.OwnerId == ownerId, ct);
         var added = 0;
-        if (BankReady(settings) && ScheduleDue(settings, clock.GetUtcNow()))
+        if (ScheduleDue(settings, clock.GetUtcNow()) && await tokens.CanShareAsync(ownerId, payments, ct))
         {
             added = await QueueAsync(ownerId, ct);
             settings.LastScheduledPeriod = VietnamTime(clock.GetUtcNow()).ToString("yyyy-MM");
@@ -50,14 +54,16 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
 
     public async Task<int> QueueAsync(Guid ownerId, CancellationToken ct)
     {
+        if (!await tokens.CanShareAsync(ownerId, payments, ct))
+            throw new ApiException(409, "Configure payment settings before sharing tenant links.");
         // Serializable scope also encloses the scheduled-period marker in the worker.
         var candidates = await (from i in db.Invoices.AsNoTracking()
             join o in db.Occupancies.AsNoTracking() on i.OccupancyId equals o.Id
             where i.OwnerId == ownerId && i.LifecycleState == InvoiceLifecycleState.Issued && i.Total > i.Paid && o.IsActive
-            select new { i.Id, o.Phone }).ToListAsync(ct);
+            select new { i.Id, Occupancy = o }).ToListAsync(ct);
         var now = clock.GetUtcNow().ToUnixTimeMilliseconds();
         var added = 0;
-        foreach (var invoice in candidates.Where(x => NormalizePhone(x.Phone) != null))
+        foreach (var invoice in candidates.Where(x => NormalizePhone(x.Occupancy.Phone) != null && ValidToken(x.Occupancy) != null))
         {
             var row = await db.ZaloReminders.SingleOrDefaultAsync(x => x.InvoiceId == invoice.Id, ct);
             if (row is null)
@@ -93,8 +99,7 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
             // An interrupted submission may have reached Zalo. Require explicit requeue after the cooldown.
             await db.ZaloReminders.Where(x => x.OwnerId == ownerId && x.Status == "Sending")
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, "Unknown").SetProperty(x => x.Detail, "DeliveryUnknown"), ct);
-            var settings = await db.ZaloSettings.AsNoTracking().SingleAsync(x => x.OwnerId == ownerId, ct);
-            if (!BankReady(settings) || !await db.Users.AnyAsync(x => x.Id == ownerId && x.Role == UserRole.Owner && x.Status == OwnerStatus.Approved, ct)) return;
+            if (!await tokens.CanShareAsync(ownerId, payments, ct) || !await db.Users.AnyAsync(x => x.Id == ownerId && x.Role == UserRole.Owner && x.Status == OwnerStatus.Approved, ct)) return;
             if ((await gateway.ConnectionAsync(ownerId, "status", ct)).Status != "Connected") return;
             var job = await db.ZaloReminders.Where(x => x.OwnerId == ownerId && x.Status == "Pending")
                 .OrderBy(x => x.QueuedAtMs).ThenBy(x => x.InvoiceId).FirstOrDefaultAsync(ct);
@@ -111,18 +116,26 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
             }
             if (job.LastAttemptAtMs != 0 && now - job.LastAttemptAtMs < CooldownMs) return;
             if (!InSendWindow(clock.GetUtcNow())) return;
+            var token = ValidToken(occupancy!);
+            if (token is null)
+            {
+                job.Status = "Skipped";
+                job.Detail = "TenantLinkUnavailable";
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+            var link = tokens.Url(token).TrimEnd('/') + $"/invoices/{invoice.Id:D}/checkout";
             var remaining = (long)ApiSupport.RoundVnd(invoice.Total - invoice.Paid);
-            var reference = "R" + invoice.Id.ToString("N")[..16].ToUpperInvariant();
             var money = remaining.ToString("N0", CultureInfo.GetCultureInfo("vi-VN"));
             var description = string.IsNullOrWhiteSpace(invoice.Description) ? invoice.Kind == "Deposit" ? "Tiền cọc" : "Tiền phòng và dịch vụ" : invoice.Description;
-            var message = string.Create(CultureInfo.GetCultureInfo("vi-VN"), $"Roomie • Hóa đơn {invoice.Period}\n{invoice.BuildingName} – Phòng {invoice.RoomName}\nNgười thuê: {invoice.TenantName}\nNội dung hóa đơn: {description}\nTiền phòng: {invoice.Rent:N0} đ; điện: {invoice.ElectricityAmount:N0} đ; nước: {invoice.WaterAmount:N0} đ; dịch vụ: {invoice.ServiceAmount:N0} đ\nTổng: {invoice.Total:N0} đ; đã trả: {invoice.Paid:N0} đ\nCòn thanh toán: {money} đ\nHạn thanh toán: {invoice.DueDate:dd/MM/yyyy}\nNgân hàng (BIN): {settings.BankBin}\nSTK: {settings.BankAccount} – {settings.BankAccountName}\nNội dung: {reference}\nQuét QR đính kèm để chuyển khoản. Bạn có thể trả lời chủ trọ tại đây.");
+            var message = string.Create(CultureInfo.GetCultureInfo("vi-VN"), $"Roomie • Hóa đơn {invoice.Period}\n{invoice.BuildingName} – Phòng {invoice.RoomName}\nNgười thuê: {invoice.TenantName}\nNội dung hóa đơn: {description}\nTiền phòng: {invoice.Rent:N0} đ; điện: {invoice.ElectricityAmount:N0} đ; nước: {invoice.WaterAmount:N0} đ; dịch vụ: {invoice.ServiceAmount:N0} đ\nTổng: {invoice.Total:N0} đ; đã trả: {invoice.Paid:N0} đ\nCòn thanh toán: {money} đ\nHạn thanh toán: {invoice.DueDate:dd/MM/yyyy}\nXem hóa đơn và thanh toán: {link}\nBạn có thể trả lời chủ trọ tại đây.");
             var previousAttemptAtMs = job.LastAttemptAtMs;
             job.Status = "Sending";
             job.LastAttemptAtMs = clock.GetUtcNow().ToUnixTimeMilliseconds();
             await db.SaveChangesAsync(ct); // Persist before external side effects.
             try
             {
-                var result = await gateway.SendAsync(ownerId, new(job.AttemptId, phone, message, settings.BankBin, settings.BankAccount, remaining, reference), ct);
+                var result = await gateway.SendAsync(ownerId, new(job.AttemptId, phone, message), ct);
                 job.Status = result.Status is "Sent" or "Failed" ? result.Status : result.Status is "Disconnected" or "Deferred" ? "Pending" : "Unknown";
                 if (job.Status == "Pending") job.LastAttemptAtMs = previousAttemptAtMs; // Provider confirms no submission took place.
                 job.Detail = job.Status == "Sent" || result.Status == "Deferred" ? null : job.Status == "Failed" ? "RecipientRejected" : result.Status == "Disconnected" ? "ReconnectRequired" : "DeliveryUnknown";

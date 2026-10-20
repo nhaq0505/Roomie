@@ -36,6 +36,7 @@ function detailLabel(detail?: string | null) {
     case 'DeliveryUnknown': return t("Có thể tin đã gửi. Kiểm tra Zalo trước khi thêm lại sau 20 giờ.");
     case 'RecipientRejected': return t("Không tìm thấy hoặc không thể gửi đến số điện thoại này.");
     case 'ReconnectRequired': return t("Quét QR lại để tiếp tục kết nối.");
+    case 'TenantLinkUnavailable': return t("Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.");
     case 'InvoiceIneligible': return t("Hóa đơn đã trả đủ, chưa phát hành hoặc người thuê không còn phù hợp.");
     case 'DisconnectedByOwner': return t("Đã dừng theo yêu cầu ngắt kết nối.");
     default: return '';
@@ -66,7 +67,7 @@ export default function ZaloSettingsPage() {
     { title: t("Lần xử lý gần nhất"), key: 'time', render: (_: unknown, row: ZaloReminder) => new Intl.DateTimeFormat(getLocale(), { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(row.sentAtMs ?? (row.lastAttemptAtMs || row.queuedAtMs)) },
   ];
   return <>
-    <PageTitle title={t("Nhắc hóa đơn qua Zalo")} subtitle={t("Gửi hóa đơn và QR chuyển khoản từ Zalo của bạn.")} extra={<Button onClick={() => setGuide(true)}>{t("Hướng dẫn sử dụng")}</Button>} />
+    <PageTitle title={t("Nhắc hóa đơn qua Zalo")} subtitle={t("Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.")} extra={<Button onClick={() => setGuide(true)}>{t("Hướng dẫn sử dụng")}</Button>} />
     {settings.isError ? <LoadError error={settings.error} onRetry={() => void settings.refetch()} /> : settings.isPending ? <Skeleton active /> : <div className="zalo-settings-grid">
       <SectionCard title={t("Kết nối Zalo")}>
         <Space direction="vertical" size="middle" className="zalo-full-width">
@@ -83,7 +84,7 @@ export default function ZaloSettingsPage() {
         </Space>
       </SectionCard>
     </div>}
-    <SectionCard title={t("Hàng đợi nhắc hóa đơn")} extra={<Popconfirm title={t("Thêm các hóa đơn còn nợ vào hàng đợi?")} onConfirm={() => queue.mutate()} okText={t("Thêm vào hàng đợi")} cancelText={t("Hủy")}><Button icon={<MessageOutlined />} disabled={!connected || !settings.data?.bankAccount} loading={queue.isPending}>{t("Nhắc hóa đơn còn nợ")}</Button></Popconfirm>}>
+    <SectionCard title={t("Hàng đợi nhắc hóa đơn")} extra={<Popconfirm title={t("Thêm các hóa đơn còn nợ vào hàng đợi?")} onConfirm={() => queue.mutate()} okText={t("Thêm vào hàng đợi")} cancelText={t("Hủy")}><Button icon={<MessageOutlined />} disabled={!connected} loading={queue.isPending}>{t("Nhắc hóa đơn còn nợ")}</Button></Popconfirm>}>
       <Typography.Paragraph type="secondary">{t("Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Chỉ gửi đến người thuê đang ở có số di động Việt Nam hợp lệ.")}</Typography.Paragraph>
       {history.isError ? <LoadError error={history.error} onRetry={() => void history.refetch()} /> : <ResponsiveTable<ZaloReminder> rowKey="invoiceId" columns={columns} dataSource={history.data?.items ?? []} loading={history.isPending} locale={{ emptyText: t("Chưa có hóa đơn trong hàng đợi") }} pagination={{ current: page, pageSize: 20, total: history.data?.total ?? 0, onChange: setPage, showSizeChanger: false }} />}
     </SectionCard>

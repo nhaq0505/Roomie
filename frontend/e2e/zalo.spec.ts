@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-const initialSettings = { scheduleEnabled: false, dayOfMonth: 31, hour: 8, minute: 30, bankBin: '970436', bankAccount: '123456789', bankAccountName: 'FIXTURE OWNER', gatewayEnabled: true };
+const initialSettings = { scheduleEnabled: false, dayOfMonth: 31, hour: 8, minute: 30, bankBin: '', bankAccount: '', bankAccountName: '', gatewayEnabled: true };
 async function setup(page: Page, status = 'Disconnected') {
   let settings = { ...initialSettings }, state = status;
   await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 'fixture-owner', role: 'Owner', status: 'Approved', name: 'Fixture', email: 'owner@example.invalid' } }));

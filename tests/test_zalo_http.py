@@ -32,7 +32,7 @@ class ZaloHttpTests(unittest.TestCase):
     def test_settings_persist_without_cross_owner_leak(self):
         self.owner.ok('PUT', '/api/zalo/settings', BANK)
         settings = self.owner.ok('GET', '/api/zalo/settings')
-        for key, value in BANK.items(): self.assertEqual(settings[key], value)
+        for key in ('scheduleEnabled', 'dayOfMonth', 'hour', 'minute'): self.assertEqual(settings[key], BANK[key])
         self.assertFalse(settings['gatewayEnabled'])
         self.assertNotIn('gatewayToken', settings)
         other, _ = self.create_owner()
@@ -40,9 +40,9 @@ class ZaloHttpTests(unittest.TestCase):
         self.assertEqual(other.ok('GET', '/api/zalo/history')['items'], [])
         self.assertEqual(self.owner.ok('GET', '/api/zalo/history?page=2')['page'], 2)
 
-    def test_schedule_and_bank_validation(self):
-        for patch in ({'dayOfMonth': 0}, {'dayOfMonth': 32}, {'hour': 6}, {'hour': 21}, {'minute': 60},
-                      {'bankBin': 'fake'}, {'bankAccount': '123\n456'}, {'bankAccountName': ' '}):
+    def test_schedule_validation_without_bank_requirement(self):
+        self.owner.ok('PUT', '/api/zalo/settings', {'scheduleEnabled': False, 'dayOfMonth': 1, 'hour': 8, 'minute': 0})
+        for patch in ({'dayOfMonth': 0}, {'dayOfMonth': 32}, {'hour': 6}, {'hour': 21}, {'minute': 60}):
             self.assertEqual(self.owner.request('PUT', '/api/zalo/settings', {**BANK, **patch})[0], 400)
         self.assertEqual(self.owner.request('PUT', '/api/zalo/settings', {**BANK, 'hour': 20, 'minute': 59})[0], 204)
 

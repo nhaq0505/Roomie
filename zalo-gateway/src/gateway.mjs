@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import QRCode from 'qrcode';
-import { vietqr } from './vietqr.mjs';
 
 export class Gateway {
   constructor(store, createZalo, now = Date.now) {
@@ -87,7 +85,6 @@ export class Gateway {
     if (s.busy || hour < 7 || hour >= 21 || this.now() - s.saved.lastSendAt < 5000) return { status: 'Deferred' };
     s.busy = true;
     try {
-      const qr = await QRCode.toBuffer(vietqr(body), { width: 512, margin: 4, errorCorrectionLevel: 'M' });
       let user;
       try { user = await s.api.findUser(body.phone); }
       catch { return { status: 'Failed' }; }
@@ -99,10 +96,8 @@ export class Gateway {
       s.saved.lastSendAt = this.now();
       this.persist(owner, s);
       try {
-        const result = await s.api.sendMessage({ msg: body.message, attachments: [{ data: qr, filename: 'hoa-don-qr.png',
-          metadata: { width: 512, height: 512, totalSize: qr.length } }] }, user.uid, 0);
-        // zca-js sends a single PNG with the text as its caption; message is null for this response.
-        const delivered = result?.attachment?.length === 1 && result.attachment[0]?.msgId;
+        const result = await s.api.sendMessage({ msg: body.message }, user.uid, 0);
+        const delivered = result?.message?.msgId;
         s.saved.attempts[body.attemptId].status = delivered ? 'Sent' : 'Unknown';
       } catch { s.saved.attempts[body.attemptId].status = 'Unknown'; }
       this.persist(owner, s);

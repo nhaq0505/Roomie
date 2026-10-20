@@ -1149,5 +1149,7 @@
   "Chọn ngày/giờ gửi tháng hoặc bấm nhắc hóa đơn còn nợ. Tin gồm thông tin hóa đơn và ảnh QR chuyển khoản.",
   "Giữ thiết bị Zalo Web đăng nhập. Khi phiên bị đăng xuất, quay lại đây và quét QR mới.",
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.",
-  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại."
+  "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.",
+  "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.",
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng."
 ]

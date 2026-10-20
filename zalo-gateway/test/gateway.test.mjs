@@ -7,7 +7,6 @@ import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Gateway } from '../src/gateway.mjs';
 import { EncryptedStore } from '../src/store.mjs';
-import { vietqr, crc16 } from '../src/vietqr.mjs';
 
 const owner = '11111111-1111-1111-1111-111111111111';
 const other = '22222222-2222-2222-2222-222222222222';
@@ -21,9 +20,10 @@ function fixture(t) {
   let sends = 0, fail = false, findFail = false;
   const api = { listener, getOwnId: () => 'fixture-uid', findUser: async () => { if (findFail) throw Error('fixture'); return { uid: 'fixture-tenant' }; },
     sendMessage: async (message, uid, type) => { sends++; if (fail) throw Error('fixture timeout');
-      assert.equal(uid, 'fixture-tenant'); assert.equal(type, 0); assert.equal(message.attachments[0].filename, 'hoa-don-qr.png');
-      assert.deepEqual(message.attachments[0].data.subarray(0, 8), Buffer.from([137,80,78,71,13,10,26,10]));
-      return { message: null, attachment: [{ msgId: 'fixture-message' }] }; } };
+      assert.equal(uid, 'fixture-tenant'); assert.equal(type, 0); assert.equal(message.attachments, undefined);
+      assert.ok(message.msg.includes('https://roomie.example/t/fixture/invoices/fixture/checkout'));
+      return { message: { msgId: 'fixture-message' }, attachment: [] }; } };
+
   let now = Date.parse('2026-10-20T01:00:00Z');
   const factory = () => ({ login: async () => api, loginQR: async (_, callback) => {
     callback({ type: 0, data: { image: 'fixture-base64' }, actions: { abort() {} } });
@@ -31,28 +31,10 @@ function fixture(t) {
     return api;
   } });
   const gateway = new Gateway(store, factory, () => now);
-  const body = () => ({ attemptId: randomUUID(), phone: '0912345678', message: 'Fixture invoice', bankBin: '970436', bankAccount: '123456789', amount: 75000, transferContent: 'R1234567890ABCDEF' });
+  const body = () => ({ attemptId: randomUUID(), phone: '0912345678', message: 'Fixture invoice https://roomie.example/t/fixture/invoices/fixture/checkout' });
   return { dir, key, store, api, gateway, factory, body, advance: ms => { now += ms; }, set: value => { now = Date.parse(value); }, sends: () => sends, fail: () => { fail = true; }, findFail: () => { findFail = true; } };
 }
 async function connect(f) { f.gateway.connect(owner); await new Promise(resolve => setImmediate(resolve)); assert.equal((await f.gateway.status(owner)).status, 'Connected'); }
-function fields(text) {
-  const out = {}; let i = 0;
-  while (i < text.length) { const id = text.slice(i, i + 2); const n = Number(text.slice(i + 2, i + 4)); assert.ok(Number.isInteger(n)); out[id] = text.slice(i + 4, i + 4 + n); i += 4 + n; }
-  assert.equal(i, text.length); return out;
-}
-test('VietQR contains the exact bank, account, VND amount, transfer reference and valid CRC', () => {
-  assert.equal(crc16('123456789'), '29B1');
-  const payload = vietqr({ bankBin: '970436', bankAccount: '123456789', amount: 75000, transferContent: 'R1234567890ABCDEF' });
-  const root = fields(payload); const merchant = fields(root['38']); const bank = fields(merchant['01']);
-  assert.equal(root['53'], '704'); assert.equal(root['54'], '75000'); assert.equal(root['58'], 'VN');
-  assert.equal(merchant['00'], 'A000000727'); assert.equal(merchant['02'], 'QRIBFTTA');
-  assert.equal(bank['00'], '970436'); assert.equal(bank['01'], '123456789'); assert.equal(fields(root['62'])['08'], 'R1234567890ABCDEF');
-  assert.equal(root['63'], crc16(payload.slice(0, -4)));
-});
-test('VietQR rejects invalid bank fields, amount and transfer content', () => {
-  const base = { bankBin: '970436', bankAccount: '123456789', amount: 75000, transferContent: 'R123' };
-  for (const patch of [{ bankBin: 'bad' }, { bankAccount: '123\n456' }, { amount: 0 }, { amount: 1.2 }, { transferContent: 'x'.repeat(26) }]) assert.throws(() => vietqr({ ...base, ...patch }));
-});
 test('saved session is encrypted and authentication failures do not reveal credentials', t => {
   const f = fixture(t); f.store.write(owner, { cookie: 'COOKIE_SECRET' });
   assert.deepEqual(f.store.read(owner), { cookie: 'COOKIE_SECRET' });
@@ -67,11 +49,11 @@ test('QR login persists credentials and a restart restores the real session', as
   await new Promise(resolve => setImmediate(resolve));
   assert.equal((await restarted.status(owner)).status, 'Connected');
 });
-test('single image caption response is success and duplicate attempt never resends', async t => {
+test('text message response is success and duplicate attempt never resends', async t => {
   const f = fixture(t); await connect(f); const body = f.body();
   assert.equal((await f.gateway.send(owner, body)).status, 'Sent');
   assert.equal((await f.gateway.send(owner, body)).status, 'Sent'); assert.equal(f.sends(), 1);
-  assert.equal((await f.gateway.send(owner, { ...body, amount: 1 })).status, 'Unknown'); assert.equal(f.sends(), 1);
+  assert.equal((await f.gateway.send(owner, { ...body, message: body.message + ' changed' })).status, 'Unknown'); assert.equal(f.sends(), 1);
 });
 test('replayed success survives gateway process restart', async t => {
   const f = fixture(t); await connect(f); const body = f.body(); await f.gateway.send(owner, body);

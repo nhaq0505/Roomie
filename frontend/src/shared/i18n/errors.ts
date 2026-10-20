@@ -1,5 +1,12 @@
 import { getLanguage, hasMessage, t, translateMessage } from './runtime';
 const zaloMessages: Record<string, readonly string[]> = {
+  "Configure payment settings before sharing tenant links.": [
+    "Vui lòng hoàn tất cấu hình thanh toán trước khi gửi link cho người thuê.",
+    "Complete payment settings before sending tenant links.",
+    "请先完成付款设置，再发送租客链接。",
+    "결제 설정을 완료한 뒤 세입자 링크를 보내세요.",
+    "किरायेदार को लिंक भेजने से पहले भुगतान सेटिंग पूरी करें।"
+  ],
   "Zalo gateway is not configured.": [
     "Dịch vụ Zalo chưa được bật. Liên hệ quản trị viên để cấu hình.",
     "Zalo is not enabled. Contact your administrator.",
