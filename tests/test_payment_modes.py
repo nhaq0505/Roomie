@@ -40,6 +40,9 @@ class PaymentModesHttpTests(unittest.TestCase):
         self.assertEqual(self.owner.request('POST',f"/api/manual-payments/{request['id']}/confirm",{'amount':1})[0],409)
         for _ in range(2): self.owner.ok('POST',f"/api/manual-payments/{request['id']}/confirm",{'amount':request['amount']})
         self.assertEqual(self.guest.ok('GET',f'/api/tenant/{self.token}')['totals']['outstanding'],0)
+        pending = self.owner.ok('GET','/api/manual-payments?page=1&pageSize=1')
+        self.assertEqual(pending['items'], [])
+        self.assertEqual(pending['total'], 0)
     def test_stale_batch_cannot_partially_credit_other_invoices(self):
         charge = self.supplement(100)
         request = self.selection()

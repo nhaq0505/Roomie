@@ -54,7 +54,7 @@ public static class ManualPaymentEndpoints
         routes.MapGet("", async (int? page, int? pageSize, HttpContext context, AppDbContext db, CancellationToken ct) => {
             var ownerId = ApiSupport.OwnerId(context);
             var paging = PageRequest.Parse(page, pageSize);
-            var source = db.ManualPaymentRequests.AsNoTracking().Where(x => x.OwnerId == ownerId);
+            var source = db.ManualPaymentRequests.AsNoTracking().Where(x => x.OwnerId == ownerId && x.ConfirmedAt == null);
             var total = await source.CountAsync(ct);
             var requests = await source.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(ct);

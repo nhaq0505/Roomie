@@ -100,7 +100,7 @@ for (const width of [375, 1440]) {
     await page.route('**/api/**', route => {
       const path = new URL(route.request().url()).pathname;
       if (path === '/api/auth/me') return route.fulfill({ json: owner });
-      if (path === '/api/manual-payments') return route.fulfill({ json: { items: [{ ...manual, roomName: 'Phòng 101', tenantName: 'Fixture Tenant', confirmedAt: confirmed ? new Date().toISOString() : null }], total: 1 } });
+      if (path === '/api/manual-payments') return route.fulfill({ json: { items: confirmed ? [] : [{ ...manual, roomName: 'Phòng 101', tenantName: 'Fixture Tenant' }], total: confirmed ? 0 : 1 } });
       if (path === '/api/manual-payments/fixture-request/confirm') {
         expect(route.request().postDataJSON()).toEqual({ amount: 300000 });
         confirmed = true; confirmations++;
@@ -114,6 +114,7 @@ for (const width of [375, 1440]) {
     });
     await page.goto('/invoices');
     await expect(page.getByRole('heading', { name: 'Chuyển khoản chờ xác nhận', exact: true })).toBeVisible();
+    await page.screenshot({ path: `/tmp/roomie-ui-review/payments/pending-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Xác nhận đã nhận tiền', exact: true }).click();
     const dialog = page.getByRole('dialog');
     const submit = dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true });
@@ -123,7 +124,8 @@ for (const width of [375, 1440]) {
     await expect(submit).toBeEnabled();
     await submit.click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText('Đã xác nhận', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Chuyển khoản chờ xác nhận', exact: true })).toHaveCount(0);
+    await expect(page.locator('.manual-payment-request')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Xác nhận đã nhận tiền', exact: true })).toHaveCount(0);
     expect(confirmations).toBe(1);
     expect(invoiceReads).toBeGreaterThan(1);

@@ -42,7 +42,7 @@ Các thao tác sửa hóa đơn, quyết toán cọc, kết thúc lượt thuê 
 - `PUT /api/settings/payment/preferences`: `{confirmationMode,bankBin?,accountNumber?,accountName?}`; cấu hình của chính Owner đang đăng nhập.
 - `GET /api/tenant/{token}`: thêm `confirmationMode`, `totals.unpaidCount`.
 - `POST /api/tenant/{token}/manual-payments`: `{invoiceId:null}` để tạo QR tất cả, hoặc `{invoiceId:"..."}` cho một hóa đơn.
-- `GET /api/manual-payments?page=1&pageSize=20`: danh sách phân trang `{items,total,page,pageSize}` của Owner, có tên phòng, người thuê, reference, danh sách phân bổ và trạng thái xác nhận.
+- `GET /api/manual-payments?page=1&pageSize=20`: danh sách **chưa xác nhận** phân trang `{items,total,page,pageSize}` của Owner, có tên phòng, người thuê, reference và danh sách phân bổ. Sau xác nhận, yêu cầu rời danh sách chờ; dữ liệu yêu cầu và khoản thu vẫn được lưu. Khi không còn yêu cầu, giao diện ẩn cả khối chờ.
 - `POST /api/manual-payments/{id}/confirm`: `{amount}`; chỉ Owner sở hữu yêu cầu được ghi nhận.
 - `POST /api/tenant/{token}/payment`: tạo đơn payOS gộp từ dư nợ máy chủ.
 - `POST /api/tenant/{token}/orders/{orderCode}/reconcile`: chỉ đối soát đơn có hóa đơn gốc thuộc đúng lượt thuê/token.

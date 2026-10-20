@@ -59,7 +59,27 @@
 .invoice-paid-note { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 12px; border-radius: 10px; color: #347f62; background: #eff8f2; font-size: 13px; }
 .drawer-loading { padding-top: 18px; }
 
-.manual-payment-confirmations { margin-bottom: 20px; }
+.manual-payment-confirmations.ant-card { margin-bottom: 20px; border: 1px solid #b5dcd1; border-top: 3px solid var(--teal-dark); background: #f1faf6; }
 .manual-payment-requests { margin-top: 16px; }
-.manual-payment-request { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.manual-payment-request { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 18px; border: 1px solid #d8e8e1; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
 .manual-payment-request small { color: var(--muted); }
+
+.manual-payment-heading, .manual-payment-title { display: flex; align-items: center; gap: 10px; }
+.manual-payment-heading { justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
+.manual-payment-title { flex: 1; min-width: 0; }
+.manual-payment-title > .anticon { color: var(--teal-dark); font-size: 22px; }
+.manual-payment-title h4.ant-typography { margin: 0; font-size: 18px; }
+.manual-payment-count { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 14px; color: #fff; background: var(--teal-dark); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.manual-payment-requests { display: grid; gap: 12px; }
+.manual-payment-request > div { display: grid; gap: 5px; min-width: 0; }
+.manual-payment-request strong { color: var(--ink); }
+.manual-payment-amount { margin: 3px 0; color: var(--teal-dark); font-size: 21px; font-weight: 750; }
+.manual-payment-amount > span { color: var(--muted); font-size: 13px; font-weight: 400; }
+@media (max-width: 600px) {
+  .manual-payment-confirmations .ant-card-body { padding: 18px; }
+  .manual-payment-title { flex-basis: 100%; }
+  .manual-payment-title h4.ant-typography { font-size: 17px; }
+  .manual-payment-heading > .ant-btn { margin-left: auto; }
+  .manual-payment-request { padding: 16px; }
+  .manual-payment-request > .ant-btn { width: 100%; }
+}
