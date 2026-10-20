@@ -16,17 +16,28 @@
 .landing-page p, .landing-page li { text-wrap: pretty; }
 .landing-page section[id] { scroll-margin-top: 100px; }
 .landing-page a { text-decoration: none; }
+.landing-nav a, .landing-text-link, .footer-links a { transition: color 180ms ease; }
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.landing-page) { scroll-behavior: smooth; }
+  .landing-page [data-landing-pending] { opacity: 0; transform: translateY(var(--landing-reveal-distance, 12px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-page a { transition: none; }
+}
 .landing-header { position: sticky; top: 0; z-index: 30; background: var(--landing-deep); border-bottom: 1px solid #2a444d; }
 .landing-header-inner { max-width: 1328px; padding: 16px 24px; min-height: 80px; margin: auto; display: flex; align-items: center; gap: 40px; }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; color: #fff; }
 .landing-brand strong { font: 700 24px/1 Manrope, sans-serif; letter-spacing: -.5px; }
 .landing-brand .brand-mark { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; background: var(--roomie-brand-color); color: #fff; }
 .landing-nav { display: flex; align-items: center; gap: 28px; }
-.landing-nav a, .landing-login { display: inline-flex; align-items: center; min-height: 40px; color: #edf9f4; font-size: 14px; }
-.landing-nav a:hover, .landing-login:hover { color: var(--landing-mint); }
+.landing-nav a { display: inline-flex; align-items: center; min-height: 40px; color: #edf9f4; font-size: 14px; }
+.landing-nav a:hover { color: var(--landing-mint); }
 .landing-header-actions { display: flex; align-items: center; gap: 20px; margin-left: auto; }
 .landing-header-actions .language-selector { width: 128px; min-width: 128px; height: 40px; }
 .landing-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; padding: 10px 20px; border: 1px solid transparent; border-radius: 12px; font-size: 14px; font-weight: 600; line-height: 1.5; white-space: nowrap; transition: background-color .2s, color .2s; }
+.landing-btn-outline { color: #edf9f4; border-color: #a3c6bc; background: transparent; }
+.landing-btn-outline:hover { color: #fff; background: #193b42; }
+.landing-btn-outline:focus-visible { outline: 3px solid var(--landing-mint); outline-offset: 3px; }
 .landing-btn-light { background: #fff; color: var(--landing-deep)!important; border-color: #fff; }
 .landing-btn-light:hover { background: #d9f8eb; }
 .landing-btn-lg { min-height: 52px; padding: 14px 28px; font-size: 16px; }

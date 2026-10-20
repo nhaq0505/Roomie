@@ -11,6 +11,7 @@ import RoomieMark from '../../shared/ui/RoomieMark';
 import { useAuth } from '../auth/session';
 import { type User } from '../auth/index';
 import './LandingPage.css';
+import { useLandingMotion } from './useLandingMotion';
 
 function Brand({ footer = false }: { footer?: boolean }) {
   return <Link to="/" className={`landing-brand${footer ? ' landing-brand--footer' : ''}`} aria-label="Roomie">
@@ -87,18 +88,19 @@ function BillingIllustration() {
 }
 
 export function LandingContent({ user = null }: { user?: User | null }) {
+  const rootRef = useLandingMotion();
   const workspace = user?.role === 'Admin' ? '/admin/owners' : '/dashboard';
   const destination = user ? workspace : '/register';
   const actionLabel = user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ");
 
-  return <div className="landing-page">
+  return <div className="landing-page" ref={rootRef}>
     <header className="landing-header">
       <div className="landing-header-inner">
         <Brand />
         <nav className="landing-nav" aria-label={t("Điều hướng chính")}><a href="#features">{t("Tính năng")}</a><a href="#how-it-works">{t("Cách hoạt động")}</a></nav>
         <div className="landing-header-actions">
           <LanguageSelector />
-          {!user && <Link to="/login" className="landing-login">{t("Đăng nhập")}</Link>}
+          {!user && <Link to="/login" className="landing-btn landing-btn-outline landing-login">{t("Đăng nhập")}</Link>}
           <Link to={destination} className="landing-btn landing-btn-light"><span className="btn-text-full">{actionLabel}</span><span className="btn-text-short">{user ? t("Tổng quan") : t("Đăng ký")}</span></Link>
         </div>
       </div>
