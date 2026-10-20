@@ -26,12 +26,12 @@ flowchart TD
         end
 
         subgraph Workers ["Worker Telemetry"]
-            W1["InvoiceSweepService ('invoice-sweep')"] -->|Heartbeat| WorkerTracker["DefaultWorkerStateTracker"]
+            W1["InvoiceSweepService ('invoice-sweep')"] -->|Heartbeat| WorkerTracker["WorkerTelemetryTracker"]
             W2["PaymentReconciliationHostedService ('reconcile')"] -->|Heartbeat| WorkerTracker
             W3["PasswordRecoveryEmailWorker ('recovery-email')"] -->|Heartbeat| WorkerTracker
             W4["ZaloReminderWorker ('zalo')"] -->|Heartbeat| WorkerTracker
             W5["DataMaintenanceService ('cleanup')"] -->|Heartbeat| WorkerTracker
-            W6["MonitoringAggregationWorker ('aggregation')"] -->|Heartbeat| WorkerTracker
+            W6["OpsMinuteFlushWorker ('ops-aggregation')"] -->|Heartbeat| WorkerTracker
             WorkerTracker --> WorkerDb["WorkerHeartbeats (EF Core)"]
         end
 
@@ -43,9 +43,9 @@ flowchart TD
         end
 
         subgraph Incidents ["Incident & Alerting Engine"]
-            Engine["IncidentEngine / IncidentMonitoringService"] --> OpsMonitoring
+            Engine["IncidentMonitoringService"] --> OpsMonitoring
             Engine --> IncidentDb["MonitoringIncidents (EF Core)"]
-            Engine --> AlertNotifier["SmtpIncidentAlertNotifier"]
+            Engine --> AlertNotifier["SmtpIncidentNotifier"]
             AlertNotifier --> Smtp["SMTP Email Alert (1h cooldown)"]
         end
 
@@ -91,8 +91,17 @@ P95 latency is interpolated within the target percentile bucket ($0.95 \times N$
 ## 3. Host Collector Ingestion (`LinuxHostCollectorMetricsReader`)
 
 - **Path Resolution**: Ingests `/app/monitoring-host/host-metrics.json` via read-only bind mount `/var/lib/rehouse/monitoring/public:/app/monitoring-host:ro`. Supports configuration override (`Monitoring:HostMetricsPath`) and environment override (`MONITORING_HOST_METRICS_PATH`).
-- **Staleness Bound**: 180 seconds (3 minutes) from `generated_at`. If older, `IsStale = true`.
-- **Nullable Value Preservation**: Unknown or uncollected CPU/RAM/Disk metrics remain `null`; never fabricated as healthy `0.0`.
+- **Real Collector JSON Schema**:
+  - `incidents.active`: An array/list of active host incident objects, each with stable collector ID (`id`), `target`, `severity`, `title`, `current_value`, `consecutive_samples`, and `opened_at`.
+  - `incidents.recent_history`: An array/list of historical resolved incident objects, each with stable collector ID, `resolved_at`, `duration_seconds`, and `resolved_value`.
+  - `services.backup_watchdog`: Surfaces backup marker telemetry with default threshold of 27 hours (97200 seconds), `last_success_at`, `age_seconds`, and `status`.
+- **Ingestion Guards & Bounded Resource Limits**:
+  - **Bounded File Size**: Maximum file size limited to 2MB to guard against memory exhaustion.
+  - **Max Parser Depth**: `JsonDocumentOptions` enforces `MaxDepth = 16`.
+  - **Future Timestamp Protection**: If `generated_at` exceeds the system clock by > 2 minutes, it is rejected and marked stale/invalid (`RecordedAt = null`, `IsStale = true`).
+  - **Out-of-Range & Non-Finite Filtering**: CPU%, RAM%, and Disk% metrics must be finite numbers in `[0.0, 100.0]`; out-of-range, NaN, or Infinity values are safely preserved as `null`.
+  - **Absent Container Handling**: If the `containers` property is absent or empty, `containerCount` remains `null` rather than inventing `0` (which would wrongfully imply a catastrophic container outage).
+- **Staleness Tracking**: Marked stale (`IsStale = true`) when `(now - recordedAt) > 180s` (3 collector cycles). Stale or missing data transitions dependent alerts to `Unknown`, keeping existing incidents active without wrongful auto-resolution.
 - **Fault-Tolerant Parsing**: Malformed JSON or missing files return `null` and log debug/warning without throwing or crashing the API.
 
 ---
@@ -106,12 +115,28 @@ All 6 application background workers are instrumented to report lifecycle heartb
 3. `recovery-email`: Queued password reset and verification delivery (`PasswordRecoveryEmailWorker`).
 4. `zalo`: Queued Zalo reminder notifications (`ZaloReminderWorker`).
 5. `cleanup`: Ephemeral session and throttled token maintenance (`DataMaintenanceService`).
-6. `aggregation`: Daily business analytics and traffic rollups (`MonitoringAggregationWorker`).
+6. `ops-aggregation`: Route telemetry minute bucket EF Core flush and 30-day retention (`OpsMinuteFlushWorker`).
+
+### Display-Only Mapping: `backup-watchdog`
+To integrate with the frontend operations dashboard without requiring central DTO schema modifications, the host collector's authoritative `backup_watchdog` service is mapped into the `workers` array of `AdminMonitoringOperationsResponse`:
+- **Worker Name**: `"backup-watchdog"`
+- **Status & Staleness**: Reflects real status (`Healthy`, `Degraded`, or `Unknown`). If the host collector is stale (>180s), missing, or the backup marker age exceeds 27h (97200s), status is strictly `Unknown` and `IsStale = true`. Real stale or unknown states stay `Unknown` even if recent telemetry exists.
+- **Timestamps**: Uses actual `last_success_at` derived from the filesystem marker mtime. No invented start or error timestamps (`LastStartedAt = null`, `LastErrorAt = null`).
+- **Exclusion from App Alert Engine**: `backup-watchdog` is strictly **excluded** from the application's `IncidentMonitoringService` worker SLA/alert evaluation, because the autonomous Ubuntu host collector (`rehouse-host-collector.py`) is the sole 27-hour notification authority.
 
 ### Worker Status Semantics
-- `Status`: `"Healthy"`, `"Degraded"`, `"Failed"`, `"Disabled"`.
+- `Status`: `"Healthy"`, `"Degraded"`, `"Failed"`, `"Disabled"`, `"Unknown"`.
 - `ConsecFailures`: Incremented on failure; reset to 0 upon healthy cycle completion.
-- `IsStale`: True if `now - UpdatedAt > 10 minutes`.
+- `IsStale`: Evaluated against per-worker SLAs:
+  - `recovery-email`: 5 minutes (300s)
+  - `zalo`: 5 minutes (300s)
+  - `reconcile`: 10 minutes (600s)
+  - `cleanup`: 20 minutes (1200s)
+  - `ops-aggregation`: 2 hours (7200s)
+  - `invoice-sweep`: 26 hours (93600s)
+  - Default: 15 minutes
+- Startup Grace Period: A 10-minute grace period from system startup prevents false stall alerts for newly started workers.
+- Disabled Workers: Workers with `IsEnabled == false` are never marked stale or failed.
 
 ### Operational Queue Stats
 - `ZaloPendingQueueCount`: Unsent reminders in `ZaloReminders` with `Status == 'Pending'`.
@@ -125,23 +150,24 @@ All 6 application background workers are instrumented to report lifecycle heartb
 
 ### Incident Lifecycle
 - States: `Active` -> `Acknowledged` -> `Resolved`.
-- Cooldown: 1 hour (3600 seconds) reminder cooldown. Initial alert fires immediately; subsequent alerts for the same active condition fire once per hour.
-- Auto-Recovery: When operational conditions normalize, the active incident automatically transitions to `Resolved`, and an immediate recovery notice is dispatched.
+- Cooldown: 1 hour (3600 seconds) reminder cooldown. Initial alert fires immediately upon accepted delivery; subsequent reminder alerts fire once per hour.
+- Notification Success Gating: `LastNotifiedAt` and `NotificationCount` are updated strictly **after** accepted SMTP delivery. If SMTP delivery fails (e.g. SMTP server unreachable), `LastNotifiedAt` remains null and notification remains pending for immediate retry next cycle without cooldown suppression.
+- Recovery Notification Retries: When an incident resolves, a recovery notice is dispatched. If SMTP delivery fails, the incident is flagged for pending recovery retry in subsequent cycles until delivery succeeds.
+- Explicit Auto-Recovery vs. Unknown State: An incident only auto-resolves when telemetry explicitly proves the condition is healthy. During periods of missing, stale, or insufficient telemetry (e.g. < 100 requests in 5-min/10-min window, or stale host metrics), active incidents remain open and are NEVER auto-resolved on silence or absent data.
 
 ### Evaluated Alert Rules
 | Incident Key | Trigger Condition | Severity | Cooldown |
 |---|---|---|---|
-| `high_5xx_rate` | 5xx error rate >= 10.0% (Critical) / >= 5.0% (Warning) | Critical / Warning | 1 hour |
-| `high_p95_latency` | API P95 latency >= 2000ms (Critical) / >= 1000ms (Warning) | Critical / Warning | 1 hour |
-| `database_disconnected` | `CanConnectAsync() == false` | Critical | 1 hour |
+| `high_5xx_rate` | 5xx error rate > 5.0% sustained over 5 minutes (min 100 requests) | Critical (>= 10%) / Warning (>= 5%) | 1 hour |
+| `high_p95_latency` | API P95 latency > 2000ms sustained over 10 minutes (min 100 requests) | Critical | 1 hour |
+| `database_disconnected` | 3 consecutive probe failures at least 1 minute apart | Critical | 1 hour |
 | `host_collector_stale` | Host collector metric age > 180 seconds | Warning | 1 hour |
-| `host_cpu_high` | Host CPU utilization >= 85.0% (Warning) / >= 95.0% (Critical) | Critical / Warning | 1 hour |
-| `host_disk_high` | Host disk utilization >= 85.0% (Warning) / >= 95.0% (Critical) | Critical / Warning | 1 hour |
-| `host_memory_high` | Host RAM utilization >= 85.0% (Warning) / >= 95.0% (Critical) | Critical / Warning | 1 hour |
-| `worker_failure_{name}` | Background worker failed or consecutive failures >= 3 | Critical / Warning | 1 hour |
+| `host_cpu_high` | Host CPU utilization >= 85.0% sustained 10 minutes (consumed from collector) | Critical / Warning | 1 hour (collector managed) |
+| `host_disk_high` | Host disk utilization >= 85.0% sustained 5 minutes (consumed from collector) | Critical / Warning | 1 hour (collector managed) |
+| `worker_stalled_{name}` | Enabled background worker failed or exceeded per-worker SLA without heartbeat | Warning | 1 hour |
 
 ### Alert Email Delivery
-Dispatched via `SmtpIncidentAlertNotifier` to `MONITORING_ALERT_TO`.
+Dispatched via `SmtpIncidentNotifier` to `MONITORING_ALERT_TO`.
 All notification emails append the delivery disclaimer:
 ```
 Note: SMTP acceptance by server does not guarantee final mailbox delivery (accepted != delivered).
@@ -195,6 +221,16 @@ Requires `Admin` role. Returns combined overview, route histogram latencies, hos
       "lastErrorAt": null,
       "lastErrorMessage": null,
       "isStale": false
+    },
+    {
+      "workerName": "backup-watchdog",
+      "isEnabled": true,
+      "status": "Healthy",
+      "lastStartedAt": null,
+      "lastSuccessAt": "2026-10-20T15:00:00Z",
+      "lastErrorAt": null,
+      "lastErrorMessage": null,
+      "isStale": false
     }
   ],
   "queues": {
@@ -205,6 +241,9 @@ Requires `Admin` role. Returns combined overview, route histogram latencies, hos
   }
 }
 ```
+
+> [!NOTE]
+> **Histogram & UI Availability**: Root `histogramBuckets` is optional; when raw bucket distributions are not emitted by the backend, the frontend UI gracefully displays an "unavailable" state for the route histogram card without throwing errors.
 
 ### 2. `GET /api/admin/monitoring/incidents`
 Returns active incident count and historical incident records:

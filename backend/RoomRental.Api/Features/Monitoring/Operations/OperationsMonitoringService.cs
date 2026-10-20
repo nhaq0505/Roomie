@@ -56,8 +56,65 @@ public sealed class OperationsMonitoringService(
             MaxLatencyMs: r.MaxLatencyMs
         )).ToList();
 
-        var hostMetrics = await hostReader.ReadHostMetricsAsync(ct);
-        var workers = await workerTracker.GetWorkerStatusesAsync(ct);
+        HostCollectorMetrics? collectorMetrics = null;
+        HostMetricsDto? hostMetrics = null;
+        if (hostReader is ILinuxHostCollectorMetricsReader linuxReader)
+        {
+            collectorMetrics = await linuxReader.ReadHostMetricsAsync(ct);
+            if (collectorMetrics != null)
+            {
+                hostMetrics = new HostMetricsDto(
+                    CpuPercent: collectorMetrics.CpuPercent,
+                    MemoryPercent: collectorMetrics.MemoryPercent,
+                    DiskPercent: collectorMetrics.DiskPercent,
+                    ContainerCount: collectorMetrics.ContainerCount,
+                    HealthEndpointStatus: collectorMetrics.HealthEndpointStatus,
+                    HostStatus: collectorMetrics.HostStatus,
+                    RecordedAt: collectorMetrics.RecordedAt,
+                    IsStale: collectorMetrics.IsStale
+                );
+            }
+        }
+        else
+        {
+            hostMetrics = await hostReader.ReadHostMetricsAsync(ct);
+        }
+
+        var workersList = (await workerTracker.GetWorkerStatusesAsync(ct)).ToList();
+
+        // Surface authoritative collector backupWatchdog as WorkerStatusDto named "backup-watchdog"
+        if (!workersList.Any(w => w.WorkerName.Contains("backup", StringComparison.OrdinalIgnoreCase) || w.WorkerName.Contains("watchdog", StringComparison.OrdinalIgnoreCase)))
+        {
+            var bw = collectorMetrics?.BackupWatchdog;
+            var isStale = collectorMetrics == null || collectorMetrics.IsStale || (bw != null && bw.AgeSeconds.HasValue && bw.AgeSeconds.Value > bw.ThresholdSeconds);
+
+            string status;
+            if (collectorMetrics == null || collectorMetrics.IsStale || bw == null || bw.Status.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                status = "Unknown";
+            }
+            else if (bw.Status.Equals("healthy", StringComparison.OrdinalIgnoreCase))
+            {
+                status = isStale ? "Unknown" : "Healthy";
+            }
+            else
+            {
+                status = isStale ? "Unknown" : "Degraded";
+            }
+
+            workersList.Add(new WorkerStatusDto(
+                WorkerName: "backup-watchdog",
+                IsEnabled: bw != null && !bw.Status.Equals("unknown", StringComparison.OrdinalIgnoreCase),
+                Status: status,
+                LastStartedAt: null,
+                LastSuccessAt: bw?.LastSuccessAt,
+                LastErrorAt: null,
+                LastErrorMessage: bw != null && bw.Status.Equals("stale", StringComparison.OrdinalIgnoreCase)
+                    ? $"Backup age exceeds threshold ({bw.ThresholdSeconds}s)"
+                    : null,
+                IsStale: isStale
+            ));
+        }
 
         int? zaloPendingCount = null;
         int? zaloEligibleCount = null;
@@ -84,7 +141,7 @@ public sealed class OperationsMonitoringService(
             Overview: overviewDto,
             RouteMetrics: routeMetrics,
             HostMetrics: hostMetrics,
-            Workers: workers,
+            Workers: workersList,
             Queues: queueStats
         );
     }

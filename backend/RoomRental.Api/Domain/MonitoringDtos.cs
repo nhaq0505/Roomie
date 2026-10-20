@@ -196,7 +196,7 @@ public sealed record HostMetricsDto(
     double? CpuPercent,
     double? MemoryPercent,
     double? DiskPercent,
-    int ContainerCount,
+    int? ContainerCount,
     string HealthEndpointStatus,
     string HostStatus,
     DateTimeOffset? RecordedAt,

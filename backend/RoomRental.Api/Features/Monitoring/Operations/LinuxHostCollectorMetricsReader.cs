@@ -12,15 +12,39 @@ public sealed class HostMetricsOptions
     public double StalenessThresholdSeconds { get; set; } = 180.0;
 }
 
+public sealed record HostCollectorIncident(
+    string Target,
+    string Id,
+    string Severity,
+    string Title,
+    string? CurrentValue,
+    int ConsecutiveSamples,
+    DateTimeOffset? OpenedAt,
+    DateTimeOffset? LastNotifiedAt,
+    DateTimeOffset? ResolvedAt = null,
+    double? DurationSeconds = null,
+    string? ResolvedValue = null
+);
+
+public sealed record BackupWatchdogStatus(
+    string Status,
+    DateTimeOffset? LastSuccessAt,
+    double? AgeSeconds,
+    double ThresholdSeconds
+);
+
 public sealed record HostCollectorMetrics(
     double? CpuPercent,
     double? MemoryPercent,
     double? DiskPercent,
-    int ContainerCount,
+    int? ContainerCount,
     string HealthEndpointStatus,
     string HostStatus,
     DateTimeOffset? RecordedAt,
-    bool IsStale
+    bool IsStale,
+    IReadOnlyList<HostCollectorIncident>? ActiveIncidents = null,
+    IReadOnlyList<HostCollectorIncident>? RecentHistory = null,
+    BackupWatchdogStatus? BackupWatchdog = null
 );
 
 public interface ILinuxHostCollectorMetricsReader
@@ -78,27 +102,42 @@ public sealed class LinuxHostCollectorMetricsReader : ILinuxHostCollectorMetrics
 
     public Task<HostCollectorMetrics?> ReadHostMetricsAsync(CancellationToken ct = default)
     {
-        if (!File.Exists(_metricsPath))
+        var fileInfo = new FileInfo(_metricsPath);
+        if (!fileInfo.Exists || fileInfo.Length > 2 * 1024 * 1024)
         {
-            _logger.LogDebug("Host metrics file not found at {Path}", _metricsPath);
+            _logger.LogDebug("Host metrics file not found or exceeds 2MB limit at {Path}", _metricsPath);
             return Task.FromResult<HostCollectorMetrics?>(null);
         }
 
         try
         {
+            var jsonOptions = new JsonDocumentOptions
+            {
+                MaxDepth = 16,
+                CommentHandling = JsonCommentHandling.Skip
+            };
+
             using var stream = File.OpenRead(_metricsPath);
-            using var doc = JsonDocument.Parse(stream);
+            using var doc = JsonDocument.Parse(stream, jsonOptions);
             var root = doc.RootElement;
 
+            var now = _clock.GetUtcNow();
             DateTimeOffset? recordedAt = null;
             if (root.TryGetProperty("generated_at", out var genProp) &&
                 genProp.ValueKind == JsonValueKind.String &&
                 DateTimeOffset.TryParse(genProp.GetString(), out var parsedDate))
             {
-                recordedAt = parsedDate;
+                // Reject anomalous future timestamp (> 2 minutes in future)
+                if (parsedDate <= now.AddMinutes(2))
+                {
+                    recordedAt = parsedDate;
+                }
+                else
+                {
+                    _logger.LogWarning("Host metrics generated_at is in the future: {Timestamp}", parsedDate);
+                }
             }
 
-            var now = _clock.GetUtcNow();
             var isStale = recordedAt == null || (now - recordedAt.Value).TotalSeconds > _stalenessThresholdSeconds;
 
             double? cpuPercent = null;
@@ -110,50 +149,129 @@ public sealed class LinuxHostCollectorMetricsReader : ILinuxHostCollectorMetrics
             {
                 if (hostProp.TryGetProperty("cpu", out var cpuObj) && cpuObj.ValueKind == JsonValueKind.Object)
                 {
-                    if (cpuObj.TryGetProperty("percent", out var cpuVal) && cpuVal.ValueKind == JsonValueKind.Number)
+                    if (cpuObj.TryGetProperty("percent", out var cpuVal))
                     {
-                        cpuPercent = cpuVal.GetDouble();
-                    }
-                    if (cpuObj.TryGetProperty("status", out var cpuStatus) && cpuStatus.ValueKind == JsonValueKind.String)
-                    {
-                        hostStatus = cpuStatus.GetString() ?? "Unknown";
+                        cpuPercent = ParseBoundedPercentage(cpuVal);
                     }
                 }
 
                 if (hostProp.TryGetProperty("memory", out var memObj) && memObj.ValueKind == JsonValueKind.Object)
                 {
-                    if (memObj.TryGetProperty("percent", out var memVal) && memVal.ValueKind == JsonValueKind.Number)
+                    if (memObj.TryGetProperty("percent", out var memVal))
                     {
-                        memoryPercent = memVal.GetDouble();
+                        memoryPercent = ParseBoundedPercentage(memVal);
                     }
                 }
 
                 if (hostProp.TryGetProperty("disk", out var diskObj) && diskObj.ValueKind == JsonValueKind.Object)
                 {
-                    if (diskObj.TryGetProperty("percent", out var diskVal) && diskVal.ValueKind == JsonValueKind.Number)
+                    if (diskObj.TryGetProperty("percent", out var diskVal))
                     {
-                        diskPercent = diskVal.GetDouble();
+                        diskPercent = ParseBoundedPercentage(diskVal);
                     }
                 }
             }
 
-            var containerCount = 0;
+            int? containerCount = null;
             if (root.TryGetProperty("containers", out var containersProp) && containersProp.ValueKind == JsonValueKind.Object)
             {
-                foreach (var _ in containersProp.EnumerateObject())
+                var runningCount = 0;
+                var hasAnyContainer = false;
+                foreach (var container in containersProp.EnumerateObject())
                 {
-                    containerCount++;
+                    if (container.Value.ValueKind == JsonValueKind.Object)
+                    {
+                        hasAnyContainer = true;
+                        if (container.Value.TryGetProperty("running", out var rProp) && rProp.ValueKind == JsonValueKind.True)
+                        {
+                            runningCount++;
+                        }
+                    }
+                }
+                if (hasAnyContainer)
+                {
+                    containerCount = runningCount;
                 }
             }
 
             var healthEndpointStatus = "unknown";
+            BackupWatchdogStatus? backupWatchdog = null;
+
             if (root.TryGetProperty("services", out var servicesProp) && servicesProp.ValueKind == JsonValueKind.Object)
             {
                 if (servicesProp.TryGetProperty("api_health", out var apiHealthProp) && apiHealthProp.ValueKind == JsonValueKind.Object)
                 {
-                    if (apiHealthProp.TryGetProperty("status", out var apiStatus) && apiStatus.ValueKind == JsonValueKind.String)
+                    if (apiHealthProp.TryGetProperty("status", out var sProp) && sProp.ValueKind == JsonValueKind.String)
                     {
-                        healthEndpointStatus = apiStatus.GetString() ?? "unknown";
+                        healthEndpointStatus = sProp.GetString() ?? "unknown";
+                    }
+                }
+
+                if (servicesProp.TryGetProperty("backup_watchdog", out var bwProp) && bwProp.ValueKind == JsonValueKind.Object)
+                {
+                    var bwStatus = "unknown";
+                    if (bwProp.TryGetProperty("status", out var bwsProp) && bwsProp.ValueKind == JsonValueKind.String)
+                    {
+                        bwStatus = bwsProp.GetString() ?? "unknown";
+                    }
+                    DateTimeOffset? bwLastSuccessAt = null;
+                    if (bwProp.TryGetProperty("last_success_at", out var lsaProp) &&
+                        lsaProp.ValueKind == JsonValueKind.String &&
+                        DateTimeOffset.TryParse(lsaProp.GetString(), out var parsedLsa))
+                    {
+                        bwLastSuccessAt = parsedLsa;
+                    }
+                    double? bwAgeSeconds = null;
+                    if (bwProp.TryGetProperty("age_seconds", out var asProp) && asProp.ValueKind == JsonValueKind.Number && asProp.TryGetDouble(out var parsedAge))
+                    {
+                        if (!double.IsNaN(parsedAge) && !double.IsInfinity(parsedAge) && parsedAge >= 0)
+                        {
+                            bwAgeSeconds = parsedAge;
+                        }
+                    }
+                    var bwThresholdSeconds = 97200.0; // 27 hours default
+                    if (bwProp.TryGetProperty("threshold_seconds", out var tsProp) &&
+                        tsProp.ValueKind == JsonValueKind.Number &&
+                        tsProp.TryGetDouble(out var parsedTs) &&
+                        !double.IsNaN(parsedTs) && !double.IsInfinity(parsedTs) && parsedTs > 0)
+                    {
+                        bwThresholdSeconds = parsedTs;
+                    }
+                    backupWatchdog = new BackupWatchdogStatus(bwStatus, bwLastSuccessAt, bwAgeSeconds, bwThresholdSeconds);
+                }
+            }
+
+            var activeIncidents = new List<HostCollectorIncident>();
+            var recentHistory = new List<HostCollectorIncident>();
+
+            if (root.TryGetProperty("incidents", out var incidentsProp) && incidentsProp.ValueKind == JsonValueKind.Object)
+            {
+                if (incidentsProp.TryGetProperty("active", out var activeProp))
+                {
+                    if (activeProp.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var incElement in activeProp.EnumerateArray())
+                        {
+                            var inc = ParseIncident(incElement);
+                            if (inc != null) activeIncidents.Add(inc);
+                        }
+                    }
+                    else if (activeProp.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var incProp in activeProp.EnumerateObject())
+                        {
+                            var inc = ParseIncident(incProp.Value, incProp.Name);
+                            if (inc != null) activeIncidents.Add(inc);
+                        }
+                    }
+                }
+
+                if (incidentsProp.TryGetProperty("recent_history", out var historyProp) && historyProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var histElement in historyProp.EnumerateArray())
+                    {
+                        var inc = ParseIncident(histElement);
+                        if (inc != null) recentHistory.Add(inc);
                     }
                 }
             }
@@ -163,7 +281,7 @@ public sealed class LinuxHostCollectorMetricsReader : ILinuxHostCollectorMetrics
                 if (collectorProp.TryGetProperty("status", out var colStatus) && colStatus.ValueKind == JsonValueKind.String)
                 {
                     var cStatus = colStatus.GetString();
-                    if (!string.IsNullOrWhiteSpace(cStatus) && hostStatus == "Unknown")
+                    if (!string.IsNullOrWhiteSpace(cStatus))
                     {
                         hostStatus = cStatus;
                     }
@@ -178,7 +296,10 @@ public sealed class LinuxHostCollectorMetricsReader : ILinuxHostCollectorMetrics
                 HealthEndpointStatus: healthEndpointStatus,
                 HostStatus: hostStatus,
                 RecordedAt: recordedAt,
-                IsStale: isStale
+                IsStale: isStale,
+                ActiveIncidents: activeIncidents,
+                RecentHistory: recentHistory,
+                BackupWatchdog: backupWatchdog
             ));
         }
         catch (JsonException ex)
@@ -191,5 +312,84 @@ public sealed class LinuxHostCollectorMetricsReader : ILinuxHostCollectorMetrics
             _logger.LogWarning(ex, "Failed to read host metrics at {Path}", _metricsPath);
             return Task.FromResult<HostCollectorMetrics?>(null);
         }
+    }
+
+    private static double? ParseBoundedPercentage(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDouble(out var val))
+        {
+            if (!double.IsNaN(val) && !double.IsInfinity(val) && val >= 0.0 && val <= 100.0)
+            {
+                return val;
+            }
+        }
+        return null;
+    }
+
+    private static HostCollectorIncident? ParseIncident(JsonElement incObj, string? fallbackTarget = null)
+    {
+        if (incObj.ValueKind != JsonValueKind.Object) return null;
+
+        var target = fallbackTarget ?? "system";
+        if (incObj.TryGetProperty("target", out var targetProp) && targetProp.ValueKind == JsonValueKind.String)
+        {
+            target = targetProp.GetString() ?? target;
+        }
+
+        var id = incObj.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
+            ? idProp.GetString() ?? $"inc_{target}"
+            : $"inc_{target}";
+
+        var severity = incObj.TryGetProperty("severity", out var sevProp) && sevProp.ValueKind == JsonValueKind.String
+            ? sevProp.GetString() ?? "warning"
+            : "warning";
+
+        var title = incObj.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String
+            ? titleProp.GetString() ?? ""
+            : "";
+
+        var curVal = incObj.TryGetProperty("current_value", out var cvProp) && cvProp.ValueKind == JsonValueKind.String
+            ? cvProp.GetString()
+            : null;
+
+        var consec = incObj.TryGetProperty("consecutive_samples", out var csProp) && csProp.ValueKind == JsonValueKind.Number
+            ? csProp.GetInt32()
+            : 0;
+
+        DateTimeOffset? openedAt = null;
+        if (incObj.TryGetProperty("opened_at", out var oaProp) &&
+            oaProp.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(oaProp.GetString(), out var parsedOa))
+        {
+            openedAt = parsedOa;
+        }
+
+        DateTimeOffset? lastNotifiedAt = null;
+        if (incObj.TryGetProperty("last_notified_at", out var lnProp) &&
+            lnProp.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(lnProp.GetString(), out var parsedLn))
+        {
+            lastNotifiedAt = parsedLn;
+        }
+
+        DateTimeOffset? resolvedAt = null;
+        if (incObj.TryGetProperty("resolved_at", out var raProp) &&
+            raProp.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(raProp.GetString(), out var parsedRa))
+        {
+            resolvedAt = parsedRa;
+        }
+
+        double? durationSeconds = null;
+        if (incObj.TryGetProperty("duration_seconds", out var dsProp) && dsProp.ValueKind == JsonValueKind.Number)
+        {
+            durationSeconds = dsProp.GetDouble();
+        }
+
+        var resolvedValue = incObj.TryGetProperty("resolved_value", out var rvProp) && rvProp.ValueKind == JsonValueKind.String
+            ? rvProp.GetString()
+            : null;
+
+        return new HostCollectorIncident(target, id, severity, title, curVal, consec, openedAt, lastNotifiedAt, resolvedAt, durationSeconds, resolvedValue);
     }
 }

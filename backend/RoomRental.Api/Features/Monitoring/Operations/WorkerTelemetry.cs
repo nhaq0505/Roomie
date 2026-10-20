@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Features.Monitoring.Operations;
 
@@ -24,15 +25,28 @@ public interface IWorkerTelemetryTracker
     Task ExecuteTrackedAsync(string workerName, Func<CancellationToken, Task> action, CancellationToken ct = default);
 }
 
-public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker
+public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerStateTracker
 {
     private readonly ConcurrentDictionary<string, WorkerState> _workers = new();
     private readonly TimeProvider _clock;
+    private readonly DateTimeOffset _trackerCreatedAt;
 
     public WorkerTelemetryTracker(TimeProvider clock)
     {
         _clock = clock;
+        _trackerCreatedAt = clock.GetUtcNow();
     }
+
+    public static TimeSpan GetWorkerSla(string workerName) => workerName switch
+    {
+        "recovery-email" => TimeSpan.FromMinutes(5),
+        "zalo" => TimeSpan.FromMinutes(5),
+        "reconcile" => TimeSpan.FromMinutes(10),
+        "cleanup" => TimeSpan.FromMinutes(20),
+        "ops-aggregation" => TimeSpan.FromHours(2),
+        "invoice-sweep" => TimeSpan.FromHours(26),
+        _ => TimeSpan.FromMinutes(15)
+    };
 
     public void RecordHeartbeat(string workerName, bool isEnabled, string status, string? errorMessage = null)
     {
@@ -103,13 +117,28 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker
     public IReadOnlyList<WorkerExecutionStatus> GetStatuses()
     {
         var now = _clock.GetUtcNow();
-        var staleCutoff = now.AddMinutes(-10);
 
         return _workers.Values.Select(w =>
         {
             lock (w.SyncRoot)
             {
-                var isStale = w.UpdatedAt < staleCutoff;
+                bool isStale;
+                if (!w.IsEnabled)
+                {
+                    isStale = false;
+                }
+                else if (w.LastSuccessAt == null && w.LastStartedAt == null)
+                {
+                    var elapsed = now - _trackerCreatedAt;
+                    isStale = elapsed > TimeSpan.FromMinutes(10);
+                }
+                else
+                {
+                    var sla = GetWorkerSla(w.WorkerName);
+                    var referenceTime = w.LastSuccessAt ?? w.UpdatedAt;
+                    isStale = (now - referenceTime) > sla;
+                }
+
                 return new WorkerExecutionStatus(
                     WorkerName: w.WorkerName,
                     IsEnabled: w.IsEnabled,
@@ -123,6 +152,29 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker
                 );
             }
         }).OrderBy(w => w.WorkerName).ToList();
+    }
+
+    public Task RecordWorkerHeartbeatAsync(string workerName, bool isEnabled, string status, string? errorMessage, CancellationToken ct)
+    {
+        RecordHeartbeat(workerName, isEnabled, status, errorMessage);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<WorkerStatusDto>> GetWorkerStatusesAsync(CancellationToken ct)
+    {
+        var statuses = GetStatuses();
+        IReadOnlyList<WorkerStatusDto> dtos = statuses.Select(s => new WorkerStatusDto(
+            s.WorkerName,
+            s.IsEnabled,
+            s.Status,
+            s.LastStartedAt,
+            s.LastSuccessAt,
+            s.LastErrorAt,
+            s.LastErrorMessage,
+            s.IsStale
+        )).ToList();
+
+        return Task.FromResult(dtos);
     }
 
     public async Task ExecuteTrackedAsync(string workerName, Func<CancellationToken, Task> action, CancellationToken ct = default)

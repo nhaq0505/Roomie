@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Features.Monitoring.Operations;
 
@@ -16,34 +17,24 @@ public interface IAlertEmailSender
     Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default);
 }
 
-public sealed class SmtpIncidentNotifier : IIncidentAlertNotifier
+public sealed class SmtpIncidentNotifier(
+    IOptions<IncidentNotificationOptions> options,
+    ILogger<SmtpIncidentNotifier> logger,
+    IAlertEmailSender? emailSender = null) : IIncidentNotifier
 {
-    private readonly IAlertEmailSender? _emailSender;
-    private readonly IncidentNotificationOptions _options;
-    private readonly ILogger<SmtpIncidentNotifier> _logger;
-
-    public SmtpIncidentNotifier(
-        IOptions<IncidentNotificationOptions> options,
-        ILogger<SmtpIncidentNotifier> logger,
-        IAlertEmailSender? emailSender = null)
+    public async Task SendIncidentAlertAsync(MonitoringIncident incident, bool isRecovery, CancellationToken ct)
     {
-        _options = options.Value;
-        _logger = logger;
-        _emailSender = emailSender;
-    }
-
-    public async Task SendAlertAsync(IncidentSnapshot incident, bool isRecovery, CancellationToken ct = default)
-    {
-        if (!_options.Enabled)
+        var opt = options.Value;
+        if (!opt.Enabled)
         {
-            _logger.LogInformation("Incident alerts disabled by configuration");
+            logger.LogInformation("Incident alerting disabled via options.");
             return;
         }
 
-        var recipient = _options.AlertEmailTo ?? Environment.GetEnvironmentVariable("MONITORING_ALERT_TO");
+        var recipient = opt.AlertEmailTo ?? Environment.GetEnvironmentVariable("MONITORING_ALERT_TO");
         if (string.IsNullOrWhiteSpace(recipient))
         {
-            _logger.LogWarning("No alert recipient configured for incident {Key}", incident.IncidentKey);
+            logger.LogWarning("No alert recipient configured for incident {Key}", incident.IncidentKey);
             return;
         }
 
@@ -68,12 +59,15 @@ public sealed class SmtpIncidentNotifier : IIncidentAlertNotifier
             Note: SMTP acceptance by server does not guarantee final mailbox delivery (accepted != delivered).
             """;
 
-        _logger.LogInformation("Sending incident alert for {Key} (isRecovery: {Recovery}) to {Recipient}",
+        logger.LogInformation("Sending incident alert for {Key} (isRecovery: {Recovery}) to {Recipient}",
             incident.IncidentKey, isRecovery, recipient);
 
-        if (_emailSender != null)
+        if (emailSender != null)
         {
-            await _emailSender.SendEmailAsync(recipient, subject, body, ct);
+            await emailSender.SendEmailAsync(recipient, subject, body, ct);
         }
     }
+
+    public Task SendAlertAsync(MonitoringIncident incident, bool isRecovery, CancellationToken ct = default)
+        => SendIncidentAlertAsync(incident, isRecovery, ct);
 }

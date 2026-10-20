@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Features.Monitoring.Operations;
 
@@ -23,11 +24,20 @@ public sealed record OperationsOverviewSnapshot(
     string? Window = "1h"
 );
 
+public sealed record WindowLatencySummary(
+    int TotalRequests,
+    int Status5xxCount,
+    double? Api5xxRatePercent,
+    double? LatencyP95Ms
+);
+
 public interface IRouteLatencyAggregator
 {
     void Record(string routeTemplate, string httpMethod, int statusCode, double latencyMs);
     IReadOnlyList<RouteLatencySnapshot> GetRouteSnapshots(TimeSpan window);
     OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null);
+    WindowLatencySummary GetWindowSummary(TimeSpan window);
+    IReadOnlyList<OperationalRouteMinuteBucket> DrainCompletedMinuteBuckets(long beforeMinuteEpoch);
     void Reset();
 }
 
@@ -48,7 +58,7 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         var normalizedRoute = NormalizeRoute(routeTemplate);
         var normalizedMethod = httpMethod.ToUpperInvariant();
 
-        var collection = _minuteBuckets.GetOrAdd(minuteEpoch, _ => new MinuteBucketCollection());
+        var collection = _minuteBuckets.GetOrAdd(minuteEpoch, _ => new MinuteBucketCollection(minuteEpoch));
         collection.Record(normalizedRoute, normalizedMethod, statusCode, latencyMs);
 
         // Prune buckets older than 120 minutes to prevent unbounded memory growth
@@ -92,17 +102,14 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         return results.OrderByDescending(r => r.RequestCount).ToList();
     }
 
-    public OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null)
+    public WindowLatencySummary GetWindowSummary(TimeSpan window)
     {
-        var routes = GetRouteSnapshots(window);
-        long totalRequests = 0;
-        long total5xx = 0;
-        var globalAcc = new RouteHistogramAccumulator();
-
         var now = _clock.GetUtcNow();
         var currentMinute = now.ToUnixTimeSeconds() / 60;
         var windowMinutes = (long)Math.Ceiling(window.TotalMinutes);
         var minMinute = currentMinute - windowMinutes;
+
+        var globalAcc = new RouteHistogramAccumulator();
 
         foreach (var (minute, collection) in _minuteBuckets)
         {
@@ -112,8 +119,8 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
             }
         }
 
-        totalRequests = globalAcc.RequestCount;
-        total5xx = globalAcc.Status5xxCount;
+        var totalRequests = globalAcc.RequestCount;
+        var total5xx = globalAcc.Status5xxCount;
 
         double? rate5xx = null;
         if (totalRequests > 0)
@@ -121,27 +128,58 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
             rate5xx = Math.Round((double)total5xx / totalRequests * 100.0, 2);
         }
 
-        double? p95 = globalAcc.RequestCount > 0 ? globalAcc.CalculateP95() : null;
+        double? p95 = totalRequests > 0 ? globalAcc.CalculateP95() : null;
+
+        return new WindowLatencySummary(
+            TotalRequests: totalRequests,
+            Status5xxCount: total5xx,
+            Api5xxRatePercent: rate5xx,
+            LatencyP95Ms: p95
+        );
+    }
+
+    public OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null)
+    {
+        var summary = GetWindowSummary(window);
+        var windowMinutes = (long)Math.Ceiling(window.TotalMinutes);
 
         var overallStatus = "Healthy";
-        if (dbConnected == false || (rate5xx != null && rate5xx >= 10.0) || (p95 != null && p95 >= 2000.0))
+        if (dbConnected == false || (summary.Api5xxRatePercent != null && summary.Api5xxRatePercent >= 10.0 && summary.TotalRequests >= 100) ||
+            (summary.LatencyP95Ms != null && summary.LatencyP95Ms >= 2000.0 && summary.TotalRequests >= 100))
         {
             overallStatus = "Unhealthy";
         }
-        else if ((rate5xx != null && rate5xx >= 5.0) || (p95 != null && p95 >= 1000.0) || dbStatus == "Degraded")
+        else if (dbStatus == "Degraded" || (summary.Api5xxRatePercent != null && summary.Api5xxRatePercent >= 5.0 && summary.TotalRequests >= 100) ||
+            (summary.LatencyP95Ms != null && summary.LatencyP95Ms >= 1000.0 && summary.TotalRequests >= 100))
         {
             overallStatus = "Degraded";
         }
 
         return new OperationsOverviewSnapshot(
             OverallStatus: overallStatus,
-            Api5xxRatePercent: rate5xx,
-            LatencyP95Ms: p95,
-            TotalRequestsLastHour: totalRequests,
+            Api5xxRatePercent: summary.Api5xxRatePercent,
+            LatencyP95Ms: summary.LatencyP95Ms,
+            TotalRequestsLastHour: summary.TotalRequests,
             DatabaseConnected: dbConnected,
             DatabaseStatus: dbStatus ?? (dbConnected == true ? "Healthy" : (dbConnected == false ? "Unhealthy" : null)),
             Window: $"{windowMinutes / 60}h" == "1h" ? "1h" : $"{windowMinutes}m"
         );
+    }
+
+    public IReadOnlyList<OperationalRouteMinuteBucket> DrainCompletedMinuteBuckets(long beforeMinuteEpoch)
+    {
+        var drained = new List<OperationalRouteMinuteBucket>();
+        foreach (var minute in _minuteBuckets.Keys)
+        {
+            if (minute < beforeMinuteEpoch)
+            {
+                if (_minuteBuckets.TryRemove(minute, out var collection))
+                {
+                    drained.AddRange(collection.ToEntityBuckets());
+                }
+            }
+        }
+        return drained;
     }
 
     public void Reset()
@@ -183,18 +221,25 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 
     private sealed class MinuteBucketCollection
     {
-        private readonly ConcurrentDictionary<(string Route, string Method), RouteHistogramAccumulator> _byRoute = new();
+        public long MinuteEpoch { get; }
+        private readonly ConcurrentDictionary<(string Route, string Method, int StatusCode), RouteHistogramAccumulator> _byRouteStatus = new();
+
+        public MinuteBucketCollection(long minuteEpoch)
+        {
+            MinuteEpoch = minuteEpoch;
+        }
 
         public void Record(string route, string method, int statusCode, double latencyMs)
         {
-            var acc = _byRoute.GetOrAdd((route, method), _ => new RouteHistogramAccumulator());
+            var acc = _byRouteStatus.GetOrAdd((route, method, statusCode), _ => new RouteHistogramAccumulator());
             acc.Add(statusCode, latencyMs);
         }
 
         public void AggregateInto(Dictionary<(string Route, string Method), RouteHistogramAccumulator> target)
         {
-            foreach (var (key, sourceAcc) in _byRoute)
+            foreach (var ((route, method, _), sourceAcc) in _byRouteStatus)
             {
+                var key = (route, method);
                 if (!target.TryGetValue(key, out var acc))
                 {
                     acc = new RouteHistogramAccumulator();
@@ -206,10 +251,42 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 
         public void AggregateGlobal(RouteHistogramAccumulator target)
         {
-            foreach (var sourceAcc in _byRoute.Values)
+            foreach (var sourceAcc in _byRouteStatus.Values)
             {
                 target.MergeFrom(sourceAcc);
             }
+        }
+
+        public IReadOnlyList<OperationalRouteMinuteBucket> ToEntityBuckets()
+        {
+            var timestamp = DateTimeOffset.FromUnixTimeSeconds(MinuteEpoch * 60);
+            var list = new List<OperationalRouteMinuteBucket>();
+
+            foreach (var ((route, method, statusCode), acc) in _byRouteStatus)
+            {
+                if (acc.RequestCount > 0)
+                {
+                    list.Add(new OperationalRouteMinuteBucket
+                    {
+                        MinuteTimestamp = timestamp,
+                        RouteTemplate = route,
+                        HttpMethod = method,
+                        StatusCode = statusCode,
+                        RequestCount = acc.RequestCount,
+                        LatencyLe50ms = acc.Le50,
+                        LatencyLe100ms = acc.Le100,
+                        LatencyLe250ms = acc.Le250,
+                        LatencyLe500ms = acc.Le500,
+                        LatencyLe1000ms = acc.Le1000,
+                        LatencyLe2000ms = acc.Le2000,
+                        LatencyGt2000ms = acc.Gt2000,
+                        TotalLatencyMs = acc.TotalLatencyMs,
+                        MaxLatencyMs = acc.MaxLatencyMs
+                    });
+                }
+            }
+
+            return list;
         }
     }
 
@@ -230,6 +307,13 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 
         public int RequestCount => _requestCount;
         public int Status5xxCount => _status5xxCount;
+        public int Le50 => _le50;
+        public int Le100 => _le100;
+        public int Le250 => _le250;
+        public int Le500 => _le500;
+        public int Le1000 => _le1000;
+        public int Le2000 => _le2000;
+        public int Gt2000 => _gt2000;
         public double TotalLatencyMs => _totalLatencyMs;
         public double MaxLatencyMs => _maxLatencyMs;
 

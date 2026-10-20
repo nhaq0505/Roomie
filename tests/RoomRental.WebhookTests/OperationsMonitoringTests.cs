@@ -73,12 +73,12 @@ public static class OperationsMonitoringTests
             var missingResult = await reader.ReadHostMetricsAsync();
             Assert(missingResult == null, "Host reader returns null when file is missing");
 
-            // Test 2: Valid JSON within freshness threshold
+            // Test 2: Valid JSON within freshness threshold matching real Python collector output
             var validJson = """
             {
                 "version": "1.0",
                 "generated_at": "2026-10-20T15:59:00Z",
-                "collector": { "version": "1.0.0", "status": "healthy", "duration_ms": 120 },
+                "collector": { "version": "1.1.0", "status": "healthy", "duration_ms": 120 },
                 "host": {
                     "hostname": "test-vps",
                     "cpu": { "percent": 42.5, "status": "healthy" },
@@ -86,11 +86,41 @@ public static class OperationsMonitoringTests
                     "disk": { "percent": 35.2 }
                 },
                 "containers": {
-                    "app": { "status": "running", "health": "healthy" },
-                    "db": { "status": "running", "health": "healthy" }
+                    "app": { "running": true, "status": "running", "health": "healthy" },
+                    "db": { "running": true, "status": "running", "health": "healthy" }
                 },
                 "services": {
-                    "api_health": { "status": "healthy" }
+                    "api_health": { "status": "healthy" },
+                    "backup_watchdog": {
+                        "status": "healthy",
+                        "last_success_at": "2026-10-20T15:00:00Z",
+                        "age_seconds": 3600,
+                        "threshold_seconds": 97200
+                    }
+                },
+                "incidents": {
+                    "active": [
+                        {
+                            "id": "inc_cpu_1729418400",
+                            "target": "cpu",
+                            "severity": "warning",
+                            "title": "CPU sustained high",
+                            "consecutive_samples": 10,
+                            "current_value": "88%",
+                            "opened_at": "2026-10-20T15:50:00Z"
+                        }
+                    ],
+                    "recent_history": [
+                        {
+                            "id": "inc_disk_1729415000",
+                            "target": "disk",
+                            "severity": "warning",
+                            "title": "Disk sustained high",
+                            "resolved_at": "2026-10-20T15:30:00Z",
+                            "duration_seconds": 900,
+                            "resolved_value": "72%"
+                        }
+                    ]
                 }
             }
             """;
@@ -105,13 +135,18 @@ public static class OperationsMonitoringTests
             Assert(validResult.HealthEndpointStatus == "healthy", "HealthEndpointStatus parsed correctly");
             Assert(validResult.HostStatus == "healthy", "HostStatus parsed correctly");
             Assert(!validResult.IsStale, "Metric generated 60s ago is not stale (< 180s)");
+            Assert(validResult.ActiveIncidents?.Count == 1, "Active incidents list parsed");
+            Assert(validResult.ActiveIncidents?[0].Id == "inc_cpu_1729418400", "Active incident stable ID matches");
+            Assert(validResult.RecentHistory?.Count == 1, "Recent history list parsed");
+            Assert(validResult.RecentHistory?[0].Id == "inc_disk_1729415000", "Recent history stable ID matches");
+            Assert(validResult.BackupWatchdog != null && validResult.BackupWatchdog.ThresholdSeconds == 97200.0, "Backup watchdog threshold is 27h (97200s)");
 
             // Test 3: Stale JSON (> 180s)
             fakeClock.Advance(TimeSpan.FromMinutes(5)); // now 16:05:00, sample at 15:59:00 (360s old)
             var staleResult = await reader.ReadHostMetricsAsync();
             Assert(staleResult != null && staleResult.IsStale, "Metric older than 180s is marked stale");
 
-            // Test 4: Nullable fields preserve nulls without fabricating 0.0
+            // Test 4: Nullable fields preserve nulls without fabricating 0.0 or 0 count
             var nullableJson = """
             {
                 "version": "1.0",
@@ -122,7 +157,11 @@ public static class OperationsMonitoringTests
                     "disk": null
                 },
                 "containers": {},
-                "services": {}
+                "services": {
+                    "backup_watchdog": {
+                        "status": "healthy"
+                    }
+                }
             }
             """;
             await File.WriteAllTextAsync(metricsFile, nullableJson);
@@ -132,9 +171,37 @@ public static class OperationsMonitoringTests
             Assert(nullResult!.CpuPercent == null, "Nullable CPU preserved as null");
             Assert(nullResult.MemoryPercent == null, "Missing RAM preserved as null");
             Assert(nullResult.DiskPercent == null, "Null disk preserved as null");
-            Assert(nullResult.ContainerCount == 0, "Container count is 0 for empty object");
+            Assert(nullResult.ContainerCount == null, "Container count is null (not invented 0) for empty object");
+            Assert(nullResult.BackupWatchdog?.ThresholdSeconds == 97200.0, "Omitted watchdog threshold defaults to 27h (97200s)");
 
-            // Test 5: Corrupt JSON returns null without crashing
+            // Test 5: Out of range percentages rejected as null
+            var outOfRangeJson = """
+            {
+                "version": "1.0",
+                "generated_at": "2026-10-20T16:04:30Z",
+                "host": {
+                    "cpu": { "percent": 150.0 },
+                    "memory": { "percent": -10.0 }
+                }
+            }
+            """;
+            await File.WriteAllTextAsync(metricsFile, outOfRangeJson);
+            var rangeResult = await reader.ReadHostMetricsAsync();
+            Assert(rangeResult?.CpuPercent == null, "CPU percent > 100 rejected as null");
+            Assert(rangeResult?.MemoryPercent == null, "Memory percent < 0 rejected as null");
+
+            // Test 6: Future timestamp > 2m rejected
+            var futureJson = """
+            {
+                "version": "1.0",
+                "generated_at": "2026-10-20T16:20:00Z"
+            }
+            """;
+            await File.WriteAllTextAsync(metricsFile, futureJson);
+            var futureResult = await reader.ReadHostMetricsAsync();
+            Assert(futureResult != null && futureResult.IsStale && futureResult.RecordedAt == null, "Future timestamp marked invalid/stale");
+
+            // Test 7: Corrupt JSON returns null without crashing
             await File.WriteAllTextAsync(metricsFile, "{ corrupt json !!!");
             var corruptResult = await reader.ReadHostMetricsAsync();
             Assert(corruptResult == null, "Host reader returns null for malformed JSON");
@@ -208,7 +275,7 @@ public static class OperationsMonitoringTests
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
         var tracker = new WorkerTelemetryTracker(fakeClock);
 
-        // Record successful execution
+        // Test 1: Record successful execution
         await tracker.ExecuteTrackedAsync("invoice-sweep", async ct =>
         {
             await Task.Delay(1, ct);
@@ -221,7 +288,7 @@ public static class OperationsMonitoringTests
         Assert(statuses[0].ConsecutiveFailures == 0, "0 consecutive failures on success");
         Assert(!statuses[0].IsStale, "Worker is not stale");
 
-        // Record failure
+        // Test 2: Record failure
         try
         {
             await tracker.ExecuteTrackedAsync("reconcile", _ => throw new InvalidOperationException("payOS timeout"));
@@ -237,67 +304,207 @@ public static class OperationsMonitoringTests
         Assert(reconcileStatus.ConsecutiveFailures == 1, "1 consecutive failure recorded");
         Assert(reconcileStatus.LastErrorMessage == "payOS timeout", "Error message recorded");
 
-        // Stale worker detection after 15 minutes
+        // Test 3: Per-worker SLA staleness test
+        // Advance 15 minutes: reconcile (SLA 10m) should be stale, but invoice-sweep (SLA 26h) should NOT be stale!
         fakeClock.Advance(TimeSpan.FromMinutes(15));
         statuses = tracker.GetStatuses();
-        Assert(statuses.All(s => s.IsStale), "Workers without recent updates marked stale (> 10m)");
+        var rStatus15m = statuses.Single(s => s.WorkerName == "reconcile");
+        var iStatus15m = statuses.Single(s => s.WorkerName == "invoice-sweep");
+        Assert(rStatus15m.IsStale, "Reconcile worker is stale after 15m (> 10m SLA)");
+        Assert(!iStatus15m.IsStale, "Invoice sweep worker is NOT stale after 15m (within 26h SLA)");
+
+        // Test 4: Disabled worker is never stale
+        tracker.RecordHeartbeat("disabled-worker", isEnabled: false, status: "Healthy");
+        fakeClock.Advance(TimeSpan.FromHours(50));
+        statuses = tracker.GetStatuses();
+        var dStatus = statuses.Single(s => s.WorkerName == "disabled-worker");
+        Assert(!dStatus.IsStale, "Disabled worker is never marked stale");
+
+        // Test 5: Invoice sweep becomes stale after exceeding 26h SLA
+        var iStatus50h = statuses.Single(s => s.WorkerName == "invoice-sweep");
+        Assert(iStatus50h.IsStale, "Invoice sweep worker is stale after exceeding 26h SLA");
     }
 
     private static async Task TestIncidentEngineAndAlertsAsync()
     {
+        var tempDbPath = Path.Combine(Path.GetTempPath(), $"incidents_test_{Guid.NewGuid():N}.db");
+        await using var connection = new SqliteConnection($"Data Source={tempDbPath}");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var db = new AppDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+        var aggregator = new RouteLatencyAggregator(fakeClock);
         var fakeNotifier = new FakeAlertNotifier();
-        var engine = new IncidentEngine(fakeNotifier, fakeClock, NullLogger<IncidentEngine>.Instance);
+        var fakeHostReader = new FakeHostReader();
+        var workerTracker = new WorkerTelemetryTracker(fakeClock);
 
-        // Scenario 1: Trigger 5xx rate incident
-        var inputCritical5xx = new IncidentEvaluationInput(
-            Overview: new OperationsOverviewSnapshot("Unhealthy", Api5xxRatePercent: 12.5, LatencyP95Ms: 150.0,
-                TotalRequestsLastHour: 200, DatabaseConnected: true, DatabaseStatus: "Healthy"),
-            HostMetrics: null,
-            Workers: null,
-            Queues: null
+        var incidentService = new IncidentMonitoringService(
+            db,
+            aggregator,
+            fakeHostReader,
+            workerTracker,
+            fakeNotifier,
+            fakeClock,
+            NullLogger<IncidentMonitoringService>.Instance
         );
 
-        await engine.EvaluateRulesAsync(inputCritical5xx);
-        var incidents = engine.GetIncidents();
-        Assert(incidents.Count == 1, "One active incident created");
-        Assert(incidents[0].IncidentKey == "high_5xx_rate", "IncidentKey is high_5xx_rate");
-        Assert(incidents[0].Severity == "Critical", "Severity is Critical for 12.5% 5xx rate");
-        Assert(incidents[0].State == "Active", "State is Active");
-        Assert(fakeNotifier.Alerts.Count == 1, "Sent 1 alert email");
+        // --- Scenario 1: 5xx Rate Rule (Exact: Sustained 5min, Min 100 req, > 5.0% threshold) ---
+        // Step 1.1: 90 requests with 10 errors (rate = 11.1%), but TotalRequests < 100 -> NO incident opened!
+        for (int i = 0; i < 80; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        for (int i = 0; i < 10; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
+
+        await incidentService.TriggerIncidentCheckAsync(default);
+        var incidentsResp = await incidentService.GetIncidentsAsync(default);
+        Assert(incidentsResp.ActiveIncidentCount == 0, "No incident triggered when 5-min requests < 100");
+        Assert(fakeNotifier.Alerts.Count == 0, "No alert email sent when requests < 100");
+
+        // Step 1.2: Add 20 more requests (5 errors) -> Total 110 requests, 15 errors = 13.6% > 5% -> Triggers High 5xx incident!
+        for (int i = 0; i < 15; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        for (int i = 0; i < 5; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
+
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        Assert(incidentsResp.ActiveIncidentCount == 1, "Incident triggered when requests >= 100 and 5xx rate > 5%");
+        var active5xx = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(active5xx.Severity == "Critical", "Severity is Critical for 5xx rate >= 10%");
+        Assert(active5xx.State == "Active", "Incident state is Active");
+        Assert(fakeNotifier.Alerts.Count == 1, "Sent 1 initial alert email");
         Assert(!fakeNotifier.Alerts[0].IsRecovery, "Alert is not a recovery notice");
-        Assert(fakeNotifier.Alerts[0].Incident.NotificationCount == 1, "Notification count is 1");
+        Assert(active5xx.NotificationCount == 1, "Notification count is 1");
 
-        // Scenario 2: Cooldown suppresses repeat notification within 1 hour
+        // Step 1.3: 1-hour Cooldown suppresses repeat notification
         fakeClock.Advance(TimeSpan.FromMinutes(20));
-        await engine.EvaluateRulesAsync(inputCritical5xx);
-        Assert(fakeNotifier.Alerts.Count == 1, "No duplicate alert sent within 1 hour cooldown");
+        await incidentService.TriggerIncidentCheckAsync(default);
+        Assert(fakeNotifier.Alerts.Count == 1, "No duplicate alert sent within 1-hour cooldown");
 
-        // Scenario 3: Cooldown expires at 65 minutes -> sends reminder notification
-        fakeClock.Advance(TimeSpan.FromMinutes(45)); // total 65 minutes since initial notification
-        await engine.EvaluateRulesAsync(inputCritical5xx);
+        // Step 1.4: Traffic drops below 100 requests in 5-minute window -> Unknown state PRESERVES active incident (NO auto-resolve!)
+        fakeClock.Advance(TimeSpan.FromMinutes(10));
+        for (int i = 0; i < 5; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var preservedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(preservedInc.State == "Active", "Incident remains Active during low-traffic unknown window");
+
+        // Step 1.5: Cooldown expires after 65 minutes -> Sends reminder notification
+        fakeClock.Advance(TimeSpan.FromMinutes(40)); // now 70 min since initial notification
+        for (int i = 0; i < 90; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        for (int i = 0; i < 20; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
+        await incidentService.TriggerIncidentCheckAsync(default);
         Assert(fakeNotifier.Alerts.Count == 2, "Reminder alert sent after 1 hour cooldown");
-        Assert(fakeNotifier.Alerts[1].Incident.NotificationCount == 2, "Notification count incremented to 2");
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var remindedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(remindedInc.NotificationCount == 2, "Notification count incremented to 2");
 
-        // Scenario 4: Acknowledgment
-        var acked = engine.AcknowledgeIncident(incidents[0].Id, "Investigating payment gateway 502s");
-        Assert(acked != null && acked.State == "Acknowledged", "Incident state transitioned to Acknowledged");
-
-        // Scenario 5: Auto-recovery when condition clears
-        var inputHealthy = new IncidentEvaluationInput(
-            Overview: new OperationsOverviewSnapshot("Healthy", Api5xxRatePercent: 0.5, LatencyP95Ms: 120.0,
-                TotalRequestsLastHour: 250, DatabaseConnected: true, DatabaseStatus: "Healthy"),
-            HostMetrics: null,
-            Workers: null,
-            Queues: null
-        );
-
-        await engine.EvaluateRulesAsync(inputHealthy);
-        var updatedIncidents = engine.GetIncidents();
-        var resolvedInc = updatedIncidents.Single(i => i.IncidentKey == "high_5xx_rate");
-        Assert(resolvedInc.State == "Resolved", "Incident auto-resolved when 5xx rate normalized");
-        Assert(fakeNotifier.Alerts.Count == 3, "Sent recovery notification");
+        // Step 1.6: Explicit healthy traffic (120 requests, 0 errors) -> Auto-resolves and sends recovery notice!
+        fakeClock.Advance(TimeSpan.FromMinutes(6));
+        for (int i = 0; i < 120; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var resolved5xx = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(resolved5xx.State == "Resolved", "Incident auto-resolved when condition explicitly healthy");
+        Assert(resolved5xx.ResolvedAt != null, "ResolvedAt timestamp recorded");
+        Assert(fakeNotifier.Alerts.Count == 3, "Sent recovery notification email");
         Assert(fakeNotifier.Alerts[2].IsRecovery, "Third notification is recovery notice");
+
+        // --- Scenario 2: API P95 Latency Rule (Exact: Sustained 10min, Min 100 req, > 2000ms threshold) ---
+        fakeClock.Advance(TimeSpan.FromMinutes(15));
+        for (int i = 0; i < 105; i++) aggregator.Record("/api/slow", "GET", 200, 2500.0);
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var p95Inc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_p95_latency");
+        Assert(p95Inc.State == "Active", "High P95 incident triggered for latency > 2000ms");
+        Assert(p95Inc.Severity == "Critical", "P95 severity is Critical");
+
+        // Auto-resolve P95 when latency normalizes
+        fakeClock.Advance(TimeSpan.FromMinutes(11));
+        for (int i = 0; i < 110; i++) aggregator.Record("/api/slow", "GET", 200, 50.0);
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var resolvedP95 = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_p95_latency");
+        Assert(resolvedP95.State == "Resolved", "High P95 incident auto-resolved with fast requests");
+
+        // --- Scenario 3: Database Connectivity Rule (Exact: 3 consecutive probes >= 1 min apart) ---
+        IncidentMonitoringService.ResetDbProbeHistory();
+        incidentService.DbProbeOverride = _ => Task.FromResult(false);
+
+        // Probe 1 at T+0: Does NOT trigger yet (needs 3 consecutive probes)
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        Assert(!incidentsResp.Incidents.Any(i => i.IncidentKey == "database_disconnected" && i.State != "Resolved"),
+            "1 probe failure does not trigger database incident immediately");
+
+        // Probe 2 at T+1m: Does NOT trigger yet
+        fakeClock.Advance(TimeSpan.FromMinutes(1));
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        Assert(!incidentsResp.Incidents.Any(i => i.IncidentKey == "database_disconnected" && i.State != "Resolved"),
+            "2 probe failures do not trigger database incident yet");
+
+        // Probe 3 at T+2.5m: 3 consecutive probes >= 1 min apart -> TRIGGERS database_disconnected!
+        fakeClock.Advance(TimeSpan.FromMinutes(1.5));
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var dbInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "database_disconnected");
+        Assert(dbInc.State == "Active", "Database incident triggered after 3 consecutive failures >= 1m apart");
+        Assert(dbInc.Severity == "Critical", "Database incident severity is Critical");
+
+        // Reconnect and probe succeeds -> Auto-resolves!
+        incidentService.DbProbeOverride = _ => Task.FromResult(true);
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var resolvedDbInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "database_disconnected");
+        Assert(resolvedDbInc.State == "Resolved", "Database incident auto-resolved after connection restored");
+        incidentService.DbProbeOverride = null;
+
+        // --- Scenario 4: Worker Telemetry & SLAs ---
+        workerTracker.RecordHeartbeat("zalo", isEnabled: true, status: "Healthy");
+        workerTracker.RecordHeartbeat("recovery-email", isEnabled: true, status: "Healthy");
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        Assert(!incidentsResp.Incidents.Any(i => i.IncidentKey.StartsWith("worker_stalled") && i.State != "Resolved"),
+            "Healthy workers have no active incidents");
+
+        // Trigger worker failure
+        workerTracker.RecordFailure("zalo", "Zalo token expired");
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var zaloInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "worker_stalled_zalo");
+        Assert(zaloInc.State == "Active", "Worker failure triggers worker_stalled incident");
+
+        // Worker recovers
+        workerTracker.RecordSuccess("zalo");
+        await incidentService.TriggerIncidentCheckAsync(default);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var resolvedZalo = incidentsResp.Incidents.Single(i => i.IncidentKey == "worker_stalled_zalo");
+        Assert(resolvedZalo.State == "Resolved", "Worker incident auto-resolves when worker recovers");
+
+        // --- Scenario 5: Notification Failure & Retry Queue ---
+        fakeNotifier.ShouldThrow = true; // Simulate SMTP failure
+        fakeClock.Advance(TimeSpan.FromMinutes(20));
+        workerTracker.RecordFailure("recovery-email", "SMTP timeout");
+        await incidentService.TriggerIncidentCheckAsync(default);
+
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var emailInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "worker_stalled_recovery-email");
+        Assert(emailInc.State == "Active", "Incident created even when SMTP throws");
+        Assert(emailInc.LastNotifiedAt == null, "LastNotifiedAt remains null when SMTP delivery fails");
+        Assert(emailInc.NotificationCount == 0, "NotificationCount remains 0 when SMTP delivery fails");
+
+        // Next cycle: SMTP server is back online
+        fakeNotifier.ShouldThrow = false;
+        fakeClock.Advance(TimeSpan.FromMinutes(1));
+        await incidentService.TriggerIncidentCheckAsync(default);
+
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var retriedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "worker_stalled_recovery-email");
+        Assert(retriedInc.LastNotifiedAt != null, "LastNotifiedAt updated after successful retry");
+        Assert(retriedInc.NotificationCount == 1, "NotificationCount incremented after successful retry");
     }
 
     private static async Task TestSmtpIncidentNotifierAsync()
@@ -312,23 +519,24 @@ public static class OperationsMonitoringTests
 
         var notifier = new SmtpIncidentNotifier(options, NullLogger<SmtpIncidentNotifier>.Instance, fakeEmailSender);
 
-        var sampleIncident = new IncidentSnapshot(
-            Id: Guid.NewGuid(),
-            IncidentKey: "host_disk_high",
-            RuleName: "High Host Disk Utilization",
-            Severity: "Warning",
-            State: "Active",
-            Summary: "Host Disk usage is 89.5% (>= 85% threshold)",
-            Details: "Disk percent: 89.5%",
-            StartedAt: DateTimeOffset.Parse("2026-10-20T16:00:00Z"),
-            AcknowledgedAt: null,
-            ResolvedAt: null,
-            LastNotifiedAt: DateTimeOffset.Parse("2026-10-20T16:00:00Z"),
-            NotificationCount: 1
-        );
+        var sampleIncident = new MonitoringIncident
+        {
+            Id = Guid.NewGuid(),
+            IncidentKey = "host_disk_high",
+            RuleName = "High Host Disk Utilization",
+            Severity = "Warning",
+            State = "Active",
+            Summary = "Host Disk usage is 89.5% (>= 85% threshold)",
+            Details = "Disk percent: 89.5%",
+            StartedAt = DateTimeOffset.Parse("2026-10-20T16:00:00Z"),
+            AcknowledgedAt = null,
+            ResolvedAt = null,
+            LastNotifiedAt = DateTimeOffset.Parse("2026-10-20T16:00:00Z"),
+            NotificationCount = 1
+        };
 
         // Test alert email
-        await notifier.SendAlertAsync(sampleIncident, isRecovery: false);
+        await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default);
         Assert(fakeEmailSender.SentEmails.Count == 1, "Sent 1 alert email");
         var sentAlert = fakeEmailSender.SentEmails[0];
         Assert(sentAlert.To == "ops-team@rehouse.vn", "Sent to configured ops email");
@@ -337,7 +545,8 @@ public static class OperationsMonitoringTests
             "Body includes required SMTP delivery disclaimer");
 
         // Test recovery email
-        await notifier.SendAlertAsync(sampleIncident, isRecovery: true);
+        sampleIncident.ResolvedAt = DateTimeOffset.Parse("2026-10-20T16:30:00Z");
+        await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: true, default);
         Assert(fakeEmailSender.SentEmails.Count == 2, "Sent recovery email");
         var sentRecovery = fakeEmailSender.SentEmails[1];
         Assert(sentRecovery.Subject.Contains("[RESOLVED] High Host Disk Utilization"), "Subject formatted with [RESOLVED]");
@@ -381,7 +590,7 @@ public static class OperationsMonitoringTests
         await workerTracker.RecordWorkerHeartbeatAsync("recovery-email", isEnabled: true, status: "Healthy", errorMessage: null, default);
         await workerTracker.RecordWorkerHeartbeatAsync("zalo", isEnabled: true, status: "Healthy", errorMessage: null, default);
         await workerTracker.RecordWorkerHeartbeatAsync("cleanup", isEnabled: true, status: "Healthy", errorMessage: null, default);
-        await workerTracker.RecordWorkerHeartbeatAsync("aggregation", isEnabled: true, status: "Healthy", errorMessage: null, default);
+        await workerTracker.RecordWorkerHeartbeatAsync("ops-aggregation", isEnabled: true, status: "Healthy", errorMessage: null, default);
 
         var adminClient = app.GetTestClient();
         adminClient.BaseAddress = new Uri("http://localhost");
@@ -395,8 +604,10 @@ public static class OperationsMonitoringTests
         Assert(opsData != null, "Operations response parsed successfully");
         Assert(opsData!.Overview.OverallStatus == "Healthy", "Default overview status is Healthy");
         Assert(opsData.Overview.Window == "1h", "Default window is 1h");
-        Assert(opsData.Workers.Count == 6, "All 6 application workers tracked");
-        Assert(opsData.Workers.All(w => w.Status == "Healthy"), "All 6 application workers healthy");
+        Assert(opsData.Workers.Any(w => w.WorkerName == "backup-watchdog"), "backup-watchdog surfaced as WorkerStatusDto");
+        Assert(opsData.Workers.Count(w => w.WorkerName != "backup-watchdog") == 6, "All 6 application workers tracked");
+        Assert(opsData.Workers.Where(w => w.WorkerName != "backup-watchdog").All(w => w.Status == "Healthy"), "All 6 application workers healthy");
+        Assert(opsData.Workers.Single(w => w.WorkerName == "backup-watchdog").Status == "Unknown", "Missing collector surfaces backup-watchdog as Unknown");
         Assert(opsData.Queues != null, "Operational queues stats present");
 
         // 2. Query with custom window
@@ -475,14 +686,40 @@ public static class OperationsMonitoringTests
         }
     }
 
-    private sealed class FakeAlertNotifier : IIncidentAlertNotifier
+    private sealed class FakeAlertNotifier : IIncidentNotifier
     {
-        public List<(IncidentSnapshot Incident, bool IsRecovery)> Alerts { get; } = new();
+        public bool ShouldThrow { get; set; }
+        public List<(MonitoringIncident Incident, bool IsRecovery)> Alerts { get; } = new();
 
-        public Task SendAlertAsync(IncidentSnapshot incident, bool isRecovery, CancellationToken ct = default)
+        public Task SendIncidentAlertAsync(MonitoringIncident incident, bool isRecovery, CancellationToken ct)
         {
+            if (ShouldThrow)
+            {
+                throw new InvalidOperationException("SMTP connection refused");
+            }
+
             Alerts.Add((incident, isRecovery));
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeHostReader : ILinuxHostCollectorMetricsReader, IHostMetricsReader
+    {
+        public HostCollectorMetrics? Metrics { get; set; }
+        public Task<HostCollectorMetrics?> ReadHostMetricsAsync(CancellationToken ct = default) => Task.FromResult(Metrics);
+        Task<HostMetricsDto?> IHostMetricsReader.ReadHostMetricsAsync(CancellationToken ct)
+        {
+            if (Metrics == null) return Task.FromResult<HostMetricsDto?>(null);
+            return Task.FromResult<HostMetricsDto?>(new HostMetricsDto(
+                Metrics.CpuPercent,
+                Metrics.MemoryPercent,
+                Metrics.DiskPercent,
+                Metrics.ContainerCount,
+                Metrics.HealthEndpointStatus,
+                Metrics.HostStatus,
+                Metrics.RecordedAt,
+                Metrics.IsStale
+            ));
         }
     }
 

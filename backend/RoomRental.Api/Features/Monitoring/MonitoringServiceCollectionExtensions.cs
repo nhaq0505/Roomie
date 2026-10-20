@@ -30,18 +30,31 @@ public static class MonitoringServiceCollectionExtensions
         services.Configure<HostMetricsOptions>(configuration.GetSection(HostMetricsOptions.SectionName));
         services.Configure<IncidentNotificationOptions>(configuration.GetSection(IncidentNotificationOptions.SectionName));
 
+        services.RemoveAll<IRouteLatencyAggregator>();
         services.AddSingleton<IRouteLatencyAggregator, RouteLatencyAggregator>();
-        services.AddSingleton<IWorkerTelemetryTracker, WorkerTelemetryTracker>();
-        services.AddSingleton<IIncidentAlertNotifier, SmtpIncidentNotifier>();
-        services.AddSingleton<IIncidentEngine, IncidentEngine>();
 
+        services.RemoveAll<IWorkerStateTracker>();
+        services.RemoveAll<IWorkerTelemetryTracker>();
+        services.RemoveAll<WorkerTelemetryTracker>();
+        services.AddSingleton<WorkerTelemetryTracker>();
+        services.AddSingleton<IWorkerTelemetryTracker>(sp => sp.GetRequiredService<WorkerTelemetryTracker>());
+        services.AddSingleton<IWorkerStateTracker>(sp => sp.GetRequiredService<WorkerTelemetryTracker>());
+
+        services.RemoveAll<IHostMetricsReader>();
+        services.RemoveAll<ILinuxHostCollectorMetricsReader>();
         services.AddScoped<IHostMetricsReader, LinuxHostCollectorMetricsReader>();
         services.AddScoped<ILinuxHostCollectorMetricsReader, LinuxHostCollectorMetricsReader>();
-        services.AddScoped<IOperationsMonitoringService, OperationsMonitoringService>();
-        services.AddScoped<IIncidentService, IncidentMonitoringService>();
-        services.AddScoped<IIncidentNotifier, SmtpIncidentAlertNotifier>();
 
-        services.AddHostedService<MonitoringAggregationWorker>();
+        services.RemoveAll<IOperationsMonitoringService>();
+        services.AddScoped<IOperationsMonitoringService, OperationsMonitoringService>();
+
+        services.RemoveAll<IIncidentService>();
+        services.AddScoped<IIncidentService, IncidentMonitoringService>();
+
+        services.RemoveAll<IIncidentNotifier>();
+        services.AddScoped<IIncidentNotifier, SmtpIncidentNotifier>();
+
+        services.AddHostedService<OpsMinuteFlushWorker>();
 
         return services;
     }
