@@ -80,6 +80,13 @@ internal static class MonitoringFoundationTests
         indexCmd.CommandText = "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_AnalyticsEvents_EventId'";
         var indexSql = Convert.ToString(await indexCmd.ExecuteScalarAsync()) ?? "";
         Assert(indexSql.Contains("UNIQUE"), "EventId has unique index on AnalyticsEvents");
+
+        // Verify Postgres model snapshot has no pending changes
+        var pgOptions = new DbContextOptionsBuilder<PostgresAppDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Database=dummy")
+            .Options;
+        await using var pgDb = new PostgresAppDbContext(pgOptions);
+        Assert(!pgDb.Database.HasPendingModelChanges(), "Postgres migration snapshot has no pending model changes");
     }
 
     private static async Task TestClientAnalyticsServiceAsync()
