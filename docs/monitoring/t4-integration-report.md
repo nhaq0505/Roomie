@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 - **Integrated Branch**: `nhaq0505/monitoring-core`
-- **Integrated Commit SHA**: `bd27eb19e82de77b2b843dc585567632fc8114a3`
-- **Original Base Checkout**: `/Users/nguyenhoanhquan/orca/workspaces/Quản Lý Phòng/LandingPage` on branch `nhaq0505/LandingPage` (HEAD `f1576506825a1acde37d51960dd2dc80f5c7b23d`) remained completely untouched.
-- **Provider Status**: In-process test fakes only; zero external calls to payOS, SMTP, or VPS; zero production or shared database modifications.
+- **Integrated Commit SHA**: `d30fe7716e95c3f450cb488f2a482acf28918b36`
+- **Target Repository & Base Checkout**: `/Users/nguyenhoanhquan/orca/workspaces/Quản Lý Phòng/LandingPage` on branch `nhaq0505/LandingPage` (original HEAD `f1576506825a1acde37d51960dd2dc80f5c7b23d`) remained completely untouched and will remain untouched until T7.
+- **Provider Status**: In-process test fakes and disposable QA databases only; zero calls to production/real payOS, real SMTP, or external VPS hosts; zero modifications to shared or production databases.
 
 ---
 
@@ -30,12 +30,13 @@ Imported cleanly onto base `8a9e764` (T1 settled core):
 4. **Integration & Acceptance Hardening Commits**:
    - `8ec3a97`: Add Postgres model snapshot pending changes assertion in foundation tests
    - `bd27eb1`: Complete T4 integration of nullable metrics, server registration funnel, date bounds, and 4-catalog i18n
+   - `d30fe77`: Publish T4 integration verification report
 
 ---
 
 ## 3. Reconciled Architectural Invariants
-- **Concurrency & Transacted Invoices**: Preserved `8a9e764` invariant where `InvoiceService.GenerateForOwnerAsync` detects outer transactions and defers milestone tracking strictly until after `transaction.CommitAsync()` in `/readings`.
-- **System Actor vs Owner Actions**: System sweep increments `SystemActionCount` without incrementing `OwnerActionCount`. Webhooks are recorded with central System actor and explicit `PaidAt`.
+- **Concurrency & Transacted Invoices**: Preserved `8a9e764` invariant where `InvoiceService.GenerateForOwnerAsync` detects outer caller transactions and defers milestone tracking strictly until after `await transaction.CommitAsync()` in `/readings`. Tested on real disk-backed disposable SQLite DB with foreign keys enabled.
+- **System Actor vs Owner Actions**: System background sweep increments `SystemActionCount` without incrementing `OwnerActionCount`. Webhooks are recorded with central System actor and explicit `PaidAt`.
 - **Worker Telemetry**: Worker transitions to `Running` upon tick start, preserves `LastSuccessAt` during execution, and clears consecutive failures on healthy completion.
 - **HTTP Pipeline & Diagnostics**: `RouteLatencyMiddleware` sits before exception handlers; unhandled 500s are captured accurately without false 200 statuses; 4xx errors are distinguished from server errors.
 - **Watchdog Authority**: 27h backup watchdog is authoritative; missing collector reports `Unknown` rather than synthetic healthy.
@@ -60,22 +61,44 @@ Imported cleanly onto base `8a9e764` (T1 settled core):
 
 ---
 
-## 5. Executable Test Evidence
-| Suite | Command | Result |
-| :--- | :--- | :--- |
-| **C# WebhookTests** | `dotnet run --project tests/RoomRental.WebhookTests/RoomRental.WebhookTests.csproj` | **ALL PASS** (OperationalHardening, SharedSupport, Migrations, PayOsPayment, BatchPayment, TenantLinkHttp, AccountOccupancy, RegistrationEmailTemplate, RegistrationVerification, PasswordRecovery, ManualReceipt, AuthSecurityHttp, RoomTenantLifecycleHttp, AccountingBillingHttp, PayOsOperationsHttp, MonitoringFoundation, MonitoringBusiness, OperationsMonitoring) |
-| **C# ZaloTests** | `dotnet run --project tests/RoomRental.ZaloTests/RoomRental.ZaloTests.csproj` | **PASS** (53 assertions; 0 provider calls) |
-| **Python Host Collector** | `python3 -m unittest tests/test_host_collector.py` | **PASS** (34 unit tests; 1.18s) |
-| **Frontend Architecture** | `npm run check:architecture` | **PASS** (108 source modules; 0 dependency cycles) |
-| **Frontend i18n Catalogs** | `npm run i18n:check` | **PASS** (1,353 keys × 4 catalogs; UI coverage confirmed) |
-| **Frontend Analytics Tracker** | `npm run test:analytics` | **PASS** (first-party browser tracker; 30m idle session; PII scrubbing) |
-| **Frontend HTTP Client** | `npm run test:http` | **PASS** (transport envelopes, headers, idempotency) |
-| **Frontend API Paging** | `npm run test:api` | **PASS** (bounded pagination) |
-| **Frontend Production Build** | `npm run build` | **PASS** (`tsc -b && vite build && node scripts/prerender.mjs`) |
-| **Playwright E2E Suite** | `npm run test:e2e` | **PASS** (60 passed across 6 workers, 15.0s) |
-| **DbMigrator Build** | `dotnet build backend/RoomRental.DbMigrator/RoomRental.DbMigrator.csproj` | **PASS** (0 warnings, 0 errors) |
+## 5. Distinction Between Test Layers
+1. **Mocked UI Scenarios (Playwright E2E)**:
+   - `frontend/e2e/monitoring.spec.ts` intercepts browser HTTP requests via `page.route` to test user-facing responsive viewports (375px mobile, 1440px desktop), native SVG charts, navigation gate guards, null/zero states, and client form validation (60 test cases passed).
+2. **Real In-Process HTTP Endpoints (ASP.NET Core TestHost / WebApplicationFactory)**:
+   - `tests/RoomRental.WebhookTests/MonitoringFoundationTests.cs`, `MonitoringBusinessTests.cs`, and `OperationsMonitoringTests.cs` run the actual compiled ASP.NET Core web server and pipeline.
+   - They send real HTTP requests (`GetAsync`, `PostAsJsonAsync`) to `/api/admin/monitoring/growth`, `/api/admin/monitoring/revenue`, `/api/admin/monitoring/operations`, `/api/admin/monitoring/incidents`, `/api/admin/monitoring/campaigns`, and `/api/analytics/events`.
+   - All DI services (`DefaultGrowthMonitoringQueryService`, `DefaultRevenueMonitoringQueryService`, `OperationsMonitoringService`, `IncidentMonitoringService`, `WorkerTelemetry`, `RouteLatencyAggregator`, `SmtpIncidentNotifier`) are wired and executed against real disposable SQLite databases.
+3. **Real SQLite Concurrency & Rollback Regression**:
+   - `MonitoringBusinessTests.TestRealSqlitePostReadingsSuccessRollbackAndNoStallAsync` initializes a real disk-backed SQLite database file (`monitoring_sqlite_readings_regression_*.db`) with foreign keys enabled, executes an outer transaction, commits, and asserts that reading + issued invoice + owner milestone activate transactionally without stalls or false milestones.
+4. **Provider Migration Execution vs Offline Checks**:
+   - **SQLite**: Full live schema migration (`MigrateAsync()`), table checks, index checks, repeat migration checks executed in `MigrationTests.cs` and `MonitoringFoundationTests.cs`.
+   - **PostgreSQL**: Model equivalence confirmed via `!pgDb.Database.HasPendingModelChanges()`. Live PostgreSQL network migration execution was not run because no local PostgreSQL test daemon was provisioned in this Mac worker environment (`ZALO_TEST_POSTGRES` was not set).
 
 ---
 
-## 6. Readiness for T5/T6 Independent Reviews
-The core integration worktree is fully clean on branch `nhaq0505/monitoring-core` at commit `bd27eb19e82de77b2b843dc585567632fc8114a3`. All code is formatted, fully documented, and ready for independent peer reviews.
+## 6. Executable Test Evidence & Commands
+| Suite | Command | Execution Evidence | Status |
+| :--- | :--- | :--- | :--- |
+| **Backend API Build** | `dotnet build backend/RoomRental.Api/RoomRental.Api.csproj` | 0 Warning(s), 0 Error(s) | **PASS** |
+| **DbMigrator Build** | `dotnet build backend/RoomRental.DbMigrator/RoomRental.DbMigrator.csproj` | 0 Warning(s), 0 Error(s) | **PASS** |
+| **C# WebhookTests** | `dotnet run --project tests/RoomRental.WebhookTests/RoomRental.WebhookTests.csproj` | All 18 sub-suites passed (including MonitoringFoundation, MonitoringBusiness, OperationsMonitoring, MigrationTests) | **ALL PASS** |
+| **C# ZaloTests** | `dotnet run --project tests/RoomRental.ZaloTests/RoomRental.ZaloTests.csproj` | 53 assertions passed; 0 external provider calls | **PASS** |
+| **Python Host Collector** | `python3 -m unittest tests/test_host_collector.py` | 34 unit tests in 1.18s | **PASS** |
+| **Frontend Architecture** | `npm run check:architecture` | 108 source modules; 0 cycles | **PASS** |
+| **Frontend i18n Catalogs** | `npm run i18n:check` | 1,353 keys × 4 catalogs; UI coverage verified | **PASS** |
+| **Frontend Analytics Tracker** | `npm run test:analytics` | First-party browser tracker; 30m idle session; PII scrubbing | **PASS** |
+| **Frontend HTTP Client** | `npm run test:http` | Transport envelopes, headers, single financial submission | **PASS** |
+| **Frontend API Paging** | `npm run test:api` | Bounded pagination past 100 rows | **PASS** |
+| **Frontend Production Build** | `npm run build` | `tsc -b && vite build && node scripts/prerender.mjs` succeeded | **PASS** |
+| **Playwright E2E Suite** | `npm run test:e2e` | 60 passed across 6 workers in 15.0s | **PASS** |
+
+---
+
+## 7. Honest Limitations & Not-Run Items
+1. **Live PostgreSQL Network Execution**: Live connection against PostgreSQL was not executed because no local PostgreSQL test database daemon (`roomie_qa_zalo`) was provisioned on loopback in this test worker machine. Snapshot and migration model integrity was verified via `HasPendingModelChanges() == false`.
+2. **External Production Providers**: Real payOS merchant API, real external SMTP servers, and external Ubuntu host probes were not executed in accordance with zero-external-provider constraints. All provider flows were tested using in-process test fixtures and fakes.
+
+---
+
+## 8. Readiness for Independent T5/T6 Reviews
+The integrated worktree is completely clean on branch `nhaq0505/monitoring-core` at commit `d30fe7716e95c3f450cb488f2a482acf28918b36`. All code is formatted, fully documented, and ready for independent peer reviews by Worker B (backend/ops) and Worker C (frontend).
