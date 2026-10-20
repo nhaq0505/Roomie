@@ -1,5 +1,16 @@
 # Task T5b Independent Backend Correction Re-Review Report
 
+> [!NOTE]
+> **Resolution Status (SUPERSEDED / RESOLVED)**:
+> All 6 findings in this review report have been authoritatively resolved and verified in Tasks **T4c** and **T4d**:
+> - **Defect 1 (Outbox False-Completion)**: Resolved in `8f1e395` by verifying database milestone persistence (`OwnerMilestones.AnyAsync(...)`) before setting `Status = "Completed"`. Unverified events remain `Pending`.
+> - **Defect 2 (Draft-Edit Revision Backdating)**: Resolved in `8f1e395` by filtering `InvoiceRevisions` by `%publish%` before `IssuedAt` in `EnsureInvoiceIssuedMilestoneAsync`.
+> - **Defect 3 (Hardcoded Owner Actor on Sweeps)**: Resolved in `8f1e395` by preserving actor in outbox `TargetId` (`{targetId}:{actor}`), ensuring system sweeps increment `SystemActionCount` without incrementing `OwnerActionCount` or `HasOwnerAction` (zero false WAU/MAU).
+> - **Defect 4 (In-Memory Materialization of Owner IDs)**: Resolved in Task T4d by introducing `GetMatchingOwnerIdsQuery` returning `IQueryable<Guid>?` for pure relational SQL subqueries across growth, revenue, retention, funnel, and CAC. Proved offline via `ToQueryString()` for both SQLite and PostgreSQL (Npgsql) and tested with many matching owners.
+> - **Defect 5 (PII/SQL Leak in LastError)**: Resolved in `8f1e395` by sanitizing exception messages into bounded error codes (`ERR_...`).
+> - **Defect 6 (Missing Outbox Retention Pruning)**: Resolved in Task T4d by adding 30-day completed outbox pruning via `ExecuteDeleteAsync` in `PruneExpiredTelemetryAsync`, while preserving Pending/Failed/retry records and durable milestones.
+> See the final assembly report in [`t4c-assembly-report.md`](./t4c-assembly-report.md) and canonical runbook in [`runbook-and-metric-dictionary.md`](./runbook-and-metric-dictionary.md).
+
 **Review Date**: 2026-10-20  
 **Reviewer**: Worker B (Independent QA of Backend & Telemetry Systems)  
 **Reviewed Snapshot SHA**: `68911329abdbc325e0a4eb49d58a998fa5c56c76`  

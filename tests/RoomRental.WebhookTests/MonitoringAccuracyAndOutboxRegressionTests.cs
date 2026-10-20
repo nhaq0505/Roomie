@@ -35,6 +35,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         await TestInvoiceIssuance_Publish_And_ReadingsRollbackWithProductWrites_Async();
         await TestOutboxAck_VerifiedSuccessOnly_SanitizedError_SystemActor_Async();
         await TestBoundaryCaps_Exceeding50k_FilteredOwnerBeyond50k_Daily_Retention_Funnel_Revenue_CAC_Async();
+        await TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_SQLite_Npgsql_Async();
+        await TestPruneExpiredTelemetry_CompletedOutboxPruned_PendingFailedPreserved_Async();
         Console.WriteLine("=== ALL TASK T4B METRIC ACCURACY & OUTBOX REGRESSION TESTS PASSED ===\n");
     }
 
@@ -933,6 +935,289 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
 
         Assert(costMetrics.Summary.TotalMarketingSpendVnd == 10_005_000m,
             $"TotalMarketingSpendVnd sums ALL 10,005 entries exactly without Take(10k) cap (expected 10,005,000 VND, got {costMetrics.Summary.TotalMarketingSpendVnd})");
+    }
+
+    private static async Task TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_SQLite_Npgsql_Async()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var _ = connection;
+        await using var __ = db;
+
+        var clock = TimeProvider.System;
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+
+        // 1. OFFLINE SQL TRANSLATION TEST: SQLite & Npgsql (PostgreSQL)
+        var filter = new MonitoringFilterRequest(Source: "multi-source");
+        var campaignChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // SQLite Translation Check
+        var sqliteQuery = db.OwnerMilestones.Where(m =>
+            DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsQuery(db, filter, campaignChannels)!.Contains(m.OwnerId));
+        var sqliteSql = sqliteQuery.ToQueryString();
+        Assert(sqliteSql.Contains("IN (SELECT") || sqliteSql.Contains("in (select") || (sqliteSql.Contains("IN (") && sqliteSql.Contains("RegistrationAttributions")),
+            "SQLite generates relational SQL subquery for matching owner IDs without materialization");
+        Assert(!sqliteSql.Contains("@__matchingOwnerIds_"),
+            "SQLite SQL does not inline or parameterize matching owner IDs");
+
+        // Npgsql (PostgreSQL) Offline Translation Check (offline without network connection)
+        var pgOptions = new DbContextOptionsBuilder<PostgresAppDbContext>()
+            .UseNpgsql("Host=localhost;Database=roomie_test;Username=roomie")
+            .Options;
+        using var pgDb = new PostgresAppDbContext(pgOptions);
+        var pgQuery = pgDb.OwnerMilestones.Where(m =>
+            DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsQuery(pgDb, filter, campaignChannels)!.Contains(m.OwnerId));
+        var pgSql = pgQuery.ToQueryString();
+        Assert(pgSql.Contains("IN (SELECT") || pgSql.Contains("in (select") || (pgSql.Contains("IN (") && pgSql.Contains("RegistrationAttributions")),
+            "PostgreSQL (Npgsql) generates relational SQL subquery for matching owner IDs without materialization");
+        Assert(!pgSql.Contains("@__matchingOwnerIds_"),
+            "Npgsql SQL does not inline or parameterize matching owner IDs");
+
+        // 2. MANY MATCHING OWNERS TEST (EXACT METRIC COUNTS)
+        const int matchingCount = 20;
+        const int nonMatchingCount = 10;
+        var matchingOwnerIds = new List<Guid>();
+
+        for (var i = 0; i < matchingCount; i++)
+        {
+            var ownerId = Guid.NewGuid();
+            matchingOwnerIds.Add(ownerId);
+            db.Users.Add(new AppUser
+            {
+                Id = ownerId,
+                Email = $"multi_{i}@example.test",
+                Name = $"Multi Owner {i}",
+                PasswordHash = "fixture",
+                Role = UserRole.Owner,
+                Status = OwnerStatus.Approved,
+                CreatedAt = now.AddDays(-15)
+            });
+            db.RegistrationAttributions.Add(new RegistrationAttribution
+            {
+                OwnerId = ownerId,
+                FirstTouchSource = "multi-source",
+                FirstTouchMedium = "cpc",
+                FirstTouchCampaign = "multi-campaign",
+                RegisteredAt = now.AddDays(-15)
+            });
+            db.OwnerMilestones.Add(new OwnerMilestone
+            {
+                OwnerId = ownerId,
+                RegisteredAt = now.AddDays(-15),
+                ActivatedAt = now.AddDays(-10)
+            });
+            db.OwnerDailyActivities.Add(new OwnerDailyActivity
+            {
+                OwnerId = ownerId,
+                ActivityDate = today,
+                HasOwnerAction = true,
+                OwnerActionCount = 1,
+                LastActionType = "Login"
+            });
+            // 5 of these owners paid subscriptions
+            if (i < 5)
+            {
+                db.PayOsAttempts.Add(new PayOsAttempt
+                {
+                    Id = Guid.NewGuid(),
+                    OrderCode = 5000000 + i,
+                    OwnerId = ownerId,
+                    Amount = 100_000,
+                    Kind = "Subscription",
+                    Status = PaymentAttemptStatus.Paid,
+                    PaidAt = now.AddDays(-2),
+                    SubscriptionDays = 30
+                });
+            }
+        }
+
+        // Non-matching owners
+        for (var i = 0; i < nonMatchingCount; i++)
+        {
+            var otherOwnerId = Guid.NewGuid();
+            db.Users.Add(new AppUser
+            {
+                Id = otherOwnerId,
+                Email = $"other_{i}@example.test",
+                Name = $"Other Owner {i}",
+                PasswordHash = "fixture",
+                Role = UserRole.Owner,
+                Status = OwnerStatus.Approved,
+                CreatedAt = now.AddDays(-15)
+            });
+            db.RegistrationAttributions.Add(new RegistrationAttribution
+            {
+                OwnerId = otherOwnerId,
+                FirstTouchSource = "other-source",
+                FirstTouchMedium = "cpc",
+                RegisteredAt = now.AddDays(-15)
+            });
+            db.OwnerMilestones.Add(new OwnerMilestone
+            {
+                OwnerId = otherOwnerId,
+                RegisteredAt = now.AddDays(-15),
+                ActivatedAt = now.AddDays(-10)
+            });
+            db.OwnerDailyActivities.Add(new OwnerDailyActivity
+            {
+                OwnerId = otherOwnerId,
+                ActivityDate = today,
+                HasOwnerAction = true,
+                OwnerActionCount = 1,
+                LastActionType = "Login"
+            });
+            db.PayOsAttempts.Add(new PayOsAttempt
+            {
+                Id = Guid.NewGuid(),
+                OrderCode = 6000000 + i,
+                OwnerId = otherOwnerId,
+                Amount = 100_000,
+                Kind = "Subscription",
+                Status = PaymentAttemptStatus.Paid,
+                PaidAt = now.AddDays(-2),
+                SubscriptionDays = 30
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var growthService = new DefaultGrowthMonitoringQueryService(db, clock);
+        var growthMetrics = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest
+        {
+            Source = "multi-source",
+            FromDate = today.AddDays(-30),
+            ToDate = today
+        }, default);
+
+        Assert(growthMetrics.Summary.Registrations == matchingCount,
+            $"Growth metrics matching registrations count is exactly {matchingCount} (got {growthMetrics.Summary.Registrations})");
+        Assert(growthMetrics.Summary.ActivatedOwners == matchingCount,
+            $"Growth metrics matching activated owners count is exactly {matchingCount} (got {growthMetrics.Summary.ActivatedOwners})");
+        Assert(growthMetrics.Summary.CurrentWau == matchingCount,
+            $"Growth metrics matching WAU count is exactly {matchingCount} (got {growthMetrics.Summary.CurrentWau})");
+        Assert(growthMetrics.Summary.CurrentMau == matchingCount,
+            $"Growth metrics matching MAU count is exactly {matchingCount} (got {growthMetrics.Summary.CurrentMau})");
+
+        var revenueService = new DefaultRevenueMonitoringQueryService(db, clock);
+        var revenueMetrics = await revenueService.GetRevenueMetricsAsync(new MonitoringFilterRequest
+        {
+            Source = "multi-source",
+            FromDate = today.AddDays(-30),
+            ToDate = today
+        }, default);
+
+        Assert(revenueMetrics.Summary.TotalSubscriptionRevenueVnd == 500_000m,
+            $"Revenue metrics sums matching subscriptions only: expected 500,000 VND, got {revenueMetrics.Summary.TotalSubscriptionRevenueVnd}");
+        Assert(revenueMetrics.Summary.PaidSubscriptionCount == 5,
+            $"Revenue metrics counts matching paid subscriptions only: expected 5, got {revenueMetrics.Summary.PaidSubscriptionCount}");
+    }
+
+    private static async Task TestPruneExpiredTelemetry_CompletedOutboxPruned_PendingFailedPreserved_Async()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var _ = connection;
+        await using var __ = db;
+
+        var clock = TimeProvider.System;
+        var now = clock.GetUtcNow();
+
+        var durableOwnerId = Guid.NewGuid();
+        var oldCompletedId = Guid.NewGuid();
+        var freshCompletedId = Guid.NewGuid();
+        var oldPendingId = Guid.NewGuid();
+        var oldFailedId = Guid.NewGuid();
+
+        db.Users.Add(new AppUser
+        {
+            Id = durableOwnerId,
+            Email = "durable@example.test",
+            Name = "Durable User",
+            PasswordHash = "fixture",
+            Role = UserRole.Owner,
+            Status = OwnerStatus.Approved,
+            CreatedAt = now.AddDays(-60)
+        });
+
+        // 1. Old completed outbox event (35 days old - exceeds 30-day retention)
+        db.MilestoneOutboxEvents.Add(new MilestoneOutboxEvent
+        {
+            Id = oldCompletedId,
+            OwnerId = durableOwnerId,
+            EventType = "SubscriptionPaid",
+            TargetId = "12345:System",
+            OccurredAt = now.AddDays(-35),
+            ProcessedAt = now.AddDays(-35),
+            Status = "Completed"
+        });
+
+        // 2. Fresh completed outbox event (5 days old - within 30-day retention)
+        db.MilestoneOutboxEvents.Add(new MilestoneOutboxEvent
+        {
+            Id = freshCompletedId,
+            OwnerId = durableOwnerId,
+            EventType = "SubscriptionPaid",
+            TargetId = "12346:System",
+            OccurredAt = now.AddDays(-5),
+            ProcessedAt = now.AddDays(-5),
+            Status = "Completed"
+        });
+
+        // 3. Old pending outbox event (40 days old - MUST BE PRESERVED FOR RETRY!)
+        db.MilestoneOutboxEvents.Add(new MilestoneOutboxEvent
+        {
+            Id = oldPendingId,
+            OwnerId = durableOwnerId,
+            EventType = "InvoiceIssued",
+            TargetId = $"{Guid.NewGuid()}:Owner",
+            OccurredAt = now.AddDays(-40),
+            Status = "Pending",
+            RetryCount = 3,
+            LastError = "ERR_TIMEOUT"
+        });
+
+        // 4. Old failed outbox event (40 days old - MUST BE PRESERVED FOR AUDIT/RECOVERY!)
+        db.MilestoneOutboxEvents.Add(new MilestoneOutboxEvent
+        {
+            Id = oldFailedId,
+            OwnerId = durableOwnerId,
+            EventType = "InvoiceIssued",
+            TargetId = $"{Guid.NewGuid()}:Owner",
+            OccurredAt = now.AddDays(-40),
+            Status = "Failed",
+            RetryCount = 10,
+            LastError = "ERR_DB_UPDATE"
+        });
+
+        // 5. Durable milestone (MUST NEVER BE PRUNED!)
+        db.OwnerMilestones.Add(new OwnerMilestone
+        {
+            OwnerId = durableOwnerId,
+            RegisteredAt = now.AddDays(-50),
+            ActivatedAt = now.AddDays(-40),
+            FirstPaidAt = now.AddDays(-35)
+        });
+
+        await db.SaveChangesAsync();
+
+        var maintenanceService = new DefaultMonitoringMaintenanceService(db, clock);
+        var pruned = await maintenanceService.PruneExpiredTelemetryAsync(default);
+
+        Assert(pruned >= 1, $"PruneExpiredTelemetryAsync returns pruned count >= 1 (got {pruned})");
+
+        var oldCompletedExists = await db.MilestoneOutboxEvents.AnyAsync(e => e.Id == oldCompletedId);
+        Assert(!oldCompletedExists, "Old completed outbox event (>30d) is pruned by maintenance service");
+
+        var freshCompletedExists = await db.MilestoneOutboxEvents.AnyAsync(e => e.Id == freshCompletedId);
+        Assert(freshCompletedExists, "Fresh completed outbox event (<=30d) is preserved");
+
+        var oldPendingExists = await db.MilestoneOutboxEvents.AnyAsync(e => e.Id == oldPendingId);
+        Assert(oldPendingExists, "Old pending outbox event (>30d) is preserved for durable retry");
+
+        var oldFailedExists = await db.MilestoneOutboxEvents.AnyAsync(e => e.Id == oldFailedId);
+        Assert(oldFailedExists, "Old failed outbox event (>30d) is preserved for audit");
+
+        var milestoneExists = await db.OwnerMilestones.AnyAsync(m => m.OwnerId == durableOwnerId);
+        Assert(milestoneExists, "Durable owner milestone is preserved indefinitely");
     }
 
     private sealed class FailingMilestoneTracker(IOwnerMilestoneTracker inner, bool shouldFail) : IOwnerMilestoneTracker

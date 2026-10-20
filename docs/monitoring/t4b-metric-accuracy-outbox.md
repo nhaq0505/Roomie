@@ -58,7 +58,12 @@ Hook failures during invoice issuance permanently skipped `ActivatedAt` because 
 ---
 
 ## 5. Automated Verification Evidence
-A comprehensive regression suite was authored in `tests/RoomRental.WebhookTests/MonitoringAccuracyAndOutboxRegressionTests.cs` and executed with disposable SQLite databases:
+A comprehensive regression suite was authored in `tests/RoomRental.WebhookTests/MonitoringAccuracyAndOutboxRegressionTests.cs` and executed with disposable SQLite databases.
+
+> [!NOTE]
+> **Scope & Provider Honesty**:
+> - Assertions in `MonitoringAccuracyAndOutboxRegressionTests.cs` run through direct in-process C# service method calls (`revenueQueryService.GetRevenueMetricsAsync`, `growthService.GetGrowthMetricsAsync`, `webhookService.HandleSubscriptionPaymentSuccessAsync`) and manual `db.Database.BeginTransactionAsync()` rollbacks. Full HTTP routing, middleware, and status code verification are covered separately in the existing T1/T3 real HTTP pipeline test classes (e.g., `RealHttpPipelineRecords5xxCount`, `TestAdminOperationsEndpointReturns200` in `OperationsMonitoringTests.cs`).
+> - PostgreSQL compatibility is verified offline via EF Core design-time model snapshots (`!pgDb.Database.HasPendingModelChanges() == true`) and `ToQueryString()` SQL translation tests; live network execution against a running PostgreSQL server was omitted in this local SQLite container.
 
 1. **Fail-First Replay & Reconcile Test**:
    - Webhook telemetry post-commit hook artificially threw `InvalidOperationException`.

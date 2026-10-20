@@ -24,6 +24,7 @@
 | `5e9bd7a` | `e1d90c8` (fix/t2c-frontend-corrections) | Worker B | Resolve T6 mobile overflow, hourly rate preservation, clamped date tags, and honest funnel (T6b) |
 | `45e8fe2` | `c98de63` (review-t6) | Worker C | Publish T6 and T6b independent frontend review reports and QA evidence |
 | `8f1e395` | Task T4c (Authorized Correctness Fixes) | Worker A | Outbox durable ack verification, true publish revision filter, and system actor integrity |
+| `6846f2b` | `b15d251` (review/t5b-backend-corrections) | Worker B | Publish T5b independent backend correction QA review report |
 
 ---
 
@@ -36,6 +37,18 @@ Per coordinator guidance (`msg_9fd3ff141e7c`), three correctness blockers identi
    - All caught exceptions map to sanitized codes (`ERR_CONCURRENCY_CONFLICT`, `ERR_DB_UPDATE`, `ERR_TIMEOUT`, `ERR_INVALID_OP`, `ERR_TELEMETRY_FAILED`), guaranteeing zero raw SQL or PII leakage into error logs or database records.
 3. **System Actor Integrity**:
    - Outbox event targets format `{targetId}:{actor}` (e.g., `{invoiceId}:System` vs `{invoiceId}:Owner`). Automated system sweeps record `ActorType.System`, incrementing `SystemActionCount` without incrementing `OwnerActionCount` or setting `HasOwnerAction = true`, ensuring zero false owner WAU/MAU inflation.
+
+---
+
+### 2.2 Task T4d Final Review Resolutions: Relational Subqueries & Outbox Retention
+Per Task T4d review directives, two remaining findings from `t5b-review.md` were resolved:
+1. **Relational Subqueries for Owner Attribution Filtering (Defect 4)**:
+   - `GetMatchingOwnerIdsAsync` previously materialized matching owner IDs to memory (`HashSet<Guid>`), risking parameter limit overflow and high memory overhead across 8 metric queries.
+   - Introduced `GetMatchingOwnerIdsQuery` returning `IQueryable<Guid>?`. EF Core compiles this to relational SQL subqueries (`WHERE m.OwnerId IN (SELECT a.OwnerId FROM RegistrationAttributions a WHERE ...)`), eliminating in-memory list allocations.
+   - Verified offline via `ToQueryString()` for both SQLite and PostgreSQL (Npgsql), and verified in tests with 20 matching / 10 non-matching owners.
+2. **Completed Milestone Outbox Retention Pruning (Defect 6)**:
+   - Added 30-day retention pruning for `Status == "Completed"` outbox events via `ExecuteDeleteAsync` in `DefaultMonitoringMaintenanceService.PruneExpiredTelemetryAsync`.
+   - Verified that older `Completed` events (>30 days) are deleted, while fresh `Completed` (<=30 days), all `Pending`, and all `Failed` events are strictly preserved for retry and audit. Durable `OwnerMilestones` are preserved indefinitely.
 
 ---
 
@@ -71,10 +84,11 @@ All automated test suites across backend, frontend, host collector, and integrat
 | **Frontend Production Build** | `npm --prefix frontend run build` | Full build + prerender | **PASS** | 0 | 0 | TypeScript check (`tsc -b`), Vite build, and SSG prerendering completed in 2.44s with 0 errors. |
 | **Playwright Full E2E Suite** | `cd frontend && npx playwright test` | 67 E2E tests | **67/67** | 0 | 0 | Complete test run across desktop (1440px) and mobile (375px); zero horizontal scroll overflow. |
 
-### Non-Run Reasons & Limitations
-1. **Live PostgreSQL Network Execution**: PostgreSQL migrations and model snapshots were verified offline via EF Core design-time tooling and snapshot comparisons. Live execution against a live PostgreSQL server was omitted because disposable SQLite is the isolated provider in this container.
-2. **External Providers**: Zero calls were made to production payOS or live SMTP servers (disposable loopback fake handlers only).
-3. **No Whole-VPS Outage Probe**: The internal host collector cannot alert if the entire VPS host suffers network/power death; external monitoring is required for host death.
+### Non-Run Reasons & Honest Architecture Scope
+1. **Direct In-Process Services vs HTTP Pipeline**: Regression tests in `MonitoringAccuracyAndOutboxRegressionTests.cs` exercise business logic, outbox retries, failure injection, and manual database transaction rollbacks directly via in-process service instances (`revenueQueryService.GetRevenueMetricsAsync`, `growthService.GetGrowthMetricsAsync`, `webhookService.HandleSubscriptionPaymentSuccessAsync`). Full HTTP routing, middleware pipeline, exception mapping, and status code propagation are verified in the separate existing real HTTP integration tests (e.g. `RealHttpPipelineRecords5xxCount`, `TestAdminOperationsEndpointReturns200` in `OperationsMonitoringTests.cs`).
+2. **Offline PostgreSQL Verification**: PostgreSQL migrations and model snapshots were verified offline via EF Core design-time tooling (`!pgDb.Database.HasPendingModelChanges() == true`) and offline `ToQueryString()` SQL relational subquery translation. Live network execution against a running PostgreSQL server was omitted because disposable SQLite is the isolated provider in this container.
+3. **External Providers**: Zero calls were made to production payOS or live SMTP servers (disposable loopback fake handlers only).
+4. **No Whole-VPS Outage Probe**: The internal host collector cannot alert if the entire VPS host suffers network/power death; external monitoring is required for host death.
 
 ---
 
@@ -88,8 +102,9 @@ The following documents in `docs/monitoring/` constitute the canonical monitorin
 5. [`runbook-and-metric-dictionary.md`](./runbook-and-metric-dictionary.md): **Canonical operational runbook**, cutover steps, retention windows, unknown value handling, outbox retries, alert thresholds, and rollback procedures.
 6. [`t4-integration-report.md`](./t4-integration-report.md): Historical record of initial T4 assembly with superseding resolution links.
 7. [`t5-review.md`](./t5-review.md): Historical independent backend/ops review with resolution links to T4b.
-8. [`t6-review.md`](./t6-review.md): Historical independent frontend review with resolution links to T6b.
-9. [`t6b-review.md`](./t6b-review.md): Independent verification report approving all 7 frontend corrections.
-10. [`t2c-frontend-corrections.md`](./t2c-frontend-corrections.md): Detailed implementation record of frontend UI/UX fixes.
-11. [`t4b-metric-accuracy-outbox.md`](./t4b-metric-accuracy-outbox.md): Detailed implementation record of backend accuracy, outbox, and repair mechanisms.
-12. [`t4c-assembly-report.md`](./t4c-assembly-report.md): **This document**, representing the final pre-review assembly verification.
+8. [`t5b-review.md`](./t5b-review.md): Historical independent backend QA re-review with resolution links to T4c/T4d.
+9. [`t6-review.md`](./t6-review.md): Historical independent frontend review with resolution links to T6b.
+10. [`t6b-review.md`](./t6b-review.md): Independent verification report approving all 7 frontend corrections.
+11. [`t2c-frontend-corrections.md`](./t2c-frontend-corrections.md): Detailed implementation record of frontend UI/UX fixes.
+12. [`t4b-metric-accuracy-outbox.md`](./t4b-metric-accuracy-outbox.md): Detailed implementation record of backend accuracy, outbox, and repair mechanisms.
+13. [`t4c-assembly-report.md`](./t4c-assembly-report.md): **This document**, representing the final pre-review assembly verification.

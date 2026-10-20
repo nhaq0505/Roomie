@@ -985,11 +985,10 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             .ToHashSet();
     }
 
-    public static async Task<HashSet<Guid>?> GetMatchingOwnerIdsAsync(
+    public static IQueryable<Guid>? GetMatchingOwnerIdsQuery(
         AppDbContext db,
         MonitoringFilterRequest filter,
-        HashSet<string> campaignChannelCampaigns,
-        CancellationToken ct)
+        HashSet<string> campaignChannelCampaigns)
     {
         var hasSource = !string.IsNullOrWhiteSpace(filter.Source);
         var hasChannel = !string.IsNullOrWhiteSpace(filter.Channel);
@@ -1013,17 +1012,19 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             }
             else
             {
+                var sourceLower = filter.Source!.ToLower();
                 query = query.Where(a =>
-                    (a.FirstTouchSource != null && a.FirstTouchSource.ToLower() == filter.Source!.ToLower()) ||
-                    (a.LastTouchSource != null && a.LastTouchSource.ToLower() == filter.Source!.ToLower()));
+                    (a.FirstTouchSource != null && a.FirstTouchSource.ToLower() == sourceLower) ||
+                    (a.LastTouchSource != null && a.LastTouchSource.ToLower() == sourceLower));
             }
         }
 
         if (hasCampaign)
         {
+            var campaignLower = filter.Campaign!.ToLower();
             query = query.Where(a =>
-                (a.FirstTouchCampaign != null && a.FirstTouchCampaign.ToLower() == filter.Campaign!.ToLower()) ||
-                (a.LastTouchCampaign != null && a.LastTouchCampaign.ToLower() == filter.Campaign!.ToLower()));
+                (a.FirstTouchCampaign != null && a.FirstTouchCampaign.ToLower() == campaignLower) ||
+                (a.LastTouchCampaign != null && a.LastTouchCampaign.ToLower() == campaignLower));
         }
 
         if (hasChannel)
@@ -1046,8 +1047,19 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             }
         }
 
-        var matchingIds = await query.Select(a => a.OwnerId).ToListAsync(ct);
-        return matchingIds.ToHashSet();
+        return query.Select(a => a.OwnerId);
+    }
+
+    public static async Task<HashSet<Guid>?> GetMatchingOwnerIdsAsync(
+        AppDbContext db,
+        MonitoringFilterRequest filter,
+        HashSet<string> campaignChannelCampaigns,
+        CancellationToken ct)
+    {
+        var query = GetMatchingOwnerIdsQuery(db, filter, campaignChannelCampaigns);
+        if (query is null) return null;
+        var list = await query.ToListAsync(ct);
+        return list.ToHashSet();
     }
 
     public async Task<AdminMonitoringGrowthResponse> GetGrowthMetricsAsync(MonitoringFilterRequest filter, CancellationToken ct)
@@ -1084,7 +1096,7 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var matchingOwnerIds = await GetMatchingOwnerIdsAsync(db, filter, campaignChannels, ct);
+        var matchingOwnerIdsQuery = GetMatchingOwnerIdsQuery(db, filter, campaignChannels);
 
         var rawRetentionCutoffDate = today.AddDays(-89);
         var hasRawCoverageMissing = fromDate < rawRetentionCutoffDate;
@@ -1157,9 +1169,9 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var milestonesQuery = db.OwnerMilestones.AsNoTracking()
             .Where(m => m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc);
 
-        if (matchingOwnerIds != null)
+        if (matchingOwnerIdsQuery != null)
         {
-            milestonesQuery = milestonesQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+            milestonesQuery = milestonesQuery.Where(m => matchingOwnerIdsQuery.Contains(m.OwnerId));
         }
 
         var registrations = await milestonesQuery.CountAsync(ct);
@@ -1172,9 +1184,9 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var activationsQuery = db.OwnerMilestones.AsNoTracking()
             .Where(m => m.ActivatedAt >= startUtc && m.ActivatedAt < endUtc);
 
-        if (matchingOwnerIds != null)
+        if (matchingOwnerIdsQuery != null)
         {
-            activationsQuery = activationsQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+            activationsQuery = activationsQuery.Where(m => matchingOwnerIdsQuery.Contains(m.OwnerId));
         }
         var activatedOwners = await activationsQuery.CountAsync(ct);
 
@@ -1182,8 +1194,8 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var wauStart = today.AddDays(-6);
         var wauQuery = db.OwnerDailyActivities.AsNoTracking()
             .Where(a => a.ActivityDate >= wauStart && a.ActivityDate <= today && a.HasOwnerAction);
-        if (matchingOwnerIds != null)
-            wauQuery = wauQuery.Where(a => matchingOwnerIds.Contains(a.OwnerId));
+        if (matchingOwnerIdsQuery != null)
+            wauQuery = wauQuery.Where(a => matchingOwnerIdsQuery.Contains(a.OwnerId));
 
         var currentWau = await wauQuery
             .Select(a => a.OwnerId)
@@ -1193,8 +1205,8 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var mauStart = today.AddDays(-29);
         var mauQuery = db.OwnerDailyActivities.AsNoTracking()
             .Where(a => a.ActivityDate >= mauStart && a.ActivityDate <= today && a.HasOwnerAction);
-        if (matchingOwnerIds != null)
-            mauQuery = mauQuery.Where(a => matchingOwnerIds.Contains(a.OwnerId));
+        if (matchingOwnerIdsQuery != null)
+            mauQuery = mauQuery.Where(a => matchingOwnerIdsQuery.Contains(a.OwnerId));
 
         var currentMau = await mauQuery
             .Select(a => a.OwnerId)
@@ -1313,11 +1325,12 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
 
             var cohortOwnersQuery = db.OwnerMilestones.AsNoTracking()
                 .Where(m => m.ActivatedAt >= cohortStartUtc && m.ActivatedAt < cohortEndUtc);
-            if (matchingOwnerIds != null)
-                cohortOwnersQuery = cohortOwnersQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+            if (matchingOwnerIdsQuery != null)
+                cohortOwnersQuery = cohortOwnersQuery.Where(m => matchingOwnerIdsQuery.Contains(m.OwnerId));
 
-            var cohortOwnersSet = (await cohortOwnersQuery.Select(m => m.OwnerId).Distinct().ToListAsync(ct)).ToHashSet();
-            if (cohortOwnersSet.Count == 0)
+            var cohortOwnerIdsQuery = cohortOwnersQuery.Select(m => m.OwnerId);
+            var cohortOwnerCount = await cohortOwnerIdsQuery.Distinct().CountAsync(ct);
+            if (cohortOwnerCount == 0)
                 continue;
 
             var percentages = new List<double?>();
@@ -1339,19 +1352,19 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
                     var targetEnd = new DateOnly(targetMonth.Year, targetMonth.Month, DateTime.DaysInMonth(targetMonth.Year, targetMonth.Month));
 
                     var activeCount = await db.OwnerDailyActivities.AsNoTracking()
-                        .Where(a => a.ActivityDate >= targetStart && a.ActivityDate <= targetEnd && a.HasOwnerAction && cohortOwnersSet.Contains(a.OwnerId))
+                        .Where(a => a.ActivityDate >= targetStart && a.ActivityDate <= targetEnd && a.HasOwnerAction && cohortOwnerIdsQuery.Contains(a.OwnerId))
                         .Select(a => a.OwnerId)
                         .Distinct()
                         .CountAsync(ct);
 
-                    var pct = Math.Round((double)activeCount / cohortOwnersSet.Count * 100.0, 1);
+                    var pct = Math.Round((double)activeCount / cohortOwnerCount * 100.0, 1);
                     percentages.Add(pct);
                 }
             }
 
             retentionRows.Add(new CohortRetentionRowDto(
                 cohortPeriodStr,
-                cohortOwnersSet.Count,
+                cohortOwnerCount,
                 percentages
             ));
         }
@@ -1360,8 +1373,8 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var dailyPoints = new List<DailyGrowthPointDto>();
         var activeDaysQuery = db.OwnerDailyActivities.AsNoTracking()
             .Where(a => a.ActivityDate >= fromDate && a.ActivityDate <= toDate && a.HasOwnerAction);
-        if (matchingOwnerIds != null)
-            activeDaysQuery = activeDaysQuery.Where(a => matchingOwnerIds.Contains(a.OwnerId));
+        if (matchingOwnerIdsQuery != null)
+            activeDaysQuery = activeDaysQuery.Where(a => matchingOwnerIdsQuery.Contains(a.OwnerId));
 
         var dailyActiveCounts = await activeDaysQuery
             .GroupBy(a => a.ActivityDate)
@@ -1473,9 +1486,11 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
 
             var matchingAttemptIds = matchingAttemptsQuery.Select(a => a.RegistrationAttemptId);
 
-            var filteredFacts = factsBaseQuery.Where(f =>
-                (f.OwnerId.HasValue && matchingOwnerIds != null && matchingOwnerIds.Contains(f.OwnerId.Value)) ||
-                matchingAttemptIds.Contains(f.RegistrationAttemptId));
+            var filteredFacts = matchingOwnerIdsQuery != null
+                ? factsBaseQuery.Where(f =>
+                    (f.OwnerId.HasValue && matchingOwnerIdsQuery.Contains(f.OwnerId.Value)) ||
+                    matchingAttemptIds.Contains(f.RegistrationAttemptId))
+                : factsBaseQuery.Where(f => matchingAttemptIds.Contains(f.RegistrationAttemptId));
 
             funnelStarted = await filteredFacts.Where(x => x.Stage == "Started").CountAsync(ct);
             funnelResent = await filteredFacts.Where(x => x.Stage == "CodeResent").CountAsync(ct);
@@ -1541,15 +1556,15 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var matchingOwnerIds = await DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsAsync(db, filter, campaignChannels, ct);
+        var matchingOwnerIdsQuery = DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsQuery(db, filter, campaignChannels);
 
         // 1. Subscription Orders (Confirmed Paid Subscription Only)
         var ordersQuery = db.PayOsAttempts.AsNoTracking()
             .Where(x => x.Kind == "Subscription" && x.Status == PaymentAttemptStatus.Paid && x.PaidAt >= startUtc && x.PaidAt < endUtc);
 
-        if (matchingOwnerIds != null)
+        if (matchingOwnerIdsQuery != null)
         {
-            ordersQuery = ordersQuery.Where(o => matchingOwnerIds.Contains(o.OwnerId));
+            ordersQuery = ordersQuery.Where(o => matchingOwnerIdsQuery.Contains(o.OwnerId));
         }
 
         var totalSubscriptionRevenueVnd = await ordersQuery.SumAsync(o => (decimal?)o.Amount, ct) ?? 0m;
@@ -1623,9 +1638,9 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             var cohortOwnersQuery = db.OwnerMilestones.AsNoTracking()
                 .Where(m => m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc);
 
-            if (matchingOwnerIds != null)
+            if (matchingOwnerIdsQuery != null)
             {
-                cohortOwnersQuery = cohortOwnersQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+                cohortOwnersQuery = cohortOwnersQuery.Where(m => matchingOwnerIdsQuery.Contains(m.OwnerId));
             }
 
             var cohortRegisteredCount = await cohortOwnersQuery.CountAsync(ct);
@@ -1982,10 +1997,18 @@ public sealed class DefaultMonitoringMaintenanceService(AppDbContext db, TimePro
             pruned += oldAggregates.Count;
         }
 
-        if (pruned > 0)
+        if (oldEvents.Count > 0 || oldActivities.Count > 0 || oldAggregates.Count > 0)
         {
             await db.SaveChangesAsync(ct);
         }
+
+        // 4. Completed Milestone Outbox Events (30 days retention; preserve Pending, Failed, and retry records)
+        var outboxCutoff = now.AddDays(-30);
+        var prunedOutbox = await db.MilestoneOutboxEvents
+            .Where(e => e.Status == "Completed" && (e.ProcessedAt != null ? e.ProcessedAt < outboxCutoff : e.OccurredAt < outboxCutoff))
+            .ExecuteDeleteAsync(ct);
+        pruned += prunedOutbox;
+
         return pruned;
     }
 
