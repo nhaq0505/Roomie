@@ -36,6 +36,7 @@ internal static class MonitoringBusinessTests
         await TestOlderThan90DaysRawAbsentAsync();
         await TestFilteredFunnelAttributionAsync();
         await TestInvalidAndExtremeDateRangesAsync();
+        await TestRealSqlitePostReadingsSuccessRollbackAndNoStallAsync();
         await TestCampaignTrackingUrlAndEndpointAsync();
         await TestMonitoringMaintenanceServiceAsync();
         await TestHttpBusinessFlowsAndDegradedTelemetryAsync();
@@ -806,6 +807,158 @@ internal static class MonitoringBusinessTests
         var invertedGrowth = await growthService.GetGrowthMetricsAsync(invertedFilter, default);
         Assert(invertedGrowth.DailySeries.Count == 11,
             $"Inverted range safely swapped and returned 11 points (got {invertedGrowth.DailySeries.Count})");
+    }
+
+    private static async Task TestRealSqlitePostReadingsSuccessRollbackAndNoStallAsync()
+    {
+        var dbFilePath = Path.Combine(Path.GetTempPath(), $"roomie_readings_test_{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={dbFilePath};Mode=ReadWriteCreate;Cache=Shared";
+
+        try
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+            builder.Logging.ClearProviders();
+            builder.WebHost.UseTestServer();
+            builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+            builder.Services.AddMonitoringCore(builder.Configuration);
+            builder.Services.AddScoped<InvoiceService>();
+            builder.Services.AddSingleton(TimeProvider.System);
+            builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions, MonitoringFixtureAuth>("fixture", _ => { });
+            builder.Services.AddAuthorization();
+            builder.Services.AddRateLimiter(options => options.AddPolicy("analytics",
+                _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter("fixture")));
+
+            await using var app = builder.Build();
+            app.UseMiddleware<ApiExceptionMiddleware>();
+            app.UseRouting();
+            app.UseRateLimiter();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            var routes = app.MapGroup("/api").RequireAuthorization(policy => policy.RequireRole("Owner"));
+            BillingEndpoints.MapReadingsRoutes(routes);
+            app.MapMonitoringEndpoints();
+            await app.StartAsync();
+
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            var ownerId = Guid.NewGuid();
+            var user = new AppUser
+            {
+                Id = ownerId,
+                Email = "readings.owner@test.example",
+                Name = "Readings Owner",
+                PasswordHash = "fixture",
+                Role = UserRole.Owner,
+                Status = OwnerStatus.Approved,
+                CreatedAt = DateTimeOffset.UtcNow.AddDays(-10)
+            };
+            db.Users.Add(user);
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = ownerId,
+                Name = "Tòa Nhà Thử Nghiệm",
+                Address = "123 Đường Test"
+            };
+            var room = new Room
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                Name = "P101",
+                Rent = 2_500_000m,
+                ElectricityRate = 3_500m,
+                WaterFee = 50_000m,
+                WaterPerPerson = false,
+                ServiceFee = 30_000m
+            };
+            var occupancy = new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                RoomId = room.Id,
+                TenantName = "Người Thuê A",
+                Phone = "0912345678",
+                People = 1,
+                StartDate = new DateOnly(2026, 8, 1),
+                IsActive = true
+            };
+            var milestone = new OwnerMilestone
+            {
+                OwnerId = ownerId,
+                RegisteredAt = DateTimeOffset.UtcNow.AddDays(-10),
+                ActivatedAt = null,
+                FirstActivatedInvoiceId = null
+            };
+
+            db.Buildings.Add(building);
+            db.Rooms.Add(room);
+            db.Occupancies.Add(occupancy);
+            db.OwnerMilestones.Add(milestone);
+            await db.SaveChangesAsync();
+
+            var client = app.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
+            client.DefaultRequestHeaders.Add("X-Fixture-Role", "Owner");
+            client.DefaultRequestHeaders.Add("X-Fixture-UserId", ownerId.ToString());
+
+            // 1. Rollback case: POST /readings with invalid current reading (-10) must rollback, not stall, and not activate owner
+            var badReadingReq = new HttpRequestMessage(HttpMethod.Post, "/api/readings")
+            {
+                Content = JsonContent.Create(new
+                {
+                    RoomId = room.Id,
+                    Period = "2026-09",
+                    CurrentReading = -10m
+                })
+            };
+            var badResp = await client.SendAsync(badReadingReq);
+            Assert(badResp.StatusCode == HttpStatusCode.BadRequest,
+                $"Invalid reading rejected with 400 Bad Request (got {badResp.StatusCode})");
+
+            var unactivatedMilestone = await db.OwnerMilestones.AsNoTracking().SingleAsync(x => x.OwnerId == ownerId);
+            Assert(unactivatedMilestone.ActivatedAt == null,
+                "Rollback path does not prematurely activate owner milestone (ActivatedAt remains null)");
+            Assert(await db.Readings.CountAsync(r => r.OccupancyId == occupancy.Id) == 0,
+                "Rollback path does not insert reading");
+            Assert(await db.Invoices.CountAsync(i => i.OccupancyId == occupancy.Id) == 0,
+                "Rollback path does not insert invoice");
+
+            // 2. Success case: POST /readings with valid reading must succeed without stalling SQLite, commit outer transaction, and activate owner
+            var goodReadingReq = new HttpRequestMessage(HttpMethod.Post, "/api/readings")
+            {
+                Content = JsonContent.Create(new
+                {
+                    RoomId = room.Id,
+                    Period = "2026-09",
+                    CurrentReading = 150m
+                })
+            };
+            var goodResp = await client.SendAsync(goodReadingReq);
+            Assert(goodResp.StatusCode == HttpStatusCode.Created,
+                $"Valid reading succeeds with 201 Created without SQLite stalls (got {goodResp.StatusCode})");
+
+            var createdReading = await db.Readings.AsNoTracking().SingleAsync(r => r.OccupancyId == occupancy.Id);
+            Assert(createdReading.CurrentReading == 150m && createdReading.Period == "2026-09",
+                "Reading successfully committed to disposable SQLite DB");
+
+            var createdInvoice = await db.Invoices.AsNoTracking().SingleAsync(i => i.OccupancyId == occupancy.Id && i.Period == "2026-09");
+            Assert(createdInvoice.LifecycleState == InvoiceLifecycleState.Issued,
+                "Monthly invoice issued and committed");
+
+            var activatedMilestone = await db.OwnerMilestones.AsNoTracking().SingleAsync(x => x.OwnerId == ownerId);
+            Assert(activatedMilestone.ActivatedAt != null,
+                "Owner milestone successfully activated after outer transaction commit");
+            Assert(activatedMilestone.FirstActivatedInvoiceId == createdInvoice.Id,
+                $"FirstActivatedInvoiceId matches committed invoice (got {activatedMilestone.FirstActivatedInvoiceId})");
+        }
+        finally
+        {
+            // Clean up temporary database file
+            SqliteConnection.ClearAllPools();
+            try { if (File.Exists(dbFilePath)) File.Delete(dbFilePath); } catch { }
+        }
     }
 
     private static async Task TestCampaignTrackingUrlAndEndpointAsync()

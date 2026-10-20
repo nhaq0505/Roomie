@@ -11,7 +11,7 @@ namespace RoomRental.Api.Endpoints;
 
 public static partial class BillingEndpoints
 {
-    private static void MapReadingsRoutes(RouteGroupBuilder routes)
+    public static void MapReadingsRoutes(RouteGroupBuilder routes)
     {
         routes.MapGet("/readings", async (string? period, HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
         {
@@ -87,7 +87,11 @@ public static partial class BillingEndpoints
             await transaction.CommitAsync(cancellationToken);
             if (milestoneTracker != null)
             {
-                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "ReadingRecorded", cancellationToken); }
+                try
+                {
+                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, cancellationToken);
+                    await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "ReadingRecorded", cancellationToken);
+                }
                 catch { /* Telemetry failure must not block product */ }
             }
             return Results.Created($"/api/readings?period={work.Period}", new ReadingDto(reading.Id, work.Room.Id, work.Occupancy.Id,

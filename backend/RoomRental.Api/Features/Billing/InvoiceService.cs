@@ -56,20 +56,23 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
         }
 
         if (created > 0) await db.SaveChangesAsync(cancellationToken);
-        if (ownedTransaction is not null) await ownedTransaction.CommitAsync(cancellationToken);
-
-        if (milestoneTracker != null && issuedInvoices.Count > 0)
+        if (ownedTransaction is not null)
         {
-            try
+            await ownedTransaction.CommitAsync(cancellationToken);
+
+            if (milestoneTracker != null && issuedInvoices.Count > 0)
             {
-                foreach (var inv in issuedInvoices)
+                try
                 {
-                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, inv.Id, inv.Kind, actor, cancellationToken);
+                    foreach (var inv in issuedInvoices)
+                    {
+                        await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, inv.Id, inv.Kind, actor, cancellationToken);
+                    }
                 }
-            }
-            catch
-            {
-                // Telemetry failure must not break invoice generation
+                catch
+                {
+                    // Telemetry failure must not break invoice generation
+                }
             }
         }
 
