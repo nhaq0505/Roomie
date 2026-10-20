@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<LoginThrottle> LoginThrottles => Set<LoginThrottle>();
     public DbSet<RegistrationVerification> RegistrationVerifications => Set<RegistrationVerification>();
+    public DbSet<PasswordRecovery> PasswordRecoveries => Set<PasswordRecovery>();
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Room> Rooms => Set<Room>();
@@ -63,6 +64,20 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<AppUser>().Property(x => x.MfaRecoveryHashes).IsConcurrencyToken();
         modelBuilder.Entity<RegistrationVerification>().HasIndex(x => x.ExpiresAt);
         modelBuilder.Entity<AuthSession>().HasIndex(x => x.ExpiresAt);
+        modelBuilder.Entity<PasswordRecovery>(entity =>
+        {
+            entity.HasKey(x => x.Email);
+            entity.Property(x => x.Email).HasMaxLength(320);
+            entity.HasIndex(x => x.ChallengeHash).IsUnique();
+            entity.HasIndex(x => x.ResetHash).IsUnique();
+            entity.HasIndex(x => x.ExpiresAt);
+            entity.Property(x => x.ChallengeHash).HasMaxLength(64).IsConcurrencyToken();
+            entity.Property(x => x.CodeHash).HasMaxLength(64);
+            entity.Property(x => x.ResetHash).HasMaxLength(64).IsConcurrencyToken();
+            entity.Property(x => x.SendCount).IsConcurrencyToken();
+            entity.Property(x => x.FailedAttempts).IsConcurrencyToken();
+            entity.Property(x => x.ConsumedAt).IsConcurrencyToken();
+        });
         modelBuilder.Entity<RegistrationVerification>(entity =>
         {
             entity.HasKey(x => x.Email);

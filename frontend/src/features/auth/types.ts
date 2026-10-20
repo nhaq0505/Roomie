@@ -1,5 +1,7 @@
 import type { SubscriptionTier } from '../subscription';
 export type Role = 'Admin' | 'Owner';
+export interface PasswordRecoveryChallenge { challengeToken: string; email: string; expiresAt: string; resendAvailableAt: string; }
+export interface PasswordRecoveryGrant { resetToken: string; expiresAt: string; }
 
 export type AccountStatus = 'Approved' | 'Pending' | 'Rejected' | 'Suspended';
 

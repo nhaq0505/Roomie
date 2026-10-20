@@ -49,7 +49,7 @@ export default function LoginPage() {
         <Form.Item label={t("Mật khẩu")} name="password" rules={[{ required: true, message: t("Vui lòng nhập mật khẩu.") }]}><Input.Password prefix={<LockOutlined />} placeholder={t("Nhập mật khẩu")} autoComplete="current-password" /></Form.Item>
         <Button className="auth-submit" type="primary" htmlType="submit" loading={busy} block>{t("Đăng nhập")} <ArrowRightOutlined /></Button>
       </Form>
-          <Link to="/reset-password">{t("Đặt lại mật khẩu")}</Link>
+          <Link to="/reset-password">{t("Quên mật khẩu")}</Link>
       {import.meta.env.DEV && <div className="demo-access"><div className="demo-title">{t("Dùng tài khoản mẫu")}</div><div className="demo-buttons"><Button size="small" onClick={() => fillDemo('owner@phongtro.local', 'Owner123!')}>{t("Chủ trọ")}</Button><Button size="small" onClick={() => fillDemo('admin@phongtro.local', 'Admin123!')}>{t("Quản trị")}</Button></div></div>}
       <div className="auth-switch">{t("Chưa có tài khoản?")} <Link to="/register">{t("Đăng ký làm chủ trọ")}</Link></div>
     </div></section>

@@ -10,6 +10,7 @@ import ErrorBoundary from '../shared/ui/ErrorBoundary';
 import AppShell from './layout/AppShell';
 
 const PasswordPage = lazy(() => import('../features/auth/PasswordPage'));
+const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
 const AccountStatusPage = lazy(() => import('../features/subscription/AccountStatusPage'));
@@ -54,7 +55,7 @@ export default function App() {
   const location = useLocation();
   return <><SeoMetadata /><ErrorBoundary><Suspense fallback={<AppFallback />}><Routes>
     <Route path="/login" element={<LoginPage />} />
-    <Route path="/reset-password" element={<PasswordPage reset />} />
+    <Route path="/reset-password" element={<ForgotPasswordPage />} />
     <Route path="/change-password" element={<PasswordPage layout={AppShell} />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/account-status" element={<AccountStatusPage layout={AppShell} />} />

@@ -58,6 +58,9 @@ builder.Services.AddScoped<PayOsService>();
 builder.Services.AddScoped<PaymentWebhookService>();
 builder.Services.AddScoped<IRegistrationEmailSender, SmtpRegistrationEmailSender>();
 builder.Services.AddScoped<RegistrationVerificationService>();
+builder.Services.AddScoped<IPasswordRecoveryEmailSender, SmtpRegistrationEmailSender>();
+builder.Services.AddScoped<PasswordRecoveryService>();
+builder.Services.AddHostedService<PasswordRecoveryEmailWorker>();
 // Disabling verification is reserved for isolated Development integration fixtures.
 if (!builder.Configuration.GetValue("EmailVerification:Enabled", true) && !builder.Environment.IsDevelopment())
     throw new InvalidOperationException("Email verification cannot be disabled outside Development.");
@@ -174,6 +177,7 @@ app.MapGet("/api/health", async (AppDbContext db, CancellationToken cancellation
     return Results.Json(new { status = "unavailable", database = "unreachable" }, statusCode: 503);
 });
 app.MapAuthEndpoints();
+app.MapPasswordRecoveryEndpoints();
 app.MapAdminEndpoints();
 app.MapOwnerManagementEndpoints();
 app.MapReportsEndpoints();

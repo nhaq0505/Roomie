@@ -1039,5 +1039,20 @@
   "Lưu trữ phòng {0}?",
   "Sửa",
   "Sửa dãy trọ",
-  "Đã cập nhật dãy trọ."
+  "Đã cập nhật dãy trọ.",
+  "Yêu cầu chưa thành công. Vui lòng thử lại.",
+  "Khôi phục tài khoản của bạn",
+  "Xác minh email để tự đặt lại mật khẩu an toàn.",
+  "Xác minh mã OTP",
+  "Quên mật khẩu",
+  "Email đã được xác minh. Hãy đặt mật khẩu mới cho tài khoản.",
+  "Nếu email có tài khoản, mã khôi phục sẽ được gửi đến {0}. Hãy kiểm tra cả thư rác.",
+  "Nhập email đã đăng ký để nhận mã đặt lại mật khẩu.",
+  "Mã đã hết hạn. Vui lòng yêu cầu mã mới.",
+  "Gửi mã khôi phục",
+  "Yêu cầu mã mới",
+  "Đổi địa chỉ email",
+  "Dùng mã do quản trị viên cấp",
+  "Khôi phục qua email",
+  "Mã khôi phục không hợp lệ hoặc đã hết hạn."
 ]

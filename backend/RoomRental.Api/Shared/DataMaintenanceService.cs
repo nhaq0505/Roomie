@@ -13,6 +13,9 @@ public sealed class DataMaintenanceService(IServiceScopeFactory scopes, TimeProv
         var pending = await db.RegistrationVerifications.Where(x => x.ExpiresAt < cutoff)
             .OrderBy(x => x.ExpiresAt).Take(200).ToListAsync(ct);
         db.RegistrationVerifications.RemoveRange(pending);
+        var recoveries = await db.PasswordRecoveries.Where(x => x.ExpiresAt < cutoff)
+            .OrderBy(x => x.ExpiresAt).Take(200).ToListAsync(ct);
+        db.PasswordRecoveries.RemoveRange(recoveries);
         var sessions = await db.AuthSessions.Where(x => x.ExpiresAt < cutoff)
             .OrderBy(x => x.ExpiresAt).Take(200).ToListAsync(ct);
         db.AuthSessions.RemoveRange(sessions);

@@ -661,6 +661,78 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("PaymentSettings");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.PasswordRecovery", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChallengeHash")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ConsumedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FailedAttempts")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("LastSentAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("NotificationPending")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PasswordBinding")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProtectedCode")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ResetExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResetHash")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SendCount")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("WindowStartedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Email");
+
+                    b.HasIndex("ChallengeHash")
+                        .IsUnique();
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("ResetHash")
+                        .IsUnique();
+
+                    b.ToTable("PasswordRecoveries");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.PayOsAttempt", b =>
                 {
                     b.Property<Guid>("Id")

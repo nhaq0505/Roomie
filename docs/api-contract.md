@@ -8,6 +8,9 @@ Backend: ASP.NET Core .NET 10 on port 5080. Frontend: React/TypeScript/Vite on p
 - `POST /api/auth/verify-registration` `{challengeToken,code}` → HTTP201 user. Six-digit OTP expires after10 minutes; challenge after30 minutes, max5 wrong attempts per code. Correct verification atomically creates an Approved Free Owner; sign in separately. Replayed/invalid/expired codes return400; concurrent loser may return409.
 - `POST /api/auth/resend-registration` `{challengeToken}` → refreshed challenge timing. Enforces60-second cooldown and5 sends/email/hour, returning429 when limited. Sending again invalidates the old code. New registration with the same pending email rotates its token/credentials after cooldown and preserves the send budget. Existing accounts cannot be overwritten.
 - Verification uses a256-bit challenge secret bound to its code; DB stores only hashes, never raw OTP/challenge. Existing accounts retain their prior login behavior. SMTP/TLS configuration and Gmail steps: [email OTP setup](email-otp-setup.md).
+- `POST /api/auth/forgot-password` `{email}` → HTTP202 `{challengeToken,email,expiresAt,resendAvailableAt}` for both known and unknown email; asynchronous SMTP delivery, 60-second cooldown, 5 requests/email/hour.
+- `POST /api/auth/verify-password-recovery` `{challengeToken,code}` → `{resetToken,expiresAt}`. Six-digit OTP, 10-minute expiry, max5 incorrect attempts; successful verification consumes the OTP.
+- `POST /api/auth/complete-password-recovery` `{resetToken,newPassword,confirmPassword}` → `{success:true}`. Single-use 10-minute grant; revokes all target sessions and clears browser cookie. See [password recovery](password-recovery.md) for delivery and deployment details. Manual admin-issued reset remains supported.
 - `POST /api/auth/login` `{email,password}` → user.
 - `GET /api/auth/me` → user; unauthenticated returns 401.
 - `POST /api/auth/logout`.

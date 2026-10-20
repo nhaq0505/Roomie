@@ -27,6 +27,11 @@ internal static class RegistrationEmailTemplateTests
         using var escaped = new MimeMessage { Body = RegistrationEmailTemplate.CreateBody("<script>&") };
         Check(escaped.HtmlBody.Contains("&lt;script&gt;&amp;") && !escaped.HtmlBody.Contains("<script>"),
             "dynamic email content is HTML encoded");
+        using var recovery = new MimeMessage { Body = RegistrationEmailTemplate.CreateRecoveryBody("012345") };
+        Check(recovery.TextBody.Contains("012345") && recovery.HtmlBody.Contains("012345") &&
+            recovery.HtmlBody.Contains("Đặt lại mật khẩu của bạn") && !recovery.HtmlBody.Contains("màn hình đăng ký") &&
+            recovery.TextBody.Contains("Mật khẩu hiện tại vẫn được giữ nguyên"),
+            "recovery email has its own purpose and preserves leading-zero codes without claiming account changes");
     }
 
     private static void Check(bool condition, string label)

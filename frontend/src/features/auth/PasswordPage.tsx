@@ -34,7 +34,7 @@ export default function PasswordPage({ reset = false, layout: Layout = Fragment 
         <Form.Item name="confirmPassword" label={t("Xác nhận mật khẩu mới")} dependencies={['newPassword']} rules={[{ required: true }, ({ getFieldValue }) => ({ validator(_, value) { return value === getFieldValue('newPassword') ? Promise.resolve() : Promise.reject(new Error(t("Xác nhận mật khẩu không khớp."))); } })]}><Input.Password autoComplete="new-password" maxLength={256} /></Form.Item>
         <Button type="primary" htmlType="submit" loading={mutation.isPending}>{t("Lưu mật khẩu")}</Button>
       </Form>
-      {reset && <Typography.Paragraph style={{ marginTop: 16 }}><Link to="/login">{t("Đăng nhập")}</Link></Typography.Paragraph>}
+      {reset && <Typography.Paragraph style={{ marginTop: 16 }}><Link to="/reset-password">{t("Khôi phục qua email")}</Link> · <Link to="/login">{t("Đăng nhập")}</Link></Typography.Paragraph>}
     </SectionCard></>;
   return reset ? <div style={{ maxWidth: 560, margin: '40px auto', padding: 16 }}>{content}</div> : <Layout>{content}</Layout>;
 }

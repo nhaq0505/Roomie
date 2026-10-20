@@ -60,13 +60,16 @@ def main():
                     message = email.message_from_bytes(b''.join(lines), policy=policy.default)
                     body = message.get_body(preferencelist=('plain',)).get_content()
                     match = re.search(r'\b([0-9]{6})\b', body)
-                    if not match:
+                    notification = str(message['Subject']) == 'Mật khẩu Roomie đã được thay đổi'
+                    if not match and not notification:
                         self.reply('554 Missing synthetic OTP')
                         continue
                     path = outbox / (uuid.uuid4().hex + '.json')
-                    with path.open('x') as target:
-                        os.chmod(path, 0o600)
-                        json.dump({'email': recipient, 'code': match.group(1), 'subject': str(message['Subject'])}, target)
+                    temporary = path.with_suffix('.tmp')
+                    with temporary.open('x') as target:
+                        os.chmod(temporary, 0o600)
+                        json.dump({'email': recipient, 'code': match.group(1) if match else None, 'subject': str(message['Subject'])}, target)
+                    temporary.replace(path)
                     self.reply('250 Accepted by local fixture')
                 elif verb == 'QUIT':
                     self.reply('221 Bye')

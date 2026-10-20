@@ -351,3 +351,9 @@ MFA has been removed at the user's request. `test_operational_hardening` now tes
 ## Password length policy — 16/10/2026
 
 New passwords require9–256characters; no composition rules. Boundary service tests reject empty/whitespace-only/8/257 and accept9lowercase/9digits/uppercase/256. Disposable HTTP tests cover registration, OTP verification/login, password change/session revocation and admin reset with simple nine-character passwords. Playwright reset checks eight-character rejection and nine-character acceptance without composition rules.
+
+## Password recovery
+
+The disposable `otp` provider runs registration and password-recovery HTTP tests against SQLite and a local SMTP sink. `otp-postgres` runs provider-independent registration tests and the same recovery tests against a runner-owned temporary PostgreSQL database. Both retain external-service guards; never supply a production connection. See `python3 tests/run_disposable.py --help` for runner arguments and [password recovery](../docs/password-recovery.md) for behavior.
+
+C# coverage is included in `dotnet run --project tests/RoomRental.WebhookTests`; frontend coverage is in `frontend/e2e/password-recovery.spec.ts`.

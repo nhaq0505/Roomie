@@ -18,7 +18,7 @@ internal static class MigrationTests
         await db.Database.MigrateAsync();
         if (!(await db.Users.SingleAsync()).Id.Equals(retainedId)) throw new Exception("Additive migration lost existing data");
         db.Users.Remove(await db.Users.SingleAsync()); await db.SaveChangesAsync();
-        if ((await db.Database.GetAppliedMigrationsAsync()).Count() != 2 || db.Database.HasPendingModelChanges())
+        if ((await db.Database.GetAppliedMigrationsAsync()).Count() != 3 || db.Database.HasPendingModelChanges())
             throw new Exception("SQLite initial migration or model snapshot is incomplete.");
 
         var user = new AppUser { Email = "migration@example.test", Name = "Migration fixture", PasswordHash = "fixture" };

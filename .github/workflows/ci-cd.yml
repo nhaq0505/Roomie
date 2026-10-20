@@ -167,6 +167,8 @@ jobs:
           TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=${CI_POSTGRES_PASSWORD}" \
             python3 tests/run_disposable.py --image "$image" --provider postgres
           python3 tests/run_disposable.py --image "$image" --provider otp
+          TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=${CI_POSTGRES_PASSWORD}" \
+            python3 tests/run_disposable.py --image "$image" --provider otp-postgres
           mkdir -p artifacts
           docker save "$image" | gzip > artifacts/verified-image.tar.gz
 

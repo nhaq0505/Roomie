@@ -100,7 +100,7 @@ test('password reset rejects eight characters and accepts nine lowercase charact
     }
     return route.fulfill({status:401,json:{message:'Please sign in.'}});
   });
-  await page.goto('/reset-password');
+  await page.goto('/reset-password?method=admin');
   await page.getByLabel('Email',{exact:true}).fill('fixture@example.invalid');
   await page.getByLabel('Mã đặt lại mật khẩu',{exact:true}).fill('a'.repeat(64));
   await page.getByLabel('Mật khẩu mới',{exact:true}).fill('abcdefgh');

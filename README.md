@@ -95,3 +95,5 @@ Nhân bản phòng: **Phòng & người thuê → ⋯ → Nhân bản phòng**. 
 Hóa đơn bổ sung: **Phòng & người thuê → ⋯ → Tạo hóa đơn bổ sung**, nhập nội dung, số tiền và hạn thanh toán. Dùng cho phòng đang có khách; khoản thu xuất hiện trên link khách hiện có. Xem lại tại **Hóa đơn → Hóa đơn bổ sung**.
 
 Trả phòng: **Phòng & người thuê → ⋯ → Trả phòng & quyết toán**. Xem hóa đơn còn nợ và tiền cọc đang giữ, nhập số tiền hoàn thủ công rồi xác nhận để kết thúc lượt thuê, thu hồi link khách và trả phòng về trống. Hệ thống ghi nhận khoản hoàn và phần cọc còn giữ trong lịch sử quyết toán; không chuyển tiền ngân hàng. Không chốt công tơ cuối kỳ hoặc lập hóa đơn cuối tại bước này. Cần thanh toán hết hóa đơn đã phát hành (kể cả hóa đơn cọc), xử lý Draft và giao dịch payOS đang chờ trước khi trả phòng. Ngày kết thúc là ngày Việt Nam hiện tại.
+
+Luồng quên mật khẩu, giới hạn OTP và yêu cầu triển khai: [khôi phục mật khẩu](docs/password-recovery.md).

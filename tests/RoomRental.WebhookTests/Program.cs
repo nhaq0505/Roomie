@@ -79,6 +79,7 @@ await TenantLinkHttpTests.RunAsync();
 AccountOccupancyTests.Run();
 RegistrationEmailTemplateTests.Run();
 await RegistrationVerificationTests.RunAsync();
+await PasswordRecoveryTests.RunAsync();
 await ManualReceiptTests.RunAsync();
 await AuthSecurityHttpTests.RunAsync();
 await RoomTenantLifecycleHttpTests.RunAsync();

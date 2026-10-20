@@ -10,8 +10,15 @@ public interface IRegistrationEmailSender
     Task SendAsync(string email, string code, CancellationToken ct);
 }
 
+public interface IPasswordRecoveryEmailSender
+{
+    void EnsureConfigured();
+    Task SendRecoveryCodeAsync(string email, string code, CancellationToken ct);
+    Task SendPasswordChangedAsync(string email, CancellationToken ct);
+}
+
 public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvironment environment,
-    ILogger<SmtpRegistrationEmailSender> logger) : IRegistrationEmailSender
+    ILogger<SmtpRegistrationEmailSender> logger) : IRegistrationEmailSender, IPasswordRecoveryEmailSender
 {
     private const string Unavailable = "Chức năng gửi email chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.";
 
@@ -26,7 +33,19 @@ public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvi
             throw new ApiException(503, Unavailable);
     }
 
-    public async Task SendAsync(string email, string code, CancellationToken ct)
+    public Task SendAsync(string email, string code, CancellationToken ct) =>
+        DeliverAsync(email, "Mã xác nhận đăng ký Roomie", RegistrationEmailTemplate.CreateBody(code), ct);
+
+    public Task SendRecoveryCodeAsync(string email, string code, CancellationToken ct) =>
+        DeliverAsync(email, "Mã đặt lại mật khẩu Roomie", RegistrationEmailTemplate.CreateRecoveryBody(code), ct);
+
+    public Task SendPasswordChangedAsync(string email, CancellationToken ct) =>
+        DeliverAsync(email, "Mật khẩu Roomie đã được thay đổi", new TextPart("plain")
+        {
+            Text = "Mật khẩu tài khoản Roomie của bạn vừa được đặt lại. Các phiên đăng nhập cũ đã kết thúc. Nếu bạn không thực hiện thao tác này, hãy liên hệ quản trị viên ngay. Không chia sẻ mật khẩu hoặc OTP với bất kỳ ai."
+        }, ct);
+
+    private async Task DeliverAsync(string email, string subject, MimeEntity body, CancellationToken ct)
     {
         EnsureConfigured();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -36,8 +55,8 @@ public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvi
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "Roomie", config["Email:FromAddress"]!));
             message.To.Add(MailboxAddress.Parse(email));
-            message.Subject = "Mã xác nhận đăng ký Roomie";
-            message.Body = RegistrationEmailTemplate.CreateBody(code);
+            message.Subject = subject;
+            message.Body = body;
             using var client = new SmtpClient { Timeout = 15000 };
             var security = config["Email:Smtp:Security"] ?? "StartTls";
             await client.ConnectAsync(config["Email:Smtp:Host"]!, int.Parse(config["Email:Smtp:Port"] ?? "587"),
@@ -55,7 +74,7 @@ public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvi
                 System.Security.Authentication.AuthenticationException or MailKit.Security.AuthenticationException or OperationCanceledException)
         {
             // Never log SMTP responses, credentials, recipient addresses or OTP values.
-            logger.LogWarning("Registration email delivery failed; check SMTP configuration and connectivity.");
+            logger.LogWarning("Account email delivery failed; check SMTP configuration and connectivity.");
             throw new ApiException(503, Unavailable);
         }
     }
