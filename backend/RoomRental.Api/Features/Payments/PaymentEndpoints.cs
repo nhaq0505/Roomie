@@ -85,12 +85,28 @@ public static class PaymentEndpoints
             var invoiceQuery = db.Invoices.Include(x => x.DepositSettlements).AsNoTracking().Where(invoice => invoice.OccupancyId == occupancy.Id && invoice.LifecycleState == InvoiceLifecycleState.Issued);
             if (invoiceId is not null) invoiceQuery = invoiceQuery.Where(x => x.Id == invoiceId);
             var total = await invoiceQuery.CountAsync(cancellationToken);
-            var totals = new { outstanding = await QueryAggregates.SumMoneyAsync(db, invoiceQuery.Select(x => x.Total - x.Paid), cancellationToken) };
+            var totals = new { outstanding = await QueryAggregates.SumMoneyAsync(db, invoiceQuery.Select(x => x.Total - x.Paid), cancellationToken), unpaidCount = await invoiceQuery.CountAsync(x => x.Total > x.Paid, cancellationToken) };
             var invoices = await invoiceQuery.OrderByDescending(x => x.Period).ThenByDescending(x => x.IssuedAt).ThenBy(x => x.Id)
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(cancellationToken);
             var occupancyDto = roomDto.Occupancy ?? throw new ApiException(StatusCodes.Status404NotFound, "Tenant link is no longer active.");
-            return Results.Ok(new { room = roomDto, occupancy = occupancyDto, invoices = invoices.Select(invoice => InvoiceService.ToDto(invoice)).ToList(), total, totals, page = paging.Number, pageSize = paging.Size });
+            var paymentSettings = await webhookService.GetAsync(roomBuilding.Building.OwnerId, cancellationToken);
+            return Results.Ok(new { confirmationMode = paymentSettings.ConfirmationMode, room = roomDto, occupancy = occupancyDto, invoices = invoices.Select(invoice => InvoiceService.ToDto(invoice)).ToList(), total, totals, page = paging.Number, pageSize = paging.Size });
         });
+
+        app.MapPost("/api/tenant/{token}/payment", async (string token, AppDbContext db, PayOsService service, CancellationToken ct) => {
+            var occupancy = await FindTenantAsync(db, token, ct);
+            var invoice = await db.Invoices.Where(i => i.OccupancyId == occupancy.Id && i.LifecycleState == InvoiceLifecycleState.Issued && i.Total > i.Paid)
+                .OrderBy(i => i.Id).FirstOrDefaultAsync(ct) ?? throw new ApiException(409, "Không còn hóa đơn cần thanh toán.");
+            return Results.Ok(await service.CreateOrGetCheckoutAsync(invoice.OwnerId, invoice, token, ct, allInvoices: true));
+        }).RequireRateLimiting("tenant-payment");
+
+        app.MapPost("/api/tenant/{token}/orders/{orderCode:long}/reconcile", async (string token, long orderCode, AppDbContext db, PayOsService service, CancellationToken ct) => {
+            var occupancy = await FindTenantAsync(db, token, ct);
+            var attempt = await db.PayOsAttempts.AsNoTracking().SingleOrDefaultAsync(a => a.OrderCode == orderCode && a.Kind == "Invoice" &&
+                db.Invoices.Any(i => i.Id == a.InvoiceId && i.OccupancyId == occupancy.Id && i.OwnerId == a.OwnerId), ct)
+                ?? throw new ApiException(404, "Payment order was not found for this tenant.");
+            return Results.Ok(await service.ReconcileAsync(attempt.OwnerId, orderCode, ct));
+        }).RequireRateLimiting("tenant-payment");
 
         app.MapPost("/api/tenant/{token}/invoices/{id:guid}/payment", async (string token, Guid id, AppDbContext db, PayOsService payOsService, CancellationToken cancellationToken) =>
         {
@@ -122,7 +138,7 @@ public static class PaymentEndpoints
         });
     }
 
-    private static async Task<Occupancy> FindTenantAsync(AppDbContext db, string token, CancellationToken cancellationToken)
+    internal static async Task<Occupancy> FindTenantAsync(AppDbContext db, string token, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token) || token.Length > 100)
             throw new ApiException(StatusCodes.Status404NotFound, "Tenant link was not found.");

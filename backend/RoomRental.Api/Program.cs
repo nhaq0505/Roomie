@@ -151,7 +151,7 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 app.Use(async (context, next) =>
 {
     if (context.Request.IsHttps) context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
-    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+    context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://img.vietqr.io; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
@@ -191,6 +191,8 @@ app.MapDepositEndpoints();
 app.MapMoveoutEndpoints();
 app.MapPaymentEndpoints();
 app.MapZaloEndpoints();
+app.MapPaymentPreferencesEndpoints();
+app.MapManualPaymentEndpoints();
 
 app.MapFallback("{*path:nonfile}", async context =>
 {

@@ -74,6 +74,7 @@ await OperationalHardeningTests.RunAsync();
 await SharedSupportTests.RunAsync();
 await MigrationTests.RunAsync();
 await PayOsPaymentTests.RunAsync();
+await BatchPaymentTests.RunAsync();
 await TenantLinkHttpTests.RunAsync();
 
 AccountOccupancyTests.Run();

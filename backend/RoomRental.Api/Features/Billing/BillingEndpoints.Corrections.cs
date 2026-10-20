@@ -24,7 +24,7 @@ public static partial class BillingEndpoints
                                    select new InvoiceCorrectionDto(revision.Id, revision.Revision, revision.RequestId, revision.Reason,
                                        revision.ActorId, actor.Name, revision.CreatedAt, revision.Version, revision.BeforeJson, revision.AfterJson))
                 .ToListAsync(ct);
-            var pending = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => x.OwnerId == ownerId && x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, ct);
+            var pending = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => x.OwnerId == ownerId && (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct);
             var meterPolicy = await MeterCorrectionPolicyAsync(db, invoice, ct);
             return Results.Ok(new { invoiceId = id, version = invoice.Version, hasPendingPayment = pending,
                 canCorrectMeter = meterPolicy.Allowed, meterCorrectionBlockedReason = meterPolicy.Reason, items = revisions });
@@ -56,7 +56,7 @@ public static partial class BillingEndpoints
             if (invoice.Version != request.ExpectedVersion) throw new ApiException(409, "Invoice changed. Refresh it and retry.");
             if (invoice.LifecycleState != InvoiceLifecycleState.Issued || invoice.Paid != 0 || await db.Receipts.AnyAsync(x => x.InvoiceId == id, ct))
                 throw new ApiException(409, "Only an issued invoice with no recorded receipts can be corrected.");
-            if (await db.PayOsAttempts.AnyAsync(x => x.OwnerId == ownerId && x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, ct))
+            if (await db.PayOsAttempts.AnyAsync(x => x.OwnerId == ownerId && (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct))
                 throw new ApiException(409, "Reconcile the pending payOS attempt before correcting this invoice.");
             if (invoice.Kind == "Deposit" && invoice.DepositSettlements.Count != 0)
                 throw new ApiException(409, "A deposit invoice with settlement records cannot be corrected.");
@@ -150,7 +150,7 @@ public static partial class BillingEndpoints
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             var policyAfter = await MeterCorrectionPolicyAsync(db, invoice, ct);
-            var pendingAfter = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, ct);
+            var pendingAfter = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct);
             return Results.Ok(new { invoice = InvoiceService.ToDto(invoice, pendingAfter, policyAfter.Allowed, policyAfter.Reason), correction = ToCorrectionDto(revision) });
         });
 

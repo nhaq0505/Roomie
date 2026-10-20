@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceRevision> InvoiceRevisions => Set<InvoiceRevision>();
     public DbSet<PaymentReceipt> Receipts => Set<PaymentReceipt>();
+    public DbSet<ManualPaymentRequest> ManualPaymentRequests => Set<ManualPaymentRequest>();
     public DbSet<OwnerPaymentSettings> PaymentSettings => Set<OwnerPaymentSettings>();
     public DbSet<PaymentWebhookRegistration> PaymentWebhookRegistrations => Set<PaymentWebhookRegistration>();
     public DbSet<PayOsAttempt> PayOsAttempts => Set<PayOsAttempt>();
@@ -70,6 +71,10 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Role).HasConversion<string>().HasMaxLength(24);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(x => x.StatusReason).HasMaxLength(1000);
+            entity.Property(x => x.PaymentConfirmationMode).HasConversion<string>().HasMaxLength(20).HasDefaultValue(PaymentConfirmationMode.Automatic);
+            entity.Property(x => x.ManualBankBin).HasMaxLength(6);
+            entity.Property(x => x.ManualAccountNumber).HasMaxLength(34);
+            entity.Property(x => x.ManualAccountName).HasMaxLength(100);
             entity.Property(x => x.SubscriptionTier).HasConversion<string>().HasMaxLength(24);
         });
 
@@ -226,6 +231,19 @@ public class AppDbContext : DbContext
             entity.Property(x => x.ActorName).HasMaxLength(160);
             entity.Property(x => x.BeforeJson).HasColumnType("text");
             entity.Property(x => x.AfterJson).HasColumnType("text");
+        });
+
+        modelBuilder.Entity<ManualPaymentRequest>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Occupancy>().WithMany().HasForeignKey(x => x.OccupancyId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.ConfirmedAt).IsConcurrencyToken();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.BankBin).HasMaxLength(6);
+            entity.Property(x => x.AccountNumber).HasMaxLength(34);
+            entity.Property(x => x.AccountName).HasMaxLength(100);
         });
 
         modelBuilder.Entity<PaymentReceipt>(entity =>

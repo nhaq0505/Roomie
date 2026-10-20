@@ -2,10 +2,10 @@
 /* Invoices */
 .invoice-totals-row { margin-bottom: 18px; }
 .invoice-total-tile { display: flex; flex-direction: column; gap: 9px; min-height: 82px; padding: 16px 18px; border: 1px solid #e7eeec; border-radius: 14px; background: white; }
-.invoice-total-tile span { color: #7c8d90; font-size: 13px; }
+.invoice-total-tile span { color: var(--muted); font-size: 13px; }
 .invoice-total-tile strong { color: #304a51; font-family: Manrope, sans-serif; font-size: 17px; font-weight: 700; }
 .invoice-total-paid strong { color: #237e60; }
-.invoice-total-due strong { color: #b97731; }
+.invoice-total-due strong { color: #965c21; }
 .invoice-summary-scope { margin: -7px 0 18px; color: #5c7178; font-size: 13px; line-height: 1.55; }
 .invoice-list-card .section-card-header { margin-bottom: 10px; }
 .invoice-list-actions { display: flex; align-items: center; gap: 8px; }
@@ -21,8 +21,8 @@
 .invoice-table .room-avatar-invoice { color: #6685a1; background: #edf3f8; }
 .invoice-table .room-name-cell > div:last-child { min-width: 0; flex: 1; }
 .invoice-table .room-name-cell strong, .invoice-table .room-name-cell span { overflow-wrap: anywhere; word-break: normal; }
-.balance-due { color: #bd6e3b !important; }
-.balance-clear { color: #318566 !important; }
+.balance-due { color: #9c5528 !important; }
+.balance-clear { color: var(--green) !important; }
 .invoice-drawer .ant-drawer-header { padding: 21px 24px; border-bottom: 1px solid #edf1ef; }
 .invoice-drawer .ant-drawer-title { color: #29434a; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 700; }
 .invoice-drawer .ant-drawer-body { padding: 22px 24px 28px; }
@@ -58,3 +58,8 @@
 .receipt-form-title span { color: #849397; font-size: 12px; }
 .invoice-paid-note { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 12px; border-radius: 10px; color: #347f62; background: #eff8f2; font-size: 13px; }
 .drawer-loading { padding-top: 18px; }
+
+.manual-payment-confirmations { margin-bottom: 20px; }
+.manual-payment-requests { margin-top: 16px; }
+.manual-payment-request { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.manual-payment-request small { color: var(--muted); }

@@ -76,7 +76,7 @@ def main():
                 wait(base,api)
                 if args.provider == 'otp': names=['test_registration_otp','test_password_recovery']
                 elif args.provider == 'otp-postgres': names=['test_registration_otp.RegistrationOtpHttpTests','test_password_recovery']
-                else: names=['test_api_integration','test_billing_upgrade','test_reports_archive','test_account_occupancy_dashboard','test_operational_hardening','test_zalo_http']
+                else: names=['test_api_integration','test_billing_upgrade','test_reports_archive','test_account_occupancy_dashboard','test_operational_hardening','test_zalo_http','test_payment_modes']
                 if args.provider == 'sqlite': names += ['test_payos_fixture','test_seo_http']
                 # Explicit suite selection, explicit skip accounting. No silent all-skipped gate.
                 env['PYTHONPATH']=str(ROOT/'tests')

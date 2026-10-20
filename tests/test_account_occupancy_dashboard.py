@@ -41,12 +41,12 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         self.addCleanup(db.close)
         return db
 
-    def test_edit_preserves_issued_unpaid_partial_paid_and_uses_new_count(self):
+    def test_edit_preserves_issued_unpaid_paid_and_uses_new_count(self):
         room = self.create_room(water=80)
         occupancy = self.start_occupancy(room['id'], date.fromisoformat(first_day(period_offset(-3))))
         invoices = [self.save_reading(room['id'], period_offset(offset), 110 + n * 10)['invoice']
                     for n, offset in enumerate([-3, -2, -1])]
-        for invoice, amount in zip(invoices[1:], [1, invoices[2]['total']]):
+        for invoice, amount in zip(invoices[1:], [invoices[1]['total'], invoices[2]['total']]):
             self.owner.ok('POST', f"/api/invoices/{invoice['id']}/receipts", {
                 'amount': amount, 'note': 'Synthetic history guard', 'idempotencyKey': uuid.uuid4().hex})
         before = [self.owner.ok('GET', f"/api/invoices/{x['id']}") for x in invoices]
@@ -121,7 +121,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         room = self.create_room(water=80)
         occupancy = self.start_occupancy(room['id'])
         invoice = self.save_reading(room['id'], period_offset(0), 110)['invoice']
-        self.owner.ok('POST', f"/api/invoices/{invoice['id']}/receipts", {'amount': 1, 'note': '', 'idempotencyKey': uuid.uuid4().hex})
+        self.owner.ok('POST', f"/api/invoices/{invoice['id']}/receipts", {'amount': invoice['outstanding'], 'note': '', 'idempotencyKey': uuid.uuid4().hex})
         db = self.fixture_db()
         db.execute('UPDATE Invoices SET LifecycleState=? WHERE Id=?', ('Draft', invoice['id'].upper()))
         db.commit()
@@ -197,15 +197,15 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         occupancy = self.start_occupancy(room['id'], date.fromisoformat(first_day(period_offset(-2))), deposit=500)
         prior = self.save_reading(room['id'], period_offset(-1), 110)['invoice']
         current = self.save_reading(room['id'], period_offset(0), 120)['invoice']
-        for invoice, amount in [(prior, prior['total']), (current, 100)]:
+        for invoice, amount in [(prior, prior['total']), (current, current['total'])]:
             self.owner.ok('POST', f"/api/invoices/{invoice['id']}/receipts", {'amount': amount, 'note': '', 'idempotencyKey': uuid.uuid4().hex})
         extra = self.owner.ok('POST', f"/api/rooms/{room['id']}/supplemental-invoices", {'requestId': str(uuid.uuid4()), 'occupancyId': occupancy['id'], 'description': 'Synthetic extra', 'amount': 50, 'dueDate': first_day(period_offset(1))})
         summary = self.owner.ok('GET', '/api/dashboard')
         self.assertEqual(summary['period'], period_offset(0))
         self.assertEqual(summary['monthlyBilled'], current['total'] + extra['total'])
-        self.assertEqual(summary['monthlyPaid'], 100)
-        self.assertEqual(summary['monthlyOutstanding'], summary['monthlyBilled'] - 100)
-        self.assertAlmostEqual(summary['collectionRate'], round(100 / summary['monthlyBilled'] * 100, 2))
+        self.assertEqual(summary['monthlyPaid'], current['total'])
+        self.assertEqual(summary['monthlyOutstanding'], summary['monthlyBilled'] - current['total'])
+        self.assertAlmostEqual(summary['collectionRate'], round(current['total'] / summary['monthlyBilled'] * 100, 2))
         self.assertEqual(summary['totalBilled'], summary['monthlyBilled'] + prior['total'])
         empty = self.create_room(rent=1000)
         self.start_occupancy(empty['id'])

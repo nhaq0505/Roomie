@@ -581,7 +581,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     });
 
     await page.goto('/readings');
-    await expect(page.getByRole('heading', { level: 2, name: 'Chỉ số điện' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Lập hóa đơn' })).toBeVisible();
     await expect(page.getByText('Phòng 101', { exact: true })).toBeVisible();
 
     // 1. Enter new reading with consumption calculation
@@ -707,34 +707,16 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(drawer.getByText('100.000')).toBeVisible(); // water
     await expect(drawer.locator('.breakdown-total').getByText('3.380.000')).toBeVisible(); // total
 
-    // 2. Partial cash receipt with idempotency key
-    const amountInput = drawer.getByLabel('Số tiền nhận');
-    await amountInput.fill('1500000');
-    await drawer.getByLabel('Ghi chú').fill('Đợt 1');
+    // A single confirmation settles the full outstanding balance, with no editable amount.
+    await expect(drawer.getByLabel('Số tiền nhận')).toHaveCount(0);
+    await drawer.getByLabel('Ghi chú').fill('Tất toán');
     await drawer.getByRole('button', { name: 'Lưu khoản thu' }).click();
-
-    // Confirm receipt modal
     const confirmReceiptModal = page.locator('.ant-modal-confirm');
     await expect(confirmReceiptModal).toBeVisible();
-    await expect(confirmReceiptModal).toContainText('Ghi nhận khoản thu này?');
+    await expect(confirmReceiptModal).toContainText('3.380.000');
     await confirmReceiptModal.getByRole('button', { name: 'Ghi nhận khoản thu' }).click();
-
-    // Verify idempotencyKey was generated and sent
     expect(capturedIdempotencyKey).toBeTruthy();
     expect(capturedIdempotencyKey!.length).toBeGreaterThan(10);
-
-    // Verify outstanding balance updates and status transitions to Partial
-    await expect(drawer.locator('.status-partial')).toHaveText('Thanh toán một phần');
-    await expect(drawer.locator('.balance-due').getByText('1.880.000')).toBeVisible(); // remaining balance
-
-    // 3. Full cash receipt
-    await amountInput.fill('1880000');
-    await drawer.getByLabel('Ghi chú').fill('Đợt 2 - Tất toán');
-    await drawer.getByRole('button', { name: 'Lưu khoản thu' }).click();
-
-    const confirmReceiptModal2 = page.locator('.ant-modal-confirm');
-    await expect(confirmReceiptModal2).toBeVisible();
-    await confirmReceiptModal2.getByRole('button', { name: 'Ghi nhận khoản thu' }).click();
 
     // Verify status transitions to Paid
     await expect(drawer.locator('.status-paid')).toHaveText('Đã thanh toán');

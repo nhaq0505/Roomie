@@ -242,7 +242,7 @@ for the workload, host limits, teardown, and interpretation.
 
 ## Occupancy, credential recovery and monthly KPIs — 14/10/2026
 
-`test_account_occupancy_dashboard.py` adds 12 tests for preserved Issued unpaid/partial/paid
+`test_account_occupancy_dashboard.py` adds 12 tests for preserved Issued unpaid/paid
 snapshots, new headcount and fixed water fees, owner scope/stale occupancy/validation,
 Draft revision/version/recalculation and paid/pending guards, saved reading regeneration,
 Owner/Admin password changes, session revocation, admin reauthentication, single-use,
@@ -324,7 +324,7 @@ Existing SQLite business suite59/59 remains green, with opt-in OTP classes skipp
 ## Cash receipts with pending payOS (14/10/2026)
 
 `dotnet run --project tests/RoomRental.WebhookTests` includes ManualReceiptTests with an
-in-process fake signed payOS handler. Covers atomic full/partial cash cancellation, retries,
+in-process fake signed payOS handler. Covers atomic full-balance cash cancellation, rejection of partial cash before provider calls, retries,
 provider-paid races, partial online money, malformed/signature/amount/order/timeout failures,
 rollback recovery, legacy reservations, owner/version/idempotency and terminal reconciliation.
 Latest SQLite service suite:165 assertions passed. No live provider calls.
@@ -359,3 +359,7 @@ The disposable `otp` provider runs registration and password-recovery HTTP tests
 C# coverage is included in `dotnet run --project tests/RoomRental.WebhookTests`; frontend coverage is in `frontend/e2e/password-recovery.spec.ts`.
 
 Zalo reminder tests (fake provider, no real messages): `dotnet run --project tests/RoomRental.ZaloTests`, `npm --prefix zalo-gateway test`, and `npm --prefix frontend run test:e2e -- zalo.spec.ts --workers=2`. See [Zalo setup](../docs/zalo-setup.md) for disposable PostgreSQL test configuration.
+
+## Payment modes and batch checkout
+
+`tests/test_payment_modes.py` runs in the ordinary `sqlite` and `postgres` disposable harness suites: individual/all-page VietQR selection, owner-only/idempotent confirmation, stale balance rollback and parallel confirmation. C# `BatchPaymentTests` uses a fake signed payOS channel to cover reservation membership, order reuse, invalid amounts, replay and per-invoice allocation. The existing payment fixture can run against an explicitly allowed runner-owned PostgreSQL on port 15496; it creates/drops only its own temporary databases. No real bank transfer or payable QR is used. See [payment confirmation](../docs/payment-confirmation.md).

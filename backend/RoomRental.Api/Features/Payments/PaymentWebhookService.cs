@@ -29,15 +29,21 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
     public async Task<PaymentSettingsDto> GetAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var settings = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == ownerId, cancellationToken);
+        var owner = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == ownerId, cancellationToken);
+        PaymentSettingsDto Dto(bool configured, string? clientId, string? webhookUrl, string status, string? verifiedAt, string? error) =>
+            new(configured, clientId, webhookUrl, status, verifiedAt, error) {
+                ConfirmationMode = owner?.PaymentConfirmationMode.ToString() ?? "Automatic",
+                ManualBank = owner?.ManualBankBin is not null ? new(owner.ManualBankBin, owner.ManualAccountNumber!, owner.ManualAccountName!) : null
+            };
         var url = WebhookUrl(ownerId);
-        if (settings is null) return new(false, null, url, "NotConfigured", null, null);
-        if (url is null) return new(true, settings.ClientId, null, "Failed", null,
+        if (settings is null) return Dto(false, null, url, "NotConfigured", null, null);
+        if (url is null) return Dto(true, settings.ClientId, null, "Failed", null,
             "Máy chủ chưa được cấu hình URL HTTPS công khai để nhận webhook.");
         var registration = await db.PaymentWebhookRegistrations.AsNoTracking()
             .SingleOrDefaultAsync(x => x.OwnerId == ownerId, cancellationToken);
         if (registration is null || registration.SettingsVersion != Version(settings) || registration.WebhookUrl != url)
-            return new(true, settings.ClientId, url, "Unverified", null, null);
-        return new(true, settings.ClientId, url, registration.Status, registration.VerifiedAt, registration.Error);
+            return Dto(true, settings.ClientId, url, "Unverified", null, null);
+        return Dto(true, settings.ClientId, url, registration.Status, registration.VerifiedAt, registration.Error);
     }
 
     public async Task<PaymentSettingsDto> ConfirmAsync(Guid ownerId, CancellationToken cancellationToken)

@@ -39,8 +39,8 @@ public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs)
                 throw new ApiException(409, "Draft invoices cannot receive payments. Publish the invoice first.");
             if (request.ExpectedVersion is long expected && invoice.Version != expected)
                 throw new ApiException(409, "Invoice changed. Refresh it and retry the receipt.");
-            if (request.Amount > invoice.Total - invoice.Paid)
-                throw new ApiException(409, "Receipt amount cannot exceed the outstanding balance.");
+            if (request.Amount != invoice.Total - invoice.Paid)
+                throw new ApiException(409, "Ghi nhận khoản thu phải thanh toán toàn bộ số tiền còn lại của hóa đơn.");
 
             // Keep the pending reservation until cancellation and the receipt commit together.
             // A concurrent checkout cannot reserve another order in the intervening window.

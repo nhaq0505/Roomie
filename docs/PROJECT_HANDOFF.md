@@ -869,3 +869,9 @@ CI38845852582 passed verify/publish/deploy, live revision4f3d1bce01ef3a7482d8597
 
 - User selected the entire **Tài khoản nhận tiền & lịch gửi** section in the browser and requested removing it. Removed that UI block, its form state/mutation and unused styles; connection card now spans the available width. Removed guide steps pointing to those deleted controls and updated the existing browser flow accordingly.
 - Backend configuration/storage and saved schedules were not modified. Without an existing receiving account, manual queue remains unavailable under the current backend contract. Local Vite reflects the change automatically; no real Zalo interaction or message sending was needed.
+
+### 20/10/2026 — Integrate Zalo worktree with local main
+
+- Combined Zalo reminders with main's manual payment confirmation and batch checkout. Resolved API registration, navigation, translation catalogs, disposable test registration and EF provider snapshots; kept existing migration IDs and both payment/Zalo behavior. The user-requested removal of the banking/schedule UI panel remains in place.
+- Validation after integration: frontend build, i18n1151×4 and architecture94modules PASS; all49Playwright cases PASS; payment/service regression PASS; Zalo36assertions on SQLite and PostgreSQL PASS; gateway14tests PASS. Disposable HTTP suites: SQLite83/83PASS; PostgreSQL66run with8expected skips PASS. Both EF snapshots have no pending model changes; DbMigrator build and diff checks PASS.
+- Authorized integration into local main only. No push, deployment or production database change; private local Zalo session/runtime files remain ignored.

@@ -134,7 +134,7 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
 
         receipt_key = str(uuid.uuid4())
         paid = self.owner.ok("POST", f"/api/invoices/{second['id']}/receipts", {
-            "amount": 1, "idempotencyKey": receipt_key, "expectedVersion": second["version"],
+            "amount": second["outstanding"], "idempotencyKey": receipt_key, "expectedVersion": second["version"],
         })
         self.assertEqual(paid["version"], second["version"] + 1)
         blocked_paid = self.owner.request("POST", f"/api/invoices/{second['id']}/corrections", {
@@ -198,7 +198,7 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         invoice = self.save_reading(room["id"], period, 101)["invoice"]
         version = invoice["version"]
         receipt = {
-            "amount": 1, "expectedVersion": version, "idempotencyKey": str(uuid.uuid4()),
+            "amount": invoice["outstanding"], "expectedVersion": version, "idempotencyKey": str(uuid.uuid4()),
         }
         correction = {
             "requestId": str(uuid.uuid4()), "expectedVersion": version,
@@ -220,7 +220,7 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         final = self.owner.ok("GET", f"/api/invoices/{invoice['id']}")
         self.assertEqual(final["version"], version + 1)
         self.assertEqual(final["paid"] + final["outstanding"], final["total"])
-        self.assertIn(final["paid"], (0, 1))
+        self.assertIn(final["paid"], (0, invoice["outstanding"]))
         history = self.owner.ok("GET", f"/api/invoices/{invoice['id']}/corrections")["items"]
         self.assertEqual(len(history) + int(final["paid"] > 0), 1)
 

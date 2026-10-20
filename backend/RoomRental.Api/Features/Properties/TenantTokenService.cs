@@ -18,7 +18,8 @@ public sealed class TenantTokenService(IDataProtectionProvider protectionProvide
     public async Task<bool> CanShareAsync(Guid ownerId, PaymentWebhookService webhookService, CancellationToken cancellationToken)
     {
         if (!configuration.GetValue("RequireVerifiedPaymentForTenantLink", true)) return true;
-        return (await webhookService.GetAsync(ownerId, cancellationToken)).WebhookStatus == "Verified";
+        var settings = await webhookService.GetAsync(ownerId, cancellationToken);
+        return settings.ConfirmationMode == "Manual" ? settings.ManualBank is not null : settings.WebhookStatus == "Verified";
     }
 
     public string? Unprotect(Occupancy occupancy)

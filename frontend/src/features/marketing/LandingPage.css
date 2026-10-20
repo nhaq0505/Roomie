@@ -216,7 +216,6 @@
 @media (max-width: 800px) {
   .landing-header-inner { min-height: 72px; padding: 12px 20px; gap: 16px; }
   .landing-header-actions { gap: 12px; }
-  .landing-login { display: none; }
   .landing-page .btn-text-full { display: none; }
   .landing-page .btn-text-short { display: inline; }
   .landing-hero { padding-top: 48px; }
@@ -236,12 +235,13 @@
   .footer-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 540px) {
-  .landing-header-inner { padding: 12px 16px; }
+  .landing-header-inner { padding: 12px 16px; flex-wrap: wrap; }
   .landing-brand { gap: 8px; }
   .landing-brand strong { font-size: 20px; }
   .landing-brand .brand-mark { width: 28px; height: 28px; flex-basis: 28px; border-radius: 8px; }
-  .landing-header-actions { gap: 8px; }
-  .landing-header-actions .language-selector { width: 120px; min-width: 120px; }
+  .landing-header-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; width: 100%; margin-left: 0; gap: 8px; }
+  .landing-header-actions .language-selector { width: min(120px, 100%); min-width: 0; height: 44px; }
+  .landing-header-actions .landing-btn { min-height: 44px; }
   .landing-header .landing-btn { padding: 10px 12px; }
   .landing-hero { padding: 36px 16px 32px; }
   .hero-kicker { font-size: 12px; letter-spacing: 1px; margin-bottom: 20px; }

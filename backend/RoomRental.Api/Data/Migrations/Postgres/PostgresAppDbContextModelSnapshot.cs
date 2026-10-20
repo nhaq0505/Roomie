@@ -36,6 +36,18 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<string>("ManualAccountName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ManualAccountNumber")
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)");
+
+                    b.Property<string>("ManualBankBin")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
                     b.Property<bool>("MfaEnabled")
                         .HasColumnType("boolean");
 
@@ -65,6 +77,13 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .IsConcurrencyToken()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PaymentConfirmationMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Automatic");
 
                     b.Property<DateTimeOffset?>("PendingMfaExpiresAt")
                         .HasColumnType("timestamp with time zone");
@@ -294,6 +313,9 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid?>("PaymentReservationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Period")
                         .IsRequired()
                         .HasMaxLength(7)
@@ -451,6 +473,60 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasIndex("WindowStartedAt");
 
                     b.ToTable("LoginThrottles");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.ManualPaymentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccountName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)");
+
+                    b.Property<string>("AllocationsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("BankBin")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OccupancyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccupancyId");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.ToTable("ManualPaymentRequests");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.MonthlyReading", b =>
@@ -821,6 +897,9 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.Property<long?>("ExpiresAt")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("InvoiceAllocationsJson")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("InvoiceId")
                         .HasColumnType("uuid");
 
@@ -1155,6 +1234,21 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .WithMany()
                         .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.ManualPaymentRequest", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.Occupancy", null)
+                        .WithMany()
+                        .HasForeignKey("OccupancyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

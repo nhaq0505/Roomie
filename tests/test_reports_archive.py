@@ -115,16 +115,15 @@ class ReportsArchiveIntegrationTests(unittest.TestCase):
             "amount": 1000,
             "idempotencyKey": str(uuid.uuid4()),
         })
-        self.owner.ok("POST", f"/api/invoices/{monthly['id']}/receipts", {
-            "amount": 400,
-            "note": "=1+1",
-            "idempotencyKey": str(uuid.uuid4()),
-        })
-        self.owner.ok("POST", f"/api/invoices/{monthly['id']}/receipts", {
-            "amount": 50,
-            "note": "partial manual receipt",
-            "idempotencyKey": str(uuid.uuid4()),
-        })
+        # Each cash confirmation settles its entire invoice; separate charges preserve report pagination.
+        for amount, note in [(400, "=1+1"), (50, "Full manual receipt")]:
+            charge = self.owner.ok("POST", f"/api/rooms/{room['id']}/supplemental-invoices", {
+                "requestId": str(uuid.uuid4()), "occupancyId": occupancy['id'],
+                "description": "Report fixture charge", "amount": amount, "dueDate": today_vietnam().isoformat(),
+            })
+            self.owner.ok("POST", f"/api/invoices/{charge['id']}/receipts", {
+                "amount": amount, "note": note, "idempotencyKey": str(uuid.uuid4()),
+            })
         self.owner.ok("POST", f"/api/invoices/{occupancy['depositInvoiceId']}/deposit-settlements", {
             "amount": 200,
             "kind": "Deduction",
@@ -149,7 +148,7 @@ class ReportsArchiveIntegrationTests(unittest.TestCase):
         self.assertEqual(len(set(paged_ids)), 3, "Stable report paging duplicated a receipt")
 
         debts = self.owner.ok("GET", f"/api/reports/debt?dateFrom={today}&dateTo={today}&roomId={room['id']}")
-        self.assertEqual(debts["totals"]["currentOutstanding"], 350)
+        self.assertEqual(debts["totals"]["currentOutstanding"], 800)
         self.assertEqual([row["invoiceKind"] for row in debts["items"]], ["Monthly"])
 
         deposits = self.owner.ok("GET", f"/api/reports/deposits?{filters}")
@@ -217,7 +216,7 @@ class ReportsArchiveIntegrationTests(unittest.TestCase):
                                  "Unprefixed formula-like text must use Excel's quotePrefix style")
 
         for report_type, summary_total, detail_total in (
-            ("debt", Decimal("350"), Decimal("350")),
+            ("debt", Decimal("800"), Decimal("800")),
             ("deposits", Decimal("1000"), Decimal("800")),
         ):
             status, body, _ = self.owner.request("GET", f"/api/reports/{report_type}/export.xlsx?{filters}")

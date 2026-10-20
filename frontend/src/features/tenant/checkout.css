@@ -43,3 +43,7 @@
   .tenant-page .tenant-checkout-qr .ant-qrcode svg { display: block; width: 100%; height: auto; }
   .tenant-page .tenant-checkout-details > div { gap: 8px; }
 }
+
+.tenant-manual-qr { display: flex; justify-content: center; padding: 20px 0; }
+.tenant-manual-qr .ant-image { max-width: 100%; }
+.tenant-pay-all { margin-bottom: 20px; }

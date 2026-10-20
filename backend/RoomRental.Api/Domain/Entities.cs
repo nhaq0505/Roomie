@@ -1,5 +1,7 @@
 namespace RoomRental.Api.Domain;
 
+public enum PaymentConfirmationMode { Automatic, Manual }
+
 public enum UserRole { Admin, Owner }
 public enum OwnerStatus { Pending, Approved, Rejected, Suspended }
 public enum SubscriptionTier { Free, Pro }
@@ -15,6 +17,10 @@ public sealed class AppUser
     public required string Name { get; set; }
     public required string Email { get; set; }
     public string? Phone { get; set; }
+    public PaymentConfirmationMode PaymentConfirmationMode { get; set; } = PaymentConfirmationMode.Automatic;
+    public string? ManualBankBin { get; set; }
+    public string? ManualAccountNumber { get; set; }
+    public string? ManualAccountName { get; set; }
     public required string PasswordHash { get; set; }
     // Legacy MFA storage retained to preserve the deployed schema; authentication ignores it.
     public string? ProtectedMfaSecret { get; set; }
@@ -176,6 +182,7 @@ public sealed class Invoice
     public int? MonthDays { get; set; }
     public List<DepositSettlement> DepositSettlements { get; set; } = [];
 
+    public Guid? PaymentReservationId { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid OwnerId { get; set; }
     public Guid RoomId { get; set; }
@@ -249,6 +256,7 @@ public sealed class OwnerPaymentSettings
 
 public sealed class PayOsAttempt
 {
+    public string? InvoiceAllocationsJson { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid OwnerId { get; set; }
     public Guid InvoiceId { get; set; }

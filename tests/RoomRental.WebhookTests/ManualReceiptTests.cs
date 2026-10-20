@@ -35,12 +35,13 @@ internal static class ManualReceiptTests
         {
             var attempt = await Pending(f); var http = new CancellationHandler(attempt);
             var service = new ManualReceiptService(f.Db, f.CreateService(http));
-            var result = await service.RecordAsync(f.OwnerId, f.Invoice.Id, Request(5_000), null, default);
-            Check(result.Status == "Partial" && result.Outstanding == 95_000, "partial cash keeps only the remaining invoice balance outstanding");
-            var create = new FakePayOsHandler(Key);
-            var checkout = await f.CreateService(create).CreateOrGetCheckoutAsync(f.OwnerId, f.Invoice, "synthetic-token", default);
-            Check(checkout.Amount == 95_000 && await f.Db.PayOsAttempts.CountAsync(x => x.Status == PaymentAttemptStatus.Pending) == 1,
-                "a later checkout uses only the remaining balance after partial cash");
+            await Reject(() => service.RecordAsync(f.OwnerId, f.Invoice.Id, Request(5_000), null, default), 409,
+                "partial cash receipt is rejected before provider cancellation");
+            Check(http.Gets == 0 && http.Cancels == 0 && await f.Db.Receipts.CountAsync() == 0 && f.Invoice.Paid == 25_000,
+                "partial receipt leaves provider reservation and balances unchanged");
+            var result = await service.RecordAsync(f.OwnerId, f.Invoice.Id, Request(100_000), null, default);
+            Check(result.Status == "Paid" && result.Outstanding == 0,
+                "confirmation settles the entire remaining balance of a historical partial invoice");
         }
         foreach (var terminal in new[] { "CANCELLED", "EXPIRED" })
         {

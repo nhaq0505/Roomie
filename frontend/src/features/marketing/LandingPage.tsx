@@ -42,7 +42,7 @@ function DashboardPreview() {
         <span className="dashboard-nav-active"><DashboardOutlined /><span>{t("Tổng quan")}</span></span>
         <span><HomeOutlined /><span>{t("Dãy trọ")}</span></span>
         <span><TeamOutlined /><span>{t("Phòng & người thuê")}</span></span>
-        <span><ThunderboltOutlined /><span>{t("Chỉ số điện")}</span></span>
+        <span><ThunderboltOutlined /><span>{t("Lập hóa đơn")}</span></span>
         <span><FileTextOutlined /><span>{t("Hóa đơn")}</span></span>
         <span><BarChartOutlined /><span>{t("Báo cáo")}</span></span>
       </div>

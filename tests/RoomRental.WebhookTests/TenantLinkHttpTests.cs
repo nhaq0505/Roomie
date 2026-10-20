@@ -61,6 +61,8 @@ internal static class TenantLinkHttpTests
         app.MapOwnerManagementEndpoints();
         app.MapBillingEndpoints();
         app.MapPaymentEndpoints();
+        app.MapPaymentPreferencesEndpoints();
+        app.MapManualPaymentEndpoints();
 
         var buildingId = Guid.NewGuid();
         using (var scope = app.Services.CreateScope())
@@ -174,6 +176,71 @@ internal static class TenantLinkHttpTests
             Assert(!await db.Receipts.AnyAsync() && !await db.PayOsAttempts.AnyAsync(), "link policy tests never create money or payment attempts");
         }
         Assert(provider.Calls == 3, "only three in-process webhook confirmations were made");
+
+        // Manual confirmation is independent of payOS credentials and shares no external traffic.
+        await JsonAsync(await client.PutAsJsonAsync("/api/settings/payment/preferences", new { confirmationMode = "invalid" }), HttpStatusCode.BadRequest);
+        await JsonAsync(await client.PutAsJsonAsync("/api/settings/payment/preferences", new { confirmationMode = "Manual", bankBin = "000000", accountNumber = "12345678", accountName = "TEST" }), HttpStatusCode.BadRequest);
+        using (var scope = app.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.PayOsAttempts.Add(new PayOsAttempt { OwnerId = OwnerId, InvoiceId = invoiceId, OrderCode = 989898909, Amount = 100_000 });
+            await db.SaveChangesAsync();
+        }
+        await JsonAsync(await client.PutAsJsonAsync("/api/settings/payment/preferences", new {
+            confirmationMode = "Manual", bankBin = "970436", accountNumber = "12345678", accountName = "SYNTHETIC TEST ONLY"
+        }), HttpStatusCode.Conflict);
+        using (var scope = app.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert((await db.Users.SingleAsync(x => x.Id == OwnerId)).PaymentConfirmationMode == PaymentConfirmationMode.Automatic,
+                "pending payOS prevents switching payment mode without mutating preferences");
+            db.PayOsAttempts.RemoveRange(await db.PayOsAttempts.ToListAsync()); await db.SaveChangesAsync();
+        }
+        var manualSettings = await JsonAsync(await client.PutAsJsonAsync("/api/settings/payment/preferences", new {
+            confirmationMode = "Manual", bankBin = "970436", accountNumber = "12345678", accountName = "SYNTHETIC TEST ONLY"
+        }));
+        Assert(manualSettings.GetProperty("confirmationMode").GetString() == "Manual", "owner selects and persists manual confirmation");
+        await AssertReadLinksAsync(client, roomId, invoiceId, hidden: false);
+        await JsonAsync(await client.PostAsync($"/api/tenant/{newToken}/invoices/{invoiceId}/payment", null), HttpStatusCode.Conflict);
+        var singleRequest = await JsonAsync(await client.PostAsJsonAsync($"/api/tenant/{newToken}/manual-payments", new { invoiceId }));
+        Assert(singleRequest.GetProperty("amount").GetDecimal() == 100_000 && singleRequest.GetProperty("qrUrl").GetString()!.StartsWith("https://img.vietqr.io/image/970436-12345678-compact2.png?"), "manual QR uses server-side bank settings and the individual balance");
+        using (var scope = app.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Invoices.Add(new Invoice { OwnerId = OwnerId, BuildingId = buildingId, RoomId = roomId, OccupancyId = occupancyId,
+                RoomName = "Fixture room", BuildingName = "Fixture", TenantName = "Fixture tenant", Period = "2026-09", Total = 120_000 });
+            await db.SaveChangesAsync();
+        }
+        var batch = await JsonAsync(await client.PostAsJsonAsync($"/api/tenant/{newToken}/manual-payments", new { invoiceId = (Guid?)null }));
+        var batchId = batch.GetProperty("id").GetGuid();
+        Assert(batch.GetProperty("amount").GetDecimal() == 220_000 && batch.GetProperty("invoices").GetArrayLength() == 2, "manual pay-all snapshots both outstanding invoices");
+        var reused = await JsonAsync(await client.PostAsJsonAsync($"/api/tenant/{newToken}/manual-payments", new { invoiceId = (Guid?)null }));
+        Assert(reused.GetProperty("id").GetGuid() == batchId, "reopening manual pay-all reuses a live unchanged request");
+        await JsonAsync(await client.PostAsJsonAsync($"/api/manual-payments/{batchId}/confirm", new { amount = 1 }), HttpStatusCode.Conflict);
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", otherOwner.ToString());
+        await JsonAsync(await client.PostAsJsonAsync($"/api/manual-payments/{batchId}/confirm", new { amount = 220_000 }), HttpStatusCode.NotFound);
+        client.DefaultRequestHeaders.Remove("X-Fixture-Owner");
+        await JsonAsync(await client.PostAsJsonAsync($"/api/manual-payments/{batchId}/confirm", new { amount = 220_000 }));
+        await JsonAsync(await client.PostAsJsonAsync($"/api/manual-payments/{batchId}/confirm", new { amount = 220_000 }));
+        var singleId = singleRequest.GetProperty("id").GetGuid();
+        await JsonAsync(await client.PostAsJsonAsync($"/api/manual-payments/{singleId}/confirm", new { amount = 100_000 }), HttpStatusCode.Conflict);
+        using (var scope = app.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert(await db.Receipts.CountAsync() == 2 && await db.Invoices.Where(i => i.OccupancyId == occupancyId).AllAsync(i => i.Paid == i.Total),
+                "manual batch records exactly one receipt per invoice and rejects stale/duplicate confirmation");
+        }
+        Assert(provider.Calls == 3, "manual payment workflow never calls a payment provider");
+        using (var scope = app.Services.CreateScope()) {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (var month = 1; month <= 12; month++) db.Invoices.Add(new Invoice {
+                OwnerId = OwnerId, BuildingId = buildingId, RoomId = roomId, OccupancyId = occupancyId,
+                RoomName = "Fixture room", BuildingName = "Fixture", TenantName = "Fixture tenant", Period = $"2024-{month:D2}", Total = 10
+            });
+            await db.SaveChangesAsync();
+        }
+        var paged = await JsonAsync(await client.GetAsync($"/api/tenant/{newToken}?page=1&pageSize=1"));
+        Assert(paged.GetProperty("invoices").GetArrayLength() == 1 && paged.GetProperty("totals").GetProperty("outstanding").GetDecimal() == 120,
+            "tenant summary totals cover outstanding invoices outside the current page");
+        var allPages = await JsonAsync(await client.PostAsJsonAsync($"/api/tenant/{newToken}/manual-payments", new { invoiceId = (Guid?)null }));
+        Assert(allPages.GetProperty("invoices").GetArrayLength() == 12 && allPages.GetProperty("amount").GetDecimal() == 120,
+            "pay-all includes all twelve unpaid invoices across pagination");
     }
 
     private static async Task AssertReadLinksAsync(HttpClient client, Guid roomId, Guid invoiceId, bool hidden)
