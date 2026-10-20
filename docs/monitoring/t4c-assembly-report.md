@@ -43,7 +43,7 @@ Per coordinator guidance (`msg_9fd3ff141e7c`), three correctness blockers identi
 ### 2.2 Task T4d Final Review Resolutions: Relational Subqueries & Outbox Retention
 Per Task T4d review directives, two remaining findings from `t5b-review.md` were resolved:
 1. **Relational Subqueries for Owner Attribution Filtering (Defect 4)**:
-   - `GetMatchingOwnerIdsAsync` previously materialized matching owner IDs to memory (`HashSet<Guid>`), risking parameter limit overflow and high memory overhead across 8 metric queries.
+   - `GetMatchingOwnerIdsAsync` previously materialized matching owner IDs to memory (`HashSet<Guid>`), causing unbounded owner ID materialization and high memory overhead across 8 metric queries.
    - Introduced `GetMatchingOwnerIdsQuery` returning `IQueryable<Guid>?`. EF Core compiles this to relational SQL subqueries (`WHERE m.OwnerId IN (SELECT a.OwnerId FROM RegistrationAttributions a WHERE ...)`), eliminating in-memory list allocations.
    - Verified offline via `ToQueryString()` for both SQLite and PostgreSQL (Npgsql), and verified in tests with 20 matching / 10 non-matching owners.
 2. **Completed Milestone Outbox Retention Pruning (Defect 6)**:
