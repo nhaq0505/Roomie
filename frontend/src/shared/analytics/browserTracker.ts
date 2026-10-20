@@ -19,8 +19,21 @@ export interface RegistrationAttributionContext {
   lastNonDirect: AttributionData | null;
 }
 
+export interface AttributionTouchDto {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  content?: string;
+  term?: string;
+  landingPage?: string;
+  referrer?: string;
+  occurredAt?: string;
+}
+
 export interface RegistrationAttributionDto {
   browserId?: string;
+  firstTouch?: AttributionTouchDto;
+  lastTouch?: AttributionTouchDto;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
@@ -479,8 +492,34 @@ export function getRegistrationAttributionForApi(now = Date.now()): Registration
   const firstTouch = getFirstTouchSource(now);
   const active = lastNonDirect || firstTouch;
 
+  const firstTouchDto: AttributionTouchDto | undefined = firstTouch
+    ? {
+        source: firstTouch.source !== '(direct)' ? firstTouch.source : undefined,
+        medium: firstTouch.medium,
+        campaign: firstTouch.campaign,
+        content: firstTouch.content,
+        term: firstTouch.term,
+        landingPage: firstTouch.landingPath ? normalizeRoute(firstTouch.landingPath) : undefined,
+        occurredAt: new Date(firstTouch.timestamp).toISOString(),
+      }
+    : undefined;
+
+  const lastTouchDto: AttributionTouchDto | undefined = lastNonDirect
+    ? {
+        source: lastNonDirect.source !== '(direct)' ? lastNonDirect.source : undefined,
+        medium: lastNonDirect.medium,
+        campaign: lastNonDirect.campaign,
+        content: lastNonDirect.content,
+        term: lastNonDirect.term,
+        landingPage: lastNonDirect.landingPath ? normalizeRoute(lastNonDirect.landingPath) : undefined,
+        occurredAt: new Date(lastNonDirect.timestamp).toISOString(),
+      }
+    : undefined;
+
   return {
     browserId,
+    firstTouch: firstTouchDto,
+    lastTouch: lastTouchDto,
     utmSource: active?.source !== '(direct)' ? active?.source : undefined,
     utmMedium: active?.medium,
     utmCampaign: active?.campaign,
@@ -493,6 +532,7 @@ export function getRegistrationAttributionForApi(now = Date.now()): Registration
 
 // Backend-aligned client analytics event item
 export interface AnalyticsEventItem {
+  eventId: string;
   eventType: AllowlistedEventType;
   eventName?: string;
   path: string;
@@ -555,6 +595,7 @@ export function trackEvent(
     const activeAttribution = getLastNonDirectSource(now) || getFirstTouchSource(now);
 
     const eventItem: AnalyticsEventItem = {
+      eventId: 'evt-' + generateId(),
       eventType,
       eventName: options.eventName ? scrubString(options.eventName) : undefined,
       path: normalizeRoute(options.path || window.location.pathname),

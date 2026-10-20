@@ -212,7 +212,47 @@ export interface UpdateIncidentRequest {
   note?: string | null;
 }
 
-// 5. Campaign Cost Management Types
+// 5. Campaign Metadata Management DTOs
+export interface MarketingCampaignDto {
+  id: string;
+  code: string;
+  name: string;
+  channel?: string | null;
+  source?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmSource?: string | null;
+  targetUrl?: string | null;
+  isActive: boolean;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCampaignRequest {
+  code: string;
+  name: string;
+  channel?: string | null;
+  source?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmSource?: string | null;
+  targetUrl?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateCampaignRequest {
+  name: string;
+  channel?: string | null;
+  source?: string | null;
+  utmCampaign?: string | null;
+  utmMedium?: string | null;
+  utmSource?: string | null;
+  targetUrl?: string | null;
+  isActive?: boolean | null;
+}
+
+// 6. Campaign Cost Management Types
 export interface AdminCampaignCostItemDto {
   id: string;
   date: string; // YYYY-MM-DD

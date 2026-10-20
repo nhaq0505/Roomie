@@ -6,8 +6,11 @@ import type {
   AdminMonitoringIncidentsResponse,
   AdminMonitoringOperationsResponse,
   AdminMonitoringRevenueResponse,
+  CreateCampaignRequest,
   IncidentDto,
+  MarketingCampaignDto,
   MonitoringFilterRequest,
+  UpdateCampaignRequest,
   UpdateIncidentRequest,
   UpsertCampaignCostRequest,
 } from './types';
@@ -17,7 +20,7 @@ const patch = (body?: unknown): RequestInit => ({
   ...(body === undefined ? {} : { body: json(body) }),
 });
 
-function buildQueryString(params: Record<string, string | number | undefined | null>): string {
+function buildQueryString(params: Record<string, string | number | boolean | undefined | null>): string {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== '') {
@@ -70,6 +73,22 @@ export const monitoringApi = {
 
   upsertCampaignCost: (body: UpsertCampaignCostRequest) => {
     return request<AdminCampaignCostItemDto>('/api/admin/monitoring/campaigns', post(body));
+  },
+
+  getCampaignMetadata: (params?: { activeOnly?: boolean; channel?: string; source?: string }) => {
+    const qs = buildQueryString(params || {});
+    return request<MarketingCampaignDto[]>(`/api/admin/monitoring/campaigns/metadata${qs}`);
+  },
+
+  createCampaignMetadata: (body: CreateCampaignRequest) => {
+    return request<MarketingCampaignDto>('/api/admin/monitoring/campaigns/metadata', post(body));
+  },
+
+  updateCampaignMetadata: (id: string, body: UpdateCampaignRequest) => {
+    return request<MarketingCampaignDto>(`/api/admin/monitoring/campaigns/metadata/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: json(body),
+    });
   },
 };
 
@@ -143,6 +162,35 @@ export function useUpdateIncident() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['monitoring', 'incidents'] });
       void queryClient.invalidateQueries({ queryKey: ['monitoring', 'operations'] });
+    },
+  });
+}
+
+export function useCampaignMetadata(params?: { activeOnly?: boolean; channel?: string; source?: string }) {
+  return useQuery({
+    queryKey: ['monitoring', 'campaigns-metadata', params],
+    queryFn: () => monitoringApi.getCampaignMetadata(params),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateCampaignMetadata() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateCampaignRequest) => monitoringApi.createCampaignMetadata(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaigns-metadata'] });
+    },
+  });
+}
+
+export function useUpdateCampaignMetadata() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateCampaignRequest }) =>
+      monitoringApi.updateCampaignMetadata(id, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaigns-metadata'] });
     },
   });
 }
