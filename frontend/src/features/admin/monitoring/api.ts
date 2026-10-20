@@ -6,10 +6,12 @@ import type {
   AdminMonitoringIncidentsResponse,
   AdminMonitoringOperationsResponse,
   AdminMonitoringRevenueResponse,
+  CampaignCostFilterRequest,
   CreateCampaignRequest,
   IncidentDto,
   MarketingCampaignDto,
   MonitoringFilterRequest,
+  OpsWindowPreset,
   UpdateCampaignRequest,
   UpdateIncidentRequest,
   UpsertCampaignCostRequest,
@@ -54,8 +56,10 @@ export const monitoringApi = {
     return request<AdminMonitoringRevenueResponse>(`/api/admin/monitoring/revenue${qs}`);
   },
 
-  getOperations: () => {
-    return request<AdminMonitoringOperationsResponse>('/api/admin/monitoring/operations');
+  getOperations: (window: OpsWindowPreset = '1h') => {
+    return request<AdminMonitoringOperationsResponse>(
+      `/api/admin/monitoring/operations?window=${encodeURIComponent(window)}`
+    );
   },
 
   getIncidents: () => {
@@ -66,13 +70,17 @@ export const monitoringApi = {
     return request<IncidentDto>(`/api/admin/monitoring/incidents/${encodeURIComponent(id)}`, patch(body));
   },
 
-  getCampaignCosts: (fromDate?: string, toDate?: string) => {
-    const qs = buildQueryString({ fromDate, toDate });
-    return request<AdminCampaignCostItemDto[]>(`/api/admin/monitoring/campaigns${qs}`);
+  getCampaignCosts: (params?: CampaignCostFilterRequest) => {
+    const qs = buildQueryString({
+      fromDate: params?.fromDate,
+      toDate: params?.toDate,
+      campaign: params?.campaign,
+    });
+    return request<AdminCampaignCostItemDto[]>(`/api/admin/monitoring/campaigns/costs${qs}`);
   },
 
   upsertCampaignCost: (body: UpsertCampaignCostRequest) => {
-    return request<AdminCampaignCostItemDto>('/api/admin/monitoring/campaigns', post(body));
+    return request<AdminCampaignCostItemDto>('/api/admin/monitoring/campaigns/costs', post(body));
   },
 
   getCampaignMetadata: (params?: { activeOnly?: boolean; channel?: string; source?: string }) => {
@@ -113,10 +121,10 @@ export function useRevenueMonitoring(filter: MonitoringFilterRequest, enabled = 
   });
 }
 
-export function useOperationsMonitoring(enabled = true) {
+export function useOperationsMonitoring(window: OpsWindowPreset = '1h', enabled = true) {
   return useQuery({
-    queryKey: ['monitoring', 'operations'],
-    queryFn: () => monitoringApi.getOperations(),
+    queryKey: ['monitoring', 'operations', window],
+    queryFn: () => monitoringApi.getOperations(window),
     enabled,
     retry: false,
     staleTime: 30 * 1000,
@@ -135,10 +143,11 @@ export function useMonitoringIncidents(enabled = true) {
   });
 }
 
-export function useCampaignCosts(fromDate?: string, toDate?: string) {
+export function useCampaignCosts(params?: CampaignCostFilterRequest, enabled = true) {
   return useQuery({
-    queryKey: ['monitoring', 'campaigns', fromDate, toDate],
-    queryFn: () => monitoringApi.getCampaignCosts(fromDate, toDate),
+    queryKey: ['monitoring', 'campaign-costs', params?.fromDate, params?.toDate, params?.campaign],
+    queryFn: () => monitoringApi.getCampaignCosts(params),
+    enabled,
     staleTime: 60 * 1000,
   });
 }
@@ -148,7 +157,7 @@ export function useUpsertCampaignCost() {
   return useMutation({
     mutationFn: (body: UpsertCampaignCostRequest) => monitoringApi.upsertCampaignCost(body),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaign-costs'] });
       void queryClient.invalidateQueries({ queryKey: ['monitoring', 'revenue'] });
     },
   });

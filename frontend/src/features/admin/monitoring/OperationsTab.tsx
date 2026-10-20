@@ -24,6 +24,7 @@ import { NativeLatencyHistogram } from './NativeCharts';
 import type {
   AdminMonitoringOperationsResponse,
   IncidentDto,
+  OpsWindowPreset,
   RouteLatencyMetricDto,
   WorkerStatusDto,
 } from './types';
@@ -31,6 +32,7 @@ import type {
 interface OperationsTabProps {
   data?: AdminMonitoringOperationsResponse | null;
   incidents?: IncidentDto[];
+  window?: OpsWindowPreset;
   isLoading?: boolean;
   error?: Error | unknown;
   onRetry?: () => void;
@@ -41,12 +43,20 @@ interface OperationsTabProps {
 export function OperationsTab({
   data,
   incidents = [],
+  window = '1h',
   isLoading,
   error,
   onRetry,
   is501,
   onUpdateIncidentState,
 }: OperationsTabProps) {
+  const windowText =
+    window === '7d'
+      ? t("Cửa sổ vận hành 7 ngày")
+      : window === '24h'
+        ? t("Cửa sổ vận hành 24 giờ")
+        : t("Cửa sổ vận hành 1 giờ");
+
   // Workers table columns
   const workerColumns: TableProps<WorkerStatusDto>['columns'] = [
     {
@@ -60,8 +70,8 @@ export function OperationsTab({
       dataIndex: 'status',
       key: 'status',
       render: (st: string, r) => {
-        if (!r.isEnabled) return <Tag color="default">{t("Bình thường")} (Disabled)</Tag>;
-        if (r.isStale) return <Tag color="warning">{t("Chưa xác định")}</Tag>;
+        if (!r.isEnabled) return <Tag color="default">{t("Đã tắt")}</Tag>;
+        if (r.isStale) return <Tag color="warning">{t("Dữ liệu cũ")}</Tag>;
         return <HealthTag status={st} />;
       },
     },
@@ -147,15 +157,10 @@ export function OperationsTab({
   const routes = data?.routeMetrics ?? [];
   const queues = data?.queues;
 
-  // Latency histogram buckets (synthetic from routes or mock intervals)
-  const histogramBuckets = [
-    { range: '<50ms', count: 420 },
-    { range: '50-100ms', count: 750 },
-    { range: '100-200ms', count: 310 },
-    { range: '200-500ms', count: 95 },
-    { range: '500-1000ms', count: 18 },
-    { range: '>1000ms', count: overview && overview.latencyP95Ms > 1000 ? 5 : 0, isViolating: overview ? overview.latencyP95Ms > 2000 : false },
-  ];
+  const backupWorker = workers.find((w) => {
+    const name = w.workerName.toLowerCase();
+    return name.includes('backup') || name.includes('watchdog');
+  });
 
   return (
     <div className="operations-tab-content">
@@ -168,29 +173,52 @@ export function OperationsTab({
             icon={<CheckCircleOutlined />}
             colorClass="stat-teal"
             isLoading={isLoading}
-            subtext={<span className="stat-muted">Database & Host check</span>}
+            subtext={<span className="stat-muted">{t("Kiểm tra cơ sở dữ liệu và máy chủ")}</span>}
           />
         </Col>
         <Col xs={24} sm={12} lg={5}>
           <MonitoringStatCard
             title={t("Tỷ lệ lỗi 5xx")}
-            value={overview?.api5xxRatePercent !== undefined ? `${overview.api5xxRatePercent.toFixed(2)}%` : null}
+            value={
+              overview?.api5xxRatePercent !== undefined && overview?.api5xxRatePercent !== null
+                ? `${overview.api5xxRatePercent.toFixed(2)}%`
+                : null
+            }
             icon={<AlertOutlined />}
-            colorClass={overview && overview.api5xxRatePercent > 5 ? 'stat-red' : 'stat-green'}
+            colorClass={
+              overview && overview.api5xxRatePercent !== undefined && overview.api5xxRatePercent !== null && overview.api5xxRatePercent > 5
+                ? 'stat-red'
+                : 'stat-green'
+            }
             isLoading={isLoading}
             explanation={t("Ngưỡng cảnh báo: > 5% trong 5 phút")}
-            subtext={<span className="stat-muted">{t("Tổng yêu cầu")}: {overview?.totalRequestsLastHour ?? 0}</span>}
+            subtext={
+              <span className="stat-muted">
+                {t("Tổng yêu cầu")}:{' '}
+                {overview?.totalRequestsLastHour !== undefined && overview?.totalRequestsLastHour !== null
+                  ? overview.totalRequestsLastHour
+                  : <UnknownMetric />}
+              </span>
+            }
           />
         </Col>
         <Col xs={24} sm={12} lg={5}>
           <MonitoringStatCard
             title={t("Độ trễ p95")}
-            value={overview?.latencyP95Ms !== undefined ? `${overview.latencyP95Ms.toFixed(1)} ms` : null}
+            value={
+              overview?.latencyP95Ms !== undefined && overview?.latencyP95Ms !== null
+                ? `${overview.latencyP95Ms.toFixed(1)} ms`
+                : null
+            }
             icon={<SyncOutlined />}
-            colorClass={overview && overview.latencyP95Ms > 2000 ? 'stat-amber' : 'stat-teal'}
+            colorClass={
+              overview && overview.latencyP95Ms !== undefined && overview.latencyP95Ms !== null && overview.latencyP95Ms > 2000
+                ? 'stat-amber'
+                : 'stat-teal'
+            }
             isLoading={isLoading}
             explanation={t("Ngưỡng cảnh báo: p95 > 2s trong 10 phút")}
-            subtext={<span className="stat-muted">1-hour ops window</span>}
+            subtext={<span className="stat-muted">{windowText}</span>}
           />
         </Col>
         <Col xs={24} sm={12} lg={5}>
@@ -202,7 +230,11 @@ export function OperationsTab({
             isLoading={isLoading}
             subtext={
               <span className="stat-muted">
-                {overview?.databaseConnected ? t("Đã kết nối") : t("Mất kết nối")}
+                {overview?.databaseConnected === true
+                  ? t("Đã kết nối")
+                  : overview?.databaseConnected === false
+                    ? t("Mất kết nối")
+                    : t("Chưa xác định")}
               </span>
             }
           />
@@ -210,11 +242,26 @@ export function OperationsTab({
         <Col xs={24} sm={12} lg={5}>
           <MonitoringStatCard
             title={t("Chó canh gác sao lưu (Watchdog 27h)")}
-            value={<Tag color="success">{t("Đã sao lưu hợp lệ trong vòng 27 giờ qua")}</Tag>}
+            value={backupWorker ? <HealthTag status={backupWorker.status} /> : null}
             icon={<SafetyCertificateOutlined />}
-            colorClass="stat-green"
+            colorClass={
+              backupWorker?.status?.toLowerCase() === 'healthy'
+                ? 'stat-green'
+                : backupWorker?.status?.toLowerCase() === 'critical'
+                  ? 'stat-red'
+                  : backupWorker
+                    ? 'stat-amber'
+                    : 'stat-slate'
+            }
             isLoading={isLoading}
-            subtext={<span className="stat-muted">27h authority watchdog</span>}
+            explanation={t("Chưa có dữ liệu trạng thái sao lưu")}
+            subtext={
+              <span className="stat-muted">
+                {backupWorker?.lastSuccessAt
+                  ? t("Sao lưu gần nhất: {0}", [dayjs(backupWorker.lastSuccessAt).format('YYYY-MM-DD HH:mm')])
+                  : t("Chó canh gác 27h")}
+              </span>
+            }
           />
         </Col>
       </Row>
@@ -238,42 +285,79 @@ export function OperationsTab({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
                   <span>{t("Sử dụng CPU")}</span>
-                  <strong>{host?.cpuPercent !== undefined && host?.cpuPercent !== null ? `${host.cpuPercent.toFixed(1)}%` : '—'}</strong>
+                  <strong>
+                    {host?.cpuPercent !== undefined && host?.cpuPercent !== null ? (
+                      `${host.cpuPercent.toFixed(1)}%`
+                    ) : (
+                      <UnknownMetric />
+                    )}
+                  </strong>
                 </div>
-                <Progress
-                  percent={host?.cpuPercent ?? 0}
-                  status={host && host.cpuPercent > 85 ? 'exception' : 'active'}
-                  strokeColor={host && host.cpuPercent > 85 ? '#9f443b' : '#17a486'}
-                />
+                {host?.cpuPercent !== undefined && host?.cpuPercent !== null ? (
+                  <Progress
+                    percent={host.cpuPercent}
+                    status={host.cpuPercent > 85 ? 'exception' : 'active'}
+                    strokeColor={host.cpuPercent > 85 ? '#9f443b' : '#17a486'}
+                  />
+                ) : (
+                  <div style={{ height: 8, background: '#eef2f1', borderRadius: 4, margin: '6px 0' }} />
+                )}
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
                   <span>{t("Sử dụng RAM")}</span>
-                  <strong>{host?.memoryPercent !== undefined && host?.memoryPercent !== null ? `${host.memoryPercent.toFixed(1)}%` : '—'}</strong>
+                  <strong>
+                    {host?.memoryPercent !== undefined && host?.memoryPercent !== null ? (
+                      `${host.memoryPercent.toFixed(1)}%`
+                    ) : (
+                      <UnknownMetric />
+                    )}
+                  </strong>
                 </div>
-                <Progress
-                  percent={host?.memoryPercent ?? 0}
-                  status={host && host.memoryPercent > 85 ? 'exception' : 'active'}
-                  strokeColor={host && host.memoryPercent > 85 ? '#9f443b' : '#34757c'}
-                />
+                {host?.memoryPercent !== undefined && host?.memoryPercent !== null ? (
+                  <Progress
+                    percent={host.memoryPercent}
+                    status={host.memoryPercent > 85 ? 'exception' : 'active'}
+                    strokeColor={host.memoryPercent > 85 ? '#9f443b' : '#34757c'}
+                  />
+                ) : (
+                  <div style={{ height: 8, background: '#eef2f1', borderRadius: 4, margin: '6px 0' }} />
+                )}
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
                   <span>{t("Dung lượng ổ đĩa")}</span>
-                  <strong>{host?.diskPercent !== undefined && host?.diskPercent !== null ? `${host.diskPercent.toFixed(1)}%` : '—'}</strong>
+                  <strong>
+                    {host?.diskPercent !== undefined && host?.diskPercent !== null ? (
+                      `${host.diskPercent.toFixed(1)}%`
+                    ) : (
+                      <UnknownMetric />
+                    )}
+                  </strong>
                 </div>
-                <Progress
-                  percent={host?.diskPercent ?? 0}
-                  status={host && host.diskPercent > 85 ? 'exception' : 'active'}
-                  strokeColor={host && host.diskPercent > 85 ? '#9f443b' : '#bb8133'}
-                />
+                {host?.diskPercent !== undefined && host?.diskPercent !== null ? (
+                  <Progress
+                    percent={host.diskPercent}
+                    status={host.diskPercent > 85 ? 'exception' : 'active'}
+                    strokeColor={host.diskPercent > 85 ? '#9f443b' : '#bb8133'}
+                  />
+                ) : (
+                  <div style={{ height: 8, background: '#eef2f1', borderRadius: 4, margin: '6px 0' }} />
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid #f0f4f3', fontSize: 13 }}>
                 <span>
-                  {t("Trạng thái container")}: <strong>{host?.containerCount ?? 0} active</strong>
+                  {t("Trạng thái container")}:{' '}
+                  <strong>
+                    {host?.containerCount !== undefined && host?.containerCount !== null ? (
+                      t("{0} đang chạy", [host.containerCount])
+                    ) : (
+                      <UnknownMetric />
+                    )}
+                  </strong>
                 </span>
                 <span>
                   /api/health: <HealthTag status={host?.healthEndpointStatus} />
@@ -293,9 +377,13 @@ export function OperationsTab({
                     {t("Email SMTP (Đã nhận / Đã gửi)")}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#17383d' }}>
-                    {queues?.smtpAcceptedNotDeliveredCount ?? 0}
+                    {queues?.smtpAcceptedNotDeliveredCount !== undefined && queues?.smtpAcceptedNotDeliveredCount !== null ? (
+                      queues.smtpAcceptedNotDeliveredCount
+                    ) : (
+                      <UnknownMetric />
+                    )}
                   </div>
-                  <small style={{ color: '#7a8c91' }}>Accepted not delivered</small>
+                  <small style={{ color: '#7a8c91' }}>{t("Đã nhận nhưng chưa gửi")}</small>
                 </Card>
               </Col>
 
@@ -306,9 +394,13 @@ export function OperationsTab({
                     {t("Đối soát payOS & Lỗi")}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#17383d' }}>
-                    {queues?.payOsPendingReconcileCount ?? 0}
+                    {queues?.payOsPendingReconcileCount !== undefined && queues?.payOsPendingReconcileCount !== null ? (
+                      queues.payOsPendingReconcileCount
+                    ) : (
+                      <UnknownMetric />
+                    )}
                   </div>
-                  <small style={{ color: '#7a8c91' }}>Pending reconciliation</small>
+                  <small style={{ color: '#7a8c91' }}>{t("Đang chờ đối soát")}</small>
                 </Card>
               </Col>
 
@@ -320,10 +412,18 @@ export function OperationsTab({
                         {t("Hàng đợi Zalo (Khung giờ 07:00-21:00)")}
                       </div>
                       <div style={{ fontSize: 18, fontWeight: 700, color: '#17383d' }}>
-                        {t("{0} đang chờ", [queues?.zaloPendingQueueCount ?? 0])}
+                        {queues?.zaloPendingQueueCount !== undefined && queues?.zaloPendingQueueCount !== null ? (
+                          t("{0} đang chờ", [queues.zaloPendingQueueCount])
+                        ) : (
+                          <UnknownMetric />
+                        )}
                       </div>
                       <small style={{ color: '#7a8c91' }}>
-                        {t("{0} trong khung giờ hợp lệ", [queues?.zaloEligibleWindowCount ?? 0])}
+                        {queues?.zaloEligibleWindowCount !== undefined && queues?.zaloEligibleWindowCount !== null ? (
+                          t("{0} trong khung giờ hợp lệ", [queues.zaloEligibleWindowCount])
+                        ) : (
+                          <UnknownMetric />
+                        )}
                       </small>
                     </div>
                     <Tag color="cyan">07:00 - 21:00</Tag>
@@ -339,9 +439,32 @@ export function OperationsTab({
       <div style={{ marginBottom: 18 }}>
         <SectionCard
           title={t("Phân phối độ trễ (Histogram p95)")}
-          extra={<span style={{ fontSize: 12, color: '#7a8c91' }}>1-hour ops window histogram</span>}
+          extra={<span style={{ fontSize: 12, color: '#7a8c91' }}>{windowText}</span>}
         >
-          <NativeLatencyHistogram buckets={histogramBuckets} height={160} />
+          {Array.isArray((data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] })?.histogramBuckets) &&
+          (data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] }).histogramBuckets!.length > 0 ? (
+            <NativeLatencyHistogram
+              buckets={(data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] }).histogramBuckets!}
+              height={160}
+            />
+          ) : (
+            <div
+              style={{
+                padding: '28px 16px',
+                textAlign: 'center',
+                background: '#fafbfc',
+                borderRadius: 8,
+                border: '1px dashed #d9e2ec',
+              }}
+            >
+              <div style={{ color: '#627d98', fontWeight: 500, marginBottom: 4 }}>
+                {t("Chưa có dữ liệu phân phối độ trễ")}
+              </div>
+              <div style={{ fontSize: 12, color: '#9fb3c8' }}>
+                {t("Dữ liệu phân phối độ trễ chi tiết theo bucket chưa được thu thập trong phiên bản hiện tại.")}
+              </div>
+            </div>
+          )}
         </SectionCard>
       </div>
 
@@ -417,7 +540,7 @@ export function OperationsTab({
                   </div>
                   <small style={{ color: '#7a8c91' }}>
                     {t("Thời gian kích hoạt")}: {dayjs(inc.startedAt).format('YYYY-MM-DD HH:mm:ss')}
-                    {inc.notificationCount > 0 && ` (${inc.notificationCount} notifications)`}
+                    {inc.notificationCount > 0 && t(" ({0} lần thông báo)", [inc.notificationCount])}
                   </small>
                 </div>
 

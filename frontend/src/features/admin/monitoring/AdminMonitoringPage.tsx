@@ -65,12 +65,18 @@ export default function AdminMonitoringPage() {
     campaign: filters.campaign,
   };
 
+  const campaignCostsFilter = {
+    fromDate: filters.dateFrom,
+    toDate: filters.dateTo,
+    campaign: filters.campaign,
+  };
+
   // Queries
   const growthQuery = useGrowthMonitoring(filterRequest, activeTab === 'growth');
   const revenueQuery = useRevenueMonitoring(filterRequest, activeTab === 'revenue');
-  const operationsQuery = useOperationsMonitoring(activeTab === 'operations');
+  const operationsQuery = useOperationsMonitoring(filters.opsWindow, activeTab === 'operations');
   const incidentsQuery = useMonitoringIncidents(activeTab === 'operations');
-  const campaignCostsQuery = useCampaignCosts(filters.dateFrom, filters.dateTo);
+  const campaignCostsQuery = useCampaignCosts(campaignCostsFilter, activeTab === 'revenue');
 
   // Mutations
   const upsertCostMutation = useUpsertCampaignCost();
@@ -164,6 +170,7 @@ export default function AdminMonitoringPage() {
         <OperationsTab
           data={operationsQuery.data}
           incidents={incidentsQuery.data?.incidents}
+          window={filters.opsWindow}
           isLoading={operationsQuery.isLoading || incidentsQuery.isLoading}
           error={operationsQuery.error}
           is501={is501Error(operationsQuery.error)}
@@ -187,7 +194,7 @@ export default function AdminMonitoringPage() {
       <PageTitle
         eyebrow="Admin"
         title={t("Giám sát hệ thống")}
-        subtitle="Vietnam calendar, 30-day business / 1-hour ops"
+        subtitle={t("Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam")}
       />
 
       <MonitoringFiltersBar

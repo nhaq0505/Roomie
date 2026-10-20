@@ -64,20 +64,25 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
     { title: t("Kỳ kích hoạt"), dataIndex: 'cohortPeriod', key: 'cohortPeriod', render: (val: string) => <strong>{val}</strong> },
     { title: t("Quy mô"), dataIndex: 'cohortSize', key: 'cohortSize', align: 'right' },
     {
-      title: t("Tháng 0 (100%)"),
+      title: t("Tháng 0"),
       key: 'm0',
       align: 'right',
-      render: (_, r) => `${r.retentionPercentages?.[0] ?? 100}%`,
+      render: (_, r) =>
+        r.retentionPercentages && r.retentionPercentages.length > 0 && r.retentionPercentages[0] !== null && r.retentionPercentages[0] !== undefined ? (
+          `${r.retentionPercentages[0]}%`
+        ) : (
+          <UnknownMetric explanation={t("Chưa có dữ liệu kỳ kích hoạt")} />
+        ),
     },
     {
       title: t("Tháng 1"),
       key: 'm1',
       align: 'right',
       render: (_, r) =>
-        r.retentionPercentages && r.retentionPercentages.length > 1 && r.retentionPercentages[1] !== null ? (
+        r.retentionPercentages && r.retentionPercentages.length > 1 && r.retentionPercentages[1] !== null && r.retentionPercentages[1] !== undefined ? (
           <span style={{ fontWeight: 600 }}>{r.retentionPercentages[1]}%</span>
         ) : (
-          <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+          <UnknownMetric explanation={t("Tháng dương lịch tiếp theo chưa hoàn thành hoặc chưa đủ điều kiện")} />
         ),
     },
     {
@@ -85,10 +90,10 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
       key: 'm2',
       align: 'right',
       render: (_, r) =>
-        r.retentionPercentages && r.retentionPercentages.length > 2 && r.retentionPercentages[2] !== null ? (
+        r.retentionPercentages && r.retentionPercentages.length > 2 && r.retentionPercentages[2] !== null && r.retentionPercentages[2] !== undefined ? (
           <span style={{ fontWeight: 600 }}>{r.retentionPercentages[2]}%</span>
         ) : (
-          <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+          <UnknownMetric explanation={t("Tháng dương lịch tiếp theo chưa hoàn thành hoặc chưa đủ điều kiện")} />
         ),
     },
   ];
@@ -146,9 +151,9 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
             isLoading={isLoading}
             subtext={
               <Space size={4}>
-                <span>30min idle</span>
+                <span>{t("Phiên 30 phút không hoạt động")}</span>
                 <span className="stat-muted">•</span>
-                <span>first-party</span>
+                <span>{t("Thu thập trực tiếp")}</span>
               </Space>
             }
           />
@@ -160,7 +165,7 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
             icon={<UserOutlined />}
             colorClass="stat-blue"
             isLoading={isLoading}
-            subtext={<span className="stat-muted">No cross-device</span>}
+            subtext={<span className="stat-muted">{t("Không liên kết chéo thiết bị")}</span>}
           />
         </Col>
         <Col xs={24} sm={12} lg={4}>
@@ -230,7 +235,7 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
                       <Tag color="success">{t("Trưởng thành")}</Tag>
                     </Space>
                   ) : (
-                    <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+                    <UnknownMetric explanation={t("Chưa đủ 7 ngày trưởng thành")} />
                   )}
                 </div>
                 <div style={{ fontSize: 12, color: '#7a8c91' }}>

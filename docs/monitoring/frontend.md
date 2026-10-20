@@ -65,7 +65,7 @@ frontend/
 ### 3.2 Attribution Model (First-Touch & Last Non-Direct)
 - **First Touch (`roomie_first_touch`):** Captured on the user's initial visit and preserved for up to **30 days**. Subsequent visits (even direct or campaign visits) do NOT overwrite an active first-touch record.
 - **Last Non-Direct (`roomie_last_non_direct`):** Recorded whenever the visitor arrives via a non-direct source (e.g. UTM parameters or external referrer). Direct visits do not overwrite the last non-direct source. Expires after **30 days**.
-- **Registration Attribution:** When a user registers (`/register`), `getRegistrationAttributionForApi()` attaches the active campaign attribution (last non-direct preferred, or first touch) to `RegisterRequest.Attribution`.
+- **Registration Attribution:** When a user registers (`/register`), `getRegistrationAttributionForApi()` attaches a structured `RegistrationAttributionDto` with independent `firstTouch?: AttributionTouchDto` and `lastTouch?: AttributionTouchDto`, alongside flattened UTM fields (`utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`) for backward compatibility.
 
 ### 3.3 Route Normalization and PII Scrubbing
 - **Route Allowlisting & Masking:** Paths sent to `/api/analytics/events` are scrubbed of query parameters and hashes. Tenant routes (`/t/:token`, `/tenant/:token/invoices/:id/checkout`) are automatically normalized to `/tenant/[token]` and `/tenant/[token]/invoices/[invoice_id]/checkout`. GUIDs and numeric IDs in arbitrary paths are masked.
@@ -80,6 +80,7 @@ Events sent to `POST /api/analytics/events` strictly conform to the backend `Ana
   "sessionId": "s-882f07ab-3f41",
   "events": [
     {
+      "eventId": "evt-7f1a92e4-a12b",
       "eventType": "page_view",
       "eventName": "Landing Page",
       "path": "/",
@@ -95,7 +96,7 @@ Events sent to `POST /api/analytics/events` strictly conform to the backend `Ana
 ```
 
 Allowlisted `eventType` values:
-`page_view`, `cta_click`, `session_start`, `landing_view`, `pricing_view`, `auth_attempt`, `registration_submit`, `custom`.
+`page_view`, `cta_click`, `session_start`, `landing_view`, `pricing_view`, `auth_attempt`, `registration_submit`.
 
 ---
 
@@ -113,8 +114,8 @@ Allowlisted `eventType` values:
 - **Cohort Maturity:**
   - 7-Day Activation Rate (`activationRate7Day`) and matured count.
   - 30-Day First Paid Rate (`firstPaidRate30Day`) and matured count.
-  - Clear tag indicators: `Trưởng thành` (Matured) vs `Chưa đủ 30 ngày trưởng thành` (Immature).
-- **Retention Matrix Table:** Month-over-month retention percentages by activation cohort.
+  - Clear tag indicators: `Trưởng thành` (Matured) vs `Chưa đủ 7 ngày trưởng thành` / `Chưa đủ 30 ngày trưởng thành` (Immature).
+- **Retention Matrix Table:** Month-over-month retention percentages by activation cohort based on next CALENDAR month activity (not fixed 30-day maturity). Month 0 renders an explicit unknown state (`— (Chưa xác định)`) when data is null, never inventing default 100% values.
 - **Traffic Sources & Top CTAs:** Paginated tables displaying source/medium/campaign breakdowns and CTA click conversion rates.
 
 ### 4.2 Revenue Tab (`RevenueTab.tsx`)
@@ -131,6 +132,7 @@ Allowlisted `eventType` values:
     - `NoRegistrations` -> "Chưa có lượt đăng ký"
 - **Daily Trends Chart:** Native SVG multi-line chart comparing Subscription Revenue (VND) vs Marketing Spend (VND).
 - **Manual Campaign Cost Editor (`CampaignCostModal.tsx`):**
+  - Bound to `/api/admin/monitoring/campaigns/costs` (GET & POST) with campaign filter support.
   - Supports Create and Edit operations.
   - Fields: Campaign name, Channel, Source, Date, Cash expense (VND), Person-hours, Hourly rate (VND/hour), Notes.
   - Dynamic cost preview: `Cash + (Hours * Hourly Rate)`.
@@ -141,18 +143,20 @@ Allowlisted `eventType` values:
 
 ### 4.3 Operations Tab (`OperationsTab.tsx`)
 - **Overview Stat Cards:** Overall status (`Healthy`, `Warning`, `Critical`, `Degraded`), API 5xx error rate %, p95 latency (ms), requests in last hour, Database connectivity.
+- **Configurable Ops Windows:** Supports `1h`, `24h`, and `7d` operating windows dynamically bound through query parameters and queryKey caching.
 - **Host Metrics (Systemd JSON Mount):**
   - CPU, RAM, Disk utilization progress bars with alarm thresholds (> 85%).
-  - Container active count and `/api/health` status.
+  - Container active count and `/api/health` status. Null host telemetry renders explicit unknown states (`— (Chưa xác định)`), preserving authentic 0% measurements.
   - Stale data indicator (`StaleIndicator`).
 - **Operational Queues:**
   - Zalo Pending Queue & Eligible Window (respects 07:00–21:00 operating window).
   - PayOS Pending Reconciliation count.
   - SMTP Accepted Not Delivered count.
-- **Authoritative Backup Watchdog:** Surfaces 27-hour authority watchdog status.
+  - Null queue telemetry displays explicit unknown states (`— (Chưa xác định)`), never coalesced to healthy zeros.
+- **Authoritative Backup Watchdog:** Surfaces authoritative 27-hour authority watchdog status from backend telemetry; renders an explicit Unknown state when unsupplied by the server (no invented green/healthy status).
 - **Background Worker Telemetry:** Status table covering `recovery-email`, `zalo-reminders`, `payos-reconcile`, and `invoice-sweep`.
-- **Route Latency Histogram:** Native SVG histogram categorizing requests into latency buckets (<50ms, 50-100ms, 100-200ms, 200-500ms, 500-1000ms, >1000ms).
-- **Incidents & Resolution:** Surfaces open alerts with severity badges, durations, and state transition actions (Acknowledge, Resolve).
+- **Route Latency Histogram:** Renders an explicit unavailable state (`Chưa có dữ liệu phân phối độ trễ`) when backend bucket telemetry is absent, strictly avoiding fabricated or synthetic metric distributions.
+- **Incidents & Resolution:** Surfaces open alerts with severity badges, durations, notification count, and state transition actions (Acknowledge, Resolve).
 
 ---
 
@@ -173,7 +177,8 @@ Allowlisted `eventType` values:
 ## 6. Verification and Testing
 
 The frontend implementation is verified through automated test suites:
-- **`npm run check:architecture`:** Enforces strict boundary rules between `shared/`, `features/`, and `app/`. Prohibits circular dependencies.
-- **`npm run i18n:check`:** Verifies 100% Vietnamese UI string coverage and placeholder consistency across all 4 language catalogs (`en`, `zh`, `ko`, `hi`).
+- **`npm run check:architecture`:** Enforces strict boundary rules between `shared/`, `features/`, and `app/`. Prohibits circular dependencies (108 source modules verified).
+- **`npm run i18n:check`:** Verifies 100% Vietnamese UI string coverage and placeholder consistency across all 4 language catalogs (`en`, `zh`, `ko`, `hi`) (1345 keys verified).
 - **`npm run test:analytics`:** Validates browser ID persistence, exact 30-minute idle session boundaries, in-memory storage fallback, route normalization, token masking, cyclic object scrubbing, first-touch preservation, and batch request payload formats.
+- **`npx playwright test e2e/monitoring.spec.ts`:** Validates Admin monitoring rendering on desktop (1440px) and mobile (375px), Gate access control, network request routing with window (`1h`/`24h`/`7d`) and campaign filters, explicit unknown states on null telemetry without synthetic numbers, and preservation of authentic zero values.
 - **`npm run build`:** Confirms TypeScript typecheck (`tsc -b`), production Vite bundling with lazy route code-splitting, and static SSR prerendering (`scripts/prerender.mjs`).

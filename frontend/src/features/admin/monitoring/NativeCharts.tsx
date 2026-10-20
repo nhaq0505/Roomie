@@ -309,9 +309,17 @@ export function NativeLatencyHistogram({
   buckets,
   height = 140,
 }: {
-  buckets: { range: string; count: number; isViolating?: boolean }[];
+  buckets?: { range: string; count: number; isViolating?: boolean }[];
   height?: number;
 }) {
+  if (!buckets || buckets.length === 0) {
+    return (
+      <div style={{ height, display: 'grid', placeItems: 'center', color: '#8c9ea2' }}>
+        <span>{t("Chưa có dữ liệu phân phối độ trễ")}</span>
+      </div>
+    );
+  }
+
   const maxCount = Math.max(...buckets.map((b) => b.count), 1);
   const chartHeight = height - 32;
 

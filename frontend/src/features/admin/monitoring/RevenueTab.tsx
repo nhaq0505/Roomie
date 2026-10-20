@@ -208,7 +208,7 @@ export function RevenueTab({
             icon={<WalletOutlined />}
             colorClass="stat-green"
             isLoading={isLoading}
-            subtext={<span className="stat-muted">Central webhook / reconcile deduped</span>}
+            subtext={<span className="stat-muted">{t("Đã đối soát & loại trừ trùng lặp")}</span>}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>

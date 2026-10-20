@@ -159,8 +159,8 @@ export function MonitoringFiltersBar({
               size="middle"
             >
               <Radio.Button value="1h">{t("1 giờ")}</Radio.Button>
-              <Radio.Button value="6h">{t("6 giờ")}</Radio.Button>
               <Radio.Button value="24h">{t("24 giờ")}</Radio.Button>
+              <Radio.Button value="7d">{t("7 ngày")}</Radio.Button>
             </Radio.Group>
           </Space>
         )}

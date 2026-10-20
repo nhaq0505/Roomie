@@ -2,7 +2,7 @@
 // Matches docs/monitoring/contracts.md and backend/RoomRental.Api/Domain/MonitoringDtos.cs
 
 export type DateRangePreset = '7d' | '30d' | '90d' | 'custom';
-export type OpsWindowPreset = '1h' | '6h' | '24h';
+export type OpsWindowPreset = '1h' | '24h' | '7d';
 
 export interface MonitoringFilters {
   rangePreset: DateRangePreset;
@@ -19,6 +19,12 @@ export interface MonitoringFilterRequest {
   toDate?: string;
   source?: string;
   channel?: string;
+  campaign?: string;
+}
+
+export interface CampaignCostFilterRequest {
+  fromDate?: string;
+  toDate?: string;
   campaign?: string;
 }
 
@@ -133,11 +139,12 @@ export type HealthStatus = 'Healthy' | 'Warning' | 'Critical' | 'Degraded' | 'Un
 
 export interface OpsOverviewDto {
   overallStatus: string;
-  api5xxRatePercent: number;
-  latencyP95Ms: number;
-  totalRequestsLastHour: number;
-  databaseConnected: boolean;
-  databaseStatus: string;
+  api5xxRatePercent?: number | null;
+  latencyP95Ms?: number | null;
+  totalRequestsLastHour?: number | null;
+  databaseConnected?: boolean | null;
+  databaseStatus?: string | null;
+  window?: string | null;
 }
 
 export interface RouteLatencyMetricDto {
@@ -145,18 +152,18 @@ export interface RouteLatencyMetricDto {
   httpMethod: string;
   requestCount: number;
   status5xxCount: number;
-  p95LatencyMs: number;
-  avgLatencyMs: number;
-  maxLatencyMs: number;
+  p95LatencyMs?: number | null;
+  avgLatencyMs?: number | null;
+  maxLatencyMs?: number | null;
 }
 
 export interface HostMetricsDto {
-  cpuPercent: number;
-  memoryPercent: number;
-  diskPercent: number;
-  containerCount: number;
-  healthEndpointStatus: string;
-  hostStatus: string;
+  cpuPercent: number | null;
+  memoryPercent: number | null;
+  diskPercent: number | null;
+  containerCount: number | null;
+  healthEndpointStatus?: string | null;
+  hostStatus?: string | null;
   recordedAt: string | null;
   isStale: boolean;
 }
@@ -173,10 +180,10 @@ export interface WorkerStatusDto {
 }
 
 export interface OperationalQueueStatsDto {
-  zaloPendingQueueCount: number;
-  zaloEligibleWindowCount: number;
-  payOsPendingReconcileCount: number;
-  smtpAcceptedNotDeliveredCount: number;
+  zaloPendingQueueCount: number | null;
+  zaloEligibleWindowCount: number | null;
+  payOsPendingReconcileCount: number | null;
+  smtpAcceptedNotDeliveredCount: number | null;
 }
 
 export interface AdminMonitoringOperationsResponse {

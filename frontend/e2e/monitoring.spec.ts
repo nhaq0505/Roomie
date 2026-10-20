@@ -220,7 +220,7 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
       if (path === '/api/auth/me') return route.fulfill({ json: adminUser });
       if (path === '/api/admin/monitoring/growth') return route.fulfill({ json: mockGrowthData });
       if (path === '/api/admin/monitoring/revenue') return route.fulfill({ json: mockRevenueData });
-      if (path === '/api/admin/monitoring/campaigns') {
+      if (path === '/api/admin/monitoring/campaigns/costs' || path === '/api/admin/monitoring/campaigns') {
         if (method === 'POST') {
           const body = route.request().postDataJSON();
           const newItem: AdminCampaignCostItemDto = {
@@ -341,5 +341,208 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
 
     await page.goto('/admin/monitoring');
     await expect(page).toHaveURL(/dashboard/);
+  });
+
+  test('Ops Window & Campaign Filter: verifies actual network URLs and window/campaign parameters', async ({ page }) => {
+    const requestedOpsWindows: string[] = [];
+    let requestedCampaignFilter: string | null = null;
+
+    page.on('request', (req) => {
+      try {
+        const url = new URL(req.url());
+        if (url.pathname.includes('/api/admin/monitoring/operations')) {
+          requestedOpsWindows.push(url.searchParams.get('window') || '1h');
+        }
+        if (url.pathname.includes('/api/admin/monitoring/campaigns/costs')) {
+          requestedCampaignFilter = url.searchParams.get('campaign');
+        }
+      } catch {
+        // ignore invalid urls
+      }
+    });
+
+    await page.goto('/admin/monitoring');
+
+    // Switch to Operations tab
+    await page.getByRole('tab', { name: 'Vận hành' }).click();
+
+    // Verify initial ops window is 1h
+    await expect.poll(() => requestedOpsWindows).toContain('1h');
+
+    // Click 24h ops window
+    await page.locator('.monitoring-filters-bar label', { hasText: '24 giờ' }).click();
+    await expect.poll(() => requestedOpsWindows).toContain('24h');
+
+    // Click 7d ops window
+    await page.locator('.monitoring-filters-bar label', { hasText: '7 ngày' }).click();
+    await expect.poll(() => requestedOpsWindows).toContain('7d');
+
+    // Switch to Revenue tab and test campaign filter
+    await page.getByRole('tab', { name: 'Doanh thu' }).click();
+    const campaignInput = page.getByPlaceholder('Chiến dịch');
+    await campaignInput.fill('fb_test_q4');
+
+    // Refetch/verify network URL receives campaign query parameter
+    await page.getByRole('button', { name: 'Làm mới' }).click();
+    await expect.poll(() => requestedCampaignFilter).toBe('fb_test_q4');
+  });
+
+  test('Null Telemetry: renders explicit unknown states, no synthetic counts, and no invented green watchdog', async ({ page }) => {
+    const nullOpsData: AdminMonitoringOperationsResponse = {
+      overview: {
+        overallStatus: 'Unknown',
+        api5xxRatePercent: null,
+        latencyP95Ms: null,
+        totalRequestsLastHour: null,
+        databaseConnected: null,
+        databaseStatus: null,
+        window: '1h',
+      },
+      routeMetrics: [],
+      hostMetrics: {
+        cpuPercent: null,
+        memoryPercent: null,
+        diskPercent: null,
+        containerCount: null,
+        healthEndpointStatus: 'Unknown',
+        hostStatus: 'Unknown',
+        recordedAt: null,
+        isStale: false,
+      },
+      workers: [], // No backup worker supplied
+      queues: {
+        zaloPendingQueueCount: null,
+        zaloEligibleWindowCount: null,
+        payOsPendingReconcileCount: null,
+        smtpAcceptedNotDeliveredCount: null,
+      },
+    };
+
+    await page.route('**/api/admin/monitoring/operations*', (route) => route.fulfill({ json: nullOpsData }));
+
+    await page.goto('/admin/monitoring');
+    await page.getByRole('tab', { name: 'Vận hành' }).click();
+
+    // 1. Synthetic counts (<50ms, 420, 750) must NOT exist in the operations tab
+    const opsContent = page.locator('.operations-tab-content');
+    await expect(opsContent.getByText('<50ms')).toHaveCount(0);
+    await expect(opsContent.getByText('420')).toHaveCount(0);
+    await expect(opsContent.getByText('750')).toHaveCount(0);
+
+    // 2. Histogram shows explicit unavailable state
+    await expect(page.getByText('Chưa có dữ liệu phân phối độ trễ')).toBeVisible();
+
+    // 3. Watchdog 27h shows Unknown, never hardcoded green "Đã sao lưu hợp lệ..."
+    await expect(page.getByText('Đã sao lưu hợp lệ trong vòng 27 giờ qua')).toHaveCount(0);
+    const watchdogCard = page.locator('.monitoring-stat-card', { hasText: 'Chó canh gác sao lưu' });
+    await expect(watchdogCard.getByText('Chưa xác định')).toBeVisible();
+
+    // 4. Host metrics render explicit Unknown (not healthy 0% progress)
+    const hostSection = page.locator('.section-card', { hasText: 'Hạ tầng máy chủ (Host Systemd)' });
+    await expect(hostSection.getByText('Chưa xác định').first()).toBeVisible();
+
+    // 5. Container count renders Unknown (not "0 active" or "0 đang chạy")
+    await expect(page.getByText('0 active')).toHaveCount(0);
+    const containerRow = hostSection.locator('span', { hasText: 'Trạng thái container:' });
+    await expect(containerRow.getByText('Chưa xác định')).toBeVisible();
+
+    // 6. Queues render Unknown (not 0)
+    const queueSection = page.locator('.section-card', { hasText: 'Dịch vụ tích hợp & Hàng đợi' });
+    await expect(queueSection.getByText('Chưa xác định').first()).toBeVisible();
+  });
+
+  test('Authentic Zero Telemetry: preserves authentic 0 values and authoritative watchdog status', async ({ page }) => {
+    const zeroOpsData: AdminMonitoringOperationsResponse = {
+      overview: {
+        overallStatus: 'Healthy',
+        api5xxRatePercent: 0,
+        latencyP95Ms: 15.0,
+        totalRequestsLastHour: 0,
+        databaseConnected: true,
+        databaseStatus: 'Healthy',
+        window: '1h',
+      },
+      routeMetrics: [],
+      hostMetrics: {
+        cpuPercent: 0,
+        memoryPercent: 0,
+        diskPercent: 0,
+        containerCount: 0,
+        healthEndpointStatus: 'Healthy',
+        hostStatus: 'Healthy',
+        recordedAt: '2026-10-20T09:00:00Z',
+        isStale: false,
+      },
+      workers: [
+        {
+          workerName: 'backup-watchdog',
+          isEnabled: true,
+          status: 'Healthy',
+          lastStartedAt: '2026-10-20T08:00:00Z',
+          lastSuccessAt: '2026-10-20T08:00:00Z',
+          lastErrorAt: null,
+          lastErrorMessage: null,
+          isStale: false,
+        },
+      ],
+      queues: {
+        zaloPendingQueueCount: 0,
+        zaloEligibleWindowCount: 0,
+        payOsPendingReconcileCount: 0,
+        smtpAcceptedNotDeliveredCount: 0,
+      },
+    };
+
+    await page.route('**/api/admin/monitoring/operations*', (route) => route.fulfill({ json: zeroOpsData }));
+
+    await page.goto('/admin/monitoring');
+    await page.getByRole('tab', { name: 'Vận hành' }).click();
+
+    // Authentic zero values must be preserved
+    await expect(page.getByText('0.0%').first()).toBeVisible();
+    await expect(page.getByText('0 đang chạy')).toBeVisible();
+    await expect(page.getByText('0 đang chờ')).toBeVisible();
+    await expect(page.getByText('0 trong khung giờ hợp lệ')).toBeVisible();
+
+    // Authoritative backup watchdog surfaces Healthy status from worker
+    const watchdogCard = page.locator('.monitoring-stat-card', { hasText: 'Chó canh gác sao lưu' });
+    await expect(watchdogCard.getByText('Bình thường')).toBeVisible();
+  });
+
+  test('Growth Tab: null Month 0 retention renders explicit unknown without defaulting to 100%', async ({ page }) => {
+    const nullGrowthData: AdminMonitoringGrowthResponse = {
+      ...mockGrowthData,
+      retentionMatrix: [
+        {
+          cohortPeriod: '2026-08',
+          cohortSize: 20,
+          retentionPercentages: [null, null],
+        },
+      ],
+      cohortMaturity: {
+        activationRate7Day: null,
+        activationCohortMaturedCount: 0,
+        firstPaidRate30Day: null,
+        paidCohortMaturedCount: 0,
+      },
+    };
+
+    await page.route('**/api/admin/monitoring/growth*', (route) => route.fulfill({ json: nullGrowthData }));
+
+    await page.goto('/admin/monitoring');
+
+    // Verify Cohort retention table
+    const retentionSection = page.locator('.section-card', { hasText: 'Mức độ kích hoạt (Activation)' });
+    await expect(retentionSection).toBeVisible();
+
+    // Month 0 must render Unknown ("—"), NOT "100%"
+    const row = retentionSection.locator('.ant-table-row', { hasText: '2026-08' });
+    await expect(row.getByText('100%')).toHaveCount(0);
+    await expect(row.getByText('Chưa xác định').first()).toBeVisible();
+
+    // Immature 7-day cohort tooltip explanation on hover
+    const maturitySection = page.locator('.section-card', { hasText: 'Độ trưởng thành Cohort' });
+    await maturitySection.locator('.anticon-question-circle').first().hover();
+    await expect(page.getByText('Chưa đủ 7 ngày trưởng thành')).toBeVisible();
   });
 });
