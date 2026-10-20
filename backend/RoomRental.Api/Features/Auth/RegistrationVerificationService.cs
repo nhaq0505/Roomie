@@ -57,16 +57,19 @@ public sealed class RegistrationVerificationService(AppDbContext db, IRegistrati
         if (pending is null || pending.ConsumedAt is not null || pending.ExpiresAt <= now)
             throw new ApiException(400, InvalidCode);
         CheckDeliveryLimit(pending, now);
-        if (milestoneTracker is not null)
-        {
-            await milestoneTracker.TrackRegistrationResentAsync(pending.UserId, ct);
-        }
         var previous = db.Entry(pending).CurrentValues.Clone();
         var code = PrepareCode(pending, token, now);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await transaction.DisposeAsync();
         await DeliverAsync(pending, code, previous, ct);
+        // The tracker opens its own context. Release the reservation's SQLite write
+        // lock before recording telemetry, and count only successful deliveries.
+        if (milestoneTracker is not null)
+        {
+            try { await milestoneTracker.TrackRegistrationResentAsync(pending.UserId, ct); }
+            catch { /* Telemetry failure must not block OTP delivery. */ }
+        }
         return ToDto(pending, token);
     }
 

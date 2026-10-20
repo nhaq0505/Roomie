@@ -96,6 +96,13 @@ class RegistrationOtpTests(unittest.TestCase):
         for _ in range(4):
             self.change(LastSentAt=0)
             self.client.ok('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})
+        # Exercise the real tracker on its separate DB connection: successful
+        # resends must return within the HTTP timeout and persist each fact.
+        with closing(sqlite3.connect(self.database)) as db:
+            count = db.execute('''SELECT count(*) FROM RegistrationFacts
+                WHERE Stage='CodeResent' AND RegistrationAttemptId IN
+                (SELECT UserId FROM RegistrationVerifications WHERE Email=?)''', (self.email,)).fetchone()[0]
+        self.assertEqual(count, 4)
         self.change(LastSentAt=0)
         self.assertEqual(self.client.request('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})[0], 429)
         self.assertEqual(self.client.request('POST', '/api/auth/register', self.body)[0], 429)
@@ -126,6 +133,11 @@ class RegistrationOtpTests(unittest.TestCase):
             self.assertEqual(self.client.request('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})[0], 503)
         finally:
             marker.unlink(missing_ok=True)
+        with closing(sqlite3.connect(self.database)) as db:
+            count = db.execute('''SELECT count(*) FROM RegistrationFacts
+                WHERE Stage='CodeResent' AND RegistrationAttemptId IN
+                (SELECT UserId FROM RegistrationVerifications WHERE Email=?)''', (self.email,)).fetchone()[0]
+        self.assertEqual(count, 0, 'Failed SMTP delivery must not count as a successful resend')
         self.assertEqual(self.verify(challenge, code)[0], 201)
 
     def test_concurrent_verification_consumes_code_once(self):
