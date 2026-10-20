@@ -3,7 +3,9 @@ ArrowRightOutlined, BarChartOutlined, CheckCircleFilled, CreditCardOutlined,
 DashboardOutlined, FileTextOutlined, HomeOutlined, LockOutlined,
 QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { recordAttribution, trackEvent } from '../../shared/analytics';
 import { formatVnd } from '../../shared/format';
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
@@ -93,6 +95,23 @@ export function LandingContent({ user = null }: { user?: User | null }) {
   const destination = user ? workspace : '/register';
   const actionLabel = user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ");
 
+  useEffect(() => {
+    try {
+      recordAttribution();
+      trackEvent('landing_view', { eventName: 'Landing Page' });
+    } catch {
+      // Non-blocking best-effort
+    }
+  }, []);
+
+  const handleCta = (ctaId: string, label: string) => {
+    try {
+      trackEvent('cta_click', { ctaId, eventName: label });
+    } catch {
+      // Non-blocking best-effort
+    }
+  };
+
   return <div className="landing-page" ref={rootRef}>
     <header className="landing-header">
       <div className="landing-header-inner">
@@ -100,8 +119,8 @@ export function LandingContent({ user = null }: { user?: User | null }) {
         <nav className="landing-nav" aria-label={t("Điều hướng chính")}><a href="#features">{t("Tính năng")}</a><a href="#how-it-works">{t("Cách hoạt động")}</a></nav>
         <div className="landing-header-actions">
           <LanguageSelector />
-          {!user && <Link to="/login" className="landing-btn landing-btn-outline landing-login">{t("Đăng nhập")}</Link>}
-          <Link to={destination} className="landing-btn landing-btn-light"><span className="btn-text-full">{actionLabel}</span><span className="btn-text-short">{user ? t("Tổng quan") : t("Đăng ký")}</span></Link>
+          {!user && <Link to="/login" className="landing-btn landing-btn-outline landing-login" onClick={() => handleCta('cta_header_login', 'Header Login')}>{t("Đăng nhập")}</Link>}
+          <Link to={destination} className="landing-btn landing-btn-light" onClick={() => handleCta('cta_header_action', actionLabel)}><span className="btn-text-full">{actionLabel}</span><span className="btn-text-short">{user ? t("Tổng quan") : t("Đăng ký")}</span></Link>
         </div>
       </div>
     </header>
@@ -112,7 +131,7 @@ export function LandingContent({ user = null }: { user?: User | null }) {
           <div className="hero-kicker"><span />{t("QUẢN LÝ PHÒNG TRỌ")}</div>
           <h1><span>{t("Gọn gàng từng phòng.")}</span><span>{t("Rõ ràng từng khoản.")}</span></h1>
           <p>{t("Theo dõi người thuê, chốt chỉ số điện và gửi hóa đơn trong một nơi duy nhất.")}</p>
-          <Link to={destination} className="landing-btn landing-btn-light landing-btn-lg"><span>{actionLabel}</span><ArrowRightOutlined aria-hidden="true" /></Link>
+          <Link to={destination} className="landing-btn landing-btn-light landing-btn-lg" onClick={() => handleCta('btn_hero_signup', actionLabel)}><span>{actionLabel}</span><ArrowRightOutlined aria-hidden="true" /></Link>
           <div className="hero-proof"><CheckCircleFilled /><span>{t("Người thuê xem hóa đơn, không cần cài app.")}</span></div>
         </div>
         <DashboardPreview />
@@ -121,7 +140,7 @@ export function LandingContent({ user = null }: { user?: User | null }) {
       <section id="features" className="landing-features">
         <div className="landing-section-heading"><span className="section-eyebrow">{t("TÍNH NĂNG NỔI BẬT")}</span><h2>{t("Từ phòng trống đến hóa đơn đã thu.")}</h2><p>{t("Đơn giản hóa việc quản lý mỗi ngày")}</p></div>
         <div className="product-story">
-          <div className="story-copy"><span className="story-index">01 / <HomeOutlined />{t("Phòng & người thuê")}</span><h3>{t("Mỗi căn phòng, luôn trong tầm mắt.")}</h3><p>{t("Quản lý nhiều dãy trọ và đơn giá riêng cho từng khu.")}</p><ul><li><CheckCircleFilled />{t("Nắm phòng trống, người đang thuê và tiền cọc.")}</li><li><CheckCircleFilled />{t("Theo dõi doanh thu, công nợ, tiền cọc và xuất Excel.")}</li></ul><Link to={destination} className="landing-text-link">{actionLabel}<ArrowRightOutlined aria-hidden="true" /></Link></div>
+          <div className="story-copy"><span className="story-index">01 / <HomeOutlined />{t("Phòng & người thuê")}</span><h3>{t("Mỗi căn phòng, luôn trong tầm mắt.")}</h3><p>{t("Quản lý nhiều dãy trọ và đơn giá riêng cho từng khu.")}</p><ul><li><CheckCircleFilled />{t("Nắm phòng trống, người đang thuê và tiền cọc.")}</li><li><CheckCircleFilled />{t("Theo dõi doanh thu, công nợ, tiền cọc và xuất Excel.")}</li></ul><Link to={destination} className="landing-text-link" onClick={() => handleCta('cta_features_action', actionLabel)}>{actionLabel}<ArrowRightOutlined aria-hidden="true" /></Link></div>
           <RoomsIllustration />
         </div>
         <div className="story-band"><div className="product-story product-story--reverse">
@@ -147,7 +166,7 @@ export function LandingContent({ user = null }: { user?: User | null }) {
       </section>
 
       <section className="landing-cta">
-        <div className="cta-content"><span className="section-eyebrow">Roomie</span><h2>{t("Nhẹ đầu hơn từ tháng này.")}</h2><p>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</p><Link to={destination} className="landing-btn landing-btn-light landing-btn-lg"><span>{user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ ngay")}</span><ArrowRightOutlined aria-hidden="true" /></Link></div>
+        <div className="cta-content"><span className="section-eyebrow">Roomie</span><h2>{t("Nhẹ đầu hơn từ tháng này.")}</h2><p>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</p><Link to={destination} className="landing-btn landing-btn-light landing-btn-lg" onClick={() => handleCta('cta_bottom_action', actionLabel)}><span>{user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ ngay")}</span><ArrowRightOutlined aria-hidden="true" /></Link></div>
         <ol className="setup-steps"><li><strong>{t("1. Đăng ký thông tin")}</strong><span>{t("Điền thông tin tài khoản.")}</span></li><li><strong>{t("2. Xác thực OTP email")}</strong><span>{t("Xác nhận bằng mã gửi qua email.")}</span></li><li><strong>{t("3. Thiết lập phòng & đón khách")}</strong><span>{t("Thêm dãy trọ và phòng đầu tiên.")}</span></li></ol>
       </section>
     </main>

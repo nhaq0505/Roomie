@@ -1,139 +1,274 @@
+import {
+  AppstoreOutlined,
+  BarChartOutlined,
+  CheckCircleOutlined,
+  LineChartOutlined,
+  UserAddOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { Col, Row, Space, Table, Tag } from 'antd';
 import type { TableProps } from 'antd';
-import { AppstoreOutlined, BarChartOutlined, LineChartOutlined, UserOutlined } from '@ant-design/icons';
 import { t } from '../../../shared/i18n/runtime';
 import { SectionCard } from '../../../shared/ui/Ui';
-import { MonitoringStatCard, UnknownMetric } from './MonitoringState';
+import {
+  MonitoringEmptyState,
+  MonitoringErrorState,
+  MonitoringStatCard,
+  UnconfiguredNotice,
+  UnknownMetric,
+} from './MonitoringState';
+import { NativeConversionFunnel, NativeMultiLineChart } from './NativeCharts';
 import type {
-  ActivationCohortRow,
-  ActiveUsersMetric,
-  CtaEngagementItem,
-  SessionSummary,
-  SourceTrafficItem,
+  AdminMonitoringGrowthResponse,
+  CohortRetentionRowDto,
+  CtaPerformanceDto,
+  TrafficSourceStatsDto,
 } from './types';
 
 interface GrowthTabProps {
-  sessions?: SessionSummary;
-  activeUsers?: ActiveUsersMetric;
-  sources?: SourceTrafficItem[];
-  ctas?: CtaEngagementItem[];
-  cohorts?: ActivationCohortRow[];
+  data?: AdminMonitoringGrowthResponse | null;
+  isLoading?: boolean;
+  error?: Error | unknown;
+  onRetry?: () => void;
+  is501?: boolean;
 }
 
-export function GrowthTab({ sessions, activeUsers, sources, ctas, cohorts }: GrowthTabProps) {
+export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabProps) {
   // Source table columns
-  const sourceColumns: TableProps<SourceTrafficItem>['columns'] = [
+  const sourceColumns: TableProps<TrafficSourceStatsDto>['columns'] = [
     { title: t("Nguồn"), dataIndex: 'source', key: 'source', render: (val: string) => <strong>{val}</strong> },
-    { title: t("Kênh"), dataIndex: 'medium', key: 'medium', render: (val?: string) => val || '—' },
-    { title: t("Chiến dịch"), dataIndex: 'campaign', key: 'campaign', render: (val?: string) => val || '—' },
-    { title: t("Lượt xem"), dataIndex: 'views', key: 'views', align: 'right' },
-    { title: t("Đăng ký"), dataIndex: 'signups', key: 'signups', align: 'right' },
+    { title: t("Kênh"), dataIndex: 'medium', key: 'medium', render: (val?: string | null) => val || '—' },
+    { title: t("Phiên truy cập"), dataIndex: 'sessions', key: 'sessions', align: 'right' },
+    { title: t("Đăng ký"), dataIndex: 'registrations', key: 'registrations', align: 'right' },
+    { title: t("Chủ trọ kích hoạt"), dataIndex: 'activatedOwners', key: 'activated', align: 'right' },
     {
       title: t("Tỷ lệ chuyển đổi"),
-      dataIndex: 'conversionRatePercent',
-      key: 'rate',
+      key: 'convRate',
       align: 'right',
-      render: (val: number) => `${val.toFixed(1)}%`,
+      render: (_, r) => {
+        const rate = r.sessions > 0 ? (r.registrations / r.sessions) * 100 : 0;
+        return `${rate.toFixed(1)}%`;
+      },
     },
   ];
 
   // CTA table columns
-  const ctaColumns: TableProps<CtaEngagementItem>['columns'] = [
-    { title: 'CTA', dataIndex: 'label', key: 'label', render: (val: string) => <strong>{val}</strong> },
-    { title: t("Vị trí"), dataIndex: 'placement', key: 'placement' },
+  const ctaColumns: TableProps<CtaPerformanceDto>['columns'] = [
+    { title: 'CTA', dataIndex: 'ctaId', key: 'ctaId', render: (val: string) => <code>{val}</code> },
+    { title: t("Vị trí"), dataIndex: 'path', key: 'path' },
     { title: t("Lượt nhấn"), dataIndex: 'clicks', key: 'clicks', align: 'right' },
-    { title: t("Đăng ký"), dataIndex: 'conversions', key: 'conversions', align: 'right' },
-    {
-      title: t("Tỷ lệ chuyển đổi"),
-      dataIndex: 'conversionRatePercent',
-      key: 'rate',
-      align: 'right',
-      render: (val: number) => `${val.toFixed(1)}%`,
-    },
   ];
 
-  // Cohort table columns
-  const cohortColumns: TableProps<ActivationCohortRow>['columns'] = [
-    { title: t("Kỳ kích hoạt"), dataIndex: 'cohortMonth', key: 'cohortMonth', render: (val: string) => <strong>{val}</strong> },
-    { title: t("Quy mô"), dataIndex: 'registeredOwners', key: 'registeredOwners', align: 'right' },
+  // Cohort retention columns
+  const cohortColumns: TableProps<CohortRetentionRowDto>['columns'] = [
+    { title: t("Kỳ kích hoạt"), dataIndex: 'cohortPeriod', key: 'cohortPeriod', render: (val: string) => <strong>{val}</strong> },
+    { title: t("Quy mô"), dataIndex: 'cohortSize', key: 'cohortSize', align: 'right' },
     {
-      title: t("Kích hoạt 7 ngày"),
-      key: 'activation7d',
+      title: t("Tháng 0 (100%)"),
+      key: 'm0',
       align: 'right',
-      render: (_, row) => (
-        <Space size={6}>
-          <span>{row.activated7DayCount} ({row.activated7DayRate.toFixed(1)}%)</span>
-          {row.isMature7Day ? (
-            <Tag color="success">{t("Trưởng thành")}</Tag>
-          ) : (
-            <Tag color="default">{t("Chưa đủ 30 ngày trưởng thành")}</Tag>
-          )}
-        </Space>
-      ),
+      render: (_, r) => `${r.retentionPercentages?.[0] ?? 100}%`,
     },
     {
-      title: t("Giữ chân tháng tiếp theo"),
-      key: 'retentionNextMonth',
+      title: t("Tháng 1"),
+      key: 'm1',
       align: 'right',
-      render: (_, row) =>
-        row.nextMonthRetainedCount !== null && row.nextMonthRetentionRate !== null ? (
-          <Space size={6}>
-            <span>{row.nextMonthRetainedCount} ({row.nextMonthRetentionRate.toFixed(1)}%)</span>
-            {row.isMatureRetention && <Tag color="blue">{t("Trưởng thành")}</Tag>}
-          </Space>
+      render: (_, r) =>
+        r.retentionPercentages && r.retentionPercentages.length > 1 && r.retentionPercentages[1] !== null ? (
+          <span style={{ fontWeight: 600 }}>{r.retentionPercentages[1]}%</span>
+        ) : (
+          <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+        ),
+    },
+    {
+      title: t("Tháng 2"),
+      key: 'm2',
+      align: 'right',
+      render: (_, r) =>
+        r.retentionPercentages && r.retentionPercentages.length > 2 && r.retentionPercentages[2] !== null ? (
+          <span style={{ fontWeight: 600 }}>{r.retentionPercentages[2]}%</span>
         ) : (
           <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
         ),
     },
   ];
 
+  if (is501) {
+    return (
+      <div className="growth-tab-content">
+        <UnconfiguredNotice
+          message={<strong>{t("Đang cập nhật chỉ số tăng trưởng")}</strong>}
+          description={t(
+            "Backend dịch vụ thống kê tăng trưởng đang được xử lý theo hợp đồng Task T1. Dưới đây là khung hiển thị chuẩn bị sẵn."
+          )}
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <MonitoringErrorState error={error} onRetry={onRetry} />;
+  }
+
+  const summary = data?.summary;
+  const sources = data?.sources ?? [];
+  const topCtas = data?.topCtas ?? [];
+  const retention = data?.retentionMatrix ?? [];
+  const maturity = data?.cohortMaturity;
+  const dailySeries = data?.dailySeries ?? [];
+
+  // Trend chart series
+  const dates = dailySeries.map((d) => d.date);
+  const trendSeries = [
+    { name: t("Phiên truy cập"), color: '#17a486', data: dailySeries.map((d) => d.sessions) },
+    { name: t("Đăng ký"), color: '#34757c', data: dailySeries.map((d) => d.registrations) },
+    { name: t("Chủ trọ kích hoạt"), color: '#bb8133', data: dailySeries.map((d) => d.activations) },
+    { name: t("Hoạt động"), color: '#457b9d', data: dailySeries.map((d) => d.activeOwners) },
+  ];
+
+  // Funnel stages
+  const funnelStages = [
+    { label: t("Phiên truy cập"), count: summary?.totalSessions ?? 0, color: '#17a486' },
+    { label: t("Đăng ký"), count: summary?.registrations ?? 0, color: '#34757c' },
+    { label: t("Chủ trọ kích hoạt"), count: summary?.activatedOwners ?? 0, color: '#bb8133' },
+  ];
+
   return (
     <div className="growth-tab-content">
       {/* High-level KPI Row */}
-      <Row gutter={[16, 16]} className="stat-grid">
-        <Col xs={24} sm={12} lg={6}>
+      <Row gutter={[16, 16]} className="stat-grid" style={{ marginBottom: 18 }}>
+        <Col xs={24} sm={12} lg={4}>
           <MonitoringStatCard
             title={t("Phiên truy cập")}
-            value={sessions?.totalSessions}
+            value={summary?.totalSessions}
             icon={<BarChartOutlined />}
             colorClass="stat-teal"
+            isLoading={isLoading}
             subtext={
               <Space size={4}>
                 <span>30min idle</span>
                 <span className="stat-muted">•</span>
-                <span>first-party ID</span>
+                <span>first-party</span>
               </Space>
             }
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={4}>
           <MonitoringStatCard
-            title={t("Khách truy cập duy nhất")}
-            value={sessions?.uniqueVisitors}
+            title={t("Khách duy nhất")}
+            value={summary?.uniqueVisitors}
             icon={<UserOutlined />}
             colorClass="stat-blue"
-            subtext={<span className="stat-muted">No cross-device link</span>}
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">No cross-device</span>}
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={4}>
           <MonitoringStatCard
-            title={t("Hoạt động 7 ngày (WAU7)")}
-            value={activeUsers?.wau7}
+            title={t("Đăng ký")}
+            value={summary?.registrations}
+            icon={<UserAddOutlined />}
+            colorClass="stat-green"
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">{t("Chủ trọ mới")}</span>}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={4}>
+          <MonitoringStatCard
+            title={t("Kích hoạt")}
+            value={summary?.activatedOwners}
+            icon={<CheckCircleOutlined />}
+            colorClass="stat-amber"
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">{t("Hóa đơn tháng đầu tiên phát hành")}</span>}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={4}>
+          <MonitoringStatCard
+            title={t("WAU (7 ngày)")}
+            value={summary?.currentWau}
             icon={<LineChartOutlined />}
             colorClass="stat-green"
-            subtext={<span className="stat-muted">{t("Hành động chủ trọ có ý nghĩa (không tính Admin/Hệ thống)")}</span>}
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">{t("Chỉ tính hành động chủ trọ")}</span>}
           />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={4}>
           <MonitoringStatCard
-            title={t("Hoạt động 30 ngày (MAU30)")}
-            value={activeUsers?.mau30}
+            title={t("MAU (30 ngày)")}
+            value={summary?.currentMau}
             icon={<AppstoreOutlined />}
-            colorClass="stat-amber"
-            subtext={<span className="stat-muted">{t("Hành động chủ trọ có ý nghĩa (không tính Admin/Hệ thống)")}</span>}
+            colorClass="stat-teal"
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">{t("Chỉ tính hành động chủ trọ")}</span>}
           />
         </Col>
       </Row>
+
+      {/* Funnel & Maturity Section */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
+        <Col xs={24} lg={12}>
+          <SectionCard title={t("Phễu chuyển đổi")} extra={<span style={{ fontSize: 12, color: '#7a8c91' }}>{t("Tỷ lệ qua từng giai đoạn")}</span>}>
+            {summary && summary.totalSessions > 0 ? (
+              <NativeConversionFunnel stages={funnelStages} />
+            ) : (
+              <MonitoringEmptyState />
+            )}
+          </SectionCard>
+        </Col>
+        <Col xs={24} lg={12}>
+          <SectionCard title={t("Độ trưởng thành Cohort")}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ padding: '12px 16px', background: '#f8faf9', borderRadius: 8, border: '1px solid #eef2f1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <strong>{t("Tỷ lệ kích hoạt 7 ngày")}:</strong>
+                  {maturity?.activationRate7Day !== null && maturity?.activationRate7Day !== undefined ? (
+                    <Space size={8}>
+                      <span style={{ fontSize: 18, fontWeight: 700, color: '#17a486' }}>
+                        {maturity.activationRate7Day.toFixed(1)}%
+                      </span>
+                      <Tag color="success">{t("Trưởng thành")}</Tag>
+                    </Space>
+                  ) : (
+                    <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: '#7a8c91' }}>
+                  {t("Số cohort đã đủ điều kiện")}: <strong>{maturity?.activationCohortMaturedCount ?? 0}</strong>
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 16px', background: '#f8faf9', borderRadius: 8, border: '1px solid #eef2f1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <strong>{t("Tỷ lệ trả phí lần đầu 30 ngày")}:</strong>
+                  {maturity?.firstPaidRate30Day !== null && maturity?.firstPaidRate30Day !== undefined ? (
+                    <Space size={8}>
+                      <span style={{ fontSize: 18, fontWeight: 700, color: '#34757c' }}>
+                        {maturity.firstPaidRate30Day.toFixed(1)}%
+                      </span>
+                      <Tag color="blue">{t("Trưởng thành")}</Tag>
+                    </Space>
+                  ) : (
+                    <UnknownMetric explanation={t("Chưa đủ 30 ngày trưởng thành")} />
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: '#7a8c91' }}>
+                  {t("Số cohort đã đủ điều kiện")}: <strong>{maturity?.paidCohortMaturedCount ?? 0}</strong>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+        </Col>
+      </Row>
+
+      {/* Daily Growth Trends Chart */}
+      {dailySeries.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <SectionCard title={t("Xu hướng tăng trưởng hàng ngày")}>
+            <NativeMultiLineChart dates={dates} series={trendSeries} height={220} />
+          </SectionCard>
+        </div>
+      )}
 
       {/* Traffic & UTM Section */}
       <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
@@ -141,10 +276,10 @@ export function GrowthTab({ sessions, activeUsers, sources, ctas, cohorts }: Gro
           <SectionCard title={t("Thống kê nguồn & UTM")}>
             <Table
               size="small"
-              rowKey={(r) => `${r.source}-${r.medium || ''}-${r.campaign || ''}`}
+              rowKey={(r) => `${r.source}-${r.medium || ''}`}
               columns={sourceColumns}
-              dataSource={sources ?? []}
-              pagination={false}
+              dataSource={sources}
+              pagination={{ pageSize: 5 }}
               locale={{ emptyText: t("Chưa có dữ liệu") }}
             />
           </SectionCard>
@@ -155,8 +290,8 @@ export function GrowthTab({ sessions, activeUsers, sources, ctas, cohorts }: Gro
               size="small"
               rowKey="ctaId"
               columns={ctaColumns}
-              dataSource={ctas ?? []}
-              pagination={false}
+              dataSource={topCtas}
+              pagination={{ pageSize: 5 }}
               locale={{ emptyText: t("Chưa có dữ liệu") }}
             />
           </SectionCard>
@@ -174,10 +309,10 @@ export function GrowthTab({ sessions, activeUsers, sources, ctas, cohorts }: Gro
       >
         <Table
           size="middle"
-          rowKey="cohortMonth"
+          rowKey="cohortPeriod"
           columns={cohortColumns}
-          dataSource={cohorts ?? []}
-          pagination={false}
+          dataSource={retention}
+          pagination={{ pageSize: 5 }}
           locale={{ emptyText: t("Chưa có dữ liệu") }}
         />
       </SectionCard>

@@ -1,5 +1,5 @@
-// Modular Monitoring Types
-// Aligned for independent frontend preparation prior to Task T2 backend contract wiring.
+// Exact contract-aligned types for Roomie Monitoring Subsystem
+// Matches docs/monitoring/contracts.md and backend/RoomRental.Api/Domain/MonitoringDtos.cs
 
 export type DateRangePreset = '7d' | '30d' | '90d' | 'custom';
 export type OpsWindowPreset = '1h' | '6h' | '24h';
@@ -9,186 +9,241 @@ export interface MonitoringFilters {
   dateFrom: string;
   dateTo: string;
   source?: string;
+  channel?: string;
+  campaign?: string;
   opsWindow: OpsWindowPreset;
 }
 
-// 1. Growth & Usage Types
-export interface SessionSummary {
-  totalSessions: number | null;
-  uniqueVisitors: number | null;
-  bounceRatePercent: number | null;
-  avgDurationSeconds: number | null;
-  isStale?: boolean;
-}
-
-export interface SourceTrafficItem {
-  source: string;
-  medium?: string;
+export interface MonitoringFilterRequest {
+  fromDate?: string;
+  toDate?: string;
+  source?: string;
+  channel?: string;
   campaign?: string;
-  views: number;
-  signups: number;
-  conversionRatePercent: number;
 }
 
-export interface CtaEngagementItem {
+// 1. Growth Tab Types
+export interface GrowthSummaryDto {
+  totalSessions: number;
+  uniqueVisitors: number;
+  registrations: number;
+  activatedOwners: number;
+  currentWau: number;
+  currentMau: number;
+}
+
+export interface TrafficSourceStatsDto {
+  source: string;
+  medium?: string | null;
+  sessions: number;
+  registrations: number;
+  activatedOwners: number;
+}
+
+export interface CtaPerformanceDto {
   ctaId: string;
-  label: string;
-  placement: string;
+  path: string;
   clicks: number;
-  conversions: number;
-  conversionRatePercent: number;
 }
 
-export interface ActiveUsersMetric {
-  wau7: number | null;
-  mau30: number | null;
-  breakdown: {
-    ownerActions: number;
-    adminActions: number;
-    systemActions: number;
-  };
-  isStale?: boolean;
+export interface CohortRetentionRowDto {
+  cohortPeriod: string; // e.g. "2026-08"
+  cohortSize: number;
+  retentionPercentages: number[];
 }
 
-export interface ActivationCohortRow {
-  cohortMonth: string; // e.g. "2026-09"
-  registeredOwners: number;
-  activated7DayCount: number;
-  activated7DayRate: number;
-  isMature7Day: boolean;
-  nextMonthRetainedCount: number | null;
-  nextMonthRetentionRate: number | null;
-  isMatureRetention: boolean;
+export interface CohortMaturityDto {
+  activationRate7Day: number | null;
+  activationCohortMaturedCount: number;
+  firstPaidRate30Day: number | null;
+  paidCohortMaturedCount: number;
 }
 
-// 2. Revenue Types
-export interface RevenueSummary {
-  mrrVnd: number | null;
-  totalProRevenueVnd: number | null;
-  paidSubscriptionCount: number | null;
-  isStale?: boolean;
+export interface DailyGrowthPointDto {
+  date: string; // YYYY-MM-DD
+  sessions: number;
+  registrations: number;
+  activations: number;
+  activeOwners: number;
 }
 
-export type Cac30MissingReason = 'missing_spend' | 'zero_cohort' | 'unmature_cohort';
-
-export interface Cac30CohortItem {
-  cohortMonth: string; // "2026-09"
-  totalSpendVnd: number | null;
-  newFirstPaidOwnersCount: number;
-  cacVnd: number | null;
-  missingReason?: Cac30MissingReason;
-  isMature30Day: boolean;
+export interface AdminMonitoringGrowthResponse {
+  summary: GrowthSummaryDto;
+  sources: TrafficSourceStatsDto[];
+  topCtas: CtaPerformanceDto[];
+  retentionMatrix: CohortRetentionRowDto[];
+  cohortMaturity: CohortMaturityDto;
+  dailySeries: DailyGrowthPointDto[];
 }
 
-export interface CampaignCostEntry {
-  id: string;
-  campaignName: string;
-  channel?: string;
-  recordedDate: string;
-  cashExpenseVnd: number;
+// 2. Revenue Tab Types
+export type Cac30NullReason =
+  | 'MissingCostData'
+  | 'ZeroDenominator'
+  | 'CohortImmature'
+  | 'NoRegistrations'
+  | string;
+
+export interface Cac30MetricDto {
+  valueVnd: number | null;
+  isAvailable: boolean;
+  nullReason: Cac30NullReason | null;
+}
+
+export interface RevenueSummaryDto {
+  totalSubscriptionRevenueVnd: number;
+  paidSubscriptionCount: number;
+  totalMarketingSpendVnd: number;
+  totalMarketingHours: number;
+  cac30: Cac30MetricDto;
+}
+
+export interface SubscriptionOrderRevenueDto {
+  orderCode: number;
+  ownerId: string;
+  amountVnd: number;
+  days: number | null;
+  paidAt: string;
+}
+
+export interface CampaignCostSummaryDto {
+  campaign: string;
+  channel?: string | null;
+  cashVnd: number;
   personHours: number;
-  hourlyRateVnd?: number;
+  imputedLaborCostVnd?: number | null;
   totalCostVnd: number;
-  updatedBy: string;
-  updatedAt: string;
-  notes?: string;
 }
 
-export interface CreateCampaignCostInput {
-  campaignName: string;
-  channel?: string;
-  recordedDate: string;
-  cashExpenseVnd: number;
-  personHours: number;
-  hourlyRateVnd?: number;
-  notes?: string;
-  updatedBy: string;
+export interface DailyRevenuePointDto {
+  date: string; // YYYY-MM-DD
+  subscriptionRevenueVnd: number;
+  marketingSpendVnd: number;
 }
 
-// 3. Operations Types
-export type HealthStatus = 'healthy' | 'warning' | 'critical' | 'unknown' | 'stale';
+export interface AdminMonitoringRevenueResponse {
+  summary: RevenueSummaryDto;
+  subscriptionOrders: SubscriptionOrderRevenueDto[];
+  campaignCosts: CampaignCostSummaryDto[];
+  dailySeries: DailyRevenuePointDto[];
+}
 
-export interface SystemdHostMetrics {
-  collectedAt: string | null;
-  cpuPercent: number | null;
-  ramPercent: number | null;
-  ramUsedMb: number | null;
-  ramTotalMb: number | null;
-  diskPercent: number | null;
-  diskUsedGb: number | null;
-  diskTotalGb: number | null;
-  containerStatus: 'running' | 'degraded' | 'stopped' | 'unknown';
-  apiHealthOk: boolean | null;
+// 3. Operations Tab Types
+export type HealthStatus = 'Healthy' | 'Warning' | 'Critical' | 'Degraded' | 'Unknown' | 'Stale';
+
+export interface OpsOverviewDto {
+  overallStatus: string;
+  api5xxRatePercent: number;
+  latencyP95Ms: number;
+  totalRequestsLastHour: number;
+  databaseConnected: boolean;
+  databaseStatus: string;
+}
+
+export interface RouteLatencyMetricDto {
+  routeTemplate: string;
+  httpMethod: string;
+  requestCount: number;
+  status5xxCount: number;
+  p95LatencyMs: number;
+  avgLatencyMs: number;
+  maxLatencyMs: number;
+}
+
+export interface HostMetricsDto {
+  cpuPercent: number;
+  memoryPercent: number;
+  diskPercent: number;
+  containerCount: number;
+  healthEndpointStatus: string;
+  hostStatus: string;
+  recordedAt: string | null;
   isStale: boolean;
 }
 
-export interface RouteMetricItem {
-  routeTemplate: string;
-  method: string;
-  totalRequests: number;
-  error5xxCount: number;
-  errorRatePercent: number;
-  p95LatencyMs: number | null;
-  avgLatencyMs: number | null;
+export interface WorkerStatusDto {
+  workerName: string;
+  isEnabled: boolean;
+  status: string;
+  lastStartedAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorMessage: string | null;
+  isStale: boolean;
 }
 
-export interface DatabaseHealthMetric {
-  status: HealthStatus;
-  latencyMs: number | null;
-  poolActive: number | null;
-  poolIdle: number | null;
-  lastCheckedAt: string | null;
+export interface OperationalQueueStatsDto {
+  zaloPendingQueueCount: number;
+  zaloEligibleWindowCount: number;
+  payOsPendingReconcileCount: number;
+  smtpAcceptedNotDeliveredCount: number;
 }
 
-export interface SmtpMetrics {
-  status: HealthStatus;
-  acceptedCount: number | null;
-  deliveredCount: number | null;
-  undeliveredCount: number | null;
-  isStale?: boolean;
+export interface AdminMonitoringOperationsResponse {
+  overview: OpsOverviewDto;
+  routeMetrics: RouteLatencyMetricDto[];
+  hostMetrics: HostMetricsDto | null;
+  workers: WorkerStatusDto[];
+  queues: OperationalQueueStatsDto;
 }
 
-export interface PayOsReconcileMetrics {
-  status: HealthStatus;
-  reconciledCount: number | null;
-  pendingCount: number | null;
-  errorCount: number | null;
-  lastReconciledAt: string | null;
-}
-
-export interface ZaloQueueMetrics {
-  status: HealthStatus;
-  queuedCount: number | null;
-  sentCount: number | null;
-  cooldownActive: boolean;
-  inOperatingHoursWindow: boolean; // 07:00 - 21:00
-  rateLimited: boolean;
-}
-
-export interface BackgroundWorkerItem {
-  name: string;
-  key: 'recovery_email' | 'zalo_reminders' | 'payos_reconcile' | 'invoice_sweep';
-  enabled: boolean;
-  lastStart: string | null;
-  lastSuccess: string | null;
-  lastError: string | null;
-  status: 'idle' | 'running' | 'failed' | 'disabled' | 'unknown';
-}
-
-export interface BackupWatchdogMetric {
-  status: HealthStatus;
-  lastBackupAt: string | null;
-  hoursSinceLastBackup: number | null;
-  isWithin27Hours: boolean;
-}
-
-export interface IncidentAlertItem {
+// 4. Incidents Types
+export interface IncidentDto {
   id: string;
-  title: string;
-  severity: 'warning' | 'critical';
-  component: string;
-  description: string;
-  triggeredAt: string;
-  state: 'active' | 'cooldown' | 'resolved';
-  cooldownRemainingMinutes?: number;
+  incidentKey: string;
+  ruleName: string;
+  severity: 'Warning' | 'Critical' | string;
+  state: 'Active' | 'Cooldown' | 'Resolved' | string;
+  summary: string;
+  details: string;
+  startedAt: string;
+  lastNotifiedAt: string | null;
+  resolvedAt: string | null;
+  notificationCount: number;
+}
+
+export interface AdminMonitoringIncidentsResponse {
+  activeIncidentCount: number;
+  incidents: IncidentDto[];
+}
+
+export interface UpdateIncidentRequest {
+  state: string;
+  note?: string | null;
+}
+
+// 5. Campaign Cost Management Types
+export interface AdminCampaignCostItemDto {
+  id: string;
+  date: string; // YYYY-MM-DD
+  campaign: string;
+  channel?: string | null;
+  source?: string | null;
+  cashVnd: number;
+  personHours: number;
+  hourlyRate?: number | null;
+  note?: string | null;
+  updatedByName: string;
+  updatedAt: string;
+}
+
+export interface UpsertCampaignCostRequest {
+  date: string; // YYYY-MM-DD
+  campaign: string;
+  channel?: string | null;
+  source?: string | null;
+  cashVnd: number;
+  personHours: number;
+  hourlyRate?: number | null;
+  note?: string | null;
+}
+
+// UTM Builder Types
+export interface UtmLinkParams {
+  baseUrl: string;
+  source: string;
+  medium?: string;
+  campaign?: string;
+  term?: string;
+  content?: string;
 }

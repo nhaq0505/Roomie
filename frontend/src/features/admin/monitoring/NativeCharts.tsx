@@ -1,5 +1,6 @@
 // Native SVG Visualizations
 // Zero external chart dependencies. AntD components and native SVG only.
+import { t } from '../../../shared/i18n/runtime';
 
 export interface DataPoint {
   label: string;
@@ -78,7 +79,6 @@ export function NativeBarChart({
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <div style={{ minWidth: items.length * 48, height }}>
         <svg width="100%" height={chartHeight} style={{ overflow: 'visible' }}>
-          {/* Subtle grid lines */}
           <line x1="0" y1="0" x2="100%" y2="0" stroke="#f0f3f2" strokeDasharray="3 3" />
           <line x1="0" y1={chartHeight / 2} x2="100%" y2={chartHeight / 2} stroke="#f0f3f2" strokeDasharray="3 3" />
           <line x1="0" y1={chartHeight} x2="100%" y2={chartHeight} stroke="#e5eeeb" strokeWidth="1" />
@@ -117,7 +117,6 @@ export function NativeBarChart({
           })}
         </svg>
 
-        {/* Labels underneath */}
         <div style={{ display: 'flex', justifyContent: 'space-around', paddingTop: 8 }}>
           {items.map((item) => (
             <div
@@ -137,6 +136,169 @@ export function NativeBarChart({
               {item.label}
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface FunnelStage {
+  label: string;
+  count: number;
+  color?: string;
+}
+
+export function NativeConversionFunnel({ stages }: { stages: FunnelStage[] }) {
+  if (!stages || stages.length === 0) return null;
+
+  const topCount = stages[0].count || 1;
+
+  return (
+    <div className="native-funnel" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {stages.map((stage, idx) => {
+        const percentOfTop = Math.min(Math.round((stage.count / topCount) * 100), 100);
+        const prevCount = idx > 0 ? stages[idx - 1].count || 1 : null;
+        const stepRate = prevCount !== null ? Math.min(Math.round((stage.count / prevCount) * 100), 100) : null;
+        const color = stage.color || (idx === 0 ? '#17a486' : idx === 1 ? '#34757c' : idx === 2 ? '#bb8133' : '#457b9d');
+
+        return (
+          <div key={stage.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span>
+                <strong>{stage.label}</strong>
+                {stepRate !== null && (
+                  <span style={{ marginLeft: 8, color: '#7a8c91', fontSize: 12 }}>
+                    ({stepRate}% {t("từ bước trước")})
+                  </span>
+                )}
+              </span>
+              <span>
+                <strong>{stage.count.toLocaleString()}</strong>
+                <span style={{ marginLeft: 6, color: '#7a8c91', fontSize: 12 }}>
+                  ({percentOfTop}%)
+                </span>
+              </span>
+            </div>
+            <div style={{ width: '100%', height: 18, background: '#f0f4f3', borderRadius: 9, overflow: 'hidden' }}>
+              <div
+                style={{
+                  width: `${Math.max(percentOfTop, 2)}%`,
+                  height: '100%',
+                  background: color,
+                  borderRadius: 9,
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface TrendSeries {
+  name: string;
+  color: string;
+  data: number[];
+}
+
+export function NativeMultiLineChart({
+  dates,
+  series,
+  height = 200,
+}: {
+  dates: string[];
+  series: TrendSeries[];
+  height?: number;
+}) {
+  if (!dates || dates.length === 0 || !series || series.length === 0) {
+    return (
+      <div style={{ height, display: 'grid', placeItems: 'center', color: '#8c9ea2' }}>
+        <span>—</span>
+      </div>
+    );
+  }
+
+  const allValues = series.flatMap((s) => s.data);
+  const maxVal = Math.max(...allValues, 1);
+  const minVal = 0;
+  const range = maxVal - minVal || 1;
+
+  const chartHeight = height - 40;
+  const paddingLeft = 40;
+  const paddingRight = 16;
+  const paddingTop = 12;
+  const paddingBottom = 20;
+
+  const innerWidth = 1000;
+  const innerHeight = chartHeight - paddingTop - paddingBottom;
+  const stepX = (innerWidth - paddingLeft - paddingRight) / Math.max(dates.length - 1, 1);
+
+  return (
+    <div style={{ width: '100%', overflowX: 'auto' }}>
+      <div style={{ minWidth: 480 }}>
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 8, flexWrap: 'wrap', fontSize: 12 }}>
+          {series.map((s) => (
+            <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 12, height: 3, background: s.color, borderRadius: 2 }} />
+              <span style={{ color: '#55696e' }}>{s.name}</span>
+            </div>
+          ))}
+        </div>
+
+        <svg width="100%" height={chartHeight} viewBox={`0 0 ${innerWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+          {/* Grid lines */}
+          <line x1={paddingLeft} y1={paddingTop} x2={innerWidth - paddingRight} y2={paddingTop} stroke="#f0f4f3" strokeDasharray="3 3" />
+          <line x1={paddingLeft} y1={paddingTop + innerHeight / 2} x2={innerWidth - paddingRight} y2={paddingTop + innerHeight / 2} stroke="#f0f4f3" strokeDasharray="3 3" />
+          <line x1={paddingLeft} y1={paddingTop + innerHeight} x2={innerWidth - paddingRight} y2={paddingTop + innerHeight} stroke="#e5eeeb" strokeWidth="1" />
+
+          {/* Y Axis ticks */}
+          <text x={paddingLeft - 8} y={paddingTop + 4} textAnchor="end" fontSize="11" fill="#8c9ea2">
+            {maxVal.toLocaleString()}
+          </text>
+          <text x={paddingLeft - 8} y={paddingTop + innerHeight + 4} textAnchor="end" fontSize="11" fill="#8c9ea2">
+            0
+          </text>
+
+          {/* Lines */}
+          {series.map((s) => {
+            const points = s.data.map((val, idx) => {
+              const x = paddingLeft + idx * stepX;
+              const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
+              return `${x},${y}`;
+            });
+            const pathD = `M ${points.join(' L ')}`;
+
+            return (
+              <g key={s.name}>
+                <path d={pathD} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                {s.data.map((val, idx) => {
+                  const x = paddingLeft + idx * stepX;
+                  const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
+                  return (
+                    <circle key={idx} cx={x} cy={y} r="3" fill="#fff" stroke={s.color} strokeWidth="2">
+                      <title>{`${dates[idx]}: ${val.toLocaleString()}`}</title>
+                    </circle>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Date labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft, paddingRight, paddingTop: 4 }}>
+          {dates.length > 0 && (
+            <span style={{ fontSize: 11, color: '#8c9ea2' }}>{dates[0]}</span>
+          )}
+          {dates.length > 2 && (
+            <span style={{ fontSize: 11, color: '#8c9ea2' }}>{dates[Math.floor(dates.length / 2)]}</span>
+          )}
+          {dates.length > 1 && (
+            <span style={{ fontSize: 11, color: '#8c9ea2' }}>{dates[dates.length - 1]}</span>
+          )}
         </div>
       </div>
     </div>

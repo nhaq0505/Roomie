@@ -1260,3 +1260,64 @@
 1259|Route template|路由模板|경로 템플릿|रूट टेम्पलेट
 1260|Method|请求方法|메서드|विधि
 1261|Avg latency|平均延迟|평균 지연|औसत विलंबता
+1262|Failed to save campaign cost.|无法保存活动成本。|캠페인 비용을 저장하지 못했습니다.|अभियान लागत सहेजने में विफल।
+1263|Incident status updated.|已更新故障状态。|인시던트 상태가 업데이트되었습니다.|घटना की स्थिति अपडेट की गई।
+1264|Failed to update incident.|无法更新故障状态。|인시던트를 업데이트하지 못했습니다.|घटना को अपडेट करने में विफल।
+1265|Edit Campaign Cost|编辑活动成本|캠페인 비용 수정|अभियान लागत संपादित करें
+1266|Update Cost|更新成本|비용 업데이트|लागत अपडेट करें
+1267|Activated Owners|已激活房东|활성화된 임대인|सक्रिय मकान मालिक
+1268|Month 0 (100%)|第0个月 (100%)|0개월차 (100%)|महीना 0 (100%)
+1269|Month 1|第1个月|1개월차|महीना 1
+1270|Month 2|第2个月|2개월차|महीना 2
+1271|Updating growth metrics|正在更新增长指标|성장 지표 업데이트 중|वृद्धि मेट्रिक्स अपडेट किए जा रहे हैं
+1272|Growth metrics backend service is being processed under Task T1 contract. The prepared layout is shown below.|增长统计后端服务正在根据Task T1契约进行处理。以下为预备布局。|성장 통계 백엔드 서비스는 Task T1 계약에 따라 처리 중입니다. 아래는 준비된 레이아웃입니다.|वृद्धि मेट्रिक्स बैकएंड सेवा टास्क T1 अनुबंध के तहत संसाधित की जा रही है। तैयार लेआउट नीचे दिखाया गया है।
+1273|Active|活跃|활동|सक्रिय
+1274|Unique Visitors|独立访客|순 방문자|अद्वितीय आगंतुक
+1275|New Owners|新房东|신규 임대인|नए मकान मालिक
+1276|Activation|激活|활성화|सक्रियण
+1277|First monthly invoice issued|首张月结账单已开具|첫 번째 월별 청구서 발행됨|पहला मासिक चालान जारी किया गया
+1278|WAU (7 days)|周活跃用户 (7天)|주간 활성 사용자 (7일)|साप्ताहिक सक्रिय उपयोगकर्ता (7 दिन)
+1279|Owner actions only|仅计算房东自身操作|임대인 본인 활동만 집계|केवल मकान मालिक की कार्रवाइयां
+1280|MAU (30 days)|月活跃用户 (30天)|월간 활성 사용자 (30일)|मासिक सक्रिय उपयोगकर्ता (30 दिन)
+1281|Conversion Funnel|转化漏斗|전환 퍼널|रूपांतरण फ़नल
+1282|Rates across stages|各阶段转化率|단계별 전환율|चरणों में दरें
+1283|Cohort Maturity|群组成熟度|코호트 성숙도|समूह परिपक्वता
+1284|7-day activation rate|7天激活率|7일 활성화율|7-दिवसीय सक्रियण दर
+1285|Matured cohorts count|已达成熟期群组数|성숙 완료된 코호트 수|परिपक्व समूहों की संख्या
+1286|30-day first paid rate|30天首付率|30일 첫 결제율|30-दिवसीय पहली सशुल्क दर
+1287|Daily Growth Trends|每日增长趋势|일별 성장 추세|दैनिक वृद्धि रुझान
+1288|Stale data|已过期数据|이전 데이터|पुराना डेटा
+1289|Failed to load data.|无法加载数据。|데이터를 불러오지 못했습니다.|डेटा लोड करने में विफल।
+1290|Data load error|加载数据出错|데이터 로딩 오류|डेटा लोड त्रुटि
+1291|from previous step|来自上一步|이전 단계 대비|पिछले चरण से
+1292|Updating operations metrics|正在更新运维指标|운영 지표 업데이트 중|परिचालन मेट्रिक्स अपडेट किए जा रहे हैं
+1293|Operations metrics backend service, telemetry and systemd collector are being connected under Task T3. The interface below is ready to receive telemetry.|运维指标后端服务、遥测与systemd采集器正在根据Task T3连接。下方界面已准备好接收遥测数据。|운영 지표 백엔드 서비스, 텔레메트리 및 systemd 수집기는 Task T3에 따라 연결 중입니다. 아래 인터페이스는 텔레메트리를 수신할 준비가 되었습니다.|परिचालन मेट्रिक्स बैकएंड सेवा, टेलीमेट्री और सिस्टमडी कलेक्टर टास्क T3 के तहत जुड़े हुए हैं। नीचे दिया गया इंटरफ़ेस टेलीमेट्री प्राप्त करने के लिए तैयार है।
+1294|Overall Status|总体状态|전체 상태|समग्र स्थिति
+1295|Warning threshold: > 5% over 5 minutes|告警阈值: 5分钟内 > 5%|경고 기준: 5분간 > 5%|चेतावनी सीमा: 5 मिनट में > 5%
+1296|Warning threshold: p95 > 2s over 10 minutes|告警阈值: 10分钟内 p95 > 2秒|경고 기준: 10분간 p95 > 2초|चेतावनी सीमा: 10 मिनट में p95 > 2s
+1297|Database|数据库|데이터베이스|डेटाबेस
+1298|Connected|已连接|연결됨|कनेक्टेड
+1299|Disconnected|未连接|연결 끊김|डिस्कनेक्टेड
+1300|{0} pending|{0} 个待处理|{0}개 대기 중|{0} लंबित
+1301|{0} in operating window|{0} 个在营业窗口内|{0}개 유효 시간대 내|{0} परिचालन समय में
+1302|{0} incidents|{0} 起故障|{0}건의 인시던트|{0} घटनाएं
+1303|Order code|订单编号|주문 번호|ऑर्डर कोड
+1304|Duration (days)|时长 (天)|기간 (일)|अवधि (दिन)
+1305|Payment time|支付时间|결제 시간|भुगतान का समय
+1306|Cash expense (VND)|现金支出 (VND)|현금 지출 (VND)|नकद खर्च (VND)
+1307|Person-hours|工时|작업 공수|कार्य घंटे
+1308|Actions|操作|동작|कार्रवाइयां
+1309|Updating revenue metrics|正在更新收入指标|수익 지표 업데이트 중|राजस्व मेट्रिक्स अपडेट किए जा रहे हैं
+1310|Revenue and cost metrics backend service is being connected under Task T1. Standalone campaign cost management below is ready.|收入与成本统计后端服务正在根据Task T1连接。下方独立活动成本管理已就绪。|수익 및 비용 통계 백엔드 서비스는 Task T1에 따라 연결 중입니다. 아래의 독립적인 캠페인 비용 관리가 준비되었습니다.|राजस्व और लागत मेट्रिक्स बैकएंड सेवा टास्क T1 के तहत जुड़ी हुई है। नीचे स्वतंत्र अभियान लागत प्रबंधन तैयार है।
+1311|Marketing spend|营销支出|마케팅 비용|विपणन खर्च
+1312|Total marketing spend|总营销支出|총 마케팅 비용|कुल विपणन खर्च
+1313|person-hours|工时|공수|कार्य घंटे
+1314|Revenue & Cost Trends|收入与成本趋势|수익 및 비용 추세|राजस्व और लागत रुझान
+1315|UTM Link Builder|生成UTM链接|UTM 링크 생성|UTM लिंक बिल्डर
+1316|Pro Subscriptions|Pro订阅订单|Pro 구독 주문|प्रो सदस्यता
+1317|Reconciled with payment gateway|已通过支付网关对账|결제 게이트웨이 정산 완료|भुगतान गेटवे से मिलान किया गया
+1318|Failed to copy link.|无法复制链接。|링크를 복사하지 못했습니다.|लिंक कॉपी करने में विफल।
+1319|Base URL|基础网址|기본 URL|मूल यूआरएल
+1320|Pricing|价格方案|가격 정책|मूल्य निर्धारण
+1321|Keyword|关键词|키워드|कीवर्ड
+1322|Generated Link|生成的链接|생성된 링크|तैयार लिंक

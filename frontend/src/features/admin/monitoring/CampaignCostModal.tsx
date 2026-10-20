@@ -1,86 +1,130 @@
 import { DatePicker, Form, Input, InputNumber, Modal, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatVnd } from '../../../shared/format';
 import { dateFormat, t } from '../../../shared/i18n/runtime';
 import MoneyInput from '../../../shared/ui/MoneyInput';
-import type { CreateCampaignCostInput } from './types';
+import type { AdminCampaignCostItemDto, UpsertCampaignCostRequest } from './types';
 
 interface CampaignCostModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (values: CreateCampaignCostInput) => void;
-  defaultUpdater?: string;
+  onSubmit: (values: UpsertCampaignCostRequest) => void;
+  initialItem?: AdminCampaignCostItemDto | null;
+  isLoading?: boolean;
 }
 
-export function CampaignCostModal({ open, onClose, onSubmit, defaultUpdater = 'admin' }: CampaignCostModalProps) {
+export function CampaignCostModal({
+  open,
+  onClose,
+  onSubmit,
+  initialItem,
+  isLoading,
+}: CampaignCostModalProps) {
   const [form] = Form.useForm();
   const [cashExpense, setCashExpense] = useState<number>(0);
   const [personHours, setPersonHours] = useState<number>(0);
   const [hourlyRate, setHourlyRate] = useState<number>(0);
 
+  useEffect(() => {
+    if (initialItem && open) {
+      setCashExpense(initialItem.cashVnd || 0);
+      setPersonHours(initialItem.personHours || 0);
+      setHourlyRate(initialItem.hourlyRate || 0);
+      form.setFieldsValue({
+        campaign: initialItem.campaign,
+        channel: initialItem.channel,
+        source: initialItem.source,
+        date: dayjs(initialItem.date),
+        cashVnd: initialItem.cashVnd || 0,
+        personHours: initialItem.personHours || 0,
+        hourlyRate: initialItem.hourlyRate || 0,
+        note: initialItem.note,
+      });
+    } else if (open) {
+      setCashExpense(0);
+      setPersonHours(0);
+      setHourlyRate(0);
+      form.resetFields();
+      form.setFieldsValue({
+        date: dayjs(),
+        cashVnd: 0,
+        personHours: 0,
+        hourlyRate: 0,
+      });
+    }
+  }, [initialItem, open, form]);
+
   const totalCost = (cashExpense || 0) + (personHours || 0) * (hourlyRate || 0);
 
   const handleFinish = (values: {
-    campaignName: string;
+    campaign: string;
     channel?: string;
-    recordedDate: dayjs.Dayjs;
-    cashExpenseVnd: number;
+    source?: string;
+    date: dayjs.Dayjs;
+    cashVnd: number;
     personHours: number;
-    hourlyRateVnd?: number;
-    notes?: string;
-    updatedBy: string;
+    hourlyRate?: number;
+    note?: string;
   }) => {
     onSubmit({
-      campaignName: values.campaignName.trim(),
-      channel: values.channel?.trim(),
-      recordedDate: values.recordedDate.format('YYYY-MM-DD'),
-      cashExpenseVnd: values.cashExpenseVnd || 0,
+      campaign: values.campaign.trim(),
+      channel: values.channel?.trim() || null,
+      source: values.source?.trim() || null,
+      date: values.date.format('YYYY-MM-DD'),
+      cashVnd: values.cashVnd || 0,
       personHours: values.personHours || 0,
-      hourlyRateVnd: values.hourlyRateVnd,
-      notes: values.notes?.trim(),
-      updatedBy: values.updatedBy.trim(),
+      hourlyRate: values.hourlyRate && values.hourlyRate > 0 ? values.hourlyRate : null,
+      note: values.note?.trim() || null,
     });
     form.resetFields();
     onClose();
   };
 
+  const isEditing = Boolean(initialItem);
+
   return (
     <Modal
-      title={t("Thêm chi phí chiến dịch")}
+      title={isEditing ? t("Sửa chi phí chiến dịch") : t("Thêm chi phí chiến dịch")}
       open={open}
       onCancel={onClose}
       onOk={() => form.submit()}
-      okText={t("Lưu chi phí")}
+      okText={isEditing ? t("Cập nhật chi phí") : t("Lưu chi phí")}
       cancelText={t("Hủy")}
+      confirmLoading={isLoading}
       destroyOnClose
     >
       <Form
         form={form}
         layout="vertical"
         initialValues={{
-          recordedDate: dayjs(),
-          cashExpenseVnd: 0,
+          date: dayjs(),
+          cashVnd: 0,
           personHours: 0,
-          hourlyRateVnd: 0,
-          updatedBy: defaultUpdater,
+          hourlyRate: 0,
         }}
         onFinish={handleFinish}
       >
         <Form.Item
-          name="campaignName"
+          name="campaign"
           label={t("Tên chiến dịch")}
           rules={[{ required: true, message: t("Vui lòng nhập tên chiến dịch.") }]}
         >
           <Input placeholder="vd: Facebook Ads Q4" />
         </Form.Item>
 
-        <Form.Item name="channel" label={t("Kênh")}>
-          <Input placeholder="Facebook, Google, Zalo..." />
-        </Form.Item>
+        <Space style={{ display: 'flex', width: '100%' }} size={12}>
+          <Form.Item name="channel" label={t("Kênh")} style={{ flex: 1 }}>
+            <Input placeholder="social, search, email..." />
+          </Form.Item>
+
+          <Form.Item name="source" label={t("Nguồn")} style={{ flex: 1 }}>
+            <Input placeholder="facebook, google, zalo..." />
+          </Form.Item>
+        </Space>
 
         <Form.Item
-          name="recordedDate"
+          name="date"
           label={t("Ngày ghi nhận")}
           rules={[{ required: true }]}
         >
@@ -89,7 +133,7 @@ export function CampaignCostModal({ open, onClose, onSubmit, defaultUpdater = 'a
 
         <Space style={{ display: 'flex', width: '100%' }} size={12}>
           <Form.Item
-            name="cashExpenseVnd"
+            name="cashVnd"
             label={t("Chi phí tiền mặt (VND)")}
             style={{ flex: 1 }}
           >
@@ -115,7 +159,7 @@ export function CampaignCostModal({ open, onClose, onSubmit, defaultUpdater = 'a
           </Form.Item>
         </Space>
 
-        <Form.Item name="hourlyRateVnd" label={t("Đơn giá giờ công (VND/giờ)")}>
+        <Form.Item name="hourlyRate" label={t("Đơn giá giờ công (VND/giờ)")}>
           <MoneyInput
             style={{ width: '100%' }}
             min={0}
@@ -144,15 +188,19 @@ export function CampaignCostModal({ open, onClose, onSubmit, defaultUpdater = 'a
           </div>
         </div>
 
-        <Form.Item
-          name="updatedBy"
-          label={t("Người cập nhật")}
-          rules={[{ required: true, message: t("Vui lòng nhập người cập nhật.") }]}
-        >
-          <Input />
-        </Form.Item>
+        {initialItem?.updatedByName && (
+          <div style={{ marginBottom: 16, fontSize: 13, color: '#667085' }}>
+            <span>{t("Người cập nhật")}: </span>
+            <strong>{initialItem.updatedByName}</strong>
+            {initialItem.updatedAt && (
+              <span style={{ marginLeft: 8 }}>
+                ({dayjs(initialItem.updatedAt).format('YYYY-MM-DD HH:mm')})
+              </span>
+            )}
+          </div>
+        )}
 
-        <Form.Item name="notes" label={t("Ghi chú")}>
+        <Form.Item name="note" label={t("Ghi chú")}>
           <Input.TextArea rows={2} />
         </Form.Item>
       </Form>

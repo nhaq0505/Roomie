@@ -1,121 +1,199 @@
-import { PlusOutlined, WalletOutlined } from '@ant-design/icons';
-import { Button, Col, Row, Table, Tag } from 'antd';
+import {
+  EditOutlined,
+  LinkOutlined,
+  PlusOutlined,
+  UsergroupAddOutlined,
+  WalletOutlined,
+} from '@ant-design/icons';
+import { Button, Col, Row, Space, Table } from 'antd';
 import type { TableProps } from 'antd';
 import { useState } from 'react';
 import { formatVnd } from '../../../shared/format';
 import { t } from '../../../shared/i18n/runtime';
 import { SectionCard } from '../../../shared/ui/Ui';
 import { CampaignCostModal } from './CampaignCostModal';
-import { MonitoringStatCard, UnknownMetric } from './MonitoringState';
-import type { Cac30CohortItem, CampaignCostEntry, CreateCampaignCostInput, RevenueSummary } from './types';
+import {
+  CacNullReasonTag,
+  MonitoringErrorState,
+  MonitoringStatCard,
+  UnconfiguredNotice,
+} from './MonitoringState';
+import { NativeMultiLineChart } from './NativeCharts';
+import { UtmLinkBuilderModal } from './UtmLinkBuilderModal';
+import type {
+  AdminCampaignCostItemDto,
+  AdminMonitoringRevenueResponse,
+  SubscriptionOrderRevenueDto,
+  UpsertCampaignCostRequest,
+} from './types';
 
 interface RevenueTabProps {
-  revenue?: RevenueSummary;
-  cacCohorts?: Cac30CohortItem[];
-  campaignCosts?: CampaignCostEntry[];
-  onAddCampaignCost?: (input: CreateCampaignCostInput) => void;
+  data?: AdminMonitoringRevenueResponse | null;
+  campaignCostsList?: AdminCampaignCostItemDto[];
+  isLoading?: boolean;
+  error?: Error | unknown;
+  onRetry?: () => void;
+  is501?: boolean;
+  onUpsertCampaignCost?: (input: UpsertCampaignCostRequest) => void;
+  isSavingCost?: boolean;
 }
 
 export function RevenueTab({
-  revenue,
-  cacCohorts,
-  campaignCosts = [],
-  onAddCampaignCost,
+  data,
+  campaignCostsList = [],
+  isLoading,
+  error,
+  onRetry,
+  is501,
+  onUpsertCampaignCost,
+  isSavingCost,
 }: RevenueTabProps) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [costModalOpen, setCostModalOpen] = useState(false);
+  const [utmModalOpen, setUtmModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AdminCampaignCostItemDto | null>(null);
 
-  // CAC Cohort Table columns
-  const cacColumns: TableProps<Cac30CohortItem>['columns'] = [
-    { title: t("Kỳ kích hoạt"), dataIndex: 'cohortMonth', key: 'cohortMonth', render: (val: string) => <strong>{val}</strong> },
+  // Subscription Orders table columns
+  const orderColumns: TableProps<SubscriptionOrderRevenueDto>['columns'] = [
     {
-      title: t("Tổng chi phí"),
-      dataIndex: 'totalSpendVnd',
-      key: 'spend',
-      align: 'right',
-      render: (val: number | null) => (val !== null ? formatVnd(val) : <UnknownMetric explanation={t("Chưa nhập chi phí")} />),
-    },
-    { title: t("Lượt thanh toán Pro"), dataIndex: 'newFirstPaidOwnersCount', key: 'owners', align: 'right' },
-    {
-      title: t("Chi phí chuyển đổi chủ trọ (CAC30)"),
-      key: 'cac',
-      align: 'right',
-      render: (_, row) => {
-        if (row.cacVnd !== null) {
-          return <strong>{formatVnd(row.cacVnd)}</strong>;
-        }
-        if (row.missingReason === 'missing_spend') {
-          return <Tag color="warning">{t("Chưa nhập chi phí")}</Tag>;
-        }
-        if (row.missingReason === 'zero_cohort') {
-          return <Tag color="default">{t("Chưa có chủ trọ trả phí")}</Tag>;
-        }
-        if (row.missingReason === 'unmature_cohort') {
-          return <Tag color="blue">{t("Chưa đủ 30 ngày trưởng thành")}</Tag>;
-        }
-        return <UnknownMetric />;
-      },
+      title: t("Mã đơn hàng"),
+      dataIndex: 'orderCode',
+      key: 'orderCode',
+      render: (val: number) => <strong>#{val}</strong>,
     },
     {
-      title: t("Trưởng thành"),
-      dataIndex: 'isMature30Day',
-      key: 'maturity',
-      align: 'center',
-      render: (val: boolean) => (
-        <Tag color={val ? 'success' : 'default'}>
-          {val ? t("Trưởng thành") : t("Chưa đủ 30 ngày trưởng thành")}
-        </Tag>
-      ),
+      title: t("Chủ trọ"),
+      dataIndex: 'ownerId',
+      key: 'ownerId',
+      render: (val: string) => <code>{val ? `${val.slice(0, 8)}...` : '—'}</code>,
+    },
+    {
+      title: t("Số tiền"),
+      dataIndex: 'amountVnd',
+      key: 'amountVnd',
+      align: 'right',
+      render: (val: number) => <strong style={{ color: '#17a486' }}>{formatVnd(val)}</strong>,
+    },
+    {
+      title: t("Thời hạn (ngày)"),
+      dataIndex: 'days',
+      key: 'days',
+      align: 'right',
+      render: (val?: number | null) => (val ? `${val} ${t("ngày")}` : '—'),
+    },
+    {
+      title: t("Thời gian thanh toán"),
+      dataIndex: 'paidAt',
+      key: 'paidAt',
+      render: (val: string) => (val ? new Date(val).toLocaleString('vi-VN') : '—'),
     },
   ];
 
   // Campaign cost entries columns
-  const costColumns: TableProps<CampaignCostEntry>['columns'] = [
-    { title: t("Tên chiến dịch"), dataIndex: 'campaignName', key: 'name', render: (val: string) => <strong>{val}</strong> },
-    { title: t("Kênh"), dataIndex: 'channel', key: 'channel', render: (val?: string) => val || '—' },
-    { title: t("Ngày ghi nhận"), dataIndex: 'recordedDate', key: 'date' },
+  const costColumns: TableProps<AdminCampaignCostItemDto>['columns'] = [
+    { title: t("Tên chiến dịch"), dataIndex: 'campaign', key: 'campaign', render: (val: string) => <strong>{val}</strong> },
+    { title: t("Kênh"), dataIndex: 'channel', key: 'channel', render: (val?: string | null) => val || '—' },
+    { title: t("Nguồn"), dataIndex: 'source', key: 'source', render: (val?: string | null) => val || '—' },
+    { title: t("Ngày ghi nhận"), dataIndex: 'date', key: 'date' },
     {
-      title: t("Chi phí tiền mặt (VND)"),
-      dataIndex: 'cashExpenseVnd',
+      title: t("Tiền mặt (VND)"),
+      dataIndex: 'cashVnd',
       key: 'cash',
       align: 'right',
       render: (val: number) => formatVnd(val),
     },
     {
-      title: t("Số giờ công"),
+      title: t("Giờ công"),
       dataIndex: 'personHours',
       key: 'hours',
       align: 'right',
-      render: (val: number, r) => `${val}h${r.hourlyRateVnd ? ` @ ${formatVnd(r.hourlyRateVnd)}/h` : ''}`,
+      render: (val: number, r) => `${val}h${r.hourlyRate ? ` @ ${formatVnd(r.hourlyRate)}/h` : ''}`,
     },
     {
       title: t("Tổng chi phí"),
-      dataIndex: 'totalCostVnd',
-      key: 'total',
+      key: 'totalCost',
       align: 'right',
-      render: (val: number) => <strong style={{ color: '#17a486' }}>{formatVnd(val)}</strong>,
+      render: (_, r) => {
+        const total = (r.cashVnd || 0) + (r.personHours || 0) * (r.hourlyRate || 0);
+        return <strong style={{ color: '#17a486' }}>{formatVnd(total)}</strong>;
+      },
     },
-    { title: t("Người cập nhật"), dataIndex: 'updatedBy', key: 'updater' },
-    { title: t("Ghi chú"), dataIndex: 'notes', key: 'notes', render: (val?: string) => val || '—' },
+    { title: t("Người cập nhật"), dataIndex: 'updatedByName', key: 'updater' },
+    {
+      title: t("Hành động"),
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => (
+        <Button
+          size="small"
+          icon={<EditOutlined />}
+          onClick={() => {
+            setEditingItem(record);
+            setCostModalOpen(true);
+          }}
+        >
+          {t("Sửa")}
+        </Button>
+      ),
+    },
+  ];
+
+  if (is501) {
+    return (
+      <div className="revenue-tab-content">
+        <UnconfiguredNotice
+          message={<strong>{t("Đang cập nhật chỉ số doanh thu")}</strong>}
+          description={t(
+            "Backend dịch vụ thống kê doanh thu và chi phí đang được kết nối theo Task T1. Quản lý chi phí chiến dịch độc lập dưới đây đã sẵn sàng."
+          )}
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <MonitoringErrorState error={error} onRetry={onRetry} />;
+  }
+
+  const summary = data?.summary;
+  const orders = data?.subscriptionOrders ?? [];
+  const dailySeries = data?.dailySeries ?? [];
+
+  // Trends chart
+  const dates = dailySeries.map((d) => d.date);
+  const trendSeries = [
+    { name: t("Doanh thu Pro"), color: '#17a486', data: dailySeries.map((d) => d.subscriptionRevenueVnd) },
+    { name: t("Chi phí tiếp thị"), color: '#9f443b', data: dailySeries.map((d) => d.marketingSpendVnd) },
   ];
 
   return (
     <div className="revenue-tab-content">
       <CampaignCostModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={(input) => {
-          onAddCampaignCost?.(input);
+        open={costModalOpen}
+        onClose={() => {
+          setCostModalOpen(false);
+          setEditingItem(null);
         }}
+        initialItem={editingItem}
+        onSubmit={(input) => {
+          onUpsertCampaignCost?.(input);
+        }}
+        isLoading={isSavingCost}
+      />
+
+      <UtmLinkBuilderModal
+        open={utmModalOpen}
+        onClose={() => setUtmModalOpen(false)}
       />
 
       {/* KPI Cards */}
-      <Row gutter={[16, 16]} className="stat-grid">
-        <Col xs={24} sm={12} lg={8}>
+      <Row gutter={[16, 16]} className="stat-grid" style={{ marginBottom: 18 }}>
+        <Col xs={24} sm={12} lg={6}>
           <MonitoringStatCard
-            title={t("Doanh thu tháng (MRR)")}
-            value={revenue?.mrrVnd !== null && revenue?.mrrVnd !== undefined ? formatVnd(revenue.mrrVnd) : null}
+            title={t("Doanh thu Pro")}
+            value={summary?.totalSubscriptionRevenueVnd !== undefined ? formatVnd(summary.totalSubscriptionRevenueVnd) : null}
             icon={<WalletOutlined />}
             colorClass="stat-teal"
+            isLoading={isLoading}
             subtext={
               <span className="stat-muted">
                 {t("Chỉ tính gói Pro thanh toán thành công qua cổng (đã đối soát, trừ gói Admin tặng và tiền thuê phòng)")}
@@ -123,72 +201,114 @@ export function RevenueTab({
             }
           />
         </Col>
-        <Col xs={24} sm={12} lg={8}>
+        <Col xs={24} sm={12} lg={6}>
           <MonitoringStatCard
-            title={t("Doanh thu Pro")}
+            title={t("Lượt thanh toán Pro")}
+            value={summary?.paidSubscriptionCount}
+            icon={<WalletOutlined />}
+            colorClass="stat-green"
+            isLoading={isLoading}
+            subtext={<span className="stat-muted">Central webhook / reconcile deduped</span>}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <MonitoringStatCard
+            title={t("Tổng chi phí tiếp thị")}
+            value={summary?.totalMarketingSpendVnd !== undefined ? formatVnd(summary.totalMarketingSpendVnd) : null}
+            icon={<UsergroupAddOutlined />}
+            colorClass="stat-amber"
+            isLoading={isLoading}
+            subtext={
+              summary?.totalMarketingHours ? (
+                <span className="stat-muted">{summary.totalMarketingHours} {t("giờ công")}</span>
+              ) : undefined
+            }
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <MonitoringStatCard
+            title={t("Chi phí chuyển đổi chủ trọ (CAC30)")}
             value={
-              revenue?.totalProRevenueVnd !== null && revenue?.totalProRevenueVnd !== undefined
-                ? formatVnd(revenue.totalProRevenueVnd)
-                : null
+              summary?.cac30?.isAvailable && summary.cac30.valueVnd !== null
+                ? formatVnd(summary.cac30.valueVnd)
+                : summary?.cac30?.nullReason ? (
+                  <CacNullReasonTag reason={summary.cac30.nullReason} />
+                ) : null
             }
             icon={<WalletOutlined />}
             colorClass="stat-blue"
-            subtext={<span className="stat-muted">{t("Chỉ tính gói Pro thanh toán thành công qua cổng (đã đối soát, trừ gói Admin tặng và tiền thuê phòng)")}</span>}
-          />
-        </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <MonitoringStatCard
-            title={t("Lượt thanh toán Pro")}
-            value={revenue?.paidSubscriptionCount}
-            icon={<WalletOutlined />}
-            colorClass="stat-green"
-            subtext={<span className="stat-muted">Central webhook / reconcile deduped</span>}
+            isLoading={isLoading}
+            subtext={
+              <span className="stat-muted">
+                {t("Tổng chi phí kỳ / Số chủ trọ Pro mới trong 30 ngày")}
+              </span>
+            }
           />
         </Col>
       </Row>
 
-      {/* CAC30 Cohorts Section */}
+      {/* Daily Revenue Trends Chart */}
+      {dailySeries.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <SectionCard title={t("Xu hướng doanh thu & chi phí")}>
+            <NativeMultiLineChart dates={dates} series={trendSeries} height={220} />
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Manual Campaign Cost Management */}
       <div style={{ marginBottom: 18 }}>
         <SectionCard
-          title={t("Chi phí chuyển đổi chủ trọ (CAC30)")}
+          title={t("Quản lý chi phí thủ công")}
           extra={
-            <span style={{ fontSize: 13, color: '#7a8c91' }}>
-              {t("Tổng chi phí kỳ / Số chủ trọ Pro mới trong 30 ngày")}
-            </span>
+            <Space size={8}>
+              <Button
+                icon={<LinkOutlined />}
+                onClick={() => setUtmModalOpen(true)}
+              >
+                {t("Tạo liên kết UTM")}
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingItem(null);
+                  setCostModalOpen(true);
+                }}
+                style={{ background: '#17a486', borderColor: '#17a486' }}
+              >
+                {t("Thêm chi phí chiến dịch")}
+              </Button>
+            </Space>
           }
         >
           <Table
-            size="middle"
-            rowKey="cohortMonth"
-            columns={cacColumns}
-            dataSource={cacCohorts ?? []}
-            pagination={false}
-            locale={{ emptyText: t("Chưa có dữ liệu") }}
+            size="small"
+            rowKey="id"
+            columns={costColumns}
+            dataSource={campaignCostsList}
+            pagination={{ pageSize: 5 }}
+            locale={{ emptyText: t("Chưa ghi nhận chi phí nào") }}
           />
         </SectionCard>
       </div>
 
-      {/* Manual Campaign Cost Management */}
+      {/* Subscription Orders */}
       <SectionCard
-        title={t("Quản lý chi phí thủ công")}
+        title={t("Đơn đăng ký gói Pro")}
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setModalOpen(true)}
-            style={{ background: '#17a486', borderColor: '#17a486' }}
-          >
-            {t("Thêm chi phí chiến dịch")}
-          </Button>
+          <span style={{ fontSize: 13, color: '#7a8c91' }}>
+            {t("Đã đối soát qua cổng thanh toán")}
+          </span>
         }
       >
         <Table
           size="small"
-          rowKey="id"
-          columns={costColumns}
-          dataSource={campaignCosts}
+          rowKey="orderCode"
+          columns={orderColumns}
+          dataSource={orders}
           pagination={{ pageSize: 5 }}
-          locale={{ emptyText: t("Chưa ghi nhận chi phí nào") }}
+          locale={{ emptyText: t("Chưa có dữ liệu") }}
         />
       </SectionCard>
     </div>

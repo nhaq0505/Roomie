@@ -19,27 +19,36 @@ export interface RegistrationAttributionContext {
   lastNonDirect: AttributionData | null;
 }
 
-export type AllowlistedEventName =
+export interface RegistrationAttributionDto {
+  browserId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  landingPage?: string;
+  referrer?: string;
+}
+
+export type AllowlistedEventType =
   | 'page_view'
   | 'cta_click'
   | 'session_start'
-  | 'registration_start'
-  | 'registration_complete'
-  | 'otp_request'
-  | 'otp_verify'
-  | 'checkout_start'
-  | 'checkout_complete';
+  | 'landing_view'
+  | 'pricing_view'
+  | 'auth_attempt'
+  | 'registration_submit'
+  | 'custom';
 
-export const ALLOWED_EVENT_NAMES = new Set<string>([
+export const ALLOWED_EVENT_TYPES = new Set<string>([
   'page_view',
   'cta_click',
   'session_start',
-  'registration_start',
-  'registration_complete',
-  'otp_request',
-  'otp_verify',
-  'checkout_start',
-  'checkout_complete',
+  'landing_view',
+  'pricing_view',
+  'auth_attempt',
+  'registration_submit',
+  'custom',
 ]);
 
 const STORAGE_KEYS = {
@@ -52,52 +61,80 @@ const STORAGE_KEYS = {
 
 export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
 export const ATTRIBUTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days window
-const MAX_EVENTS_PER_MINUTE = 30;
+const MAX_EVENTS_PER_MINUTE = 60;
 const MAX_KEY_LENGTH = 32;
 const MAX_VAL_LENGTH = 128;
-const MAX_PAYLOAD_BYTES = 2048;
+const MAX_PAYLOAD_BYTES = 4096;
+
+// In-memory fallback cache so IDs remain stable even when localStorage is blocked or throws
+const inMemoryStorage = new Map<string, string>();
 
 // In-memory rate limiting state
 let eventCountInWindow = 0;
 let windowStartTime = 0;
 
-function isBrowser(): boolean {
+export function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof document !== 'undefined';
 }
 
-function safeGetStorage(key: string): string | null {
-  if (!isBrowser()) return null;
+export function isBot(): boolean {
+  if (!isBrowser()) return false;
   try {
-    return localStorage.getItem(key);
+    if (typeof navigator !== 'undefined') {
+      if (navigator.webdriver) return true;
+      const ua = navigator.userAgent || '';
+      if (/bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot/i.test(ua)) {
+        return true;
+      }
+    }
   } catch {
-    return null;
+    // Ignore
+  }
+  return false;
+}
+
+export function safeGetStorage(key: string): string | null {
+  if (!isBrowser()) return inMemoryStorage.get(key) ?? null;
+  try {
+    const val = localStorage.getItem(key);
+    return val !== null ? val : (inMemoryStorage.get(key) ?? null);
+  } catch {
+    return inMemoryStorage.get(key) ?? null;
   }
 }
 
-function safeSetStorage(key: string, value: string): void {
+export function safeSetStorage(key: string, value: string): void {
+  inMemoryStorage.set(key, value);
   if (!isBrowser()) return;
   try {
     localStorage.setItem(key, value);
   } catch {
-    // Gracefully handle storage quota or private-browsing restrictions
+    // LocalStorage blocked, quota exceeded, or in private mode; memoryStorage preserves stability
   }
 }
 
-function generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      // Fallback
+export function clearInMemoryStorage(): void {
+  inMemoryStorage.clear();
+}
+
+export function generateId(): string {
+  try {
+    if (typeof crypto !== 'undefined') {
+      if (typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      if (typeof crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      }
     }
+  } catch {
+    // Fallback if crypto throws in restrictive contexts
   }
   const bytes = new Uint8Array(16);
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Ensure first-party browser ID (persists indefinitely per browser, no cross-device linking)
@@ -116,7 +153,12 @@ export function getOrCreateSessionId(now = Date.now()): { sessionId: string; isN
   const rawLastActive = safeGetStorage(STORAGE_KEYS.LAST_ACTIVE);
   const lastActive = rawLastActive ? Number(rawLastActive) : 0;
 
-  const isExpired = !currentSessionId || isNaN(lastActive) || (now - lastActive > SESSION_IDLE_TIMEOUT_MS);
+  const isExpired =
+    !currentSessionId ||
+    isNaN(lastActive) ||
+    lastActive <= 0 ||
+    lastActive > now ||
+    now - lastActive >= SESSION_IDLE_TIMEOUT_MS;
 
   if (isExpired) {
     const newSessionId = generateId();
@@ -129,60 +171,145 @@ export function getOrCreateSessionId(now = Date.now()): { sessionId: string; isN
   return { sessionId: currentSessionId, isNew: false };
 }
 
-// Strip query parameters except safe analytics keys to guarantee no PII/tokens in URLs
-export function sanitizePath(rawUrlOrPath: string): string {
-  try {
-    const url = new URL(rawUrlOrPath, 'https://roomie.local');
-    const safeParams = new URLSearchParams();
-    const allowedParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'lang'];
-    for (const key of allowedParams) {
-      const val = url.searchParams.get(key);
-      if (val) safeParams.set(key, val.slice(0, MAX_VAL_LENGTH));
-    }
-    const query = safeParams.toString();
-    return url.pathname + (query ? `?${query}` : '');
-  } catch {
-    return '/';
+// Known static routes in the application
+const STATIC_ROUTES = new Set<string>([
+  '/',
+  '/login',
+  '/register',
+  '/reset-password',
+  '/change-password',
+  '/account-status',
+  '/welcome',
+  '/dashboard',
+  '/buildings',
+  '/rooms',
+  '/readings',
+  '/invoices',
+  '/reports',
+  '/settings/payment',
+  '/settings/zalo',
+  '/admin/owners',
+  '/admin/monitoring',
+]);
+
+// Route allowlisting & normalization to prevent leaking arbitrary tokens or PII in URL paths
+export function normalizeRoute(rawPathname: string): string {
+  if (!rawPathname || typeof rawPathname !== 'string') return '/';
+
+  let clean = rawPathname.trim();
+  const qIdx = clean.indexOf('?');
+  if (qIdx >= 0) clean = clean.slice(0, qIdx);
+  const hashIdx = clean.indexOf('#');
+  if (hashIdx >= 0) clean = clean.slice(0, hashIdx);
+
+  clean = clean.replace(/\/+/g, '/');
+  if (!clean.startsWith('/')) clean = '/' + clean;
+  if (clean.length > 1 && clean.endsWith('/')) clean = clean.slice(0, -1);
+
+  if (STATIC_ROUTES.has(clean)) {
+    return clean;
   }
+
+  // Tenant overview and checkout routes (scrub raw tokens and invoice IDs)
+  if (/^\/(?:t|tenant)\/[^/]+\/invoices\/[^/]+\/checkout\/?$/.test(clean)) {
+    return '/tenant/[token]/invoices/[invoice_id]/checkout';
+  }
+  if (/^\/(?:t|tenant)\/[^/]+\/?$/.test(clean)) {
+    return '/tenant/[token]';
+  }
+
+  // Generic sanitization: mask GUIDs, hex tokens, and numeric IDs
+  const sanitized = clean
+    .replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '[id]')
+    .replace(/[0-9a-fA-F]{16,64}/g, '[token]')
+    .replace(/\/\d+(?=\/|$)/g, '/[id]');
+
+  return sanitized.slice(0, 64);
 }
 
 // PII scrub patterns
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PHONE_REGEX = /(?:\+?84|0)[3|5|7|8|9]\d{8}/g;
 const OTP_REGEX = /\b\d{4,6}\b/g;
-const TOKEN_REGEX = /\b(ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*|[0-9a-f]{32,64})\b/gi;
+const TOKEN_REGEX = /\b(ey[A-Za-z0-9-_=]{8,}(?:\.[A-Za-z0-9-_=]+)*|[0-9a-fA-F]{32,64})\b/gi;
+const SUSPICIOUS_KEYS = /password|token|secret|otp|cookie|auth|card|bank|phone|email|pin|bearer/i;
 
-export function scrubPii(value: unknown): unknown {
+export function scrubString(str: string): string {
+  if (typeof str !== 'string') return '';
+  let sanitized = str
+    .replace(EMAIL_REGEX, '[REDACTED_EMAIL]')
+    .replace(PHONE_REGEX, '[REDACTED_PHONE]')
+    .replace(TOKEN_REGEX, '[REDACTED_TOKEN]');
+  if (/otp|code|pin|secret/i.test(sanitized)) {
+    sanitized = sanitized.replace(OTP_REGEX, '[REDACTED_OTP]');
+  }
+  return sanitized.slice(0, MAX_VAL_LENGTH);
+}
+
+export function scrubPii(value: unknown, seen = new WeakSet<object>(), depth = 0): unknown {
+  if (depth > 5) return null;
+  if (value === null || value === undefined) return null;
+
   if (typeof value === 'string') {
-    let sanitized = value
-      .replace(EMAIL_REGEX, '[REDACTED_EMAIL]')
-      .replace(PHONE_REGEX, '[REDACTED_PHONE]')
-      .replace(TOKEN_REGEX, '[REDACTED_TOKEN]');
-    if (/otp|code|pin|password|secret|bearer/i.test(value)) {
-      sanitized = sanitized.replace(OTP_REGEX, '[REDACTED_OTP]');
-    }
-    return sanitized.slice(0, MAX_VAL_LENGTH);
+    return scrubString(value);
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
-  if (Array.isArray(value)) {
-    return value.slice(0, 10).map(scrubPii);
+  if (typeof value !== 'object') {
+    return null;
   }
-  if (value && typeof value === 'object') {
-    const cleaned: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) {
-      if (typeof k === 'string' && k.length <= MAX_KEY_LENGTH) {
-        if (/password|token|secret|otp|cookie|auth|card|bank|phone|email/i.test(k)) {
-          cleaned[k] = '[REDACTED]';
-        } else {
-          cleaned[k] = scrubPii(v);
-        }
+
+  // Detect and prevent infinite cycles
+  if (seen.has(value)) {
+    return '[CIRCULAR]';
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 10).map((item) => scrubPii(item, seen, depth + 1));
+  }
+
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof k === 'string' && k.length <= MAX_KEY_LENGTH) {
+      if (SUSPICIOUS_KEYS.test(k)) {
+        cleaned[k] = '[REDACTED]';
+      } else {
+        cleaned[k] = scrubPii(v, seen, depth + 1);
       }
     }
-    return cleaned;
   }
-  return null;
+  return cleaned;
+}
+
+// Bounded label sanitization for UTMs and CTAs matching server regex ^[a-zA-Z0-9_\-\.]{1,64}$
+export function sanitizeLabel(label?: string | null): string | undefined {
+  if (!label || typeof label !== 'string') return undefined;
+  const scrubbed = scrubString(label.trim());
+  const validCharsOnly = scrubbed.replace(/[^a-zA-Z0-9_\-\.]/g, '_').slice(0, 64);
+  return validCharsOnly.length > 0 ? validCharsOnly : undefined;
+}
+
+// Strip query parameters except safe analytics keys to guarantee no PII/tokens in landing paths
+export function sanitizePath(rawUrlOrPath: string): string {
+  try {
+    const url = new URL(rawUrlOrPath, 'https://roomie.local');
+    const normalizedPath = normalizeRoute(url.pathname);
+    const safeParams = new URLSearchParams();
+    const allowedParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    for (const key of allowedParams) {
+      const val = url.searchParams.get(key);
+      if (val) {
+        const cleanedVal = sanitizeLabel(val);
+        if (cleanedVal) safeParams.set(key, cleanedVal);
+      }
+    }
+    const query = safeParams.toString();
+    return normalizedPath + (query ? `?${query}` : '');
+  } catch {
+    return '/';
+  }
 }
 
 export function parseAttributionFromUrl(
@@ -191,12 +318,25 @@ export function parseAttributionFromUrl(
   pathname: string,
   now = Date.now()
 ): AttributionData {
-  const params = new URLSearchParams(search);
-  const utmSource = params.get('utm_source')?.trim();
-  const utmMedium = params.get('utm_medium')?.trim();
-  const utmCampaign = params.get('utm_campaign')?.trim();
-  const utmTerm = params.get('utm_term')?.trim();
-  const utmContent = params.get('utm_content')?.trim();
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(search);
+  } catch {
+    params = new URLSearchParams();
+  }
+
+  const rawSource = params.get('utm_source');
+  const rawMedium = params.get('utm_medium');
+  const rawCampaign = params.get('utm_campaign');
+  const rawTerm = params.get('utm_term');
+  const rawContent = params.get('utm_content');
+
+  // Scrub and sanitize labels BEFORE storing in attribution
+  const utmSource = sanitizeLabel(rawSource);
+  const utmMedium = sanitizeLabel(rawMedium);
+  const utmCampaign = sanitizeLabel(rawCampaign);
+  const utmTerm = sanitizeLabel(rawTerm);
+  const utmContent = sanitizeLabel(rawContent);
 
   let referrerHost = '';
   if (referrer) {
@@ -207,7 +347,6 @@ export function parseAttributionFromUrl(
     }
   }
 
-  // Check if referrer is external
   const currentHost = isBrowser() ? window.location.hostname : '';
   const isExternalReferrer = Boolean(referrerHost && (!currentHost || referrerHost !== currentHost));
 
@@ -215,10 +354,10 @@ export function parseAttributionFromUrl(
   let medium: string | undefined = undefined;
 
   if (utmSource) {
-    source = utmSource.slice(0, MAX_VAL_LENGTH);
-    medium = utmMedium ? utmMedium.slice(0, MAX_VAL_LENGTH) : 'cpc';
+    source = utmSource;
+    medium = utmMedium || 'cpc';
   } else if (isExternalReferrer) {
-    source = referrerHost.slice(0, MAX_VAL_LENGTH);
+    source = sanitizeLabel(referrerHost) || '(referral)';
     medium = 'referral';
   }
 
@@ -228,43 +367,53 @@ export function parseAttributionFromUrl(
     landingPath: sanitizePath(pathname + (search ? (search.startsWith('?') ? search : `?${search}`) : '')),
   };
   if (medium) attribution.medium = medium;
-  if (utmCampaign) attribution.campaign = utmCampaign.slice(0, MAX_VAL_LENGTH);
-  if (utmTerm) attribution.term = utmTerm.slice(0, MAX_VAL_LENGTH);
-  if (utmContent) attribution.content = utmContent.slice(0, MAX_VAL_LENGTH);
+  if (utmCampaign) attribution.campaign = utmCampaign;
+  if (utmTerm) attribution.term = utmTerm;
+  if (utmContent) attribution.content = utmContent;
 
   return attribution;
 }
 
 // Initialize and record attribution on page load/visit
 export function recordAttribution(now = Date.now()): void {
-  if (!isBrowser()) return;
+  if (!isBrowser() || isBot()) return;
 
-  const attribution = parseAttributionFromUrl(
-    window.location.search,
-    document.referrer,
-    window.location.pathname,
-    now
-  );
+  try {
+    const attribution = parseAttributionFromUrl(
+      window.location.search,
+      document.referrer,
+      window.location.pathname,
+      now
+    );
 
-  // 1. First Touch: set once and preserve for up to 30 days
-  const existingFirstTouchRaw = safeGetStorage(STORAGE_KEYS.FIRST_TOUCH);
-  if (!existingFirstTouchRaw) {
-    safeSetStorage(STORAGE_KEYS.FIRST_TOUCH, JSON.stringify(attribution));
-  } else {
-    try {
-      const existing = JSON.parse(existingFirstTouchRaw) as AttributionData;
-      // If expired (> 30 days), refresh
-      if (now - existing.timestamp > ATTRIBUTION_WINDOW_MS) {
+    // 1. First Touch: set once and preserve for up to 30 days
+    const existingFirstTouchRaw = safeGetStorage(STORAGE_KEYS.FIRST_TOUCH);
+    if (!existingFirstTouchRaw) {
+      safeSetStorage(STORAGE_KEYS.FIRST_TOUCH, JSON.stringify(attribution));
+    } else {
+      try {
+        const existing = JSON.parse(existingFirstTouchRaw) as AttributionData;
+        // If missing timestamp, future timestamp, or expired (> 30 days), refresh
+        if (
+          !existing ||
+          typeof existing.timestamp !== 'number' ||
+          existing.timestamp > now ||
+          now - existing.timestamp > ATTRIBUTION_WINDOW_MS
+        ) {
+          safeSetStorage(STORAGE_KEYS.FIRST_TOUCH, JSON.stringify(attribution));
+        }
+        // Otherwise: preserve first touch!
+      } catch {
         safeSetStorage(STORAGE_KEYS.FIRST_TOUCH, JSON.stringify(attribution));
       }
-    } catch {
-      safeSetStorage(STORAGE_KEYS.FIRST_TOUCH, JSON.stringify(attribution));
     }
-  }
 
-  // 2. Last Non-Direct: record if this visit is non-direct
-  if (attribution.source !== '(direct)' && attribution.source !== 'direct') {
-    safeSetStorage(STORAGE_KEYS.LAST_NON_DIRECT, JSON.stringify(attribution));
+    // 2. Last Non-Direct: record if this visit is non-direct
+    if (attribution.source !== '(direct)' && attribution.source !== 'direct') {
+      safeSetStorage(STORAGE_KEYS.LAST_NON_DIRECT, JSON.stringify(attribution));
+    }
+  } catch {
+    // Non-blocking best-effort
   }
 }
 
@@ -274,10 +423,15 @@ export function getLastNonDirectSource(now = Date.now()): AttributionData | null
   if (!raw) return null;
   try {
     const data = JSON.parse(raw) as AttributionData;
-    if (now - data.timestamp <= ATTRIBUTION_WINDOW_MS) {
+    if (
+      data &&
+      typeof data.timestamp === 'number' &&
+      data.timestamp <= now &&
+      now - data.timestamp <= ATTRIBUTION_WINDOW_MS
+    ) {
       return data;
     }
-    return null; // Expired beyond 30 days
+    return null;
   } catch {
     return null;
   }
@@ -289,7 +443,12 @@ export function getFirstTouchSource(now = Date.now()): AttributionData | null {
   if (!raw) return null;
   try {
     const data = JSON.parse(raw) as AttributionData;
-    if (now - data.timestamp <= ATTRIBUTION_WINDOW_MS) {
+    if (
+      data &&
+      typeof data.timestamp === 'number' &&
+      data.timestamp <= now &&
+      now - data.timestamp <= ATTRIBUTION_WINDOW_MS
+    ) {
       return data;
     }
     return null;
@@ -298,7 +457,7 @@ export function getFirstTouchSource(now = Date.now()): AttributionData | null {
   }
 }
 
-// Returns full attribution context to pass along during registration/OTP verification
+// Returns full attribution context for registration
 export function getRegistrationAttributionContext(now = Date.now()): RegistrationAttributionContext {
   const browserId = getOrCreateBrowserId();
   const { sessionId } = getOrCreateSessionId(now);
@@ -313,14 +472,45 @@ export function getRegistrationAttributionContext(now = Date.now()): Registratio
   };
 }
 
-// Event Tracking Primitive
-export interface EventPayload {
-  eventName: AllowlistedEventName;
-  properties?: Record<string, unknown>;
-  browserId?: string;
-  sessionId?: string;
-  timestamp?: number;
-  url?: string;
+// Returns the formatted DTO to pass in authApi.register
+export function getRegistrationAttributionForApi(now = Date.now()): RegistrationAttributionDto {
+  const browserId = getOrCreateBrowserId();
+  const lastNonDirect = getLastNonDirectSource(now);
+  const firstTouch = getFirstTouchSource(now);
+  const active = lastNonDirect || firstTouch;
+
+  return {
+    browserId,
+    utmSource: active?.source !== '(direct)' ? active?.source : undefined,
+    utmMedium: active?.medium,
+    utmCampaign: active?.campaign,
+    utmContent: active?.content,
+    utmTerm: active?.term,
+    landingPage: active?.landingPath ? normalizeRoute(active.landingPath) : undefined,
+    referrer: isBrowser() && document.referrer ? normalizeRoute(document.referrer) : undefined,
+  };
+}
+
+// Backend-aligned client analytics event item
+export interface AnalyticsEventItem {
+  eventType: AllowlistedEventType;
+  eventName?: string;
+  path: string;
+  referrerPath?: string;
+  ctaId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  clientTimestamp?: string;
+}
+
+// Backend-aligned batch request
+export interface AnalyticsEventBatchRequest {
+  browserId: string;
+  sessionId: string;
+  events: AnalyticsEventItem[];
 }
 
 function checkRateLimit(now = Date.now()): boolean {
@@ -329,42 +519,70 @@ function checkRateLimit(now = Date.now()): boolean {
     eventCountInWindow = 0;
   }
   if (eventCountInWindow >= MAX_EVENTS_PER_MINUTE) {
-    return false; // Throttled
+    return false;
   }
   eventCountInWindow++;
   return true;
 }
 
+export interface TrackEventOptions {
+  eventName?: string;
+  path?: string;
+  referrerPath?: string;
+  ctaId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  properties?: Record<string, unknown>;
+}
+
 export function trackEvent(
-  eventName: AllowlistedEventName,
-  properties: Record<string, unknown> = {}
+  eventType: AllowlistedEventType,
+  options: TrackEventOptions = {}
 ): boolean {
-  if (!isBrowser()) return false;
-  if (!ALLOWED_EVENT_NAMES.has(eventName)) return false;
-
-  const now = Date.now();
-  if (!checkRateLimit(now)) return false;
-
-  const browserId = getOrCreateBrowserId();
-  const { sessionId } = getOrCreateSessionId(now);
-
-  const cleanProps = scrubPii(properties) as Record<string, unknown>;
-  const payload: EventPayload = {
-    eventName,
-    properties: cleanProps,
-    browserId,
-    sessionId,
-    timestamp: now,
-    url: sanitizePath(window.location.pathname + window.location.search),
-  };
-
-  const json = JSON.stringify(payload);
-  if (json.length > MAX_PAYLOAD_BYTES) {
-    return false; // Bounded payload protection
-  }
-
-  // Non-blocking best-effort transmission via sendBeacon or fetch keepalive
   try {
+    if (!isBrowser() || isBot()) return false;
+    if (!ALLOWED_EVENT_TYPES.has(eventType)) return false;
+
+    const now = Date.now();
+    if (!checkRateLimit(now)) return false;
+
+    const browserId = getOrCreateBrowserId();
+    const { sessionId } = getOrCreateSessionId(now);
+
+    const activeAttribution = getLastNonDirectSource(now) || getFirstTouchSource(now);
+
+    const eventItem: AnalyticsEventItem = {
+      eventType,
+      eventName: options.eventName ? scrubString(options.eventName) : undefined,
+      path: normalizeRoute(options.path || window.location.pathname),
+      referrerPath: options.referrerPath
+        ? normalizeRoute(options.referrerPath)
+        : document.referrer
+          ? normalizeRoute(document.referrer)
+          : undefined,
+      ctaId: sanitizeLabel(options.ctaId),
+      utmSource: sanitizeLabel(options.utmSource || activeAttribution?.source !== '(direct)' ? options.utmSource || activeAttribution?.source : undefined),
+      utmMedium: sanitizeLabel(options.utmMedium || activeAttribution?.medium),
+      utmCampaign: sanitizeLabel(options.utmCampaign || activeAttribution?.campaign),
+      utmContent: sanitizeLabel(options.utmContent || activeAttribution?.content),
+      utmTerm: sanitizeLabel(options.utmTerm || activeAttribution?.term),
+      clientTimestamp: new Date(now).toISOString(),
+    };
+
+    const batchRequest: AnalyticsEventBatchRequest = {
+      browserId,
+      sessionId,
+      events: [eventItem],
+    };
+
+    const json = JSON.stringify(batchRequest);
+    if (json.length > MAX_PAYLOAD_BYTES) {
+      return false;
+    }
+
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
       const blob = new Blob([json], { type: 'application/json' });
       const sent = navigator.sendBeacon('/api/analytics/events', blob);
@@ -379,7 +597,7 @@ export function trackEvent(
         keepalive: true,
         credentials: 'same-origin',
       }).catch(() => {
-        // Analytics must never break or interrupt caller application logic
+        // Must never break application logic
       });
       return true;
     }

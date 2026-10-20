@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { errorText } from '../../shared/i18n/errors';
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
+import { getRegistrationAttributionForApi, trackEvent } from '../../shared/analytics';
 import RoomieMark from '../../shared/ui/RoomieMark';
 import { useAuth } from './AuthProvider';
 import { authApi, type RegistrationVerification } from './index';
@@ -60,9 +61,20 @@ export default function RegisterPage() {
   const submit = async (values: { name: string; email: string; password: string; phone: string }) => {
     if (busy) return;
     setBusy(true); setError('');
+    try {
+      trackEvent('registration_submit', { eventName: 'Registration Submit', path: '/register' });
+    } catch {
+      // Non-blocking
+    }
     let accountCreated = false;
     try {
-      const registration = await authApi.register(values);
+      let attribution;
+      try {
+        attribution = getRegistrationAttributionForApi();
+      } catch {
+        // Fallback
+      }
+      const registration = await authApi.register({ ...values, attribution });
       if ('verificationRequired' in registration && registration.verificationRequired) {
         form.resetFields(['password']);
         saveChallenge(registration);

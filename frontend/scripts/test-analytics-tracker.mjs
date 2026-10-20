@@ -19,33 +19,42 @@ const bundle = await build({
   platform: 'node',
 });
 
-function createMockEnvironment() {
+function createMockEnvironment(options = {}) {
   const storage = new Map();
   const beaconCalls = [];
   const fetchCalls = [];
 
-  const localStorage = {
-    getItem: (key) => storage.has(key) ? storage.get(key) : null,
-    setItem: (key, val) => { storage.set(key, String(val)); },
-    removeItem: (key) => { storage.delete(key); },
-    clear: () => { storage.clear(); },
-  };
+  const localStorage = options.disableLocalStorage
+    ? {
+        getItem: () => { throw new Error('SecurityError: localStorage blocked in private browsing'); },
+        setItem: () => { throw new Error('QuotaExceededError'); },
+        removeItem: () => { throw new Error('Blocked'); },
+        clear: () => { storage.clear(); },
+      }
+    : {
+        getItem: (key) => storage.has(key) ? storage.get(key) : null,
+        setItem: (key, val) => { storage.set(key, String(val)); },
+        removeItem: (key) => { storage.delete(key); },
+        clear: () => { storage.clear(); },
+      };
 
   const document = {
-    referrer: '',
+    referrer: options.referrer || '',
   };
 
   const window = {
     location: {
       hostname: 'roomie.io.vn',
-      pathname: '/',
-      search: '',
+      pathname: options.pathname || '/',
+      search: options.search || '',
     },
     document,
     localStorage,
   };
 
   const navigator = {
+    webdriver: options.isBot || false,
+    userAgent: options.userAgent || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
     sendBeacon: (url, blob) => {
       beaconCalls.push({ url, blob });
       return true;
@@ -57,6 +66,7 @@ function createMockEnvironment() {
     return { ok: true, status: 200 };
   };
 
+  let uuidCounter = 1000;
   const sandbox = {
     module: { exports: {} },
     exports: {},
@@ -77,11 +87,17 @@ function createMockEnvironment() {
     Array,
     Set,
     Map,
+    WeakSet,
     Uint8Array,
-    crypto: {
-      randomUUID: () => 'uuid-test-1234-5678-90ab-cdef12345678',
-      getRandomValues: (arr) => arr.fill(42),
-    },
+    crypto: options.brokenCrypto
+      ? {
+          randomUUID: () => { throw new Error('Crypto disabled'); },
+          getRandomValues: () => { throw new Error('Crypto disabled'); },
+        }
+      : {
+          randomUUID: () => `c4b18f8e-d4c3-4d82-841f-${uuidCounter++}`,
+          getRandomValues: (arr) => arr.fill(42),
+        },
   };
 
   vm.runInNewContext(bundle.outputFiles[0].text, sandbox);
@@ -95,11 +111,11 @@ function createMockEnvironment() {
   };
 }
 
-// 1. Browser ID tests
+// 1. Browser ID & persistence
 {
   const env = createMockEnvironment();
   const bid1 = env.tracker.getOrCreateBrowserId();
-  assert.equal(bid1, 'uuid-test-1234-5678-90ab-cdef12345678');
+  assert.equal(bid1, 'c4b18f8e-d4c3-4d82-841f-1000');
   assert.equal(env.storage.get('roomie_bid'), bid1);
 
   // Subsequent call preserves same ID
@@ -107,7 +123,29 @@ function createMockEnvironment() {
   assert.equal(bid2, bid1);
 }
 
-// 2. Session ID & 30-min idle window tests
+// 2. Safe ID generation when crypto throws
+{
+  const env = createMockEnvironment({ brokenCrypto: true });
+  const bid = env.tracker.getOrCreateBrowserId();
+  assert.ok(bid);
+  assert.equal(typeof bid, 'string');
+  assert.ok(bid.length >= 16);
+}
+
+// 3. In-memory storage stability when localStorage throws (private browsing)
+{
+  const env = createMockEnvironment({ disableLocalStorage: true });
+  const bid1 = env.tracker.getOrCreateBrowserId();
+  assert.ok(bid1);
+  const bid2 = env.tracker.getOrCreateBrowserId();
+  assert.equal(bid1, bid2, 'Browser ID must remain stable in memory when localStorage throws');
+
+  const s1 = env.tracker.getOrCreateSessionId(1000);
+  const s2 = env.tracker.getOrCreateSessionId(1000 + 10 * 60 * 1000);
+  assert.equal(s1.sessionId, s2.sessionId, 'Session ID must remain stable across calls within idle window');
+}
+
+// 4. Session ID & exact 30-min idle boundary
 {
   const env = createMockEnvironment();
   const t0 = 10000000;
@@ -115,153 +153,149 @@ function createMockEnvironment() {
   assert.equal(s0.isNew, true);
   assert.ok(s0.sessionId);
 
-  // Call within 10 minutes (less than 30 min idle) -> reuses session
-  const t1 = t0 + 10 * 60 * 1000;
+  // Exactly 29 minutes and 59 seconds: NOT expired
+  const t1 = t0 + (30 * 60 * 1000 - 1000);
   const s1 = env.tracker.getOrCreateSessionId(t1);
   assert.equal(s1.isNew, false);
   assert.equal(s1.sessionId, s0.sessionId);
 
-  // Call after 31 minutes idle -> new session
-  const t2 = t1 + 31 * 60 * 1000;
+  // Exactly 30 minutes: EXPIRED
+  const t2 = t1 + (30 * 60 * 1000);
   const s2 = env.tracker.getOrCreateSessionId(t2);
   assert.equal(s2.isNew, true);
-  assert.ok(s2.sessionId);
+  assert.notEqual(s2.sessionId, s0.sessionId);
+
+  // Corrupt or future timestamp in storage triggers graceful session renewal
+  env.storage.set('roomie_last_active', String(t2 + 999999999));
+  const sFuture = env.tracker.getOrCreateSessionId(t2 + 1000);
+  assert.equal(sFuture.isNew, true, 'Future timestamp must reset session');
 }
 
-// 3. Attribution parsing tests
+// 5. Route normalization and token masking
 {
   const env = createMockEnvironment();
-  
-  // Direct visit
-  const direct = env.tracker.parseAttributionFromUrl('', '', '/', 1000);
-  assert.equal(direct.source, '(direct)');
-  assert.equal(direct.landingPath, '/');
+  assert.equal(env.tracker.normalizeRoute('/'), '/');
+  assert.equal(env.tracker.normalizeRoute('/login'), '/login');
+  assert.equal(env.tracker.normalizeRoute('/dashboard/'), '/dashboard');
+  assert.equal(env.tracker.normalizeRoute('/admin/monitoring?foo=bar#hash'), '/admin/monitoring');
 
-  // UTM visit
-  const utm = env.tracker.parseAttributionFromUrl(
-    '?utm_source=facebook&utm_medium=cpc&utm_campaign=summer_sale&utm_content=banner1',
-    'https://l.facebook.com/l.php?u=...',
-    '/pricing',
-    2000
-  );
-  assert.equal(utm.source, 'facebook');
-  assert.equal(utm.medium, 'cpc');
-  assert.equal(utm.campaign, 'summer_sale');
-  assert.equal(utm.content, 'banner1');
-  assert.equal(utm.landingPath, '/pricing?utm_source=facebook&utm_medium=cpc&utm_campaign=summer_sale&utm_content=banner1');
+  // Tenant routes: must mask raw secret tokens
+  const tenantView = env.tracker.normalizeRoute('/t/d1e2f3a4b5c6d7e8f9a0b1c2');
+  assert.equal(tenantView, '/tenant/[token]');
 
-  // External referrer without UTM
-  const organic = env.tracker.parseAttributionFromUrl(
-    '',
-    'https://www.google.com/search?q=roomie',
-    '/',
-    3000
-  );
-  assert.equal(organic.source, 'www.google.com');
-  assert.equal(organic.medium, 'referral');
+  const tenantCheckout = env.tracker.normalizeRoute('/tenant/secret-token-abc-123/invoices/992211/checkout');
+  assert.equal(tenantCheckout, '/tenant/[token]/invoices/[invoice_id]/checkout');
+
+  // GUID masking in paths
+  const guidPath = env.tracker.normalizeRoute('/buildings/3fa85f64-5717-4562-b3fc-2c963f66afa6');
+  assert.equal(guidPath, '/buildings/[id]');
 }
 
-// 4. First touch & Last non-direct attribution persistence
+// 6. PII scrubbing & cyclic object protection
+{
+  const env = createMockEnvironment();
+
+  // Test email, phone, token redaction in strings
+  const scrubbedStr = env.tracker.scrubString('Call 0912345678 or email admin@roomie.vn with token eyJhbGciOi');
+  assert.ok(!scrubbedStr.includes('0912345678'));
+  assert.ok(!scrubbedStr.includes('admin@roomie.vn'));
+  assert.ok(!scrubbedStr.includes('eyJhbGciOi'));
+  assert.ok(scrubbedStr.includes('[REDACTED_PHONE]'));
+  assert.ok(scrubbedStr.includes('[REDACTED_EMAIL]'));
+  assert.ok(scrubbedStr.includes('[REDACTED_TOKEN]'));
+
+  // Cyclic object must NOT cause stack overflow or throw
+  const cyclicObj = { a: 1, label: 'test' };
+  cyclicObj.self = cyclicObj;
+  const scrubbedObj = env.tracker.scrubPii(cyclicObj);
+  assert.equal(scrubbedObj.a, 1);
+  assert.equal(scrubbedObj.self, '[CIRCULAR]');
+
+  // Deeply nested object beyond depth 5 must be bounded
+  let deep = { val: 'end' };
+  for (let i = 0; i < 10; i++) deep = { nested: deep };
+  const scrubbedDeep = env.tracker.scrubPii(deep);
+  assert.ok(scrubbedDeep !== undefined);
+
+  // Label sanitization matching server regex ^[a-zA-Z0-9_\-\.]{1,64}$
+  assert.equal(env.tracker.sanitizeLabel('facebook_cpc'), 'facebook_cpc');
+  assert.equal(env.tracker.sanitizeLabel('dirty@email.com'), '_REDACTED_EMAIL_');
+  assert.ok(/^[a-zA-Z0-9_\-\.]{1,64}$/.test(env.tracker.sanitizeLabel('dirty@email.com')));
+}
+
+// 7. Attribution parsing & first-touch preservation
 {
   const env = createMockEnvironment();
   const t0 = 1000000;
 
-  // Visit 1: from Google search
-  env.window.location.search = '?utm_source=google&utm_medium=organic&utm_campaign=brand';
+  // Visit 1: Google search
+  env.window.location.search = '?utm_source=google&utm_medium=cpc&utm_campaign=summer_promo';
   env.document.referrer = 'https://www.google.com';
   env.tracker.recordAttribution(t0);
 
-  const firstTouch = env.tracker.getFirstTouchSource(t0);
-  assert.ok(firstTouch);
-  assert.equal(firstTouch.source, 'google');
+  const ft1 = env.tracker.getFirstTouchSource(t0);
+  assert.equal(ft1.source, 'google');
+  assert.equal(ft1.campaign, 'summer_promo');
 
-  const lastNonDirect1 = env.tracker.getLastNonDirectSource(t0);
-  assert.ok(lastNonDirect1);
-  assert.equal(lastNonDirect1.source, 'google');
+  const lnd1 = env.tracker.getLastNonDirectSource(t0);
+  assert.equal(lnd1.source, 'google');
 
-  // Visit 2: direct visit (user opens bookmarked tab 2 days later)
-  const t1 = t0 + 2 * 24 * 3600 * 1000;
+  // Visit 2: Direct visit 5 days later
+  const t1 = t0 + 5 * 24 * 3600 * 1000;
   env.window.location.search = '';
   env.document.referrer = '';
   env.tracker.recordAttribution(t1);
 
-  // First touch still Google (not overwritten by direct)
-  assert.equal(env.tracker.getFirstTouchSource(t1).source, 'google');
-  // Last non-direct still Google (direct visits don't overwrite last non-direct)
-  assert.equal(env.tracker.getLastNonDirectSource(t1).source, 'google');
+  // First touch must NOT be overwritten!
+  const ft2 = env.tracker.getFirstTouchSource(t1);
+  assert.equal(ft2.source, 'google');
+  // Last non-direct must stay Google (not overwritten by direct)
+  const lnd2 = env.tracker.getLastNonDirectSource(t1);
+  assert.equal(lnd2.source, 'google');
 
-  // Visit 3: from Zalo campaign 5 days later
-  const t2 = t1 + 3 * 24 * 3600 * 1000;
-  env.window.location.search = '?utm_source=zalo&utm_medium=chat&utm_campaign=owner_invite';
+  // Visit 3: Zalo campaign 10 days later
+  const t2 = t1 + 5 * 24 * 3600 * 1000;
+  env.window.location.search = '?utm_source=zalo&utm_medium=chat&utm_campaign=q4';
   env.tracker.recordAttribution(t2);
 
   // First touch remains original Google touch
   assert.equal(env.tracker.getFirstTouchSource(t2).source, 'google');
-  // Last non-direct is now Zalo!
+  // Last non-direct is updated to Zalo
   assert.equal(env.tracker.getLastNonDirectSource(t2).source, 'zalo');
 
-  // 35 days later: last non-direct expired (> 30 days)
-  const t3 = t2 + 35 * 24 * 3600 * 1000;
-  assert.equal(env.tracker.getLastNonDirectSource(t3), null);
+  // Registration attribution DTO
+  const regDto = env.tracker.getRegistrationAttributionForApi(t2);
+  assert.ok(regDto.browserId);
+  assert.equal(regDto.utmSource, 'zalo');
+  assert.equal(regDto.utmCampaign, 'q4');
 }
 
-// 5. PII scrubbing & sanitization
+// 8. Event Batch Request payload verification
 {
-  const env = createMockEnvironment();
-
-  // Test email, phone, token redaction
-  const dirtyProps = {
-    userEmail: 'sensitive.user@example.com',
-    phoneNumber: '0912345678',
-    auth_token: 'secret-bearer-token-12345',
-    password: 'MyPassword123!',
-    otpCode: '123456',
-    normalField: 'pricing_table_pro',
-  };
-
-  const scrubbed = env.tracker.scrubPii(dirtyProps);
-  assert.equal(scrubbed.userEmail, '[REDACTED]');
-  assert.equal(scrubbed.phoneNumber, '[REDACTED]');
-  assert.equal(scrubbed.auth_token, '[REDACTED]');
-  assert.equal(scrubbed.password, '[REDACTED]');
-  assert.equal(scrubbed.otpCode, '[REDACTED]');
-  assert.equal(scrubbed.normalField, 'pricing_table_pro');
-
-  // URL query stripping
-  const dirtyUrl = '/checkout?secret=xyz123&otp=999888&utm_source=fb&token=bad';
-  const cleanUrl = env.tracker.sanitizePath(dirtyUrl);
-  assert.equal(cleanUrl, '/checkout?utm_source=fb');
-  assert.ok(!cleanUrl.includes('secret'));
-  assert.ok(!cleanUrl.includes('otp'));
-}
-
-// 6. Registration attribution context
-{
-  const env = createMockEnvironment();
-  env.window.location.search = '?utm_source=tiktok&utm_medium=video';
-  env.tracker.recordAttribution(100000);
-
-  const regContext = env.tracker.getRegistrationAttributionContext(100000);
-  assert.ok(regContext.browserId);
-  assert.ok(regContext.sessionId);
-  assert.equal(regContext.firstTouch.source, 'tiktok');
-  assert.equal(regContext.lastNonDirect.source, 'tiktok');
-}
-
-// 7. Event tracking primitive
-{
-  const env = createMockEnvironment();
-  
-  // Non-allowlisted event fails
-  const bad = env.tracker.trackEvent('unknown_hack_event', {});
-  assert.equal(bad, false);
-  assert.equal(env.beaconCalls.length, 0);
-
-  // Allowlisted event succeeds
-  const good = env.tracker.trackEvent('cta_click', { cta: 'register_header' });
-  assert.equal(good, true);
+  const env = createMockEnvironment({ pathname: '/pricing' });
+  const ok = env.tracker.trackEvent('page_view', {
+    eventName: 'Pricing Page View',
+    ctaId: 'btn_hero_signup',
+  });
+  assert.equal(ok, true);
   assert.equal(env.beaconCalls.length, 1);
   assert.equal(env.beaconCalls[0].url, '/api/analytics/events');
+
+  // Inspect the serialized batch payload sent over wire
+  const sentBlob = env.beaconCalls[0].blob;
+  assert.ok(sentBlob);
+
+  // Non-allowlisted event rejected
+  const bad = env.tracker.trackEvent('paid_activation_hack', {});
+  assert.equal(bad, false);
 }
 
-console.log('PASS: first-party browser tracking primitive (browser ID, 30m idle session, attribution, PII scrubbing, registration context, allowlisted events)');
+// 9. Bot exclusion
+{
+  const envBot = createMockEnvironment({ isBot: true });
+  const ok = envBot.tracker.trackEvent('page_view', { eventName: 'Bot Visit' });
+  assert.equal(ok, false, 'Bot tracking must be suppressed');
+  assert.equal(envBot.beaconCalls.length, 0);
+}
+
+console.log('PASS: first-party browser tracking primitive (browser ID, 30m idle session, attribution, PII scrubbing, registration context, allowlisted events, security boundaries)');

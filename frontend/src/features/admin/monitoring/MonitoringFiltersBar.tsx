@@ -1,5 +1,5 @@
-import { ReloadOutlined } from '@ant-design/icons';
-import { Button, DatePicker, Radio, Select, Space } from 'antd';
+import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button, DatePicker, Input, Radio, Select, Space, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { dateFormat, t } from '../../../shared/i18n/runtime';
 import type { DateRangePreset, MonitoringFilters, OpsWindowPreset } from './types';
@@ -10,10 +10,10 @@ interface MonitoringFiltersBarProps {
   onRefresh: () => void;
   isLoading?: boolean;
   activeTab: 'growth' | 'revenue' | 'operations';
+  lastUpdatedAt?: Date | null;
 }
 
 function calculatePresetDates(preset: DateRangePreset): [string, string] {
-  // Use Vietnam timezone Asia/Ho_Chi_Minh
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric',
@@ -33,7 +33,6 @@ function calculatePresetDates(preset: DateRangePreset): [string, string] {
   if (preset === '90d') {
     return [today.subtract(89, 'day').format('YYYY-MM-DD'), todayStr];
   }
-  // Default: 30 days
   return [today.subtract(29, 'day').format('YYYY-MM-DD'), todayStr];
 }
 
@@ -43,6 +42,7 @@ export function MonitoringFiltersBar({
   onRefresh,
   isLoading,
   activeTab,
+  lastUpdatedAt,
 }: MonitoringFiltersBarProps) {
   const handlePresetChange = (preset: DateRangePreset) => {
     if (preset === 'custom') {
@@ -64,7 +64,11 @@ export function MonitoringFiltersBar({
   };
 
   const handleSourceChange = (val?: string) => {
-    onChange({ ...filters, source: val });
+    onChange({ ...filters, source: val || undefined });
+  };
+
+  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange({ ...filters, campaign: e.target.value.trim() || undefined });
   };
 
   const handleOpsWindowChange = (val: OpsWindowPreset) => {
@@ -77,10 +81,34 @@ export function MonitoringFiltersBar({
     { value: 'google', label: 'google' },
     { value: 'facebook', label: 'facebook' },
     { value: 'zalo', label: 'zalo' },
+    { value: 'tiktok', label: 'tiktok' },
   ];
 
+  const formatLastUpdated = (date: Date) => {
+    return new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
+  };
+
   return (
-    <div className="monitoring-filters-bar">
+    <div
+      className="monitoring-filters-bar"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 12,
+        padding: '12px 16px',
+        background: '#fff',
+        borderRadius: 12,
+        marginBottom: 20,
+        border: '1px solid #e8f0ee',
+      }}
+    >
       <Space wrap size={[12, 12]}>
         {activeTab !== 'operations' ? (
           <>
@@ -106,11 +134,19 @@ export function MonitoringFiltersBar({
             )}
 
             <Select
-              style={{ width: 150 }}
+              style={{ width: 140 }}
               value={filters.source ?? ''}
               onChange={handleSourceChange}
               options={sourceOptions}
               placeholder={t("Nguồn / Kênh")}
+            />
+
+            <Input
+              style={{ width: 160 }}
+              value={filters.campaign ?? ''}
+              onChange={handleCampaignChange}
+              placeholder={t("Chiến dịch")}
+              allowClear
             />
           </>
         ) : (
@@ -128,8 +164,21 @@ export function MonitoringFiltersBar({
             </Radio.Group>
           </Space>
         )}
+      </Space>
 
-        <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={isLoading}>
+      <Space size={12}>
+        {lastUpdatedAt && (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <ClockCircleOutlined style={{ marginRight: 4 }} />
+            <span>{formatLastUpdated(lastUpdatedAt)} (UTC+7)</span>
+          </Typography.Text>
+        )}
+
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={onRefresh}
+          loading={isLoading}
+        >
           {t("Làm mới")}
         </Button>
       </Space>
