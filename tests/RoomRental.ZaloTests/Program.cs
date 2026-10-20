@@ -76,9 +76,9 @@ await db.SaveChangesAsync();
 Assert(await service.QueueAsync(owner.Id, default) == 1, "queue filters draft, paid, invalid phone, inactive and other owner");
 Assert(await service.QueueAsync(owner.Id, default) == 0, "double enqueue does not duplicate");
 await service.DispatchAsync(owner.Id, default);
-Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Message.Contains("75.000") && gateway.Sends[0].Phone == "0912345678", "send remaining amount and normalized number");
+Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Message.Contains("Tổng: 100.000 đ;") && gateway.Sends[0].Phone == "0912345678", "send invoice total and normalized number");
 var originalToken = tokens.Unprotect(await db.Occupancies.SingleAsync(x => x.Id == invoice.OccupancyId));
-Assert(gateway.Sends[0].Message.Contains($"Xem hóa đơn: https://roomie.example/t/{originalToken}\n") &&
+Assert(gateway.Sends[0].Message.EndsWith($"Thanh Toán Tại : https://roomie.example/t/{originalToken}") &&
     !gateway.Sends[0].Message.Contains("/checkout") && !gateway.Sends[0].Message.Contains("/invoices/") &&
     !gateway.Sends[0].Message.Contains("STK:") && !gateway.Sends[0].Message.Contains("Quét QR"), "existing tenant overview link, no direct checkout, bank or QR");
 db.ChangeTracker.Clear();
@@ -168,7 +168,7 @@ var resident = await db.Occupancies.SingleAsync(x => x.Id == rotatedInvoice.Occu
 var rotated = tokens.Create(); resident.TenantTokenHash = rotated.Hash; resident.ProtectedTenantToken = rotated.ProtectedToken;
 await db.SaveChangesAsync();
 await service.DispatchAsync(owner.Id, default);
-Assert(gateway.Sends.Last().Message.Contains($"Xem hóa đơn: {tokens.Url(rotated.Token)}\n") && !gateway.Sends.Last().Message.Contains("/checkout"), "dispatch uses current rotated tenant link");
+Assert(gateway.Sends.Last().Message.EndsWith($"Thanh Toán Tại : {tokens.Url(rotated.Token)}") && !gateway.Sends.Last().Message.Contains("/checkout"), "dispatch uses current rotated tenant link");
 clock.Set(DateTimeOffset.Parse("2026-10-25T01:00:00Z"));
 await service.QueueAsync(owner.Id, default);
 resident.TenantTokenHash = "revoked"; await db.SaveChangesAsync();

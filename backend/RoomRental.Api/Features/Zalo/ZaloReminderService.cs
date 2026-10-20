@@ -144,10 +144,21 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
                 return;
             }
             var link = tokens.Url(token);
-            var remaining = (long)ApiSupport.RoundVnd(invoice.Total - invoice.Paid);
-            var money = remaining.ToString("N0", CultureInfo.GetCultureInfo("vi-VN"));
             var description = string.IsNullOrWhiteSpace(invoice.Description) ? invoice.Kind == "Deposit" ? "Tiền cọc" : "Tiền phòng và dịch vụ" : invoice.Description;
-            var message = string.Create(CultureInfo.GetCultureInfo("vi-VN"), $"Roomie • Hóa đơn {invoice.Period}\n{invoice.BuildingName} – Phòng {invoice.RoomName}\nNgười thuê: {invoice.TenantName}\nNội dung hóa đơn: {description}\nTiền phòng: {invoice.Rent:N0} đ; điện: {invoice.ElectricityAmount:N0} đ; nước: {invoice.WaterAmount:N0} đ; dịch vụ: {invoice.ServiceAmount:N0} đ\nTổng: {invoice.Total:N0} đ; đã trả: {invoice.Paid:N0} đ\nCòn thanh toán: {money} đ\nHạn thanh toán: {invoice.DueDate:dd/MM/yyyy}\nXem hóa đơn: {link}\nBạn có thể trả lời chủ trọ tại đây.");
+            var message = string.Create(CultureInfo.GetCultureInfo("vi-VN"), $"""
+                Roomie • Hóa đơn {invoice.Period}
+
+                {invoice.BuildingName} – Phòng {invoice.RoomName}
+                Người thuê: {invoice.TenantName}
+                Nội dung hóa đơn: {description}
+                Tiền phòng: {invoice.Rent:N0} đ;
+                Điện: {invoice.ElectricityAmount:N0} đ; Nước: {invoice.WaterAmount:N0} đ;
+                Dịch vụ: {invoice.ServiceAmount:N0} đ
+
+                Tổng: {invoice.Total:N0} đ;
+
+                Thanh Toán Tại : {link}
+                """);
             var previousAttemptAtMs = job.LastAttemptAtMs;
             job.Status = "Sending";
             job.LastAttemptAtMs = clock.GetUtcNow().ToUnixTimeMilliseconds();
