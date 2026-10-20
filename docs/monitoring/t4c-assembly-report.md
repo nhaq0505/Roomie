@@ -23,6 +23,19 @@
 | `a227e6c` | `867bbf0` (review/t5-backend-ops) | Worker B | Publish T5 independent backend and ops QA review report |
 | `5e9bd7a` | `e1d90c8` (fix/t2c-frontend-corrections) | Worker B | Resolve T6 mobile overflow, hourly rate preservation, clamped date tags, and honest funnel (T6b) |
 | `45e8fe2` | `c98de63` (review-t6) | Worker C | Publish T6 and T6b independent frontend review reports and QA evidence |
+| `8f1e395` | Task T4c (Authorized Correctness Fixes) | Worker A | Outbox durable ack verification, true publish revision filter, and system actor integrity |
+
+---
+
+### 2.1 Authorized Correctness Blockers Resolved in Commit `8f1e395`
+Per coordinator guidance (`msg_9fd3ff141e7c`), three correctness blockers identified during T5/T6 were resolved and verified with regression tests:
+1. **True Publish Revision Filter**:
+   - `EnsureInvoiceIssuedMilestoneAsync` now searches for revisions matching `EF.Functions.Like(r.Reason, "%publish%")` prior to `IssuedAt`, guaranteeing draft edit revisions (e.g. reading corrections prior to publication) are never selected as the activation milestone timestamp.
+2. **Durable Outbox Acknowledgement & Sanitized Errors**:
+   - `ProcessPendingOutboxEventsAsync` strictly checks `db.OwnerMilestones.AnyAsync(m => m.OwnerId == ev.OwnerId && ... != null)` before setting `ev.Status = "Completed"`. If the milestone is not durably recorded, the event remains `"Pending"` with an incremented `RetryCount` and `LastError = "ERR_MILESTONE_NOT_RECORDED"`.
+   - All caught exceptions map to sanitized codes (`ERR_CONCURRENCY_CONFLICT`, `ERR_DB_UPDATE`, `ERR_TIMEOUT`, `ERR_INVALID_OP`, `ERR_TELEMETRY_FAILED`), guaranteeing zero raw SQL or PII leakage into error logs or database records.
+3. **System Actor Integrity**:
+   - Outbox event targets format `{targetId}:{actor}` (e.g., `{invoiceId}:System` vs `{invoiceId}:Owner`). Automated system sweeps record `ActorType.System`, incrementing `SystemActionCount` without incrementing `OwnerActionCount` or setting `HasOwnerAction = true`, ensuring zero false owner WAU/MAU inflation.
 
 ---
 
