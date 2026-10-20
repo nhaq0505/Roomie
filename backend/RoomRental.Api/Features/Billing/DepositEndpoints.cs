@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -10,7 +11,7 @@ public static class DepositEndpoints
     public static void MapDepositEndpoints(this WebApplication app)
     {
         app.MapPost("/api/invoices/{id:guid}/deposit-settlements", async (Guid id, DepositSettlementRequest request,
-            HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+            HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             if (request.Kind is not ("Refund" or "Deduction") || request.Amount <= 0 ||
@@ -65,6 +66,11 @@ public static class DepositEndpoints
             invoice.Version++;
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "DepositSettlement", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(InvoiceService.ToDto(invoice));
         }).RequireAuthorization(policy => policy.RequireRole("Owner"));
     }

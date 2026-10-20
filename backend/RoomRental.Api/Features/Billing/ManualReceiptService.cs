@@ -6,7 +6,7 @@ namespace RoomRental.Api.Services;
 
 public sealed record ManualReceiptResult(Guid Id, Guid InvoiceId, decimal Amount, decimal Paid, decimal Outstanding, string Status, long Version);
 
-public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs)
+public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
 {
     public async Task<ManualReceiptResult> RecordAsync(Guid ownerId, Guid invoiceId, ReceiptRequest request,
         string? headerKey, CancellationToken ct)
@@ -59,6 +59,11 @@ public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs)
                 InvoiceService.RecalculateStatus(invoice);
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
+                if (milestoneTracker != null)
+                {
+                    try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "ManualReceipt", ct); }
+                    catch { /* Telemetry failure must not block product */ }
+                }
                 return Result(invoice, receipt);
             }
             await transaction.RollbackAsync(ct);

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -67,7 +68,7 @@ public static partial class OwnerManagementEndpoints
             return Results.Ok(result);
         });
 
-        routes.MapPost("/rooms", async (RoomCreateRequest request, HttpContext context, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
+        routes.MapPost("/rooms", async (RoomCreateRequest request, HttpContext context, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
@@ -99,6 +100,11 @@ public static partial class OwnerManagementEndpoints
             db.Rooms.Add(room);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "RoomCreate", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Created($"/api/rooms/{room.Id}", await ToRoomDtoAsync(db, tokenService, webhookService, room, building, null, VietnamCalendar.CurrentVietnamPeriod(), cancellationToken));
         });
 
@@ -114,10 +120,11 @@ public static partial class OwnerManagementEndpoints
                 archiveBatchId = row.Room.ArchiveBatchId, buildingArchived = row.Building.ArchivedAt is not null });
         });
 
-        routes.MapMethods("/rooms/{id:guid}", ["PATCH"], async (Guid id, RoomUpdateRequest request, HttpContext context, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
+        routes.MapMethods("/rooms/{id:guid}", ["PATCH"], async (Guid id, RoomUpdateRequest request, HttpContext context, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
+            var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
-            var (room, building) = await PropertyLookup.FindRoomAsync(db, ApiSupport.OwnerId(context), id, cancellationToken);
+            var (room, building) = await PropertyLookup.FindRoomAsync(db, ownerId, id, cancellationToken);
             ValidateFees(request.Name, request.Rent, request.ElectricityRate, request.WaterFee, request.ServiceFee, 0);
             room.Name = request.Name.Trim();
             room.Rent = ApiSupport.RoundVnd(request.Rent);
@@ -127,11 +134,16 @@ public static partial class OwnerManagementEndpoints
             room.ServiceFee = ApiSupport.RoundVnd(request.ServiceFee);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "RoomUpdate", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             var occupancy = await db.Occupancies.AsNoTracking().SingleOrDefaultAsync(item => item.RoomId == id && item.IsActive, cancellationToken);
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, VietnamCalendar.CurrentVietnamPeriod(), cancellationToken));
         });
 
-        routes.MapDelete("/rooms/{id:guid}", async (Guid id, HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+        routes.MapDelete("/rooms/{id:guid}", async (Guid id, HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
@@ -154,10 +166,15 @@ public static partial class OwnerManagementEndpoints
             row.Room.ArchiveBatchId = batchId;
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "RoomArchive", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(new { archived = true, archiveBatchId = batchId });
         });
 
-        routes.MapPost("/rooms/{id:guid}/restore", async (Guid id, HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+        routes.MapPost("/rooms/{id:guid}/restore", async (Guid id, HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
@@ -187,6 +204,11 @@ public static partial class OwnerManagementEndpoints
             row.Room.ArchiveBatchId = null;
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "RoomRestore", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(new { restored = true });
         });
 

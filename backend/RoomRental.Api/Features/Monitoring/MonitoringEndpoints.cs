@@ -202,5 +202,40 @@ public static class MonitoringEndpoints
             var response = await revenueService.UpsertCampaignCostAsync(request, adminId, adminName, ct);
             return Results.Ok(response);
         });
+
+        adminGroup.MapGet("/campaigns/generate-url", (
+            [FromQuery] string targetUrl,
+            [FromQuery] string? source,
+            [FromQuery] string? medium,
+            [FromQuery] string? campaign,
+            [FromQuery] string? term,
+            [FromQuery] string? content,
+            IRevenueMonitoringQueryService revenueService) =>
+        {
+            if (string.IsNullOrWhiteSpace(targetUrl))
+                return Results.BadRequest(new { message = "targetUrl is required" });
+            var trackingUrl = revenueService.BuildTrackingUrl(targetUrl, source, medium, campaign, term, content);
+            return Results.Ok(new { url = trackingUrl });
+        });
+
+        // Maintenance Endpoints
+        adminGroup.MapPost("/maintenance/rollup", async (
+            [FromQuery] DateOnly? date,
+            IMonitoringMaintenanceService maintenanceService,
+            TimeProvider clock,
+            CancellationToken ct) =>
+        {
+            var targetDate = date ?? ApiSupport.VietnamDate(clock.GetUtcNow());
+            var result = await maintenanceService.RollupDailyAggregateAsync(targetDate, ct);
+            return Results.Ok(result);
+        });
+
+        adminGroup.MapPost("/maintenance/prune", async (
+            IMonitoringMaintenanceService maintenanceService,
+            CancellationToken ct) =>
+        {
+            var count = await maintenanceService.PruneExpiredTelemetryAsync(ct);
+            return Results.Ok(new { prunedCount = count });
+        });
     }
 }

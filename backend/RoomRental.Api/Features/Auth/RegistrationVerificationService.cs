@@ -6,7 +6,7 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class RegistrationVerificationService(AppDbContext db, IRegistrationEmailSender sender, TimeProvider clock)
+public sealed class RegistrationVerificationService(AppDbContext db, IRegistrationEmailSender sender, TimeProvider clock, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
 {
     private const string InvalidCode = "Mã xác nhận không hợp lệ hoặc đã hết hạn.";
     private const string TooManyAttempts = "Bạn đã nhập sai mã quá nhiều lần. Vui lòng gửi lại mã.";
@@ -57,6 +57,10 @@ public sealed class RegistrationVerificationService(AppDbContext db, IRegistrati
         if (pending is null || pending.ConsumedAt is not null || pending.ExpiresAt <= now)
             throw new ApiException(400, InvalidCode);
         CheckDeliveryLimit(pending, now);
+        if (milestoneTracker is not null)
+        {
+            await milestoneTracker.TrackRegistrationResentAsync(pending.UserId, ct);
+        }
         var previous = db.Entry(pending).CurrentValues.Clone();
         var code = PrepareCode(pending, token, now);
         await db.SaveChangesAsync(ct);

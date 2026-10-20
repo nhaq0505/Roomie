@@ -21,6 +21,17 @@ public static class ApiSupport
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, zone).DateTime);
     }
 
+    public static DateTimeOffset StartOfVietnamDate(DateOnly date)
+    {
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
+        catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
+        var local = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
+        return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
+    }
+
+    public static DateTimeOffset EndOfVietnamDate(DateOnly date) => StartOfVietnamDate(date.AddDays(1));
+
     public static Guid UserId(HttpContext context)
     {
         var value = context.User.FindFirstValue(ClaimTypes.NameIdentifier);

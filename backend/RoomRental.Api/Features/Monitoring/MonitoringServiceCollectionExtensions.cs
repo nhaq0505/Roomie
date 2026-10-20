@@ -9,11 +9,12 @@ public static class MonitoringServiceCollectionExtensions
     {
         // Core tracking & intake services (foundation implementations)
         services.AddScoped<IClientAnalyticsService, ClientAnalyticsService>();
-        services.AddScoped<IOwnerMilestoneTracker, OwnerMilestoneTracker>();
+        services.AddScoped<IOwnerMilestoneTracker>(sp => new OwnerMilestoneTracker(sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<TimeProvider>()));
 
         // Query & Ops services registration points (Worker C and Worker B/T1 register or replace these)
         services.TryAddScoped<IGrowthMonitoringQueryService, DefaultGrowthMonitoringQueryService>();
         services.TryAddScoped<IRevenueMonitoringQueryService, DefaultRevenueMonitoringQueryService>();
+        services.TryAddScoped<IMonitoringMaintenanceService, DefaultMonitoringMaintenanceService>();
         services.TryAddScoped<IOperationsMonitoringService, DefaultOperationsMonitoringService>();
         services.TryAddScoped<IWorkerStateTracker, DefaultWorkerStateTracker>();
         services.TryAddScoped<IHostMetricsReader, DefaultHostMetricsReader>();

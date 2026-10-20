@@ -147,8 +147,11 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   - `source` (optional, string)
   - `channel` (optional, string)
   - `campaign` (optional, string)
-- **Status in T0:** Explicitly `501 Not Implemented` (implemented in T1).
-- **Retention Semantics:** `retentionPercentages` is `IReadOnlyList<double?>`. Immature future cohort cells are `null`, never `0.0`.
+- **Status in T1:** Fully implemented via `IGrowthMonitoringQueryService`.
+- **Funnel Facts (`funnel`):** Exposes `RegistrationFunnelDto` (`startedCount`, `codeResentCount`, `verifiedCount`, `bypassedCount`) from server-authoritative `RegistrationFacts`.
+- **Retention Semantics:** `retentionPercentages` is `IReadOnlyList<double?>`. Incomplete current calendar month and future cohort cells are `null`, never mature `0.0`.
+- **Channel Mapping & Touchpoint Credit:** Filter parameters (`source`, `channel`, `campaign`) are evaluated consistently across all growth metrics, retention, WAU, MAU, revenue orders, CAC, and campaign costs. A touchpoint is evaluated as a cohesive unit (`FirstTouch` or `LastTouch`); filters never mix `FirstTouchSource` with unrelated `LastTouchCampaign`. Channel maps to attribution medium or campaign channel metadata.
+- **13-Month Continuity:** When raw client analytics events (`AnalyticsEvents`) are pruned after 90 days, historical daily series fallback to durable `DailyAggregateMetrics` to avoid false zeros.
 - **Response Shape (`AdminMonitoringGrowthResponse`):**
 ```json
 {
@@ -204,12 +207,12 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
 #### 2.3.2 Revenue Tab Metrics
 - **Route:** `GET /api/admin/monitoring/revenue`
 - **Query Parameters:** `fromDate`, `toDate`, `source`, `channel`, `campaign`
-- **Status in T0:** Explicitly `501 Not Implemented` (implemented in T1).
+- **Status in T1:** Fully implemented via `IGrowthMonitoringQueryService`.
 - **Metric Invariants:**
   - Pro revenue includes ONLY server-confirmed, paid subscription attempts (`PayOsAttempt` with `Kind == "Subscription"` and `Status == PaymentAttemptStatus.Paid`).
   - Unapproved or speculative `mrrVnd` is explicitly removed from `RevenueSummaryDto`.
   - Tenant rent and admin-granted complimentary Pro tiers are strictly excluded from revenue metrics.
-  - CAC30 = Spend in signup cohort period / New first-paid owners within 30 days. When costs are missing or the denominator is zero, CAC returns `null` with an explicit reason (`MissingCostData`, `ZeroDenominator`, `CohortImmature`, `NoRegistrations`).
+  - CAC30 = Spend in signup cohort period / New first-paid owners within 30 days. When costs are missing, labor valuation is missing (person-hours logged without an hourly rate), or the denominator is zero, CAC returns `null` with an explicit reason (`MissingCostData`, `MissingValuation`, `ZeroDenominator`, `CohortImmature`, `NoRegistrations`). Omitted hourly rate cannot invent valuation. Cash is real spend, person-hours are logged separately, and imputed labor is null unless an explicit hourly rate is entered.
 - **Response Shape (`AdminMonitoringRevenueResponse`):**
 ```json
 {
@@ -370,6 +373,23 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
 ```
 - **Response Body (`AdminCampaignCostItemDto`):** Returns persisted entity with audit updater info (`UpdatedByName`, `UpdatedAt`).
 
+#### 2.3.7 Campaign Tracking URL Generation
+- **Route:** `GET /api/admin/monitoring/campaigns/generate-url`
+- **Query Parameters:** `targetUrl` (required), `source`, `medium`, `campaign`, `term`, `content`
+- **Status in T1:** Fully implemented via `IRevenueMonitoringQueryService.BuildTrackingUrl`.
+- **Response Shape:**
+```json
+{
+  "url": "https://roomie.io.vn/pricing?utm_source=facebook&utm_medium=cpc&utm_campaign=summer_promo&utm_content=banner_v1"
+}
+```
+
+#### 2.3.8 Maintenance Operations
+- **Routes:**
+  - `POST /api/admin/monitoring/maintenance/rollup` - Aggregates daily metrics into `DailyAggregateMetrics` for a date (default: yesterday in Vietnam calendar).
+  - `POST /api/admin/monitoring/maintenance/prune` - Prunes raw web analytics older than 90 days, owner daily activities older than 13 months, and daily aggregate metrics older than 13 months. `OwnerMilestones` are preserved indefinitely and never pruned.
+- **Status in T1:** Fully implemented via `IMonitoringMaintenanceService`.
+
 ---
 
 ## 3. Data Semantics and Retention Rules
@@ -388,6 +408,8 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   - Only actions performed explicitly by the Owner themselves (`ActorType.Owner`) increment `OwnerActionCount` and set `HasOwnerAction = true`.
   - WAU (last 7 Vietnam calendar days) and MAU (last 30 Vietnam calendar days) count only distinct owners where `HasOwnerAction == true`.
   - Monthly retention matrix calculates whether owners in an activation cohort had `HasOwnerAction == true` in subsequent calendar months.
+- **Committed Success Paths & Isolation:** All milestone tracking and activity hooks are dispatched strictly on committed success paths (after `transaction.CommitAsync`). Independent DbContext scopes never execute inside open SQLite transactions, avoiding deadlocks and lock contention. Telemetry failures are suppressed and cannot abort core business workflows.
+- **Authoritative Provider Timestamps:** Payment webhooks and reconciliations run under `ActorType.System` and record the provider's authoritative persisted `PaidAt` timestamp rather than a fabricated callback arrival instant. Milestone tracking deduplicates repeated webhook signals and manual reconciliations idempotently.
 
 ### 3.3 Data Retention Policies
 - **Raw Web Events (`AnalyticsEvents`):** 90 days. Pruned by background maintenance.

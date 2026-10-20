@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -51,7 +52,7 @@ public static partial class OwnerManagementEndpoints
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, VietnamCalendar.CurrentVietnamPeriod(), ct));
         });
 
-        routes.MapPost("/rooms/{id:guid}/occupancy", async (Guid id, OccupancyRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
+        routes.MapPost("/rooms/{id:guid}/occupancy", async (Guid id, OccupancyRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, TenantTokenService tokenService, PaymentWebhookService webhookService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
@@ -91,12 +92,17 @@ public static partial class OwnerManagementEndpoints
             }
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "OccupancyMoveIn", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, currentPeriod, cancellationToken));
         });
 
         routes.MapPost("/rooms/{id:guid}/end-occupancy", async (Guid id, CompleteMoveoutRequest request,
-            HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
-            await MoveoutEndpoints.CompleteMoveoutAsync(id, request, context, db, cancellationToken));
+            HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
+            await MoveoutEndpoints.CompleteMoveoutAsync(id, request, context, db, milestoneTracker, cancellationToken));
 
         routes.MapPost("/rooms/{id:guid}/rotate-link", async (Guid id, HttpContext context, AppDbContext db,
             TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>

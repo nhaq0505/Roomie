@@ -43,13 +43,19 @@ public static class AuthEndpoints
             user.PasswordHash = hasher.HashPassword(user, request.Password!);
             var isVerificationEnabled = configuration.GetValue("EmailVerification:Enabled", true);
             if (milestoneTracker != null)
-                await milestoneTracker.TrackRegistrationStartedAsync(user.Id, request.Attribution, isVerificationEnabled ? "Code" : "Bypass", cancellationToken);
+            {
+                try { await milestoneTracker.TrackRegistrationStartedAsync(user.Id, request.Attribution, isVerificationEnabled ? "Code" : "Bypass", cancellationToken); }
+                catch { /* Telemetry failure must not block registration */ }
+            }
             if (isVerificationEnabled)
                 return Results.Json(await verification.StartAsync(user, cancellationToken), statusCode: 202);
             db.Users.Add(user);
             await db.SaveChangesAsync(cancellationToken);
             if (milestoneTracker != null)
-                await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, request.Attribution, "Bypass", cancellationToken);
+            {
+                try { await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, request.Attribution, "Bypass", cancellationToken); }
+                catch { /* Telemetry failure must not block registration */ }
+            }
             return Results.Created("/api/auth/me", ToDto(user));
         }).RequireRateLimiting("auth");
 
@@ -58,7 +64,10 @@ public static class AuthEndpoints
         {
             var user = await verification.VerifyAsync(request.ChallengeToken, request.Code, ct);
             if (milestoneTracker != null)
-                await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, null, "Code", ct);
+            {
+                try { await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, null, "Code", ct); }
+                catch { /* Telemetry failure must not block verification */ }
+            }
             return Results.Created("/api/auth/me", ToDto(user));
         }).RequireRateLimiting("auth");
 

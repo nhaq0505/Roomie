@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -78,7 +79,7 @@ public static class MoveoutEndpoints
     }
 
     internal static async Task<IResult> CompleteMoveoutAsync(Guid id, CompleteMoveoutRequest request,
-        HttpContext context, AppDbContext db, CancellationToken ct)
+        HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default)
     {
         var ownerId = ApiSupport.OwnerId(context);
         if (request.OccupancyId == Guid.Empty || request.RequestId == Guid.Empty)
@@ -183,6 +184,11 @@ public static class MoveoutEndpoints
         db.MoveoutCompletions.Add(completion);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        if (milestoneTracker != null)
+        {
+            try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "OccupancyMoveOut", ct); }
+            catch { /* Telemetry failure must not block product */ }
+        }
         return Results.Ok(ToCompletionDto(completion));
     }
 

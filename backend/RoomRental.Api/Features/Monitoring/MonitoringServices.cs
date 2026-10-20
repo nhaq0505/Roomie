@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -210,8 +211,45 @@ public sealed class ClientAnalyticsService(AppDbContext db, TimeProvider clock) 
     }
 }
 
-public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) : IOwnerMilestoneTracker
+public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
 {
+    private readonly AppDbContext? _directDb;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly TimeProvider _clock;
+
+    public OwnerMilestoneTracker(IServiceScopeFactory scopeFactory, TimeProvider clock)
+    {
+        _scopeFactory = scopeFactory;
+        _clock = clock;
+    }
+
+    public OwnerMilestoneTracker(AppDbContext db, TimeProvider clock, IServiceScopeFactory? scopeFactory = null)
+    {
+        _directDb = db;
+        _scopeFactory = scopeFactory;
+        _clock = clock;
+    }
+
+    private sealed class DbScope(AppDbContext db, IServiceScope? scope) : IAsyncDisposable
+    {
+        public AppDbContext Db { get; } = db;
+        public ValueTask DisposeAsync()
+        {
+            scope?.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private DbScope GetDbContext()
+    {
+        if (_directDb != null)
+            return new DbScope(_directDb, null);
+
+        var scope = _scopeFactory!.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return new DbScope(db, scope);
+    }
+
     private static DateTimeOffset ValidateOccurredAt(DateTimeOffset? clientTime, DateTimeOffset serverNow)
     {
         if (!clientTime.HasValue) return serverNow;
@@ -227,25 +265,34 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         string verificationMethod,
         CancellationToken ct)
     {
-        var now = clock.GetUtcNow();
-        var touch = attribution?.FirstTouch;
-        var fact = new RegistrationLifecycleFact
+        try
         {
-            RegistrationAttemptId = attemptId,
-            Stage = "Started",
-            VerificationMethod = verificationMethod,
-            BrowserId = ClientAnalyticsService.SanitizeLabel(attribution?.BrowserId),
-            UtmSource = ClientAnalyticsService.SanitizeLabel(touch?.Source ?? attribution?.UtmSource),
-            UtmMedium = ClientAnalyticsService.SanitizeLabel(touch?.Medium ?? attribution?.UtmMedium),
-            UtmCampaign = ClientAnalyticsService.SanitizeLabel(touch?.Campaign ?? attribution?.UtmCampaign),
-            UtmContent = ClientAnalyticsService.SanitizeLabel(touch?.Content ?? attribution?.UtmContent),
-            UtmTerm = ClientAnalyticsService.SanitizeLabel(touch?.Term ?? attribution?.UtmTerm),
-            LandingPage = ClientAnalyticsService.SanitizePath(touch?.LandingPage ?? attribution?.LandingPage),
-            ReferrerPath = ClientAnalyticsService.SanitizePath(touch?.Referrer ?? attribution?.Referrer),
-            OccurredAt = ValidateOccurredAt(touch?.OccurredAt, now)
-        };
-        db.RegistrationFacts.Add(fact);
-        await db.SaveChangesAsync(ct);
+            await using var context = GetDbContext();
+            var db = context.Db;
+            var now = _clock.GetUtcNow();
+            var touch = attribution?.FirstTouch;
+            var fact = new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptId,
+                Stage = "Started",
+                VerificationMethod = verificationMethod,
+                BrowserId = ClientAnalyticsService.SanitizeLabel(attribution?.BrowserId),
+                UtmSource = ClientAnalyticsService.SanitizeLabel(touch?.Source ?? attribution?.UtmSource),
+                UtmMedium = ClientAnalyticsService.SanitizeLabel(touch?.Medium ?? attribution?.UtmMedium),
+                UtmCampaign = ClientAnalyticsService.SanitizeLabel(touch?.Campaign ?? attribution?.UtmCampaign),
+                UtmContent = ClientAnalyticsService.SanitizeLabel(touch?.Content ?? attribution?.UtmContent),
+                UtmTerm = ClientAnalyticsService.SanitizeLabel(touch?.Term ?? attribution?.UtmTerm),
+                LandingPage = ClientAnalyticsService.SanitizePath(touch?.LandingPage ?? attribution?.LandingPage),
+                ReferrerPath = ClientAnalyticsService.SanitizePath(touch?.Referrer ?? attribution?.Referrer),
+                OccurredAt = ValidateOccurredAt(touch?.OccurredAt, now)
+            };
+            db.RegistrationFacts.Add(fact);
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Registration telemetry failure must not block authentication
+        }
     }
 
     public async Task TrackRegistrationCompletedAsync(
@@ -254,17 +301,51 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         string stage,
         CancellationToken ct)
     {
-        var now = clock.GetUtcNow();
-        var fact = new RegistrationLifecycleFact
+        try
         {
-            RegistrationAttemptId = attemptId,
-            OwnerId = ownerId,
-            Stage = stage,
-            VerificationMethod = stage == "Bypassed" ? "Bypass" : "Code",
-            OccurredAt = now
-        };
-        db.RegistrationFacts.Add(fact);
-        await db.SaveChangesAsync(ct);
+            await using var context = GetDbContext();
+            var db = context.Db;
+            var now = _clock.GetUtcNow();
+            var fact = new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptId,
+                OwnerId = ownerId,
+                Stage = stage,
+                VerificationMethod = stage == "Bypassed" ? "Bypass" : "Code",
+                OccurredAt = now
+            };
+            db.RegistrationFacts.Add(fact);
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Registration telemetry failure must not block authentication
+        }
+    }
+
+    public async Task TrackRegistrationResentAsync(
+        Guid attemptId,
+        CancellationToken ct)
+    {
+        try
+        {
+            await using var context = GetDbContext();
+            var db = context.Db;
+            var now = _clock.GetUtcNow();
+            var fact = new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptId,
+                Stage = "CodeResent",
+                VerificationMethod = "Code",
+                OccurredAt = now
+            };
+            db.RegistrationFacts.Add(fact);
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Registration telemetry failure must not block authentication
+        }
     }
 
     public async Task TrackOwnerRegisteredAsync(
@@ -273,42 +354,46 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         string verificationMethod,
         CancellationToken ct)
     {
-        var now = clock.GetUtcNow();
-        var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
-        if (milestone is null)
+        try
         {
-            milestone = new OwnerMilestone
+            await using var context = GetDbContext();
+            var db = context.Db;
+            var now = _clock.GetUtcNow();
+            var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
+            if (milestone is null)
             {
-                OwnerId = ownerId,
-                RegisteredAt = now,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-            db.OwnerMilestones.Add(milestone);
-        }
-
-        if (attribution is null)
-        {
-            var startedFact = await db.RegistrationFacts
-                .FirstOrDefaultAsync(x => x.RegistrationAttemptId == ownerId && x.Stage == "Started", ct);
-            if (startedFact is not null)
-            {
-                attribution = new RegistrationAttributionDto(
-                    startedFact.BrowserId,
-                    FirstTouch: new AttributionTouchDto(
-                        startedFact.UtmSource,
-                        startedFact.UtmMedium,
-                        startedFact.UtmCampaign,
-                        startedFact.UtmContent,
-                        startedFact.UtmTerm,
-                        startedFact.LandingPage,
-                        startedFact.ReferrerPath,
-                        startedFact.OccurredAt
-                    ),
-                    LastTouch: null
-                );
+                milestone = new OwnerMilestone
+                {
+                    OwnerId = ownerId,
+                    RegisteredAt = now,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                db.OwnerMilestones.Add(milestone);
             }
-        }
+
+            if (attribution is null)
+            {
+                var startedFact = await db.RegistrationFacts
+                    .FirstOrDefaultAsync(x => x.RegistrationAttemptId == ownerId && x.Stage == "Started", ct);
+                if (startedFact is not null)
+                {
+                    attribution = new RegistrationAttributionDto(
+                        startedFact.BrowserId,
+                        FirstTouch: new AttributionTouchDto(
+                            startedFact.UtmSource,
+                            startedFact.UtmMedium,
+                            startedFact.UtmCampaign,
+                            startedFact.UtmContent,
+                            startedFact.UtmTerm,
+                            startedFact.LandingPage,
+                            startedFact.ReferrerPath,
+                            startedFact.OccurredAt
+                        ),
+                        LastTouch: null
+                    );
+                }
+            }
 
         if (attribution is not null)
         {
@@ -400,6 +485,11 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
 
         await RecordOwnerActivityAsync(ownerId, ActorType.Owner, "Registered", ct);
         await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Registration telemetry failure must not block authentication
+        }
     }
 
     public async Task TrackInvoiceIssuedAsync(
@@ -409,88 +499,106 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         ActorType actor = ActorType.Owner,
         CancellationToken ct = default)
     {
-        if (!string.Equals(kind, "Monthly", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
-        var now = clock.GetUtcNow();
-        if (milestone is null)
+        try
         {
-            var actualRegisteredAt = await db.Users
-                .Where(u => u.Id == ownerId)
-                .Select(u => (DateTimeOffset?)u.CreatedAt)
-                .FirstOrDefaultAsync(ct);
-
-            if (!actualRegisteredAt.HasValue)
-            {
-                // Owner does not exist in Users table; cannot add milestone due to FK constraint
+            if (!string.Equals(kind, "Monthly", StringComparison.OrdinalIgnoreCase))
                 return;
+
+            await using var context = GetDbContext();
+            var db = context.Db;
+
+            var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
+            var now = _clock.GetUtcNow();
+            if (milestone is null)
+            {
+                var actualRegisteredAt = await db.Users
+                    .Where(u => u.Id == ownerId)
+                    .Select(u => (DateTimeOffset?)u.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
+
+                if (actualRegisteredAt.HasValue)
+                {
+                    milestone = new OwnerMilestone
+                    {
+                        OwnerId = ownerId,
+                        RegisteredAt = actualRegisteredAt,
+                        ActivatedAt = now,
+                        FirstActivatedInvoiceId = invoiceId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    };
+                    db.OwnerMilestones.Add(milestone);
+                    await db.SaveChangesAsync(ct);
+                }
+            }
+            else if (milestone.ActivatedAt is null)
+            {
+                milestone.ActivatedAt = now;
+                milestone.FirstActivatedInvoiceId = invoiceId;
+                milestone.UpdatedAt = now;
+                await db.SaveChangesAsync(ct);
             }
 
-            milestone = new OwnerMilestone
-            {
-                OwnerId = ownerId,
-                RegisteredAt = actualRegisteredAt,
-                ActivatedAt = now,
-                FirstActivatedInvoiceId = invoiceId,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-            db.OwnerMilestones.Add(milestone);
+            await RecordOwnerActivityInternalAsync(db, ownerId, actor, "InvoiceIssued", ct);
+            await db.SaveChangesAsync(ct);
         }
-        else if (milestone.ActivatedAt is null)
+        catch
         {
-            milestone.ActivatedAt = now;
-            milestone.FirstActivatedInvoiceId = invoiceId;
-            milestone.UpdatedAt = now;
+            // Telemetry failure must not block invoice issuance
         }
-
-        await RecordOwnerActivityAsync(ownerId, actor, "InvoiceIssued", ct);
-        await db.SaveChangesAsync(ct);
     }
 
     public async Task TrackSubscriptionPaidAsync(
         Guid ownerId,
         long orderCode,
         int amount,
-        ActorType actor = ActorType.Owner,
+        ActorType actor = ActorType.System,
+        DateTimeOffset? paidAt = null,
         CancellationToken ct = default)
     {
-        var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
-        var now = clock.GetUtcNow();
-        if (milestone is null)
+        try
         {
-            var actualRegisteredAt = await db.Users
-                .Where(u => u.Id == ownerId)
-                .Select(u => (DateTimeOffset?)u.CreatedAt)
-                .FirstOrDefaultAsync(ct);
+            await using var context = GetDbContext();
+            var db = context.Db;
 
-            if (!actualRegisteredAt.HasValue)
+            var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
+            var now = _clock.GetUtcNow();
+            var effectivePaidAt = paidAt ?? now;
+            if (milestone is null)
             {
-                // Owner does not exist in Users table; cannot add milestone due to FK constraint
-                return;
+                var actualRegisteredAt = await db.Users
+                    .Where(u => u.Id == ownerId)
+                    .Select(u => (DateTimeOffset?)u.CreatedAt)
+                    .FirstOrDefaultAsync(ct);
+
+                if (actualRegisteredAt.HasValue)
+                {
+                    milestone = new OwnerMilestone
+                    {
+                        OwnerId = ownerId,
+                        RegisteredAt = actualRegisteredAt,
+                        FirstPaidAt = effectivePaidAt,
+                        FirstPaidOrderCode = orderCode,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    };
+                    db.OwnerMilestones.Add(milestone);
+                }
+            }
+            else if (milestone.FirstPaidAt is null)
+            {
+                milestone.FirstPaidAt = effectivePaidAt;
+                milestone.FirstPaidOrderCode = orderCode;
+                milestone.UpdatedAt = now;
             }
 
-            milestone = new OwnerMilestone
-            {
-                OwnerId = ownerId,
-                RegisteredAt = actualRegisteredAt,
-                FirstPaidAt = now,
-                FirstPaidOrderCode = orderCode,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-            db.OwnerMilestones.Add(milestone);
+            await RecordOwnerActivityInternalAsync(db, ownerId, actor, "SubscriptionPaid", ct);
+            await db.SaveChangesAsync(ct);
         }
-        else if (milestone.FirstPaidAt is null)
+        catch
         {
-            milestone.FirstPaidAt = now;
-            milestone.FirstPaidOrderCode = orderCode;
-            milestone.UpdatedAt = now;
+            // Payment tracking failure must not block webhook processing
         }
-
-        await RecordOwnerActivityAsync(ownerId, actor, "SubscriptionPaid", ct);
-        await db.SaveChangesAsync(ct);
     }
 
     public async Task RecordOwnerActivityAsync(
@@ -499,10 +607,30 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         string actionType,
         CancellationToken ct)
     {
+        try
+        {
+            await using var context = GetDbContext();
+            var db = context.Db;
+            await RecordOwnerActivityInternalAsync(db, ownerId, actorType, actionType, ct);
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Activity recording failure must not block user operations
+        }
+    }
+
+    private async Task RecordOwnerActivityInternalAsync(
+        AppDbContext db,
+        Guid ownerId,
+        ActorType actorType,
+        string actionType,
+        CancellationToken ct)
+    {
         var userExists = await db.Users.AnyAsync(u => u.Id == ownerId, ct);
         if (!userExists) return;
 
-        var now = clock.GetUtcNow();
+        var now = _clock.GetUtcNow();
         var today = ApiSupport.VietnamDate(now);
 
         var activity = await db.OwnerDailyActivities
@@ -546,19 +674,539 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
     }
 }
 
-public sealed class DefaultGrowthMonitoringQueryService : IGrowthMonitoringQueryService
+public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimeProvider clock) : IGrowthMonitoringQueryService
 {
-    public Task<AdminMonitoringGrowthResponse> GetGrowthMetricsAsync(MonitoringFilterRequest filter, CancellationToken ct)
+    internal static HashSet<Guid>? GetMatchingOwnerIds(
+        IEnumerable<RegistrationAttribution> attributions,
+        MonitoringFilterRequest filter,
+        HashSet<string> campaignChannelCampaigns)
     {
-        throw new NotImplementedException("Growth monitoring queries are unimplemented in T0; will be implemented in T1.");
+        var hasSource = !string.IsNullOrWhiteSpace(filter.Source);
+        var hasChannel = !string.IsNullOrWhiteSpace(filter.Channel);
+        var hasCampaign = !string.IsNullOrWhiteSpace(filter.Campaign);
+
+        if (!hasSource && !hasChannel && !hasCampaign)
+            return null;
+
+        bool TouchMatches(string? source, string? medium, string? campaign)
+        {
+            if (hasSource && !string.Equals(source, filter.Source, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (hasCampaign && !string.Equals(campaign, filter.Campaign, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (hasChannel)
+            {
+                var matchMedium = string.Equals(medium, filter.Channel, StringComparison.OrdinalIgnoreCase);
+                var matchCamp = campaign != null && campaignChannelCampaigns.Contains(campaign);
+                if (!matchMedium && !matchCamp)
+                    return false;
+            }
+            return true;
+        }
+
+        return attributions
+            .Where(a => TouchMatches(a.FirstTouchSource, a.FirstTouchMedium, a.FirstTouchCampaign) ||
+                        (a.LastTouchSource != null && TouchMatches(a.LastTouchSource, a.LastTouchMedium, a.LastTouchCampaign)))
+            .Select(a => a.OwnerId)
+            .ToHashSet();
+    }
+
+    public async Task<AdminMonitoringGrowthResponse> GetGrowthMetricsAsync(MonitoringFilterRequest filter, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+
+        var toDate = filter.ToDate ?? today;
+        var fromDate = filter.FromDate ?? toDate.AddDays(-29);
+        if (fromDate > toDate)
+            (fromDate, toDate) = (toDate, fromDate);
+
+        var startUtc = ApiSupport.StartOfVietnamDate(fromDate);
+        var endUtc = ApiSupport.EndOfVietnamDate(toDate);
+
+        var campaignChannels = !string.IsNullOrWhiteSpace(filter.Channel)
+            ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var attributions = await db.RegistrationAttributions.AsNoTracking().ToListAsync(ct);
+        var matchingOwnerIds = GetMatchingOwnerIds(attributions, filter, campaignChannels);
+        var attrMap = attributions.ToDictionary(a => a.OwnerId);
+
+        // 1. Client Analytics Events
+        var eventsQuery = db.AnalyticsEvents.AsNoTracking()
+            .Where(e => e.ServerTimestamp >= startUtc && e.ServerTimestamp < endUtc);
+
+        if (!string.IsNullOrWhiteSpace(filter.Source))
+            eventsQuery = eventsQuery.Where(e => e.UtmSource == filter.Source);
+        if (!string.IsNullOrWhiteSpace(filter.Campaign))
+            eventsQuery = eventsQuery.Where(e => e.UtmCampaign == filter.Campaign);
+        if (!string.IsNullOrWhiteSpace(filter.Channel))
+        {
+            eventsQuery = eventsQuery.Where(e => e.UtmMedium == filter.Channel || (e.UtmCampaign != null && campaignChannels.Contains(e.UtmCampaign)));
+        }
+
+        var events = await eventsQuery.ToListAsync(ct);
+
+        var totalSessions = events.Select(e => e.SessionId).Distinct().Count();
+        var uniqueVisitors = events.Select(e => e.BrowserId).Distinct().Count();
+
+        // 2. Owner Milestones & Registrations in date range
+        var milestonesQuery = db.OwnerMilestones.AsNoTracking()
+            .Where(m => m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc);
+
+        if (matchingOwnerIds != null)
+        {
+            milestonesQuery = milestonesQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+        }
+
+        var registeredMilestones = await milestonesQuery.ToListAsync(ct);
+        var registrations = registeredMilestones.Count;
+
+        // Activations in date range
+        var activationsQuery = db.OwnerMilestones.AsNoTracking()
+            .Where(m => m.ActivatedAt >= startUtc && m.ActivatedAt < endUtc);
+
+        if (matchingOwnerIds != null)
+        {
+            activationsQuery = activationsQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+        }
+        var activatedOwners = await activationsQuery.CountAsync(ct);
+
+        // Current WAU (last 7 Vietnam days) and MAU (last 30 Vietnam days)
+        var wauStart = today.AddDays(-6);
+        var wauQuery = db.OwnerDailyActivities.AsNoTracking()
+            .Where(a => a.ActivityDate >= wauStart && a.ActivityDate <= today && a.HasOwnerAction);
+        if (matchingOwnerIds != null)
+            wauQuery = wauQuery.Where(a => matchingOwnerIds.Contains(a.OwnerId));
+
+        var currentWau = await wauQuery
+            .Select(a => a.OwnerId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var mauStart = today.AddDays(-29);
+        var mauQuery = db.OwnerDailyActivities.AsNoTracking()
+            .Where(a => a.ActivityDate >= mauStart && a.ActivityDate <= today && a.HasOwnerAction);
+        if (matchingOwnerIds != null)
+            mauQuery = mauQuery.Where(a => matchingOwnerIds.Contains(a.OwnerId));
+
+        var currentMau = await mauQuery
+            .Select(a => a.OwnerId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var summary = new GrowthSummaryDto(
+            totalSessions,
+            uniqueVisitors,
+            registrations,
+            activatedOwners,
+            currentWau,
+            currentMau
+        );
+
+        // 3. Sources
+        var sourceEventGroups = events
+            .GroupBy(e => (Source: e.UtmSource ?? "(direct)", Medium: e.UtmMedium ?? "(none)"))
+            .ToDictionary(g => g.Key, g => g.Select(x => x.SessionId).Distinct().Count());
+
+        var sourceRegGroups = registeredMilestones
+            .GroupBy(m => {
+                if (attrMap.TryGetValue(m.OwnerId, out var attr))
+                {
+                    var s = attr.FirstTouchSource ?? attr.LastTouchSource ?? "(direct)";
+                    var med = attr.FirstTouchMedium ?? attr.LastTouchMedium ?? "(none)";
+                    return (Source: s, Medium: med);
+                }
+                return (Source: "(direct)", Medium: "(none)");
+            })
+            .ToDictionary(g => g.Key, g => (Registrations: g.Count(), Activated: g.Count(x => x.ActivatedAt != null)));
+
+        var allKeys = sourceEventGroups.Keys.Union(sourceRegGroups.Keys).ToList();
+        var sources = allKeys.Select(k => {
+            sourceEventGroups.TryGetValue(k, out var sCount);
+            sourceRegGroups.TryGetValue(k, out var regInfo);
+            return new TrafficSourceStatsDto(
+                k.Source,
+                k.Medium == "(none)" ? null : k.Medium,
+                sCount,
+                regInfo.Registrations,
+                regInfo.Activated
+            );
+        }).OrderByDescending(s => s.Sessions).ThenByDescending(s => s.Registrations).ToList();
+
+        // 4. Top CTAs
+        var topCtas = events
+            .Where(e => string.Equals(e.EventType, "cta_click", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(e.CtaId))
+            .GroupBy(e => (CtaId: e.CtaId!, Path: e.Path))
+            .Select(g => new CtaPerformanceDto(g.Key.CtaId, g.Key.Path, g.Count()))
+            .OrderByDescending(c => c.Clicks)
+            .Take(10)
+            .ToList();
+
+        // 5. Cohort Maturity
+        // 7-day cohort: registrations that occurred at least 7 full Vietnam days ago
+        var activationCutoffUtc = ApiSupport.StartOfVietnamDate(today.AddDays(-6));
+        var activationEligible = registeredMilestones
+            .Where(m => m.RegisteredAt.HasValue && m.RegisteredAt.Value < activationCutoffUtc)
+            .ToList();
+        var activationCohortMaturedCount = activationEligible.Count;
+        double? activationRate7Day = null;
+        if (activationCohortMaturedCount > 0)
+        {
+            var activatedWithin7 = activationEligible.Count(m =>
+                m.ActivatedAt.HasValue && m.RegisteredAt.HasValue &&
+                m.ActivatedAt.Value <= m.RegisteredAt.Value.AddDays(7));
+            activationRate7Day = Math.Round((double)activatedWithin7 / activationCohortMaturedCount * 100.0, 1);
+        }
+
+        // 30-day cohort: registrations that occurred at least 30 full Vietnam days ago
+        var paidCutoffUtc = ApiSupport.StartOfVietnamDate(today.AddDays(-29));
+        var paidEligible = registeredMilestones
+            .Where(m => m.RegisteredAt.HasValue && m.RegisteredAt.Value < paidCutoffUtc)
+            .ToList();
+        var paidCohortMaturedCount = paidEligible.Count;
+        double? firstPaidRate30Day = null;
+        if (paidCohortMaturedCount > 0)
+        {
+            var paidWithin30 = paidEligible.Count(m =>
+                m.FirstPaidAt.HasValue && m.RegisteredAt.HasValue &&
+                m.FirstPaidAt.Value <= m.RegisteredAt.Value.AddDays(30));
+            firstPaidRate30Day = Math.Round((double)paidWithin30 / paidCohortMaturedCount * 100.0, 1);
+        }
+
+        var cohortMaturity = new CohortMaturityDto(
+            activationRate7Day,
+            activationCohortMaturedCount,
+            firstPaidRate30Day,
+            paidCohortMaturedCount
+        );
+
+        // 6. Retention Matrix
+        var retentionRows = new List<CohortRetentionRowDto>();
+        var currentMonthStart = new DateOnly(today.Year, today.Month, 1);
+        var allActivatedMilestones = await db.OwnerMilestones.AsNoTracking()
+            .Where(m => m.ActivatedAt != null)
+            .ToListAsync(ct);
+
+        var allActivities = await db.OwnerDailyActivities.AsNoTracking()
+            .Where(a => a.HasOwnerAction)
+            .ToListAsync(ct);
+
+        for (var i = 5; i >= 0; i--)
+        {
+            var cohortMonth = currentMonthStart.AddMonths(-i);
+            var cohortPeriodStr = cohortMonth.ToString("yyyy-MM");
+
+            var cohortOwners = allActivatedMilestones
+                .Where(m => {
+                    var actDate = ApiSupport.VietnamDate(m.ActivatedAt!.Value);
+                    return actDate.Year == cohortMonth.Year && actDate.Month == cohortMonth.Month;
+                })
+                .Select(m => m.OwnerId)
+                .Distinct();
+
+            if (matchingOwnerIds != null)
+                cohortOwners = cohortOwners.Where(id => matchingOwnerIds.Contains(id));
+
+            var cohortOwnersSet = cohortOwners.ToHashSet();
+            if (cohortOwnersSet.Count == 0)
+                continue;
+
+            var percentages = new List<double?>();
+            for (var mOffset = 0; mOffset <= 3; mOffset++)
+            {
+                var targetMonth = cohortMonth.AddMonths(mOffset);
+                if (mOffset == 0)
+                {
+                    percentages.Add(100.0);
+                }
+                else if (targetMonth >= currentMonthStart)
+                {
+                    // Target month is current ongoing (incomplete) month or future month -> null, not mature zero!
+                    percentages.Add(null);
+                }
+                else
+                {
+                    var activeCount = allActivities
+                        .Where(a => a.ActivityDate.Year == targetMonth.Year &&
+                                    a.ActivityDate.Month == targetMonth.Month &&
+                                    cohortOwnersSet.Contains(a.OwnerId))
+                        .Select(a => a.OwnerId)
+                        .Distinct()
+                        .Count();
+
+                    var pct = Math.Round((double)activeCount / cohortOwnersSet.Count * 100.0, 1);
+                    percentages.Add(pct);
+                }
+            }
+
+            retentionRows.Add(new CohortRetentionRowDto(
+                cohortPeriodStr,
+                cohortOwnersSet.Count,
+                percentages
+            ));
+        }
+
+        // 7. Daily Series & Aggregates fallback for 90d+ pruned telemetry
+        var dailyPoints = new List<DailyGrowthPointDto>();
+        var allDaysActivities = await db.OwnerDailyActivities.AsNoTracking()
+            .Where(a => a.ActivityDate >= fromDate && a.ActivityDate <= toDate && a.HasOwnerAction)
+            .ToListAsync(ct);
+
+        var allPeriodMilestones = await db.OwnerMilestones.AsNoTracking()
+            .Where(m => (m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc) || (m.ActivatedAt >= startUtc && m.ActivatedAt < endUtc))
+            .ToListAsync(ct);
+
+        var dailyAggregates = await db.DailyAggregateMetrics.AsNoTracking()
+            .Where(a => a.Date >= fromDate && a.Date <= toDate)
+            .ToDictionaryAsync(a => a.Date, ct);
+
+        for (var d = fromDate; d <= toDate; d = d.AddDays(1))
+        {
+            var dayStartUtc = ApiSupport.StartOfVietnamDate(d);
+            var dayEndUtc = ApiSupport.EndOfVietnamDate(d);
+
+            var daySessions = events
+                .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
+                .Select(e => e.SessionId)
+                .Distinct()
+                .Count();
+
+            if (daySessions == 0 && dailyAggregates.TryGetValue(d, out var agg))
+            {
+                daySessions = agg.TotalSessions;
+            }
+
+            var dayRegs = allPeriodMilestones
+                .Count(m => m.RegisteredAt >= dayStartUtc && m.RegisteredAt < dayEndUtc && (matchingOwnerIds == null || matchingOwnerIds.Contains(m.OwnerId)));
+
+            var dayActs = allPeriodMilestones
+                .Count(m => m.ActivatedAt >= dayStartUtc && m.ActivatedAt < dayEndUtc && (matchingOwnerIds == null || matchingOwnerIds.Contains(m.OwnerId)));
+
+            var dayActiveOwners = allDaysActivities
+                .Where(a => a.ActivityDate == d && (matchingOwnerIds == null || matchingOwnerIds.Contains(a.OwnerId)))
+                .Select(a => a.OwnerId)
+                .Distinct()
+                .Count();
+
+            dailyPoints.Add(new DailyGrowthPointDto(
+                d,
+                daySessions,
+                dayRegs,
+                dayActs,
+                dayActiveOwners
+            ));
+        }
+
+        // 8. Funnel facts (Started, CodeResent, Verified, Bypassed)
+        var funnelStarted = await db.RegistrationFacts.CountAsync(x => x.Stage == "Started" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
+        var funnelResent = await db.RegistrationFacts.CountAsync(x => x.Stage == "CodeResent" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
+        var funnelVerified = await db.RegistrationFacts.CountAsync(x => x.Stage == "Verified" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
+        var funnelBypassed = await db.RegistrationFacts.CountAsync(x => x.Stage == "Bypassed" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
+        var funnel = new RegistrationFunnelDto(funnelStarted, funnelResent, funnelVerified, funnelBypassed);
+
+        return new AdminMonitoringGrowthResponse(
+            summary,
+            sources,
+            topCtas,
+            retentionRows,
+            cohortMaturity,
+            dailyPoints,
+            funnel
+        );
     }
 }
 
 public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimeProvider clock) : IRevenueMonitoringQueryService
 {
-    public Task<AdminMonitoringRevenueResponse> GetRevenueMetricsAsync(MonitoringFilterRequest filter, CancellationToken ct)
+    public async Task<AdminMonitoringRevenueResponse> GetRevenueMetricsAsync(MonitoringFilterRequest filter, CancellationToken ct)
     {
-        throw new NotImplementedException("Revenue monitoring queries are unimplemented in T0; will be implemented in T1.");
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+
+        var toDate = filter.ToDate ?? today;
+        var fromDate = filter.FromDate ?? toDate.AddDays(-29);
+        if (fromDate > toDate)
+            (fromDate, toDate) = (toDate, fromDate);
+
+        var startUtc = ApiSupport.StartOfVietnamDate(fromDate);
+        var endUtc = ApiSupport.EndOfVietnamDate(toDate);
+
+        var campaignChannels = !string.IsNullOrWhiteSpace(filter.Channel)
+            ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var attributions = await db.RegistrationAttributions.AsNoTracking().ToListAsync(ct);
+        var matchingOwnerIds = DefaultGrowthMonitoringQueryService.GetMatchingOwnerIds(attributions, filter, campaignChannels);
+
+        // 1. Subscription Orders (Confirmed Paid Subscription Only)
+        var ordersQuery = db.PayOsAttempts.AsNoTracking()
+            .Where(x => x.Kind == "Subscription" && x.Status == PaymentAttemptStatus.Paid && x.PaidAt >= startUtc && x.PaidAt < endUtc);
+
+        if (matchingOwnerIds != null)
+        {
+            ordersQuery = ordersQuery.Where(o => matchingOwnerIds.Contains(o.OwnerId));
+        }
+
+        var attempts = await ordersQuery.OrderByDescending(x => x.PaidAt).ToListAsync(ct);
+        var subscriptionOrders = attempts.Select(a => new SubscriptionOrderRevenueDto(
+            a.OrderCode,
+            a.OwnerId,
+            (int)a.Amount,
+            a.SubscriptionDays,
+            a.PaidAt!.Value
+        )).ToList();
+
+        // 2. Campaign Costs
+        var costsQuery = db.CampaignCosts.AsNoTracking()
+            .Where(c => c.Date >= fromDate && c.Date <= toDate);
+
+        if (!string.IsNullOrWhiteSpace(filter.Campaign))
+            costsQuery = costsQuery.Where(c => c.Campaign == filter.Campaign);
+        if (!string.IsNullOrWhiteSpace(filter.Channel))
+            costsQuery = costsQuery.Where(c => c.Channel == filter.Channel);
+        if (!string.IsNullOrWhiteSpace(filter.Source))
+            costsQuery = costsQuery.Where(c => c.Source == filter.Source);
+
+        var costs = await costsQuery.ToListAsync(ct);
+
+        var campaignCosts = costs
+            .GroupBy(c => (c.Campaign, Channel: c.Channel ?? "(none)"))
+            .Select(g => {
+                var cash = g.Sum(x => x.CashVnd);
+                var hours = g.Sum(x => x.PersonHours);
+                var hasMissingRate = g.Any(x => x.PersonHours > 0 && x.HourlyRate == null);
+                decimal? imputed = hasMissingRate
+                    ? null
+                    : g.Sum(x => x.PersonHours * (x.HourlyRate ?? 0m));
+                var total = cash + (imputed ?? 0m);
+                return new CampaignCostSummaryDto(
+                    g.Key.Campaign,
+                    g.Key.Channel == "(none)" ? null : g.Key.Channel,
+                    cash,
+                    hours,
+                    imputed,
+                    total
+                );
+            })
+            .OrderByDescending(c => c.TotalCostVnd)
+            .ToList();
+
+        var totalMarketingSpendVnd = campaignCosts.Sum(c => c.TotalCostVnd);
+        var totalMarketingHours = campaignCosts.Sum(c => c.PersonHours);
+        var totalSubscriptionRevenueVnd = subscriptionOrders.Sum(o => (decimal)o.AmountVnd);
+        var paidSubscriptionCount = subscriptionOrders.Count;
+
+        // 3. CAC30 Calculation with explicit null reasons
+        Cac30MetricDto cac30;
+        if (costs.Count == 0)
+        {
+            cac30 = new Cac30MetricDto(null, false, "MissingCostData");
+        }
+        else if (costs.Any(c => c.PersonHours > 0 && c.HourlyRate == null))
+        {
+            cac30 = new Cac30MetricDto(null, false, "MissingValuation");
+        }
+        else
+        {
+            var cohortOwnersQuery = db.OwnerMilestones.AsNoTracking()
+                .Where(m => m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc);
+
+            if (matchingOwnerIds != null)
+            {
+                cohortOwnersQuery = cohortOwnersQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
+            }
+
+            var cohortOwners = await cohortOwnersQuery.ToListAsync(ct);
+            if (cohortOwners.Count == 0)
+            {
+                cac30 = new Cac30MetricDto(null, false, "NoRegistrations");
+            }
+            else if (toDate > today.AddDays(-30))
+            {
+                cac30 = new Cac30MetricDto(null, false, "CohortImmature");
+            }
+            else
+            {
+                var firstPaidWithin30 = cohortOwners.Count(m =>
+                    m.FirstPaidAt.HasValue && m.RegisteredAt.HasValue &&
+                    m.FirstPaidAt.Value <= m.RegisteredAt.Value.AddDays(30));
+
+                if (firstPaidWithin30 == 0)
+                {
+                    cac30 = new Cac30MetricDto(null, false, "ZeroDenominator");
+                }
+                else
+                {
+                    var cacVal = Math.Round(totalMarketingSpendVnd / firstPaidWithin30, 2);
+                    cac30 = new Cac30MetricDto(cacVal, true, null);
+                }
+            }
+        }
+
+        var summary = new RevenueSummaryDto(
+            totalSubscriptionRevenueVnd,
+            paidSubscriptionCount,
+            totalMarketingSpendVnd,
+            totalMarketingHours,
+            cac30
+        );
+
+        // 4. Daily Series
+        var dailyRevenue = new List<DailyRevenuePointDto>();
+        for (var d = fromDate; d <= toDate; d = d.AddDays(1))
+        {
+            var dayStartUtc = ApiSupport.StartOfVietnamDate(d);
+            var dayEndUtc = ApiSupport.EndOfVietnamDate(d);
+
+            var subRev = attempts
+                .Where(a => a.PaidAt >= dayStartUtc && a.PaidAt < dayEndUtc)
+                .Sum(a => a.Amount);
+
+            var dayCosts = costs.Where(c => c.Date == d).ToList();
+            var spend = dayCosts.Sum(c => c.CashVnd + (c.PersonHours > 0 && c.HourlyRate != null ? c.PersonHours * c.HourlyRate.Value : 0m));
+
+            dailyRevenue.Add(new DailyRevenuePointDto(d, subRev, spend));
+        }
+
+        return new AdminMonitoringRevenueResponse(
+            summary,
+            subscriptionOrders,
+            campaignCosts,
+            dailyRevenue
+        );
+    }
+
+    public string BuildTrackingUrl(
+        string targetUrl,
+        string? source,
+        string? medium,
+        string? campaign,
+        string? term = null,
+        string? content = null)
+    {
+        if (string.IsNullOrWhiteSpace(targetUrl))
+            return string.Empty;
+
+        var isAbsolute = targetUrl.Contains("://");
+        var baseUri = isAbsolute ? new Uri(targetUrl) : new Uri("https://roomie.io.vn" + (targetUrl.StartsWith('/') ? targetUrl : "/" + targetUrl));
+
+        var query = System.Web.HttpUtility.ParseQueryString(baseUri.Query);
+        if (!string.IsNullOrWhiteSpace(source)) query["utm_source"] = source.Trim();
+        if (!string.IsNullOrWhiteSpace(medium)) query["utm_medium"] = medium.Trim();
+        if (!string.IsNullOrWhiteSpace(campaign)) query["utm_campaign"] = campaign.Trim();
+        if (!string.IsNullOrWhiteSpace(term)) query["utm_term"] = term.Trim();
+        if (!string.IsNullOrWhiteSpace(content)) query["utm_content"] = content.Trim();
+
+        var queryString = query.ToString();
+        var queryPart = string.IsNullOrEmpty(queryString) ? "" : "?" + queryString;
+
+        if (isAbsolute)
+        {
+            return $"{baseUri.Scheme}://{baseUri.Authority}{baseUri.AbsolutePath}{queryPart}";
+        }
+
+        return $"{baseUri.AbsolutePath}{queryPart}";
     }
 
     public async Task<IReadOnlyList<MarketingCampaignDto>> GetCampaignsAsync(
@@ -586,7 +1234,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             x.IsActive,
             x.CreatedByName,
             x.CreatedAt,
-            x.UpdatedAt
+            x.UpdatedAt,
+            BuildTrackingUrl(x.TargetUrl ?? "/dang-ky", x.UtmSource, x.UtmMedium, x.UtmCampaign)
         )).ToList();
     }
 
@@ -636,7 +1285,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             campaign.IsActive,
             campaign.CreatedByName,
             campaign.CreatedAt,
-            campaign.UpdatedAt
+            campaign.UpdatedAt,
+            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign)
         );
     }
 
@@ -677,7 +1327,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             campaign.IsActive,
             campaign.CreatedByName,
             campaign.CreatedAt,
-            campaign.UpdatedAt
+            campaign.UpdatedAt,
+            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign)
         );
     }
 
@@ -763,6 +1414,141 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             entity.UpdatedByName,
             entity.UpdatedAt
         );
+    }
+}
+
+public sealed class DefaultMonitoringMaintenanceService(AppDbContext db, TimeProvider clock) : IMonitoringMaintenanceService
+{
+    public async Task<int> PruneExpiredTelemetryAsync(CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+        var pruned = 0;
+
+        // 1. Raw Web Events (90 days)
+        var rawCutoff = now.AddDays(-90);
+        var oldEvents = await db.AnalyticsEvents
+            .Where(e => e.ServerTimestamp < rawCutoff)
+            .ToListAsync(ct);
+        if (oldEvents.Count > 0)
+        {
+            db.AnalyticsEvents.RemoveRange(oldEvents);
+            pruned += oldEvents.Count;
+        }
+
+        // 2. Owner Daily Activities (13 months)
+        var activityCutoff = today.AddMonths(-13);
+        var oldActivities = await db.OwnerDailyActivities
+            .Where(a => a.ActivityDate < activityCutoff)
+            .ToListAsync(ct);
+        if (oldActivities.Count > 0)
+        {
+            db.OwnerDailyActivities.RemoveRange(oldActivities);
+            pruned += oldActivities.Count;
+        }
+
+        // 3. Daily Aggregate Metrics (13 months)
+        var oldAggregates = await db.DailyAggregateMetrics
+            .Where(a => a.Date < activityCutoff)
+            .ToListAsync(ct);
+        if (oldAggregates.Count > 0)
+        {
+            db.DailyAggregateMetrics.RemoveRange(oldAggregates);
+            pruned += oldAggregates.Count;
+        }
+
+        if (pruned > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        return pruned;
+    }
+
+    public async Task<DailyAggregateMetric> RollupDailyAggregateAsync(DateOnly date, CancellationToken ct)
+    {
+        var startUtc = ApiSupport.StartOfVietnamDate(date);
+        var endUtc = ApiSupport.EndOfVietnamDate(date);
+
+        var daySessions = await db.AnalyticsEvents.AsNoTracking()
+            .Where(e => e.ServerTimestamp >= startUtc && e.ServerTimestamp < endUtc)
+            .Select(e => e.SessionId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var dayVisitors = await db.AnalyticsEvents.AsNoTracking()
+            .Where(e => e.ServerTimestamp >= startUtc && e.ServerTimestamp < endUtc)
+            .Select(e => e.BrowserId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var registrations = await db.OwnerMilestones
+            .CountAsync(x => x.RegisteredAt >= startUtc && x.RegisteredAt < endUtc, ct);
+
+        var activations = await db.OwnerMilestones
+            .CountAsync(x => x.ActivatedAt >= startUtc && x.ActivatedAt < endUtc, ct);
+
+        var wauStart = date.AddDays(-6);
+        var activeOwnersWau = await db.OwnerDailyActivities.AsNoTracking()
+            .Where(x => x.ActivityDate >= wauStart && x.ActivityDate <= date && x.HasOwnerAction)
+            .Select(x => x.OwnerId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var mauStart = date.AddDays(-29);
+        var activeOwnersMau = await db.OwnerDailyActivities.AsNoTracking()
+            .Where(x => x.ActivityDate >= mauStart && x.ActivityDate <= date && x.HasOwnerAction)
+            .Select(x => x.OwnerId)
+            .Distinct()
+            .CountAsync(ct);
+
+        var subRevenue = await db.PayOsAttempts
+            .Where(x => x.Kind == "Subscription" && x.Status == PaymentAttemptStatus.Paid && x.PaidAt >= startUtc && x.PaidAt < endUtc)
+            .SumAsync(x => (decimal)x.Amount, ct);
+
+        var costs = await db.CampaignCosts
+            .Where(x => x.Date == date)
+            .ToListAsync(ct);
+
+        var marketingSpend = costs.Sum(x => x.CashVnd + (x.PersonHours > 0 && x.HourlyRate != null ? x.PersonHours * x.HourlyRate.Value : 0m));
+        var marketingHours = costs.Sum(x => x.PersonHours);
+
+        var aggregate = await db.DailyAggregateMetrics.SingleOrDefaultAsync(x => x.Date == date, ct);
+        if (aggregate is null)
+        {
+            aggregate = new DailyAggregateMetric
+            {
+                Date = date,
+                TotalSessions = daySessions,
+                DistinctVisitors = dayVisitors,
+                Registrations = registrations,
+                ActivatedOwners = activations,
+                ActiveOwnersWau = activeOwnersWau,
+                ActiveOwnersMau = activeOwnersMau,
+                SubscriptionRevenueVnd = subRevenue,
+                MarketingSpendVnd = marketingSpend,
+                MarketingHours = marketingHours,
+                TotalRequests = 0,
+                Total5xxErrors = 0,
+                CalculatedAt = clock.GetUtcNow()
+            };
+            db.DailyAggregateMetrics.Add(aggregate);
+        }
+        else
+        {
+            aggregate.TotalSessions = daySessions;
+            aggregate.DistinctVisitors = dayVisitors;
+            aggregate.Registrations = registrations;
+            aggregate.ActivatedOwners = activations;
+            aggregate.ActiveOwnersWau = activeOwnersWau;
+            aggregate.ActiveOwnersMau = activeOwnersMau;
+            aggregate.SubscriptionRevenueVnd = subRevenue;
+            aggregate.MarketingSpendVnd = marketingSpend;
+            aggregate.MarketingHours = marketingHours;
+            aggregate.CalculatedAt = clock.GetUtcNow();
+        }
+
+        await db.SaveChangesAsync(ct);
+        return aggregate;
     }
 }
 

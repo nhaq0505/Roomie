@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -30,7 +31,7 @@ public static partial class BillingEndpoints
                 canCorrectMeter = meterPolicy.Allowed, meterCorrectionBlockedReason = meterPolicy.Reason, items = revisions });
         });
 
-        routes.MapPost("/invoices/{id:guid}/corrections", async (Guid id, InvoiceCorrectionRequest request, HttpContext context, AppDbContext db, CancellationToken ct) =>
+        routes.MapPost("/invoices/{id:guid}/corrections", async (Guid id, InvoiceCorrectionRequest request, HttpContext context, AppDbContext db, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             var actorId = ApiSupport.UserId(context);
@@ -149,6 +150,11 @@ public static partial class BillingEndpoints
             var revision = await AddRevisionAsync(db, invoice, request.RequestId, fingerprint, reason, actorId, before, after, ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "InvoiceCorrection", ct); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             var policyAfter = await MeterCorrectionPolicyAsync(db, invoice, ct);
             var pendingAfter = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct);
             return Results.Ok(new { invoice = InvoiceService.ToDto(invoice, pendingAfter, policyAfter.Allowed, policyAfter.Reason), correction = ToCorrectionDto(revision) });

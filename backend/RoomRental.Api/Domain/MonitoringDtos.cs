@@ -108,13 +108,21 @@ public sealed record DailyGrowthPointDto(
     int ActiveOwners
 );
 
+public sealed record RegistrationFunnelDto(
+    int StartedCount,
+    int CodeResentCount,
+    int VerifiedCount,
+    int BypassedCount
+);
+
 public sealed record AdminMonitoringGrowthResponse(
     GrowthSummaryDto Summary,
     IReadOnlyList<TrafficSourceStatsDto> Sources,
     IReadOnlyList<CtaPerformanceDto> TopCtas,
     IReadOnlyList<CohortRetentionRowDto> RetentionMatrix,
     CohortMaturityDto CohortMaturity,
-    IReadOnlyList<DailyGrowthPointDto> DailySeries
+    IReadOnlyList<DailyGrowthPointDto> DailySeries,
+    RegistrationFunnelDto? Funnel = null
 );
 
 // Admin Revenue Tab DTOs
@@ -259,7 +267,8 @@ public sealed record MarketingCampaignDto(
     bool IsActive,
     string CreatedByName,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
+    DateTimeOffset UpdatedAt,
+    string? TrackingUrl = null
 );
 
 public sealed record CreateCampaignRequest(

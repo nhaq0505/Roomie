@@ -580,11 +580,14 @@ internal static class MonitoringFoundationTests
         var ownerResp = await ownerClient.GetAsync("/api/admin/monitoring/growth");
         Assert(ownerResp.StatusCode == HttpStatusCode.Forbidden, "Owner role gets 403 Forbidden for admin monitoring");
 
-        // 6. Admin role receives explicit 501 Not Implemented contract for unimplemented endpoints
+        // 6. Admin endpoints: growth returns 200 OK in T1, ops returns 501 (owned by Worker C)
         var adminClient = app.GetTestClient();
         adminClient.DefaultRequestHeaders.Add("X-Fixture-Role", "Admin");
         var adminGrowthResp = await adminClient.GetAsync("/api/admin/monitoring/growth");
-        Assert(adminGrowthResp.StatusCode == HttpStatusCode.NotImplemented, "Admin growth endpoint returns explicit 501 Not Implemented in T0 foundation");
+        Assert(adminGrowthResp.StatusCode == HttpStatusCode.OK, "Admin growth endpoint returns 200 OK in T1");
+
+        var adminRevenueResp = await adminClient.GetAsync("/api/admin/monitoring/revenue");
+        Assert(adminRevenueResp.StatusCode == HttpStatusCode.OK, "Admin revenue endpoint returns 200 OK in T1");
 
         var adminOpsResp = await adminClient.GetAsync("/api/admin/monitoring/operations");
         Assert(adminOpsResp.StatusCode == HttpStatusCode.NotImplemented, "Admin operations endpoint returns explicit 501 Not Implemented in T0 foundation");
@@ -602,7 +605,7 @@ internal static class MonitoringFoundationTests
         Assert(campaignsResp.StatusCode == HttpStatusCode.OK, "Admin campaigns endpoint returns 200 OK");
     }
 
-    private sealed class MonitoringFixtureAuth(
+    internal sealed class MonitoringFixtureAuth(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
@@ -613,7 +616,10 @@ internal static class MonitoringFoundationTests
             if (string.IsNullOrWhiteSpace(role))
                 return Task.FromResult(AuthenticateResult.NoResult());
 
-            var userId = role == "Admin" ? AdminUserId : OwnerUserId;
+            var customUserId = Request.Headers["X-Fixture-UserId"].FirstOrDefault();
+            var userId = !string.IsNullOrWhiteSpace(customUserId) && Guid.TryParse(customUserId, out var parsedUid)
+                ? parsedUid
+                : (role == "Admin" ? AdminUserId : OwnerUserId);
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),

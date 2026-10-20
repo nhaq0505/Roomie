@@ -4,11 +4,15 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null)
+public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
 {
     public Task StageZaloReminderAsync(Invoice invoice, CancellationToken ct) => zalo?.StageIssuedAsync(invoice, ct) ?? Task.CompletedTask;
 
-    public async Task<(int Created, int Skipped)> GenerateForOwnerAsync(Guid ownerId, string period, CancellationToken cancellationToken = default)
+    public async Task<(int Created, int Skipped)> GenerateForOwnerAsync(
+        Guid ownerId,
+        string period,
+        CancellationToken cancellationToken = default,
+        ActorType actor = ActorType.Owner)
     {
         await using var ownedTransaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
@@ -32,6 +36,7 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
             .ToListAsync(cancellationToken);
 
         var created = 0;
+        var issuedInvoices = new List<Invoice>();
         foreach (var row in eligible)
         {
             if (!invoicedOccupancies.Add(row.Occupancy.Id)) continue;
@@ -46,11 +51,28 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
             var invoice = CreateMonthlyInvoice(ownerId, row.Room, row.Building, row.Occupancy, row.Reading, InvoiceLifecycleState.Issued);
             db.Invoices.Add(invoice);
             await StageZaloReminderAsync(invoice, cancellationToken);
+            issuedInvoices.Add(invoice);
             created++;
         }
 
         if (created > 0) await db.SaveChangesAsync(cancellationToken);
         if (ownedTransaction is not null) await ownedTransaction.CommitAsync(cancellationToken);
+
+        if (milestoneTracker != null && issuedInvoices.Count > 0)
+        {
+            try
+            {
+                foreach (var inv in issuedInvoices)
+                {
+                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, inv.Id, inv.Kind, actor, cancellationToken);
+                }
+            }
+            catch
+            {
+                // Telemetry failure must not break invoice generation
+            }
+        }
+
         return (created, eligible.Count - created);
         }
         catch
@@ -70,7 +92,7 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
         var skipped = 0;
         foreach (var ownerId in owners)
         {
-            var result = await GenerateForOwnerAsync(ownerId, period, cancellationToken);
+            var result = await GenerateForOwnerAsync(ownerId, period, cancellationToken, ActorType.System);
             created += result.Created;
             skipped += result.Skipped;
         }

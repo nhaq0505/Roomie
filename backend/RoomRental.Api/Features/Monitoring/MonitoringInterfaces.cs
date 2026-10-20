@@ -25,6 +25,10 @@ public interface IOwnerMilestoneTracker
         string stage,
         CancellationToken ct);
 
+    Task TrackRegistrationResentAsync(
+        Guid attemptId,
+        CancellationToken ct);
+
     Task TrackOwnerRegisteredAsync(
         Guid ownerId,
         RegistrationAttributionDto? attribution,
@@ -42,7 +46,8 @@ public interface IOwnerMilestoneTracker
         Guid ownerId,
         long orderCode,
         int amount,
-        ActorType actor = ActorType.Owner,
+        ActorType actor = ActorType.System,
+        DateTimeOffset? paidAt = null,
         CancellationToken ct = default);
 
     Task RecordOwnerActivityAsync(
@@ -95,6 +100,20 @@ public interface IRevenueMonitoringQueryService
         Guid adminUserId,
         string adminUserName,
         CancellationToken ct);
+
+    string BuildTrackingUrl(
+        string targetUrl,
+        string? source,
+        string? medium,
+        string? campaign,
+        string? term = null,
+        string? content = null);
+}
+
+public interface IMonitoringMaintenanceService
+{
+    Task<int> PruneExpiredTelemetryAsync(CancellationToken ct);
+    Task<DailyAggregateMetric> RollupDailyAggregateAsync(DateOnly date, CancellationToken ct);
 }
 
 public interface IOperationsMonitoringService

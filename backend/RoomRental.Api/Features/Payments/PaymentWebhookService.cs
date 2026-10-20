@@ -10,7 +10,7 @@ using RoomRental.Api.Domain;
 namespace RoomRental.Api.Services;
 
 public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvider protectionProvider,
-    IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    IHttpClientFactory httpClientFactory, IConfiguration configuration, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
 {
     private string? WebhookUrl(Guid ownerId)
     {
@@ -133,6 +133,18 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
         db.ProcessedWebhooks.Add(new ProcessedWebhook { OwnerId = attempt.OwnerId, Reference = reference, OrderCode = trackedAttempt.OrderCode });
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+
+        if (milestoneTracker is not null)
+        {
+            try
+            {
+                await milestoneTracker.TrackSubscriptionPaidAsync(attempt.OwnerId, trackedAttempt.OrderCode, (int)amount, ActorType.System, trackedAttempt.PaidAt, cancellationToken);
+            }
+            catch
+            {
+                // Telemetry failure must not break payment processing
+            }
+        }
         return true;
     }
 }

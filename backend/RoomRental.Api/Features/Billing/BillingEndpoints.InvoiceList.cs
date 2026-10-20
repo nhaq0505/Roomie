@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -70,7 +71,7 @@ public static partial class BillingEndpoints
         });
 
         routes.MapPost("/rooms/{id:guid}/supplemental-invoices", async (Guid id, SupplementalInvoiceRequest request,
-            HttpContext context, AppDbContext db, InvoiceService invoiceService, CancellationToken cancellationToken) =>
+            HttpContext context, AppDbContext db, InvoiceService invoiceService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             var description = request.Description?.Trim();
@@ -101,14 +102,24 @@ public static partial class BillingEndpoints
             await invoiceService.StageZaloReminderAsync(invoice, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "InvoiceSupplemental", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Created($"/api/invoices/{invoice.Id}", InvoiceService.ToDto(invoice));
         });
 
-        routes.MapPost("/invoices/generate", async (GenerateInvoiceRequest request, HttpContext context, InvoiceService invoiceService, CancellationToken cancellationToken) =>
+        routes.MapPost("/invoices/generate", async (GenerateInvoiceRequest request, HttpContext context, InvoiceService invoiceService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             var period = ApiSupport.NormalizePeriod(request.Period);
-            var result = await invoiceService.GenerateForOwnerAsync(ownerId, period, cancellationToken);
+            var result = await invoiceService.GenerateForOwnerAsync(ownerId, period, cancellationToken, ActorType.Owner);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "InvoiceGenerate", cancellationToken); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(new { created = result.Created, skipped = result.Skipped, period });
         });
 
@@ -126,7 +137,7 @@ public static partial class BillingEndpoints
             return Results.Ok(InvoiceService.ToDto(invoice, pending, meterPolicy.Allowed, meterPolicy.Reason, tenantToken: token) with { HasMonthlyOverlap = overlap });
         });
 
-        routes.MapPost("/invoices/{id:guid}/publish", async (Guid id, PublishInvoiceRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, CancellationToken ct) =>
+        routes.MapPost("/invoices/{id:guid}/publish", async (Guid id, PublishInvoiceRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             if (request.RequestId == Guid.Empty || request.ExpectedVersion < 1)
@@ -168,6 +179,11 @@ public static partial class BillingEndpoints
             await invoiceService.StageZaloReminderAsync(invoice, ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            if (milestoneTracker != null)
+            {
+                try { await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, ct); }
+                catch { /* Telemetry failure must not block product */ }
+            }
             return Results.Ok(InvoiceService.ToDto(invoice));
         });
 

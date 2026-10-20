@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -72,7 +73,7 @@ public static class PaymentEndpoints
             return Results.Ok(await payOsService.ReconcileAsync(ownerId, orderCode, cancellationToken));
         });
 
-        app.MapGet("/api/tenant/{token}", async (string token, int? page, int? pageSize, Guid? invoiceId, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
+        app.MapGet("/api/tenant/{token}", async (string token, int? page, int? pageSize, Guid? invoiceId, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var occupancy = await FindTenantAsync(db, token, cancellationToken);
             var roomBuilding = await (from room in db.Rooms.AsNoTracking()
@@ -90,13 +91,17 @@ public static class PaymentEndpoints
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(cancellationToken);
             var occupancyDto = roomDto.Occupancy ?? throw new ApiException(StatusCodes.Status404NotFound, "Tenant link is no longer active.");
             var paymentSettings = await webhookService.GetAsync(roomBuilding.Building.OwnerId, cancellationToken);
+            if (milestoneTracker != null)
+                await milestoneTracker.RecordOwnerActivityAsync(roomBuilding.Building.OwnerId, ActorType.System, "TenantPortalOpen", cancellationToken);
             return Results.Ok(new { confirmationMode = paymentSettings.ConfirmationMode, room = roomDto, occupancy = occupancyDto, invoices = invoices.Select(invoice => InvoiceService.ToDto(invoice)).ToList(), total, totals, page = paging.Number, pageSize = paging.Size });
         });
 
-        app.MapPost("/api/tenant/{token}/payment", async (string token, AppDbContext db, PayOsService service, CancellationToken ct) => {
+        app.MapPost("/api/tenant/{token}/payment", async (string token, AppDbContext db, PayOsService service, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default) => {
             var occupancy = await FindTenantAsync(db, token, ct);
             var invoice = await db.Invoices.Where(i => i.OccupancyId == occupancy.Id && i.LifecycleState == InvoiceLifecycleState.Issued && i.Total > i.Paid)
                 .OrderBy(i => i.Id).FirstOrDefaultAsync(ct) ?? throw new ApiException(409, "Không còn hóa đơn cần thanh toán.");
+            if (milestoneTracker != null)
+                await milestoneTracker.RecordOwnerActivityAsync(invoice.OwnerId, ActorType.System, "TenantCheckoutAttempt", ct);
             return Results.Ok(await service.CreateOrGetCheckoutAsync(invoice.OwnerId, invoice, token, ct, allInvoices: true));
         }).RequireRateLimiting("tenant-payment");
 
@@ -108,11 +113,13 @@ public static class PaymentEndpoints
             return Results.Ok(await service.ReconcileAsync(attempt.OwnerId, orderCode, ct));
         }).RequireRateLimiting("tenant-payment");
 
-        app.MapPost("/api/tenant/{token}/invoices/{id:guid}/payment", async (string token, Guid id, AppDbContext db, PayOsService payOsService, CancellationToken cancellationToken) =>
+        app.MapPost("/api/tenant/{token}/invoices/{id:guid}/payment", async (string token, Guid id, AppDbContext db, PayOsService payOsService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
         {
             var occupancy = await FindTenantAsync(db, token, cancellationToken);
             var invoice = await db.Invoices.SingleOrDefaultAsync(row => row.Id == id && row.OccupancyId == occupancy.Id && row.LifecycleState == InvoiceLifecycleState.Issued, cancellationToken)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found for this tenant.");
+            if (milestoneTracker != null)
+                await milestoneTracker.RecordOwnerActivityAsync(invoice.OwnerId, ActorType.System, "TenantCheckoutAttempt", cancellationToken);
             var checkout = await payOsService.CreateOrGetCheckoutAsync(invoice.OwnerId, invoice, token, cancellationToken);
             return Results.Ok(checkout);
         }).RequireRateLimiting("tenant-payment");
