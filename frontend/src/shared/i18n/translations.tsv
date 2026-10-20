@@ -1343,3 +1343,11 @@
 1342|Immature cohort (< 7 days)|同期群未满 7 天成熟期|코호트 성숙 기간 미달 (7일 미만)|अपरिपक्व कोहॉर्ट (< 7 दिन)
 1343|Reconciled & deduplicated|已对账并去重|정산 및 중복 제거 완료|समाधान और डुप्लिकेट हटाया गया
 1344|30-day business metrics, operations in Vietnam calendar|30天业务指标，越南日历运维|30일 비즈니스 지표, 베트남 달력 기준 운영|30-दिवसीय व्यावसायिक मेट्रिक्स, वियतनाम कैलेंडर संचालन
+1345|Missing hourly rate valuation|缺少工时单价估值|시간당 단가 평가 누락|प्रति घंटा मूल्यांकन गायब है
+1346|No owner registrations in period|期间无房东注册|해당 기간 신규 등록 없음|अवधि में कोई पंजीकरण नहीं
+1347|Registration started|开始注册|가입 시작|पंजीकरण शुरू हुआ
+1348|OTP resent|重发验证码|인증번호 재전송|ओटीपी पुनः भेजा गया
+1349|Verification complete|验证完成|인증 완료|सत्यापन पूर्ण
+1350|OTP bypassed|跳过验证码|인증번호 건너뜀|ओटीपी बाईपास किया गया
+1351|Registrations with unknown source|来源未知的注册数|출처 불명 등록 건수|अज्ञात स्रोत पंजीकरण
+1352|Imputed labor cost (VND)|折算人工成本 (VND)|환산 인건비 (VND)|अनुमानित श्रम लागत (VND)

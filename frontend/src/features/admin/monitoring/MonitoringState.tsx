@@ -164,6 +164,8 @@ export function CacNullReasonTag({ reason }: { reason?: Cac30NullReason | null }
     case 'MissingCostData':
     case 'missing_spend':
       return <Tag color="warning">{t("Chưa nhập chi phí")}</Tag>;
+    case 'MissingValuation':
+      return <Tag color="warning">{t("Thiếu đơn giá giờ công")}</Tag>;
     case 'ZeroDenominator':
     case 'zero_cohort':
       return <Tag color="default">{t("Chưa có chủ trọ trả phí")}</Tag>;
@@ -171,7 +173,7 @@ export function CacNullReasonTag({ reason }: { reason?: Cac30NullReason | null }
     case 'unmature_cohort':
       return <Tag color="blue">{t("Chưa đủ 30 ngày trưởng thành")}</Tag>;
     case 'NoRegistrations':
-      return <Tag color="default">{t("Chưa có chủ trọ trả phí")}</Tag>;
+      return <Tag color="default">{t("Chưa có chủ trọ đăng ký")}</Tag>;
     default:
       return <UnknownMetric explanation={String(reason)} />;
   }

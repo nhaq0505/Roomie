@@ -30,8 +30,8 @@ export interface CampaignCostFilterRequest {
 
 // 1. Growth Tab Types
 export interface GrowthSummaryDto {
-  totalSessions: number;
-  uniqueVisitors: number;
+  totalSessions: number | null;
+  uniqueVisitors: number | null;
   registrations: number;
   activatedOwners: number;
   currentWau: number;
@@ -41,7 +41,7 @@ export interface GrowthSummaryDto {
 export interface TrafficSourceStatsDto {
   source: string;
   medium?: string | null;
-  sessions: number;
+  sessions: number | null;
   registrations: number;
   activatedOwners: number;
 }
@@ -67,10 +67,18 @@ export interface CohortMaturityDto {
 
 export interface DailyGrowthPointDto {
   date: string; // YYYY-MM-DD
-  sessions: number;
+  sessions: number | null;
   registrations: number;
   activations: number;
   activeOwners: number;
+}
+
+export interface RegistrationFunnelDto {
+  startedCount: number;
+  codeResentCount: number;
+  verifiedCount: number;
+  bypassedCount: number;
+  unknownAttemptCount: number;
 }
 
 export interface AdminMonitoringGrowthResponse {
@@ -80,11 +88,15 @@ export interface AdminMonitoringGrowthResponse {
   retentionMatrix: CohortRetentionRowDto[];
   cohortMaturity: CohortMaturityDto;
   dailySeries: DailyGrowthPointDto[];
+  funnel?: RegistrationFunnelDto | null;
+  effectiveFromDate?: string | null;
+  effectiveToDate?: string | null;
 }
 
 // 2. Revenue Tab Types
 export type Cac30NullReason =
   | 'MissingCostData'
+  | 'MissingValuation'
   | 'ZeroDenominator'
   | 'CohortImmature'
   | 'NoRegistrations'
@@ -132,6 +144,8 @@ export interface AdminMonitoringRevenueResponse {
   subscriptionOrders: SubscriptionOrderRevenueDto[];
   campaignCosts: CampaignCostSummaryDto[];
   dailySeries: DailyRevenuePointDto[];
+  effectiveFromDate?: string | null;
+  effectiveToDate?: string | null;
 }
 
 // 3. Operations Tab Types

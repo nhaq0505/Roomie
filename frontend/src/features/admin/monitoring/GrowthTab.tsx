@@ -38,7 +38,13 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
   const sourceColumns: TableProps<TrafficSourceStatsDto>['columns'] = [
     { title: t("Nguồn"), dataIndex: 'source', key: 'source', render: (val: string) => <strong>{val}</strong> },
     { title: t("Kênh"), dataIndex: 'medium', key: 'medium', render: (val?: string | null) => val || '—' },
-    { title: t("Phiên truy cập"), dataIndex: 'sessions', key: 'sessions', align: 'right' },
+    {
+      title: t("Phiên truy cập"),
+      dataIndex: 'sessions',
+      key: 'sessions',
+      align: 'right',
+      render: (val?: number | null) => (val !== null && val !== undefined ? val : '—'),
+    },
     { title: t("Đăng ký"), dataIndex: 'registrations', key: 'registrations', align: 'right' },
     { title: t("Chủ trọ kích hoạt"), dataIndex: 'activatedOwners', key: 'activated', align: 'right' },
     {
@@ -46,8 +52,11 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
       key: 'convRate',
       align: 'right',
       render: (_, r) => {
-        const rate = r.sessions > 0 ? (r.registrations / r.sessions) * 100 : 0;
-        return `${rate.toFixed(1)}%`;
+        if (r.sessions !== null && r.sessions !== undefined && r.sessions > 0) {
+          const rate = (r.registrations / r.sessions) * 100;
+          return `${rate.toFixed(1)}%`;
+        }
+        return r.sessions === 0 ? '0.0%' : '—';
       },
     },
   ];
@@ -214,7 +223,23 @@ export function GrowthTab({ data, isLoading, error, onRetry, is501 }: GrowthTabP
       <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
         <Col xs={24} lg={12}>
           <SectionCard title={t("Phễu chuyển đổi")} extra={<span style={{ fontSize: 12, color: '#7a8c91' }}>{t("Tỷ lệ qua từng giai đoạn")}</span>}>
-            {summary && summary.totalSessions > 0 ? (
+            {data?.funnel ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <NativeConversionFunnel
+                  stages={[
+                    { label: t("Bắt đầu đăng ký"), count: data.funnel.startedCount, color: '#34757c' },
+                    { label: t("Gửi lại mã OTP"), count: data.funnel.codeResentCount, color: '#bb8133' },
+                    { label: t("Xác thực hoàn tất"), count: data.funnel.verifiedCount, color: '#17a486' },
+                    { label: t("Bỏ qua mã OTP"), count: data.funnel.bypassedCount, color: '#457b9d' },
+                  ]}
+                />
+                {data.funnel.unknownAttemptCount > 0 && (
+                  <div style={{ fontSize: 12, color: '#7a8c91', borderTop: '1px solid #f0f4f3', paddingTop: 6 }}>
+                    <span>{t("Lượt đăng ký chưa rõ nguồn")}: <strong>{data.funnel.unknownAttemptCount}</strong></span>
+                  </div>
+                )}
+              </div>
+            ) : summary && summary.totalSessions !== null && summary.totalSessions > 0 ? (
               <NativeConversionFunnel stages={funnelStages} />
             ) : (
               <MonitoringEmptyState />

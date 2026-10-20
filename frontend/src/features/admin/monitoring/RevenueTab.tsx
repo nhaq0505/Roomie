@@ -5,7 +5,7 @@ import {
   UsergroupAddOutlined,
   WalletOutlined,
 } from '@ant-design/icons';
-import { Button, Col, Row, Space, Table } from 'antd';
+import { Button, Col, Row, Space, Table, Tag } from 'antd';
 import type { TableProps } from 'antd';
 import { useState } from 'react';
 import { formatVnd } from '../../../shared/format';
@@ -113,6 +113,14 @@ export function RevenueTab({
       key: 'totalCost',
       align: 'right',
       render: (_, r) => {
+        if (r.personHours > 0 && !r.hourlyRate) {
+          return (
+            <Space size={4}>
+              <strong style={{ color: '#17a486' }}>{formatVnd(r.cashVnd || 0)}</strong>
+              <Tag color="warning">{t("Thiếu đơn giá giờ công")}</Tag>
+            </Space>
+          );
+        }
         const total = (r.cashVnd || 0) + (r.personHours || 0) * (r.hourlyRate || 0);
         return <strong style={{ color: '#17a486' }}>{formatVnd(total)}</strong>;
       },

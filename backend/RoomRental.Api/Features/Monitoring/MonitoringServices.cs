@@ -823,7 +823,10 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             eventsQuery = eventsQuery.Where(e => e.UtmMedium == filter.Channel || (e.UtmCampaign != null && campaignChannels.Contains(e.UtmCampaign)));
         }
 
-        var events = await eventsQuery.Take(50_000).ToListAsync(ct);
+        var events = await eventsQuery.Take(50_001).ToListAsync(ct);
+        var isEventsTruncated = events.Count > 50_000;
+        if (isEventsTruncated)
+            events.RemoveAt(50_000);
 
         // 2. Daily Aggregates (pre-fetch bounded)
         var dailyAggregates = await db.DailyAggregateMetrics.AsNoTracking()
@@ -837,8 +840,8 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
 
         if (!hasRawCoverageMissing)
         {
-            totalSessions = events.Select(e => e.SessionId).Distinct().Count();
-            uniqueVisitors = events.Select(e => e.BrowserId).Distinct().Count();
+            totalSessions = await eventsQuery.Select(e => e.SessionId).Distinct().CountAsync(ct);
+            uniqueVisitors = await eventsQuery.Select(e => e.BrowserId).Distinct().CountAsync(ct);
         }
         else
         {
@@ -852,35 +855,19 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             }
             else
             {
-                // Unfiltered: can sum daily sessions if aggregates are complete
-                var canSum = true;
-                var sumSessions = 0;
-                for (var d = fromDate; d <= toDate; d = d.AddDays(1))
+                // If single day, daily aggregate TotalSessions is the exact count for that day
+                if (fromDate == toDate && dailyAggregates.TryGetValue(fromDate, out var singleAgg))
                 {
-                    if (d >= rawRetentionCutoffDate)
-                    {
-                        var dayStartUtc = ApiSupport.StartOfVietnamDate(d);
-                        var dayEndUtc = ApiSupport.EndOfVietnamDate(d);
-                        sumSessions += events
-                            .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
-                            .Select(e => e.SessionId)
-                            .Distinct()
-                            .Count();
-                    }
-                    else
-                    {
-                        if (dailyAggregates.TryGetValue(d, out var agg))
-                        {
-                            sumSessions += agg.TotalSessions;
-                        }
-                        else
-                        {
-                            canSum = false;
-                            break;
-                        }
-                    }
+                    totalSessions = singleAgg.TotalSessions;
                 }
-                totalSessions = canSum ? sumSessions : null;
+                else
+                {
+                    // Multi-day period crossing midnight with pruned raw coverage:
+                    // 30-min idle sessions cross midnight, so daily distinct session sums
+                    // mathematically overestimate true period distinct sessions.
+                    // Must report null (unavailable/unknown) rather than an imprecise sum.
+                    totalSessions = null;
+                }
             }
         }
 
@@ -893,8 +880,11 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             milestonesQuery = milestonesQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
         }
 
-        var registeredMilestones = await milestonesQuery.Take(50_000).ToListAsync(ct);
-        var registrations = registeredMilestones.Count;
+        var registrations = await milestonesQuery.CountAsync(ct);
+        var registeredMilestones = await milestonesQuery.Take(50_001).ToListAsync(ct);
+        var isMilestonesTruncated = registeredMilestones.Count > 50_000;
+        if (isMilestonesTruncated)
+            registeredMilestones.RemoveAt(50_000);
 
         // Activations in date range
         var activationsQuery = db.OwnerMilestones.AsNoTracking()
@@ -959,7 +949,7 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var sources = allKeys.Select(k => {
             sourceEventGroups.TryGetValue(k, out var sCount);
             sourceRegGroups.TryGetValue(k, out var regInfo);
-            int? reportedSessions = hasRawCoverageMissing ? null : sCount;
+            int? reportedSessions = (hasRawCoverageMissing || isEventsTruncated) ? null : sCount;
             return new TrafficSourceStatsDto(
                 k.Source,
                 k.Medium == "(none)" ? null : k.Medium,
@@ -1108,11 +1098,14 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             {
                 // Raw coverage is present for this date.
                 // A zero count here is a REAL ZERO, never fallback on aggregate!
-                daySessions = events
-                    .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
-                    .Select(e => e.SessionId)
-                    .Distinct()
-                    .Count();
+                // If the raw events query was truncated by safety cap, expose null rather than partial counts
+                daySessions = isEventsTruncated
+                    ? null
+                    : events
+                        .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
+                        .Select(e => e.SessionId)
+                        .Distinct()
+                        .Count();
             }
             else
             {
@@ -1215,7 +1208,9 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             retentionRows,
             cohortMaturity,
             dailyPoints,
-            funnel
+            funnel,
+            EffectiveFromDate: fromDate,
+            EffectiveToDate: toDate
         );
     }
 }
@@ -1393,7 +1388,9 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             summary,
             subscriptionOrders,
             campaignCosts,
-            dailyRevenue
+            dailyRevenue,
+            EffectiveFromDate: fromDate,
+            EffectiveToDate: toDate
         );
     }
 

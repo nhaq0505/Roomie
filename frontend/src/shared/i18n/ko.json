@@ -1343,5 +1343,13 @@
   "Tháng dương lịch tiếp theo chưa hoàn thành hoặc chưa đủ điều kiện": "다음 달력이 아직 완료되지 않았거나 자격이 없습니다",
   "Chưa đủ 7 ngày trưởng thành": "코호트 성숙 기간 미달 (7일 미만)",
   "Đã đối soát & loại trừ trùng lặp": "정산 및 중복 제거 완료",
-  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30일 비즈니스 지표, 베트남 달력 기준 운영"
+  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30일 비즈니스 지표, 베트남 달력 기준 운영",
+  "Thiếu đơn giá giờ công": "시간당 단가 평가 누락",
+  "Chưa có chủ trọ đăng ký": "해당 기간 신규 등록 없음",
+  "Bắt đầu đăng ký": "가입 시작",
+  "Gửi lại mã OTP": "인증번호 재전송",
+  "Xác thực hoàn tất": "인증 완료",
+  "Bỏ qua mã OTP": "인증번호 건너뜀",
+  "Lượt đăng ký chưa rõ nguồn": "출처 불명 등록 건수",
+  "Chi phí nhân công quy đổi (VND)": "환산 인건비 (VND)"
 }

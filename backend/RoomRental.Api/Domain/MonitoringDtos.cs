@@ -123,7 +123,9 @@ public sealed record AdminMonitoringGrowthResponse(
     IReadOnlyList<CohortRetentionRowDto> RetentionMatrix,
     CohortMaturityDto CohortMaturity,
     IReadOnlyList<DailyGrowthPointDto> DailySeries,
-    RegistrationFunnelDto? Funnel = null
+    RegistrationFunnelDto? Funnel = null,
+    DateOnly? EffectiveFromDate = null,
+    DateOnly? EffectiveToDate = null
 );
 
 // Admin Revenue Tab DTOs
@@ -168,7 +170,9 @@ public sealed record AdminMonitoringRevenueResponse(
     RevenueSummaryDto Summary,
     IReadOnlyList<SubscriptionOrderRevenueDto> SubscriptionOrders,
     IReadOnlyList<CampaignCostSummaryDto> CampaignCosts,
-    IReadOnlyList<DailyRevenuePointDto> DailySeries
+    IReadOnlyList<DailyRevenuePointDto> DailySeries,
+    DateOnly? EffectiveFromDate = null,
+    DateOnly? EffectiveToDate = null
 );
 
 // Admin Operations Tab DTOs

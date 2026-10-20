@@ -1343,5 +1343,13 @@
   "Tháng dương lịch tiếp theo chưa hoàn thành hoặc chưa đủ điều kiện": "下一个自然月尚未结束或不符合条件",
   "Chưa đủ 7 ngày trưởng thành": "同期群未满 7 天成熟期",
   "Đã đối soát & loại trừ trùng lặp": "已对账并去重",
-  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30天业务指标，越南日历运维"
+  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30天业务指标，越南日历运维",
+  "Thiếu đơn giá giờ công": "缺少工时单价估值",
+  "Chưa có chủ trọ đăng ký": "期间无房东注册",
+  "Bắt đầu đăng ký": "开始注册",
+  "Gửi lại mã OTP": "重发验证码",
+  "Xác thực hoàn tất": "验证完成",
+  "Bỏ qua mã OTP": "跳过验证码",
+  "Lượt đăng ký chưa rõ nguồn": "来源未知的注册数",
+  "Chi phí nhân công quy đổi (VND)": "折算人工成本 (VND)"
 }

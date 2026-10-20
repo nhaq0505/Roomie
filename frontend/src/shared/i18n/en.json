@@ -1343,5 +1343,13 @@
   "Tháng dương lịch tiếp theo chưa hoàn thành hoặc chưa đủ điều kiện": "Next calendar month not completed or not eligible",
   "Chưa đủ 7 ngày trưởng thành": "Immature cohort (< 7 days)",
   "Đã đối soát & loại trừ trùng lặp": "Reconciled & deduplicated",
-  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30-day business metrics, operations in Vietnam calendar"
+  "Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam": "30-day business metrics, operations in Vietnam calendar",
+  "Thiếu đơn giá giờ công": "Missing hourly rate valuation",
+  "Chưa có chủ trọ đăng ký": "No owner registrations in period",
+  "Bắt đầu đăng ký": "Registration started",
+  "Gửi lại mã OTP": "OTP resent",
+  "Xác thực hoàn tất": "Verification complete",
+  "Bỏ qua mã OTP": "OTP bypassed",
+  "Lượt đăng ký chưa rõ nguồn": "Registrations with unknown source",
+  "Chi phí nhân công quy đổi (VND)": "Imputed labor cost (VND)"
 }

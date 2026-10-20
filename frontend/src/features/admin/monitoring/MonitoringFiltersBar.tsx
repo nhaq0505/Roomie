@@ -130,6 +130,8 @@ export function MonitoringFiltersBar({
                 onChange={handleCustomRange}
                 format={dateFormat()}
                 allowClear={false}
+                disabledDate={(current) => current && current > dayjs().endOf('day')}
+                maxDate={dayjs()}
               />
             )}
 

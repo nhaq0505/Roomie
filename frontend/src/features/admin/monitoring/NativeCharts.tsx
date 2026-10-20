@@ -200,7 +200,7 @@ export function NativeConversionFunnel({ stages }: { stages: FunnelStage[] }) {
 export interface TrendSeries {
   name: string;
   color: string;
-  data: number[];
+  data: (number | null)[];
 }
 
 export function NativeMultiLineChart({
@@ -220,8 +220,8 @@ export function NativeMultiLineChart({
     );
   }
 
-  const allValues = series.flatMap((s) => s.data);
-  const maxVal = Math.max(...allValues, 1);
+  const allValues = series.flatMap((s) => s.data.filter((v): v is number => v !== null && v !== undefined));
+  const maxVal = allValues.length > 0 ? Math.max(...allValues, 1) : 1;
   const minVal = 0;
   const range = maxVal - minVal || 1;
 
@@ -264,17 +264,39 @@ export function NativeMultiLineChart({
 
           {/* Lines */}
           {series.map((s) => {
-            const points = s.data.map((val, idx) => {
-              const x = paddingLeft + idx * stepX;
-              const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
-              return `${x},${y}`;
+            const segments: string[][] = [];
+            let currentSegment: string[] = [];
+            s.data.forEach((val, idx) => {
+              if (val !== null && val !== undefined) {
+                const x = paddingLeft + idx * stepX;
+                const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
+                currentSegment.push(`${x},${y}`);
+              } else {
+                if (currentSegment.length > 0) {
+                  segments.push(currentSegment);
+                  currentSegment = [];
+                }
+              }
             });
-            const pathD = `M ${points.join(' L ')}`;
+            if (currentSegment.length > 0) {
+              segments.push(currentSegment);
+            }
 
             return (
               <g key={s.name}>
-                <path d={pathD} fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                {segments.map((seg, sIdx) => (
+                  <path
+                    key={sIdx}
+                    d={`M ${seg.join(' L ')}`}
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                ))}
                 {s.data.map((val, idx) => {
+                  if (val === null || val === undefined) return null;
                   const x = paddingLeft + idx * stepX;
                   const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
                   return (
