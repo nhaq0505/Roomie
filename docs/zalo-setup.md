@@ -1,6 +1,6 @@
 # Nhắc hóa đơn qua Zalo — Roomie
 
-Cập nhật 20/10: tin Zalo gửi thông tin hóa đơn và **link thanh toán Roomie**, không gửi số tài khoản hay ảnh QR chuyển khoản. Trang Zalo không yêu cầu cấu hình ngân hàng riêng; khối tài khoản/lịch đã được bỏ theo yêu cầu.
+Cập nhật 20/10: tin Zalo gửi thông tin hóa đơn và **link xem hóa đơn Roomie**, không gửi số tài khoản hay ảnh QR chuyển khoản. Trang Zalo không yêu cầu cấu hình ngân hàng riêng; khối tài khoản/lịch đã được bỏ theo yêu cầu.
 
 ## Phạm vi và cách dùng
 
@@ -10,7 +10,7 @@ Kết nối xuất hiện như thiết bị **Zalo Web** trên điện thoại. 
 
 Kết nối Zalo rồi bấm **Nhắc hóa đơn còn nợ** và xác nhận **Thêm vào hàng đợi**. Chủ trọ dùng cấu hình thanh toán hiện có của Roomie; quy tắc cấp link người thuê vẫn áp dụng (Automatic cần payOS xác minh, Manual cần cấu hình nhận tiền trong phần thanh toán). Không nhập thông tin nhận tiền ở trang Zalo.
 
-Link mở thẳng `/t/{token}/invoices/{invoiceId}/checkout` cho hóa đơn đó. Dùng token hiện có của lượt thuê, không tự tạo hoặc đổi link. Chỉ xếp hàng khi token giải mã được và khớp hash đang hoạt động; khi gửi kiểm tra lại token hiện tại để không gửi link đã thu hồi. Nếu link không còn hợp lệ sau khi xếp hàng, tin bị bỏ qua và trang hiển thị hướng dẫn kiểm tra/cấp lại link trong trang phòng.
+Link mở trang người thuê `/t/{token}`, nơi khách xem danh sách hóa đơn rồi chọn **Thanh toán** để mở QR. Tin Zalo không gửi đường dẫn `/invoices/{invoiceId}/checkout` trực tiếp. Dùng token hiện có của lượt thuê, không tự tạo hoặc đổi link. Chỉ xếp hàng khi token giải mã được và khớp hash đang hoạt động; khi gửi kiểm tra lại token hiện tại để không gửi link đã thu hồi. Nếu link không còn hợp lệ sau khi xếp hàng, tin bị bỏ qua và trang hiển thị hướng dẫn kiểm tra/cấp lại link trong trang phòng.
 
 Backend vẫn giữ API lịch đã lưu (giao diện hiện không có khối chỉnh lịch): ngày 1–31 và giờ 07:00–20:59, giờ Việt Nam. Tháng không có ngày đã chọn dùng ngày cuối tháng. Lịch chạy một lần/tháng với toàn bộ hóa đơn đã phát hành còn nợ của người thuê đang ở, gồm hóa đơn tháng, bổ sung và cọc. Nếu máy chủ khởi động lại hoặc bật lịch sau mốc đã chọn, đợt tháng hiện tại được xếp hàng bù; tháng đã ghi nhận chạy sẽ không tự chạy lại khi đổi giờ. Hóa đơn phát hành sau đợt đó có thể thêm bằng nút **Nhắc hóa đơn còn nợ**, hoặc chờ đợt tháng sau. Lịch không tự tạo/phát hành hóa đơn và không tự nhắc hằng ngày.
 

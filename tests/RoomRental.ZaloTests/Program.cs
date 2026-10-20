@@ -78,8 +78,9 @@ Assert(await service.QueueAsync(owner.Id, default) == 0, "double enqueue does no
 await service.DispatchAsync(owner.Id, default);
 Assert(gateway.Sends.Count == 1 && gateway.Sends[0].Message.Contains("75.000") && gateway.Sends[0].Phone == "0912345678", "send remaining amount and normalized number");
 var originalToken = tokens.Unprotect(await db.Occupancies.SingleAsync(x => x.Id == invoice.OccupancyId));
-Assert(gateway.Sends[0].Message.Contains($"https://roomie.example/t/{originalToken}/invoices/{invoice.Id:D}/checkout") &&
-    !gateway.Sends[0].Message.Contains("STK:") && !gateway.Sends[0].Message.Contains("Quét QR"), "existing tenant checkout link, no bank or QR required");
+Assert(gateway.Sends[0].Message.Contains($"Xem hóa đơn: https://roomie.example/t/{originalToken}\n") &&
+    !gateway.Sends[0].Message.Contains("/checkout") && !gateway.Sends[0].Message.Contains("/invoices/") &&
+    !gateway.Sends[0].Message.Contains("STK:") && !gateway.Sends[0].Message.Contains("Quét QR"), "existing tenant overview link, no direct checkout, bank or QR");
 db.ChangeTracker.Clear();
 Assert((await db.ZaloReminders.SingleAsync()).Status == "Sent", "successful send persisted");
 Assert(await service.QueueAsync(owner.Id, default) == 0, "sent invoice blocked for 20 hours");
@@ -167,7 +168,7 @@ var resident = await db.Occupancies.SingleAsync(x => x.Id == rotatedInvoice.Occu
 var rotated = tokens.Create(); resident.TenantTokenHash = rotated.Hash; resident.ProtectedTenantToken = rotated.ProtectedToken;
 await db.SaveChangesAsync();
 await service.DispatchAsync(owner.Id, default);
-Assert(gateway.Sends.Last().Message.Contains(tokens.Url(rotated.Token)), "dispatch uses current rotated tenant link");
+Assert(gateway.Sends.Last().Message.Contains($"Xem hóa đơn: {tokens.Url(rotated.Token)}\n") && !gateway.Sends.Last().Message.Contains("/checkout"), "dispatch uses current rotated tenant link");
 clock.Set(DateTimeOffset.Parse("2026-10-25T01:00:00Z"));
 await service.QueueAsync(owner.Id, default);
 resident.TenantTokenHash = "revoked"; await db.SaveChangesAsync();

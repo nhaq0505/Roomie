@@ -21,7 +21,7 @@ function fixture(t) {
   const api = { listener, getOwnId: () => 'fixture-uid', findUser: async () => { if (findFail) throw Error('fixture'); return { uid: 'fixture-tenant' }; },
     sendMessage: async (message, uid, type) => { sends++; if (fail) throw Error('fixture timeout');
       assert.equal(uid, 'fixture-tenant'); assert.equal(type, 0); assert.equal(message.attachments, undefined);
-      assert.ok(message.msg.includes('https://roomie.example/t/fixture/invoices/fixture/checkout'));
+      assert.ok(message.msg.includes('https://roomie.example/t/fixture'));
       return { message: { msgId: 'fixture-message' }, attachment: [] }; } };
 
   let now = Date.parse('2026-10-20T01:00:00Z');
@@ -31,7 +31,7 @@ function fixture(t) {
     return api;
   } });
   const gateway = new Gateway(store, factory, () => now);
-  const body = () => ({ attemptId: randomUUID(), phone: '0912345678', message: 'Fixture invoice https://roomie.example/t/fixture/invoices/fixture/checkout' });
+  const body = () => ({ attemptId: randomUUID(), phone: '0912345678', message: 'Fixture invoice https://roomie.example/t/fixture' });
   return { dir, key, store, api, gateway, factory, body, advance: ms => { now += ms; }, set: value => { now = Date.parse(value); }, sends: () => sends, fail: () => { fail = true; }, findFail: () => { findFail = true; } };
 }
 async function connect(f) { f.gateway.connect(owner); await new Promise(resolve => setImmediate(resolve)); assert.equal((await f.gateway.status(owner)).status, 'Connected'); }
