@@ -1,5 +1,14 @@
 # Task T5 Independent Backend and Operations QA Review Report
 
+> [!IMPORTANT]
+> **Defect Remediation Status (Task T4b Resolution)**:
+> The Coordinator rejected the "nonblocking" classification of the findings in Section 4 and mandated immediate resolution prior to final acceptance.
+> In Task **T4b** (commit `6891132`), all three defects were authoritatively fixed:
+> 1. **Defect 1 (Payment Telemetry Dropped Milestones)**: Resolved via `MilestoneOutboxEvent` durable retry and `EnsureSubscriptionPaidMilestoneAsync` authoritative repair using persisted `PaidAt` without duplicating Pro expiry or receipts.
+> 2. **Defect 2 (Invoice Issuance Hook Failures & Rollback)**: Resolved via `EnsureInvoiceIssuedMilestoneAsync` using provable actual publish timestamps (`invoice.IssuedAt` / `InvoiceRevision`), and outer transaction rollback protection in `/readings`.
+> 3. **Defect 3 (In-Memory Take(50k) and Take(10k) Truncation)**: Replaced with database-level SQL aggregations (`SumAsync`, `CountAsync`, `GroupBy`) and relational filter joins, verified beyond 50,000 facts, 50,000 orders, and 10,000 costs.
+> Full technical details and verification evidence are documented in [`t4b-metric-accuracy-outbox.md`](./t4b-metric-accuracy-outbox.md) and regression suite [`MonitoringAccuracyAndOutboxRegressionTests.cs`](../../tests/RoomRental.WebhookTests/MonitoringAccuracyAndOutboxRegressionTests.cs).
+
 **Review Date**: 2026-10-20  
 **Reviewer**: Worker B (Independent QA of Backend & Operations)  
 **Reviewed Snapshot SHA**: `76cde7e35be2cca72f5f63a1ab6a49ee88edb212`  

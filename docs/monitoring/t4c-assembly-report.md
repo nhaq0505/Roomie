@@ -1,0 +1,82 @@
+# Task T4c Final Assembly and Pre-Review Gate Report
+
+## 1. Executive Summary
+- **Target Worktree**: `/Users/nguyenhoanhquan/orca/workspaces/Quản Lý Phòng/monitoring-core`
+- **Branch**: `nhaq0505/monitoring-core`
+- **Assembly Scope**: Final assembly of all independently reviewed and approved monitoring components prior to the final review gate:
+  - Incorporates Task **T4b** backend metric accuracy, durable milestone outbox, and database aggregation corrections (`6891132`).
+  - Cherry-picks Task **T5** independent backend & ops review doc (`867bbf0` -> `a227e6c`).
+  - Cherry-picks Task **T6b** independent frontend UI/UX corrections resolving all 7 mobile/date/hourly-rate issues (`e1d90c8` -> `5e9bd7a`).
+  - Cherry-picks Task **T6/T6b** review reports and Playwright QA evidence (`c98de63` -> `45e8fe2`).
+  - Establishes historical crosslinks across all review documents, authoring the canonical operational runbook and metric dictionary.
+- **Repository Safety**: The original checkout `/Users/nguyenhoanhquan/orca/workspaces/Quản Lý Phòng/LandingPage` on branch `nhaq0505/LandingPage` remains pristine at HEAD `f1576506825a1acde37d51960dd2dc80f5c7b23d`. Zero commits, pushes, or deployments were made to the original repository.
+- **Provider & Database Safety**: Zero external calls to real payOS, real SMTP, or external VPS probes; all tests executed on in-process fakes, loopback SMTP sink, and disposable SQLite databases.
+
+---
+
+## 2. Integrated Commit Manifest
+
+| Commit SHA | Source / Reference | Author | Summary |
+|---|---|---|---|
+| `76cde7e` | Origin base | Worker A | T4 Integration Baseline (T0 foundation + T1 business metrics + T2 frontend + T3 operations) |
+| `6891132` | Task T4b | Worker A | Durable milestone outbox, authoritative idempotent repair, and database aggregations for accurate metrics |
+| `a227e6c` | `867bbf0` (review/t5-backend-ops) | Worker B | Publish T5 independent backend and ops QA review report |
+| `5e9bd7a` | `e1d90c8` (fix/t2c-frontend-corrections) | Worker B | Resolve T6 mobile overflow, hourly rate preservation, clamped date tags, and honest funnel (T6b) |
+| `45e8fe2` | `c98de63` (review-t6) | Worker C | Publish T6 and T6b independent frontend review reports and QA evidence |
+
+---
+
+## 3. Dual-Provider Schema and Model Equivalence
+
+Both database providers (SQLite and PostgreSQL) have been verified for additive schema alignment and zero pending model changes:
+- `SqliteAppDbContext`: Verified with `dotnet ef migrations has-pending-model-changes --context SqliteAppDbContext` -> **0 pending changes**.
+- `PostgresAppDbContext`: Verified with `dotnet ef migrations has-pending-model-changes --context PostgresAppDbContext` -> **0 pending changes**.
+- **Additive Migrations Applied**:
+  - `20261020085451_MonitoringFoundation` (both SQLite & Postgres)
+  - `20261020092153_MonitoringCorrection` (both SQLite & Postgres)
+  - `20261020122224_MilestoneOutbox` (SQLite) / `20261020122233_MilestoneOutbox` (Postgres)
+- Model snapshots (`SqliteAppDbContextModelSnapshot.cs` and `PostgresAppDbContextModelSnapshot.cs`) are completely up to date.
+
+---
+
+## 4. Verification Evidence & Test Summary
+
+All automated test suites across backend, frontend, host collector, and integration layers were executed against the combined assembly:
+
+| Test Suite | Command | Total Tests / Assertions | Passed | Failed | Skipped / Not Run | Notes |
+|---|---|---|---|---|---|---|
+| **C# Webhook & Monitoring Suite** | `dotnet run --project tests/RoomRental.WebhookTests/RoomRental.WebhookTests.csproj` | 19 test classes (hundreds of assertions) | **19/19** | 0 | 0 | Includes `MonitoringAccuracyAndOutboxRegressionTests` verifying outbox, replay, and 50k+ boundary tests. |
+| **C# Zalo Worker Suite** | `dotnet run --project tests/RoomRental.ZaloTests/RoomRental.ZaloTests.csproj` | 53 assertions | **53/53** | 0 | 0 | Verifies 07-21 window, leap month, 20h cooldown, SQLite migrations, and database leases. |
+| **Python Host Collector** | `python3 -m unittest tests/test_host_collector.py` | 34 unit tests | **34/34** | 0 | 0 | Verifies streaks, JSON schema, bind mount permissions, and SMTP queueing. |
+| **Python Backup Watchdog** | `python3 -m unittest discover -s tests -p 'test_backup_*.py'` | 7 unit tests | **7/7** | 0 | 0 | Verifies 27h backup watchdog authority and filesystem marker evaluation. |
+| **Frontend Architecture** | `npm --prefix frontend run check:architecture` | 108 source modules | **PASS** | 0 | 0 | Verifies shared/feature boundaries, public imports, and zero circular dependencies. |
+| **Frontend I18N Check** | `npm --prefix frontend run i18n:check` | 1,354 keys × 4 catalogs | **PASS** | 0 | 0 | Verifies Vietnamese, English, Korean, and Chinese catalogs with UI string coverage. |
+| **Frontend Dates & Timezone** | `npm --prefix frontend run test:dates` | Full suite | **PASS** | 0 | 0 | Verifies Vietnam calendar clamping (`Asia/Ho_Chi_Minh` UTC+7) and negative timezone resilience. |
+| **Frontend HTTP Client** | `npm --prefix frontend run test:http` | Full suite | **PASS** | 0 | 0 | Verifies header propagation, envelope handling, and error mapping. |
+| **Frontend Secondary API** | `npm --prefix frontend run test:api` | Full suite | **PASS** | 0 | 0 | Verifies secondary consumer pagination past 100 rows. |
+| **Frontend Browser Analytics** | `npm --prefix frontend run test:analytics` | Full suite | **PASS** | 0 | 0 | Verifies first-party browser ID, 30m idle session, PII scrubbing, and allowlisted events. |
+| **Frontend Production Build** | `npm --prefix frontend run build` | Full build + prerender | **PASS** | 0 | 0 | TypeScript check (`tsc -b`), Vite build, and SSG prerendering completed in 2.44s with 0 errors. |
+| **Playwright Full E2E Suite** | `cd frontend && npx playwright test` | 67 E2E tests | **67/67** | 0 | 0 | Complete test run across desktop (1440px) and mobile (375px); zero horizontal scroll overflow. |
+
+### Non-Run Reasons & Limitations
+1. **Live PostgreSQL Network Execution**: PostgreSQL migrations and model snapshots were verified offline via EF Core design-time tooling and snapshot comparisons. Live execution against a live PostgreSQL server was omitted because disposable SQLite is the isolated provider in this container.
+2. **External Providers**: Zero calls were made to production payOS or live SMTP servers (disposable loopback fake handlers only).
+3. **No Whole-VPS Outage Probe**: The internal host collector cannot alert if the entire VPS host suffers network/power death; external monitoring is required for host death.
+
+---
+
+## 5. Documentation Manifest
+
+The following documents in `docs/monitoring/` constitute the canonical monitoring documentation:
+1. [`contracts.md`](./contracts.md): Core metrics definitions, DTO schemas, and public client event contracts.
+2. [`operations.md`](./operations.md): Detailed specification of route latency aggregation, worker SLAs, host ingestion, and incident engine.
+3. [`host-contract.md`](./host-contract.md): Host collector systemd setup, file schema, and bind mount specification.
+4. [`frontend.md`](./frontend.md): Admin dashboard UI layout, SVG charting, and i18n localization.
+5. [`runbook-and-metric-dictionary.md`](./runbook-and-metric-dictionary.md): **Canonical operational runbook**, cutover steps, retention windows, unknown value handling, outbox retries, alert thresholds, and rollback procedures.
+6. [`t4-integration-report.md`](./t4-integration-report.md): Historical record of initial T4 assembly with superseding resolution links.
+7. [`t5-review.md`](./t5-review.md): Historical independent backend/ops review with resolution links to T4b.
+8. [`t6-review.md`](./t6-review.md): Historical independent frontend review with resolution links to T6b.
+9. [`t6b-review.md`](./t6b-review.md): Independent verification report approving all 7 frontend corrections.
+10. [`t2c-frontend-corrections.md`](./t2c-frontend-corrections.md): Detailed implementation record of frontend UI/UX fixes.
+11. [`t4b-metric-accuracy-outbox.md`](./t4b-metric-accuracy-outbox.md): Detailed implementation record of backend accuracy, outbox, and repair mechanisms.
+12. [`t4c-assembly-report.md`](./t4c-assembly-report.md): **This document**, representing the final pre-review assembly verification.

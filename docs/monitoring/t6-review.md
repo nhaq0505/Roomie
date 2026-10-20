@@ -1,5 +1,11 @@
 # Task T6 Independent Frontend & User Journey Review Report
 
+> [!IMPORTANT]
+> **Defect Remediation Status (Task T6b Resolution)**:
+> All five defects and warnings identified in this review (including the critical 375px mobile viewport overflow, `CampaignCostModal` null hourlyRate preservation, clamped date window tags, and honest funnel fallback) were resolved in commit `5e9bd7a` (Task T6b).
+> - **Remediation Details**: See [`t2c-frontend-corrections.md`](./t2c-frontend-corrections.md).
+> - **Independent Verification & Re-Review**: See [`t6b-review.md`](./t6b-review.md) where all 7 verified UI fixes were independently approved with 100% test pass rates across 67 Playwright E2E tests, 4-catalog i18n checks, and architectural boundary tests.
+
 ## 1. Executive Summary
 - **Reviewer**: Worker C (Independent Frontend & User Journey QA)
 - **Reviewed Snapshot SHA**: `76cde7e35be2cca72f5f63a1ab6a49ee88edb212` (incorporating T4 base `d30fe7716e95c3f450cb488f2a482acf28918b36`)

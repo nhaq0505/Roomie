@@ -1,5 +1,11 @@
 # Task T4 Integration Report: Monitoring Subsystem
 
+> [!NOTE]
+> **Historical Record & Superseding Resolutions**: This document records the initial Task T4 integration. Subsequent independent reviews and remediation tasks have superseded preliminary findings:
+> - **Backend Accuracy & Outbox Fixes**: The 3 metric accuracy defects identified in [`t5-review.md`](./t5-review.md) were resolved authoritatively in Task T4b via durable outbox retry and database aggregations; see [`t4b-metric-accuracy-outbox.md`](./t4b-metric-accuracy-outbox.md).
+> - **Frontend UI & Mobile Hardening**: The 7 UI/UX edge cases identified in [`t6-review.md`](./t6-review.md) were resolved and verified in Task T6b; see [`t2c-frontend-corrections.md`](./t2c-frontend-corrections.md) and [`t6b-review.md`](./t6b-review.md).
+> - **Final Assembly & Verification**: For final combined assembly, test evidence, and operational runbook, see [`t4c-assembly-report.md`](./t4c-assembly-report.md) and [`runbook-and-metric-dictionary.md`](./runbook-and-metric-dictionary.md).
+
 ## 1. Executive Summary
 - **Integrated Branch**: `nhaq0505/monitoring-core`
 - **Integrated Commit SHA**: `d30fe7716e95c3f450cb488f2a482acf28918b36`
