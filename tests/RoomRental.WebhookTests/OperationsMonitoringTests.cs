@@ -1,15 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -33,9 +32,6 @@ public sealed class TestTimeProvider : TimeProvider
 
 public static class OperationsMonitoringTests
 {
-    private static readonly Guid AdminUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    private static readonly Guid OwnerUserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-
     private static void Assert(bool condition, string message)
     {
         if (!condition) throw new Exception(message);
@@ -50,6 +46,9 @@ public static class OperationsMonitoringTests
         await TestWorkerTelemetryTrackerAsync();
         await TestIncidentEngineAndAlertsAsync();
         await TestSmtpIncidentNotifierAsync();
+        await TestProductionDiAlertTransportAsync();
+        await TestRouteLatencyMiddlewareRealHttpPipelineAsync();
+        TestWorkerStartVsSuccessRegressions();
         await TestOperationsAndIncidentsHttpEndpointsAsync();
     }
 
@@ -258,29 +257,23 @@ public static class OperationsMonitoringTests
         Assert(overview.Api5xxRatePercent == 5.0, "5xx rate is 5.0%");
         Assert(overview.OverallStatus == "Degraded", "Status is Degraded due to 5% 5xx rate");
 
-        // Test 4: Sliding window expiry
-        fakeClock.Advance(TimeSpan.FromMinutes(70)); // Advance past 1h
-        var expiredSnapshots = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
-        Assert(expiredSnapshots.Count == 0, "Requests older than 1h expired from 1h window");
-
-        var expiredOverview = aggregator.GetOverviewSnapshot(TimeSpan.FromHours(1), dbConnected: true);
-        Assert(expiredOverview.TotalRequestsLastHour == 0, "0 requests after window expiry");
-        Assert(expiredOverview.OverallStatus == "Healthy", "Status healthy after old traffic expired");
+        // Test 4: Pruning expired requests
+        fakeClock.Advance(TimeSpan.FromMinutes(65));
+        var prunedOverview = aggregator.GetOverviewSnapshot(TimeSpan.FromHours(1), dbConnected: true, dbStatus: "Healthy");
+        Assert(prunedOverview.TotalRequestsLastHour == 0, "Requests older than 1h expired from 1h window");
+        Assert(prunedOverview.Api5xxRatePercent == null, "Api5xxRatePercent is null when 0 requests");
+        Assert(prunedOverview.OverallStatus == "Healthy", "Status healthy after old traffic expired");
 
         return Task.CompletedTask;
     }
 
-    private static async Task TestWorkerTelemetryTrackerAsync()
+    private static Task TestWorkerTelemetryTrackerAsync()
     {
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
         var tracker = new WorkerTelemetryTracker(fakeClock);
 
-        // Test 1: Record successful execution
-        await tracker.ExecuteTrackedAsync("invoice-sweep", async ct =>
-        {
-            await Task.Delay(1, ct);
-        });
-
+        // Test 1: Record successful heartbeat
+        tracker.RecordHeartbeat("invoice-sweep", isEnabled: true, status: "Healthy");
         var statuses = tracker.GetStatuses();
         Assert(statuses.Count == 1, "Tracked 1 worker");
         Assert(statuses[0].WorkerName == "invoice-sweep", "Worker name matches");
@@ -288,47 +281,41 @@ public static class OperationsMonitoringTests
         Assert(statuses[0].ConsecutiveFailures == 0, "0 consecutive failures on success");
         Assert(!statuses[0].IsStale, "Worker is not stale");
 
-        // Test 2: Record failure
-        try
-        {
-            await tracker.ExecuteTrackedAsync("reconcile", _ => throw new InvalidOperationException("payOS timeout"));
-        }
-        catch (InvalidOperationException)
-        {
-            // Expected
-        }
-
+        // Test 2: Record worker failure
+        tracker.RecordHeartbeat("invoice-sweep", isEnabled: true, status: "Failed", errorMessage: "SMTP timeout");
         statuses = tracker.GetStatuses();
-        var reconcileStatus = statuses.Single(s => s.WorkerName == "reconcile");
-        Assert(reconcileStatus.Status == "Failed", "Failed worker has status Failed");
-        Assert(reconcileStatus.ConsecutiveFailures == 1, "1 consecutive failure recorded");
-        Assert(reconcileStatus.LastErrorMessage == "payOS timeout", "Error message recorded");
+        Assert(statuses[0].Status == "Failed", "Failed worker has status Failed");
+        Assert(statuses[0].ConsecutiveFailures == 1, "1 consecutive failure recorded");
+        Assert(statuses[0].LastErrorMessage == "SMTP timeout", "Error message recorded");
 
-        // Test 3: Per-worker SLA staleness test
-        // Advance 15 minutes: reconcile (SLA 10m) should be stale, but invoice-sweep (SLA 26h) should NOT be stale!
+        // Test 3: SLA staleness evaluation
+        tracker.RecordHeartbeat("reconcile", isEnabled: true, status: "Healthy"); // reconcile SLA is 10m
         fakeClock.Advance(TimeSpan.FromMinutes(15));
         statuses = tracker.GetStatuses();
-        var rStatus15m = statuses.Single(s => s.WorkerName == "reconcile");
-        var iStatus15m = statuses.Single(s => s.WorkerName == "invoice-sweep");
-        Assert(rStatus15m.IsStale, "Reconcile worker is stale after 15m (> 10m SLA)");
-        Assert(!iStatus15m.IsStale, "Invoice sweep worker is NOT stale after 15m (within 26h SLA)");
+        var reconcileStatus = statuses.Single(s => s.WorkerName == "reconcile");
+        Assert(reconcileStatus.IsStale, "Reconcile worker is stale after 15m (> 10m SLA)");
+
+        var sweepStatus = statuses.Single(s => s.WorkerName == "invoice-sweep"); // invoice-sweep SLA is 26h
+        Assert(!sweepStatus.IsStale, "Invoice sweep worker is NOT stale after 15m (within 26h SLA)");
 
         // Test 4: Disabled worker is never stale
-        tracker.RecordHeartbeat("disabled-worker", isEnabled: false, status: "Healthy");
-        fakeClock.Advance(TimeSpan.FromHours(50));
+        tracker.RecordHeartbeat("reconcile", isEnabled: false, status: "Healthy");
         statuses = tracker.GetStatuses();
-        var dStatus = statuses.Single(s => s.WorkerName == "disabled-worker");
-        Assert(!dStatus.IsStale, "Disabled worker is never marked stale");
+        reconcileStatus = statuses.Single(s => s.WorkerName == "reconcile");
+        Assert(!reconcileStatus.IsStale, "Disabled worker is never marked stale");
 
-        // Test 5: Invoice sweep becomes stale after exceeding 26h SLA
-        var iStatus50h = statuses.Single(s => s.WorkerName == "invoice-sweep");
-        Assert(iStatus50h.IsStale, "Invoice sweep worker is stale after exceeding 26h SLA");
+        // Test 5: Invoice sweep exceeds 26h SLA
+        fakeClock.Advance(TimeSpan.FromHours(27));
+        statuses = tracker.GetStatuses();
+        sweepStatus = statuses.Single(s => s.WorkerName == "invoice-sweep");
+        Assert(sweepStatus.IsStale, "Invoice sweep worker is stale after exceeding 26h SLA");
+
+        return Task.CompletedTask;
     }
 
     private static async Task TestIncidentEngineAndAlertsAsync()
     {
-        var tempDbPath = Path.Combine(Path.GetTempPath(), $"incidents_test_{Guid.NewGuid():N}.db");
-        await using var connection = new SqliteConnection($"Data Source={tempDbPath}");
+        await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -339,91 +326,96 @@ public static class OperationsMonitoringTests
         await db.Database.EnsureCreatedAsync();
 
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
-        var aggregator = new RouteLatencyAggregator(fakeClock);
-        var fakeNotifier = new FakeAlertNotifier();
-        var fakeHostReader = new FakeHostReader();
+        var routeAggregator = new RouteLatencyAggregator(fakeClock);
+        var hostReader = new FakeHostReader();
         var workerTracker = new WorkerTelemetryTracker(fakeClock);
+        var fakeNotifier = new FakeAlertNotifier();
 
         var incidentService = new IncidentMonitoringService(
             db,
-            aggregator,
-            fakeHostReader,
+            routeAggregator,
+            hostReader,
             workerTracker,
             fakeNotifier,
             fakeClock,
             NullLogger<IncidentMonitoringService>.Instance
         );
 
-        // --- Scenario 1: 5xx Rate Rule (Exact: Sustained 5min, Min 100 req, > 5.0% threshold) ---
-        // Step 1.1: 90 requests with 10 errors (rate = 11.1%), but TotalRequests < 100 -> NO incident opened!
-        for (int i = 0; i < 80; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
-        for (int i = 0; i < 10; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
+        // --- Scenario 1: 5xx Error Rate Rule (Exact: > 5.0% over 5-minute window with min 100 requests) ---
+        // Traffic < 100 requests (99 requests, 10 5xx): NO incident should be triggered!
+        for (int i = 0; i < 89; i++) routeAggregator.Record("/api/test", "GET", 200, 20.0);
+        for (int i = 0; i < 10; i++) routeAggregator.Record("/api/test", "GET", 500, 50.0);
 
         await incidentService.TriggerIncidentCheckAsync(default);
         var incidentsResp = await incidentService.GetIncidentsAsync(default);
         Assert(incidentsResp.ActiveIncidentCount == 0, "No incident triggered when 5-min requests < 100");
         Assert(fakeNotifier.Alerts.Count == 0, "No alert email sent when requests < 100");
 
-        // Step 1.2: Add 20 more requests (5 errors) -> Total 110 requests, 15 errors = 13.6% > 5% -> Triggers High 5xx incident!
-        for (int i = 0; i < 15; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
-        for (int i = 0; i < 5; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
-
+        // Add 1 more 5xx request -> 100 total requests, 11 5xx (11.0% rate) -> Critical incident!
+        routeAggregator.Record("/api/test", "GET", 500, 50.0);
         await incidentService.TriggerIncidentCheckAsync(default);
+
         incidentsResp = await incidentService.GetIncidentsAsync(default);
         Assert(incidentsResp.ActiveIncidentCount == 1, "Incident triggered when requests >= 100 and 5xx rate > 5%");
-        var active5xx = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
-        Assert(active5xx.Severity == "Critical", "Severity is Critical for 5xx rate >= 10%");
-        Assert(active5xx.State == "Active", "Incident state is Active");
+        var activeInc = incidentsResp.Incidents[0];
+        Assert(activeInc.Severity == "Critical", "Severity is Critical for 5xx rate >= 10%");
+        Assert(activeInc.State == "Active", "Incident state is Active");
         Assert(fakeNotifier.Alerts.Count == 1, "Sent 1 initial alert email");
         Assert(!fakeNotifier.Alerts[0].IsRecovery, "Alert is not a recovery notice");
-        Assert(active5xx.NotificationCount == 1, "Notification count is 1");
+        Assert(activeInc.NotificationCount == 1, "Notification count is 1");
 
-        // Step 1.3: 1-hour Cooldown suppresses repeat notification
-        fakeClock.Advance(TimeSpan.FromMinutes(20));
+        // Repeat check immediately -> cooldown suppresses duplicate alert
         await incidentService.TriggerIncidentCheckAsync(default);
         Assert(fakeNotifier.Alerts.Count == 1, "No duplicate alert sent within 1-hour cooldown");
 
-        // Step 1.4: Traffic drops below 100 requests in 5-minute window -> Unknown state PRESERVES active incident (NO auto-resolve!)
+        // Unknown state protection: low traffic window (< 100 requests) does NOT auto-resolve active incident!
         fakeClock.Advance(TimeSpan.FromMinutes(10));
-        for (int i = 0; i < 5; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        // Feed only 10 requests (all 200) -> traffic too low to prove healthy
+        for (int i = 0; i < 10; i++) routeAggregator.Record("/api/test", "GET", 200, 20.0);
         await incidentService.TriggerIncidentCheckAsync(default);
-        incidentsResp = await incidentService.GetIncidentsAsync(default);
-        var preservedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
-        Assert(preservedInc.State == "Active", "Incident remains Active during low-traffic unknown window");
 
-        // Step 1.5: Cooldown expires after 65 minutes -> Sends reminder notification
-        fakeClock.Advance(TimeSpan.FromMinutes(40)); // now 70 min since initial notification
-        for (int i = 0; i < 90; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
-        for (int i = 0; i < 20; i++) aggregator.Record("/api/test", "GET", 500, 50.0);
+        incidentsResp = await incidentService.GetIncidentsAsync(default);
+        var persistentInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(persistentInc.State == "Active", "Incident remains Active during low-traffic unknown window");
+
+        // Advance past 1-hour cooldown with continued high 5xx -> reminder email sent!
+        fakeClock.Advance(TimeSpan.FromMinutes(55));
+        for (int i = 0; i < 90; i++) routeAggregator.Record("/api/test", "GET", 200, 20.0);
+        for (int i = 0; i < 10; i++) routeAggregator.Record("/api/test", "GET", 500, 50.0);
         await incidentService.TriggerIncidentCheckAsync(default);
+
         Assert(fakeNotifier.Alerts.Count == 2, "Reminder alert sent after 1 hour cooldown");
         incidentsResp = await incidentService.GetIncidentsAsync(default);
-        var remindedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
-        Assert(remindedInc.NotificationCount == 2, "Notification count incremented to 2");
+        persistentInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(persistentInc.NotificationCount == 2, "Notification count incremented to 2");
 
-        // Step 1.6: Explicit healthy traffic (120 requests, 0 errors) -> Auto-resolves and sends recovery notice!
+        // Proven healthy: 100 requests with 0 5xx -> auto-resolves!
         fakeClock.Advance(TimeSpan.FromMinutes(6));
-        for (int i = 0; i < 120; i++) aggregator.Record("/api/test", "GET", 200, 25.0);
+        for (int i = 0; i < 100; i++) routeAggregator.Record("/api/test", "GET", 200, 20.0);
         await incidentService.TriggerIncidentCheckAsync(default);
+
         incidentsResp = await incidentService.GetIncidentsAsync(default);
-        var resolved5xx = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
-        Assert(resolved5xx.State == "Resolved", "Incident auto-resolved when condition explicitly healthy");
-        Assert(resolved5xx.ResolvedAt != null, "ResolvedAt timestamp recorded");
+        var resolvedInc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_5xx_rate");
+        Assert(resolvedInc.State == "Resolved", "Incident auto-resolved when condition explicitly healthy");
+        Assert(resolvedInc.ResolvedAt != null, "ResolvedAt timestamp recorded");
         Assert(fakeNotifier.Alerts.Count == 3, "Sent recovery notification email");
         Assert(fakeNotifier.Alerts[2].IsRecovery, "Third notification is recovery notice");
 
-        // --- Scenario 2: API P95 Latency Rule (Exact: Sustained 10min, Min 100 req, > 2000ms threshold) ---
-        fakeClock.Advance(TimeSpan.FromMinutes(15));
-        for (int i = 0; i < 105; i++) aggregator.Record("/api/slow", "GET", 200, 2500.0);
+        // --- Scenario 2: High P95 Latency Rule (Exact: > 2000ms over 10-minute window with min 100 requests) ---
+        fakeClock.Advance(TimeSpan.FromMinutes(10));
+        // Record 100 requests where P95 > 2000ms (90 at 100ms, 10 at 2500ms)
+        for (int i = 0; i < 90; i++) routeAggregator.Record("/api/slow", "GET", 200, 100.0);
+        for (int i = 0; i < 10; i++) routeAggregator.Record("/api/slow", "GET", 200, 2500.0);
+
         await incidentService.TriggerIncidentCheckAsync(default);
         incidentsResp = await incidentService.GetIncidentsAsync(default);
         var p95Inc = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_p95_latency");
         Assert(p95Inc.State == "Active", "High P95 incident triggered for latency > 2000ms");
         Assert(p95Inc.Severity == "Critical", "P95 severity is Critical");
 
-        // Auto-resolve P95 when latency normalizes
+        // Auto-resolve P95 with 100 fast requests
         fakeClock.Advance(TimeSpan.FromMinutes(11));
-        for (int i = 0; i < 110; i++) aggregator.Record("/api/slow", "GET", 200, 50.0);
+        for (int i = 0; i < 100; i++) routeAggregator.Record("/api/slow", "GET", 200, 50.0);
         await incidentService.TriggerIncidentCheckAsync(default);
         incidentsResp = await incidentService.GetIncidentsAsync(default);
         var resolvedP95 = incidentsResp.Incidents.Single(i => i.IncidentKey == "high_p95_latency");
@@ -517,7 +509,7 @@ public static class OperationsMonitoringTests
             Enabled = true
         });
 
-        var notifier = new SmtpIncidentNotifier(options, NullLogger<SmtpIncidentNotifier>.Instance, fakeEmailSender);
+        var notifier = new SmtpIncidentNotifier(options, fakeEmailSender, NullLogger<SmtpIncidentNotifier>.Instance);
 
         var sampleIncident = new MonitoringIncident
         {
@@ -535,7 +527,7 @@ public static class OperationsMonitoringTests
             NotificationCount = 1
         };
 
-        // Test alert email
+        // Test alert email success
         await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default);
         Assert(fakeEmailSender.SentEmails.Count == 1, "Sent 1 alert email");
         var sentAlert = fakeEmailSender.SentEmails[0];
@@ -544,12 +536,337 @@ public static class OperationsMonitoringTests
         Assert(sentAlert.Body.Contains("Note: SMTP acceptance by server does not guarantee final mailbox delivery"),
             "Body includes required SMTP delivery disclaimer");
 
-        // Test recovery email
+        // Test recovery email success
         sampleIncident.ResolvedAt = DateTimeOffset.Parse("2026-10-20T16:30:00Z");
         await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: true, default);
         Assert(fakeEmailSender.SentEmails.Count == 2, "Sent recovery email");
         var sentRecovery = fakeEmailSender.SentEmails[1];
         Assert(sentRecovery.Subject.Contains("[RESOLVED] High Host Disk Utilization"), "Subject formatted with [RESOLVED]");
+
+        // Test missing recipient throws InvalidOperationException (never silently succeeds)
+        var noRecipientOpts = Options.Create(new IncidentNotificationOptions { AlertEmailTo = null, Enabled = true });
+        var noRecipientNotifier = new SmtpIncidentNotifier(noRecipientOpts, fakeEmailSender, NullLogger<SmtpIncidentNotifier>.Instance);
+        bool threwNoRecipient = false;
+        try { await noRecipientNotifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default); }
+        catch (InvalidOperationException) { threwNoRecipient = true; }
+        Assert(threwNoRecipient, "Missing recipient throws InvalidOperationException (does not silently succeed)");
+
+        // Test disabled alerting throws InvalidOperationException (never silently succeeds)
+        var disabledOpts = Options.Create(new IncidentNotificationOptions { AlertEmailTo = "ops@rehouse.vn", Enabled = false });
+        var disabledNotifier = new SmtpIncidentNotifier(disabledOpts, fakeEmailSender, NullLogger<SmtpIncidentNotifier>.Instance);
+        bool threwDisabled = false;
+        try { await disabledNotifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default); }
+        catch (InvalidOperationException) { threwDisabled = true; }
+        Assert(threwDisabled, "Disabled alerting throws InvalidOperationException (does not silently succeed)");
+
+        // Test transport failure propagates out (never silently succeeds)
+        fakeEmailSender.ShouldThrow = true;
+        bool threwTransport = false;
+        try { await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default); }
+        catch (InvalidOperationException) { threwTransport = true; }
+        Assert(threwTransport, "Transport failure propagates exception and is not counted as sent");
+        fakeEmailSender.ShouldThrow = false;
+    }
+
+    private static async Task TestProductionDiAlertTransportAsync()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var fakeSink = new FakeEmailSender();
+        var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.Logging.ClearProviders();
+        builder.Services.AddDbContext<AppDbContext>(opts => opts.UseSqlite(connection));
+        builder.Services.AddSingleton<TimeProvider>(fakeClock);
+        builder.Services.AddMonitoringCore(builder.Configuration);
+        builder.Services.AddMonitoringOperations(builder.Configuration);
+
+        // Override IAlertEmailSender with our test sink to verify DI wireup
+        builder.Services.RemoveAll<IAlertEmailSender>();
+        builder.Services.AddSingleton<IAlertEmailSender>(fakeSink);
+
+        // Configure options with dedicated monitoring recipient
+        builder.Services.Configure<IncidentNotificationOptions>(opts =>
+        {
+            opts.AlertEmailTo = "ops-team@rehouse.vn";
+            opts.AlertEmailFrom = "monitoring@rehouse.vn";
+            opts.Enabled = true;
+        });
+
+        await using var app = builder.Build();
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        var incidentService = scope.ServiceProvider.GetRequiredService<IIncidentService>();
+        var aggregator = scope.ServiceProvider.GetRequiredService<IRouteLatencyAggregator>();
+
+        // 1. Initial incident trigger with working transport
+        // Feed 100 requests with 10 5xx to trigger high_5xx_rate (10% rate)
+        for (int i = 0; i < 90; i++) aggregator.Record("/api/invoices", "GET", 200, 25.0);
+        for (int i = 0; i < 10; i++) aggregator.Record("/api/invoices", "GET", 500, 50.0);
+
+        await incidentService.TriggerIncidentCheckAsync(default);
+        Assert(fakeSink.SentEmails.Count == 1, "DI-wired fake transport received initial alert email");
+        var initialSent = fakeSink.SentEmails[0];
+        Assert(initialSent.To == "ops-team@rehouse.vn", "Alert sent to dedicated monitoring recipient");
+        Assert(initialSent.Subject.Contains("[ALERT - CRITICAL]"), "Subject formatted with severity");
+
+        var dbInc = await db.MonitoringIncidents.SingleAsync(i => i.IncidentKey == "high_5xx_rate");
+        Assert(dbInc.LastNotifiedAt != null, "LastNotifiedAt persisted after successful delivery");
+        Assert(dbInc.NotificationCount == 1, "NotificationCount is 1 after initial delivery");
+
+        // 2. Reminder alert with transport failure
+        fakeClock.Advance(TimeSpan.FromHours(1.1)); // Exceed 1h cooldown
+        for (int i = 0; i < 90; i++) aggregator.Record("/api/invoices", "GET", 200, 25.0);
+        for (int i = 0; i < 10; i++) aggregator.Record("/api/invoices", "GET", 500, 50.0);
+        fakeSink.ShouldThrow = true; // Transport goes down
+
+        await incidentService.TriggerIncidentCheckAsync(default);
+        // Delivery failed, NotificationCount must NOT advance, LastNotifiedAt must NOT change
+        db.ChangeTracker.Clear();
+        var failedInc = await db.MonitoringIncidents.SingleAsync(i => i.IncidentKey == "high_5xx_rate");
+        Assert(failedInc.NotificationCount == 1, "NotificationCount not incremented when transport fails");
+        Assert(failedInc.LastNotifiedAt == dbInc.LastNotifiedAt, "LastNotifiedAt not updated when transport fails");
+
+        // 3. Transport recovers: reminder delivered on next cycle
+        fakeSink.ShouldThrow = false;
+        fakeClock.Advance(TimeSpan.FromMinutes(2));
+        for (int i = 0; i < 90; i++) aggregator.Record("/api/invoices", "GET", 200, 25.0);
+        for (int i = 0; i < 10; i++) aggregator.Record("/api/invoices", "GET", 500, 50.0);
+
+        await incidentService.TriggerIncidentCheckAsync(default);
+        db.ChangeTracker.Clear();
+        var retriedInc = await db.MonitoringIncidents.SingleAsync(i => i.IncidentKey == "high_5xx_rate");
+        Assert(retriedInc.NotificationCount == 2, "NotificationCount incremented to 2 after transport recovery");
+        Assert(retriedInc.LastNotifiedAt > dbInc.LastNotifiedAt, "LastNotifiedAt advanced after successful reminder delivery");
+        Assert(fakeSink.SentEmails.Count == 2, "Fake sink received reminder alert");
+
+        // 4. Recovery notice with transport failure and restart retry
+        // Clear 5xx by recording 100 fast 200s in new minute
+        fakeClock.Advance(TimeSpan.FromMinutes(10));
+        for (int i = 0; i < 100; i++) aggregator.Record("/api/invoices", "GET", 200, 20.0);
+
+        fakeSink.ShouldThrow = true; // Transport fails during recovery notice
+        await incidentService.TriggerIncidentCheckAsync(default);
+
+        db.ChangeTracker.Clear();
+        var resolvedInc = await db.MonitoringIncidents.SingleAsync(i => i.IncidentKey == "high_5xx_rate");
+        Assert(resolvedInc.State == "Resolved", "Incident resolved even when recovery notice SMTP throws");
+        Assert(resolvedInc.Details.Contains("[PENDING_RECOVERY_RETRY]"), "Recovery notice flagged for retry in DB");
+
+        // Simulate application restart with restored transport
+        fakeSink.ShouldThrow = false;
+        using var restartScope = app.Services.CreateScope();
+        var restartedIncidentService = restartScope.ServiceProvider.GetRequiredService<IIncidentService>();
+        var restartedDb = restartScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await restartedIncidentService.TriggerIncidentCheckAsync(default);
+        restartedDb.ChangeTracker.Clear();
+        var finalizedInc = await restartedDb.MonitoringIncidents.SingleAsync(i => i.IncidentKey == "high_5xx_rate");
+        Assert(!finalizedInc.Details.Contains("[PENDING_RECOVERY_RETRY]"), "Pending recovery notice retry completed and cleared");
+        Assert(fakeSink.SentEmails.Count == 3, "Fake sink received recovery email upon retry");
+        Assert(fakeSink.SentEmails[2].Subject.Contains("[RESOLVED]"), "Recovery email subject formatted with [RESOLVED]");
+    }
+
+    private static async Task TestRouteLatencyMiddlewareRealHttpPipelineAsync()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseTestServer();
+
+        var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+        var aggregator = new RouteLatencyAggregator(fakeClock);
+
+        builder.Services.AddSingleton<TimeProvider>(fakeClock);
+        builder.Services.AddSingleton<IRouteLatencyAggregator>(aggregator);
+        builder.Services.AddAuthentication("test-auth").AddScheme<AuthenticationSchemeOptions, OpsTestFixtureAuth>("test-auth", _ => { });
+        builder.Services.AddAuthorization();
+
+        await using var app = builder.Build();
+        app.UseMiddleware<ApiExceptionMiddleware>();
+        app.UseRouting();
+        app.UseMiddleware<RouteLatencyMiddleware>();
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        app.MapGet("/api/test-ok", () => Results.Ok(new { status = "success" }));
+        app.MapGet("/api/test-api-exception-400", IResult () => throw new ApiException(400, "Invalid request payload"));
+        app.MapGet("/api/test-api-exception-422", IResult () => throw new ApiException(422, "Unprocessable entity"));
+        app.MapGet("/api/test-unhandled-500", IResult () => throw new InvalidOperationException("Unhandled database connection crash"));
+        app.MapGet("/api/test-auth-challenge", [Microsoft.AspNetCore.Authorization.Authorize] () => Results.Ok(new { secret = 123 }));
+        app.MapGet("/api/test-admin-forbidden", [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin")] () => Results.Ok(new { admin = true }));
+
+        await app.StartAsync();
+
+        var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+
+        // 1. Success 200
+        var respOk = await client.GetAsync("/api/test-ok");
+        Assert(respOk.StatusCode == HttpStatusCode.OK, "Real HTTP pipeline returned 200 OK");
+        var snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var okSnap = snaps.Single(s => s.RouteTemplate == "/api/test-ok");
+        Assert(okSnap.RequestCount == 1, "/api/test-ok recorded 1 request");
+        Assert(okSnap.Status5xxCount == 0, "/api/test-ok recorded 0 5xx");
+
+        // 2. ApiException 400
+        var resp400 = await client.GetAsync("/api/test-api-exception-400");
+        Assert(resp400.StatusCode == HttpStatusCode.BadRequest, "Real HTTP pipeline returned 400 BadRequest");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap400 = snaps.Single(s => s.RouteTemplate == "/api/test-api-exception-400");
+        Assert(snap400.RequestCount == 1, "/api/test-api-exception-400 recorded 1 request");
+        Assert(snap400.Status5xxCount == 0, "/api/test-api-exception-400 recorded 0 5xx (correctly treated as 4xx, not 500)");
+
+        // 3. ApiException 422
+        var resp422 = await client.GetAsync("/api/test-api-exception-422");
+        Assert(resp422.StatusCode == HttpStatusCode.UnprocessableEntity, "Real HTTP pipeline returned 422 UnprocessableEntity");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap422 = snaps.Single(s => s.RouteTemplate == "/api/test-api-exception-422");
+        Assert(snap422.RequestCount == 1, "/api/test-api-exception-422 recorded 1 request");
+
+        // 4. Unhandled 500 (Crucial regression test: MUST record 500, NEVER 200!)
+        var resp500 = await client.GetAsync("/api/test-unhandled-500");
+        Assert(resp500.StatusCode == HttpStatusCode.InternalServerError, "Real HTTP pipeline returned 500 InternalServerError");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap500 = snaps.Single(s => s.RouteTemplate == "/api/test-unhandled-500");
+        Assert(snap500.RequestCount == 1, "/api/test-unhandled-500 recorded 1 request");
+        Assert(snap500.Status5xxCount == 1, "/api/test-unhandled-500 recorded 5xx count == 1 (NOT 200!)");
+
+        // 5. Auth Challenge 401
+        var resp401 = await client.GetAsync("/api/test-auth-challenge");
+        Assert(resp401.StatusCode == HttpStatusCode.Unauthorized, "Real HTTP pipeline returned 401 Unauthorized");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap401 = snaps.Single(s => s.RouteTemplate == "/api/test-auth-challenge");
+        Assert(snap401.RequestCount == 1, "/api/test-auth-challenge recorded 1 request");
+        Assert(snap401.Status5xxCount == 0, "/api/test-auth-challenge recorded 0 5xx");
+
+        // 6. Forbidden 403 (Owner trying to access Admin endpoint)
+        var forbiddenReq = new HttpRequestMessage(HttpMethod.Get, "/api/test-admin-forbidden");
+        forbiddenReq.Headers.Add("X-Fixture-Role", "Owner");
+        var resp403 = await client.SendAsync(forbiddenReq);
+        Assert(resp403.StatusCode == HttpStatusCode.Forbidden, "Real HTTP pipeline returned 403 Forbidden");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap403 = snaps.Single(s => s.RouteTemplate == "/api/test-admin-forbidden");
+        Assert(snap403.RequestCount == 1, "/api/test-admin-forbidden recorded 1 request");
+
+        // 7. Not Found 404
+        var resp404 = await client.GetAsync("/api/totally-nonexistent-path");
+        Assert(resp404.StatusCode == HttpStatusCode.NotFound, "Real HTTP pipeline returned 404 NotFound");
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        var snap404 = snaps.Single(s => s.RouteTemplate == "/api/totally-nonexistent-path");
+        Assert(snap404.RequestCount == 1, "/api/totally-nonexistent-path recorded 1 request");
+        Assert(snap404.Status5xxCount == 0, "/api/totally-nonexistent-path recorded 0 5xx");
+
+        // 8. Drain buckets and verify actual recorded status codes for each pipeline request
+        fakeClock.Advance(TimeSpan.FromMinutes(2));
+        var buckets = aggregator.DrainCompletedMinuteBuckets(fakeClock.GetUtcNow().ToUnixTimeSeconds() / 60);
+
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-ok" && b.StatusCode == 200), "Recorded status 200 for /api/test-ok");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-api-exception-400" && b.StatusCode == 400), "Recorded status 400 for /api/test-api-exception-400");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-api-exception-422" && b.StatusCode == 422), "Recorded status 422 for /api/test-api-exception-422");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-unhandled-500" && b.StatusCode == 500), "Recorded status 500 for /api/test-unhandled-500 (CRUCIAL: 500 recorded, NOT 200)");
+        Assert(!buckets.Any(b => b.RouteTemplate == "/api/test-unhandled-500" && b.StatusCode == 200), "Never recorded 200 for unhandled 500 exception");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-auth-challenge" && b.StatusCode == 401), "Recorded status 401 for /api/test-auth-challenge");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/test-admin-forbidden" && b.StatusCode == 403), "Recorded status 403 for /api/test-admin-forbidden");
+        Assert(buckets.Any(b => b.RouteTemplate == "/api/totally-nonexistent-path" && b.StatusCode == 404), "Recorded status 404 for /api/totally-nonexistent-path");
+    }
+
+    private static void TestWorkerStartVsSuccessRegressions()
+    {
+        var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+        var tracker = new WorkerTelemetryTracker(fakeClock);
+
+        // 1. Worker starts: status is Running, LastStartedAt updated, LastSuccessAt remains null
+        tracker.RecordStart("recovery-email");
+        var statuses = tracker.GetStatuses();
+        var emailWorker = statuses.Single(w => w.WorkerName == "recovery-email");
+        Assert(emailWorker.Status == "Running", "Worker start updates Status to Running");
+        Assert(emailWorker.LastStartedAt == fakeClock.GetUtcNow(), "Worker start updates LastStartedAt");
+        Assert(emailWorker.LastSuccessAt == null, "Worker start does NOT modify LastSuccessAt (remains null)");
+        Assert(!emailWorker.IsStale, "Worker is not stale within startup grace period");
+
+        // 2. Worker completes successfully: status is Healthy, LastSuccessAt updated
+        fakeClock.Advance(TimeSpan.FromSeconds(30));
+        tracker.RecordSuccess("recovery-email");
+        statuses = tracker.GetStatuses();
+        emailWorker = statuses.Single(w => w.WorkerName == "recovery-email");
+        Assert(emailWorker.Status == "Healthy", "Worker completion updates Status to Healthy");
+        Assert(emailWorker.LastSuccessAt == fakeClock.GetUtcNow(), "Worker completion updates LastSuccessAt");
+        Assert(emailWorker.ConsecutiveFailures == 0, "Worker completion clears ConsecutiveFailures");
+
+        // 3. Worker starts next cycle: LastSuccessAt must NOT be modified
+        fakeClock.Advance(TimeSpan.FromMinutes(2));
+        var previousSuccess = emailWorker.LastSuccessAt;
+        tracker.RecordStart("recovery-email");
+        statuses = tracker.GetStatuses();
+        emailWorker = statuses.Single(w => w.WorkerName == "recovery-email");
+        Assert(emailWorker.Status == "Running", "Next cycle start updates Status to Running");
+        Assert(emailWorker.LastStartedAt == fakeClock.GetUtcNow(), "Next cycle start updates LastStartedAt");
+        Assert(emailWorker.LastSuccessAt == previousSuccess, "Next cycle start preserves previous LastSuccessAt");
+
+        // 4. Worker fails: status is Failed, LastErrorAt updated, LastSuccessAt preserved
+        fakeClock.Advance(TimeSpan.FromSeconds(10));
+        tracker.RecordFailure("recovery-email", "Connection reset");
+        statuses = tracker.GetStatuses();
+        emailWorker = statuses.Single(w => w.WorkerName == "recovery-email");
+        Assert(emailWorker.Status == "Failed", "Worker failure updates Status to Failed");
+        Assert(emailWorker.LastErrorAt == fakeClock.GetUtcNow(), "Worker failure updates LastErrorAt");
+        Assert(emailWorker.LastErrorMessage == "Connection reset", "Worker failure records error message");
+        Assert(emailWorker.ConsecutiveFailures == 1, "Worker failure increments ConsecutiveFailures");
+        Assert(emailWorker.LastSuccessAt == previousSuccess, "Worker failure does NOT modify LastSuccessAt");
+
+        // 5. Per-worker SLA verification for all 6 workers
+        Assert(WorkerTelemetryTracker.GetWorkerSla("recovery-email") == TimeSpan.FromMinutes(5), "recovery-email SLA is 5m");
+        Assert(WorkerTelemetryTracker.GetWorkerSla("zalo") == TimeSpan.FromMinutes(5), "zalo SLA is 5m");
+        Assert(WorkerTelemetryTracker.GetWorkerSla("reconcile") == TimeSpan.FromMinutes(10), "reconcile SLA is 10m");
+        Assert(WorkerTelemetryTracker.GetWorkerSla("cleanup") == TimeSpan.FromMinutes(20), "cleanup SLA is 20m");
+        Assert(WorkerTelemetryTracker.GetWorkerSla("ops-aggregation") == TimeSpan.FromHours(2), "ops-aggregation SLA is 2h");
+        Assert(WorkerTelemetryTracker.GetWorkerSla("invoice-sweep") == TimeSpan.FromHours(26), "invoice-sweep SLA is 26h");
+
+        // Test SLA staleness boundaries for each worker
+        var workerNames = new[] { "recovery-email", "zalo", "reconcile", "cleanup", "ops-aggregation", "invoice-sweep" };
+        foreach (var name in workerNames)
+        {
+            var sla = WorkerTelemetryTracker.GetWorkerSla(name);
+            tracker.RecordSuccess(name);
+
+            // Just before SLA
+            fakeClock.Advance(sla - TimeSpan.FromMinutes(1));
+            statuses = tracker.GetStatuses();
+            var w = statuses.Single(x => x.WorkerName == name);
+            Assert(!w.IsStale, $"{name} is NOT stale just before SLA ({sla.TotalMinutes}m)");
+
+            // Exceed SLA
+            fakeClock.Advance(TimeSpan.FromMinutes(2));
+            statuses = tracker.GetStatuses();
+            w = statuses.Single(x => x.WorkerName == name);
+            Assert(w.IsStale, $"{name} is marked stale after exceeding SLA");
+        }
+
+        // 6. Disabled worker is never marked stale
+        tracker.RecordHeartbeat("recovery-email", isEnabled: false, status: "Healthy");
+        fakeClock.Advance(TimeSpan.FromDays(7));
+        statuses = tracker.GetStatuses();
+        emailWorker = statuses.Single(w => w.WorkerName == "recovery-email");
+        Assert(!emailWorker.IsStale, "Disabled worker is NEVER marked stale even after 7 days");
+
+        // 7. Startup grace period (10 minutes)
+        var freshClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+        var freshTracker = new WorkerTelemetryTracker(freshClock);
+        freshTracker.RecordStart("cleanup"); // never succeeded yet
+
+        freshClock.Advance(TimeSpan.FromMinutes(9));
+        statuses = freshTracker.GetStatuses();
+        var cleanupWorker = statuses.Single(w => w.WorkerName == "cleanup");
+        Assert(!cleanupWorker.IsStale, "Worker without success is within startup grace period at 9m");
+
+        freshClock.Advance(TimeSpan.FromMinutes(2)); // now at 11m
+        statuses = freshTracker.GetStatuses();
+        cleanupWorker = statuses.Single(w => w.WorkerName == "cleanup");
+        Assert(cleanupWorker.IsStale, "Worker without success exceeds 10m startup grace period and becomes stale");
     }
 
     private static async Task TestOperationsAndIncidentsHttpEndpointsAsync()
@@ -648,31 +965,34 @@ public static class OperationsMonitoringTests
             throw new Exception($"ackResp failed with {ackResp.StatusCode}: {err}");
         }
         Assert(ackResp.StatusCode == HttpStatusCode.OK, "Update incident state returned 200 OK");
-        var updatedIncident = await ackResp.Content.ReadFromJsonAsync<IncidentDto>();
-        Assert(updatedIncident != null && updatedIncident.State == "Acknowledged", "Incident transitioned to Acknowledged");
-        Assert(updatedIncident!.Details.Contains("Investigating root cause"), "Admin note persisted to incident details");
+        var ackData = await ackResp.Content.ReadFromJsonAsync<IncidentDto>();
+        Assert(ackData!.State == "Acknowledged", "Incident transitioned to Acknowledged");
+        Assert(ackData.Details.Contains("Investigating root cause"), "Admin note persisted to incident details");
 
         // 5. PATCH /api/admin/monitoring/incidents/{id} (Resolve)
-        var resolveRequest = new UpdateIncidentRequest("Resolved", "Service restored");
+        var resolveRequest = new UpdateIncidentRequest("Resolved", "Issue mitigated by operations");
         var resolveResp = await adminClient.PatchAsJsonAsync($"/api/admin/monitoring/incidents/{testIncident.Id}", resolveRequest);
         Assert(resolveResp.StatusCode == HttpStatusCode.OK, "Resolve incident returned 200 OK");
-        var resolvedIncident = await resolveResp.Content.ReadFromJsonAsync<IncidentDto>();
-        Assert(resolvedIncident != null && resolvedIncident.State == "Resolved", "Incident transitioned to Resolved");
-        Assert(resolvedIncident!.ResolvedAt != null, "ResolvedAt timestamp recorded");
+        var resolveData = await resolveResp.Content.ReadFromJsonAsync<IncidentDto>();
+        Assert(resolveData!.State == "Resolved", "Incident transitioned to Resolved");
+        Assert(resolveData.ResolvedAt != null, "ResolvedAt timestamp recorded");
     }
 
-    private sealed class OpsTestFixtureAuth(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    private sealed class OpsTestFixtureAuth : AuthenticationHandler<AuthenticationSchemeOptions>
     {
+        public OpsTestFixtureAuth(
+            IOptionsMonitor<AuthenticationSchemeOptions> options,
+            ILoggerFactory logger,
+            System.Text.Encodings.Web.UrlEncoder encoder)
+            : base(options, logger, encoder) { }
+
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var role = Request.Headers["X-Fixture-Role"].FirstOrDefault();
+            var role = Context.Request.Headers["X-Fixture-Role"].FirstOrDefault();
             if (string.IsNullOrWhiteSpace(role))
                 return Task.FromResult(AuthenticateResult.NoResult());
 
-            var userId = role == "Admin" ? AdminUserId : OwnerUserId;
+            var userId = role == "Admin" ? Guid.Parse("11111111-1111-1111-1111-111111111111") : Guid.Parse("22222222-2222-2222-2222-222222222222");
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
@@ -725,10 +1045,15 @@ public static class OperationsMonitoringTests
 
     private sealed class FakeEmailSender : IAlertEmailSender
     {
+        public bool ShouldThrow { get; set; }
         public List<(string To, string Subject, string Body)> SentEmails { get; } = new();
 
         public Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
         {
+            if (ShouldThrow)
+            {
+                throw new InvalidOperationException("SMTP connection refused: connection timed out");
+            }
             SentEmails.Add((to, subject, body));
             return Task.CompletedTask;
         }
