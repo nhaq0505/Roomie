@@ -652,7 +652,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to send initial incident alert for {Key}. Will retry next cycle.", eval.IncidentKey);
+                    _logger.LogWarning("Failed to send initial incident alert for {Key} ({ErrorType}). Will retry next cycle.", eval.IncidentKey, ex.GetType().Name);
                 }
             }
         }
@@ -678,7 +678,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to send reminder incident alert for {Key}. Will retry next cycle.", eval.IncidentKey);
+                    _logger.LogWarning("Failed to send reminder incident alert for {Key} ({ErrorType}). Will retry next cycle.", eval.IncidentKey, ex.GetType().Name);
                 }
             }
 
@@ -709,8 +709,11 @@ public sealed class IncidentMonitoringService : IIncidentService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to send recovery alert for {Key}. Marking pending retry.", eval.IncidentKey);
-                    existing.Details += "\n[Pending Recovery Notice]";
+                    _logger.LogWarning("Failed to send recovery alert for {Key} ({ErrorType}). Marking pending retry.", eval.IncidentKey, ex.GetType().Name);
+                    if (!existing.Details.Contains("[PENDING_RECOVERY_RETRY]"))
+                    {
+                        existing.Details += "\n[PENDING_RECOVERY_RETRY]";
+                    }
                 }
             }
 
@@ -721,7 +724,7 @@ public sealed class IncidentMonitoringService : IIncidentService
     private async Task RetryPendingRecoveryNoticesAsync(CancellationToken ct)
     {
         var pendingRecoveries = await _db.MonitoringIncidents
-            .Where(x => x.State == "Resolved" && x.Details.Contains("[Pending Recovery Notice]"))
+            .Where(x => x.State == "Resolved" && (x.Details.Contains("[PENDING_RECOVERY_RETRY]") || x.Details.Contains("[Pending Recovery Notice]")))
             .ToListAsync(ct);
 
         foreach (var incident in pendingRecoveries)
@@ -729,13 +732,17 @@ public sealed class IncidentMonitoringService : IIncidentService
             try
             {
                 await _notifier.SendIncidentAlertAsync(incident, isRecovery: true, ct);
-                incident.Details = incident.Details.Replace("\n[Pending Recovery Notice]", "");
+                incident.Details = incident.Details
+                    .Replace("\n[PENDING_RECOVERY_RETRY]", "")
+                    .Replace("[PENDING_RECOVERY_RETRY]", "")
+                    .Replace("\n[Pending Recovery Notice]", "")
+                    .Replace("[Pending Recovery Notice]", "");
                 incident.LastNotifiedAt = _clock.GetUtcNow();
                 _logger.LogInformation("Successfully delivered pending recovery notice for {Key}", incident.IncidentKey);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Pending recovery notice retry failed for {Key}", incident.IncidentKey);
+                _logger.LogWarning("Pending recovery notice retry failed for {Key} ({ErrorType})", incident.IncidentKey, ex.GetType().Name);
             }
         }
     }

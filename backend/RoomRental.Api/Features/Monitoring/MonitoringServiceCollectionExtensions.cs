@@ -51,6 +51,9 @@ public static class MonitoringServiceCollectionExtensions
         services.RemoveAll<IIncidentService>();
         services.AddScoped<IIncidentService, IncidentMonitoringService>();
 
+        services.RemoveAll<IAlertEmailSender>();
+        services.AddScoped<IAlertEmailSender, SmtpAlertEmailSender>();
+
         services.RemoveAll<IIncidentNotifier>();
         services.AddScoped<IIncidentNotifier, SmtpIncidentNotifier>();
 
