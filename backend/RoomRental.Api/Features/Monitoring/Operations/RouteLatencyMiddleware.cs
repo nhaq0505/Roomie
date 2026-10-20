@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using RoomRental.Api.Services;
 
 namespace RoomRental.Api.Features.Monitoring.Operations;
 
@@ -18,17 +19,40 @@ public sealed class RouteLatencyMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var startTimestamp = Stopwatch.GetTimestamp();
+        int? capturedStatusCode = null;
 
         try
         {
             await _next(context);
         }
+        catch (ApiException apiEx)
+        {
+            capturedStatusCode = apiEx.StatusCode;
+            throw;
+        }
+        catch (BadHttpRequestException badReq)
+        {
+            capturedStatusCode = badReq.StatusCode;
+            throw;
+        }
+        catch (Exception)
+        {
+            capturedStatusCode = StatusCodes.Status500InternalServerError;
+            throw;
+        }
         finally
         {
             var elapsedMs = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
-            var statusCode = context.Response?.StatusCode ?? 200;
-            var method = context.Request.Method;
 
+            // If an exception was thrown before an outer exception handler set the response code,
+            // capturedStatusCode ensures we record the true intended error status code (e.g. 500 or 4xx).
+            // Otherwise, context.Response.StatusCode captures handler-set codes (e.g. 401, 403, 404, 200).
+            var statusCode = capturedStatusCode
+                ?? (context.Response != null && context.Response.StatusCode >= 400 ? (int?)context.Response.StatusCode : null)
+                ?? context.Response?.StatusCode
+                ?? 200;
+
+            var method = context.Request.Method;
             var routeTemplate = GetRouteTemplate(context);
             if (!string.IsNullOrWhiteSpace(routeTemplate))
             {

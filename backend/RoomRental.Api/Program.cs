@@ -156,6 +156,7 @@ foreach (var value in (builder.Configuration["TrustedProxies"] ?? "").Split(',',
         forwardedHeaders.KnownProxies.Add(address.MapToIPv6());
 }
 app.UseForwardedHeaders(forwardedHeaders);
+app.UseMiddleware<RoomRental.Api.Features.Monitoring.Operations.RouteLatencyMiddleware>();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.Use(async (context, next) =>
 {
@@ -172,7 +173,6 @@ app.UseMiddleware<SeoMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseMiddleware<RoomRental.Api.Features.Monitoring.Operations.RouteLatencyMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<RequestSecurityMiddleware>();
