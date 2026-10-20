@@ -171,18 +171,35 @@ public static partial class BillingEndpoints
             invoice.WaterAmount = request.WaterAmount;
             invoice.ServiceAmount = request.ServiceAmount;
             invoice.Total = total;
+            var now = DateTimeOffset.UtcNow;
             invoice.LifecycleState = InvoiceLifecycleState.Issued;
+            invoice.IssuedAt = now;
             invoice.Version++;
             InvoiceService.RecalculateStatus(invoice);
             var after = SerializeSnapshot(invoice);
             await AddRevisionAsync(db, invoice, request.RequestId, fingerprint, reason, ApiSupport.UserId(context), before, after, ct);
             await invoiceService.StageZaloReminderAsync(invoice, ct);
+            var outbox = new MilestoneOutboxEvent
+            {
+                OwnerId = ownerId,
+                EventType = "InvoiceIssued",
+                TargetId = invoice.Id.ToString(),
+                OccurredAt = now,
+                Status = "Pending"
+            };
+            db.MilestoneOutboxEvents.Add(outbox);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             if (milestoneTracker != null)
             {
-                try { await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, ct); }
-                catch { /* Telemetry failure must not block product */ }
+                try
+                {
+                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, now, ct);
+                    outbox.Status = "Completed";
+                    outbox.ProcessedAt = DateTimeOffset.UtcNow;
+                    await db.SaveChangesAsync(ct);
+                }
+                catch { /* Telemetry failure must not block product; outbox remains Pending */ }
             }
             return Results.Ok(InvoiceService.ToDto(invoice));
         });

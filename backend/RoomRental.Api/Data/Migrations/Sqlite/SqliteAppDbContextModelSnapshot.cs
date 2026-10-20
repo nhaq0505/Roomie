@@ -840,6 +840,55 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.ToTable("CampaignCosts");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.MilestoneOutboxEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ProcessedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "EventType");
+
+                    b.HasIndex("Status", "OccurredAt");
+
+                    b.ToTable("MilestoneOutboxEvents");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.MonitoringIncident", b =>
                 {
                     b.Property<Guid>("Id")

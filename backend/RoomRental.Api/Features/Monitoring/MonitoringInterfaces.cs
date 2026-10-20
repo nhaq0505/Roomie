@@ -40,6 +40,7 @@ public interface IOwnerMilestoneTracker
         Guid invoiceId,
         string kind,
         ActorType actor = ActorType.Owner,
+        DateTimeOffset? issuedAt = null,
         CancellationToken ct = default);
 
     Task TrackSubscriptionPaidAsync(
@@ -55,6 +56,20 @@ public interface IOwnerMilestoneTracker
         ActorType actorType,
         string actionType,
         CancellationToken ct);
+
+    Task EnsureSubscriptionPaidMilestoneAsync(
+        Guid ownerId,
+        CancellationToken ct = default);
+
+    Task EnsureInvoiceIssuedMilestoneAsync(
+        Guid ownerId,
+        CancellationToken ct = default);
+
+    Task<int> ProcessPendingOutboxEventsAsync(
+        CancellationToken ct = default);
+
+    Task RepairMissingMilestonesAsync(
+        CancellationToken ct = default);
 }
 
 public interface IGrowthMonitoringQueryService

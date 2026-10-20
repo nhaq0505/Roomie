@@ -45,6 +45,7 @@ public class AppDbContext : DbContext
     public DbSet<MonitoringIncident> MonitoringIncidents => Set<MonitoringIncident>();
     public DbSet<OperationalEventCounter> OperationalCounters => Set<OperationalEventCounter>();
     public DbSet<DailyAggregateMetric> DailyAggregateMetrics => Set<DailyAggregateMetric>();
+    public DbSet<MilestoneOutboxEvent> MilestoneOutboxEvents => Set<MilestoneOutboxEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -472,6 +473,17 @@ public class AppDbContext : DbContext
             entity.Property(x => x.SubscriptionRevenueVnd).HasPrecision(18, 2);
             entity.Property(x => x.MarketingSpendVnd).HasPrecision(18, 2);
             entity.Property(x => x.MarketingHours).HasPrecision(10, 2);
+        });
+
+        modelBuilder.Entity<MilestoneOutboxEvent>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EventType).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.TargetId).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.Status, x.OccurredAt });
+            entity.HasIndex(x => new { x.OwnerId, x.EventType });
         });
     }
 }

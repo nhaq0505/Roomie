@@ -29,6 +29,12 @@ public sealed class PaymentReconciliationHostedService(IServiceScopeFactory scop
                 var payOsService = scope.ServiceProvider.GetRequiredService<PayOsService>();
                 await payOsService.ReconcilePendingBatchAsync(stoppingToken);
 
+                var milestoneTracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker>();
+                if (milestoneTracker != null)
+                {
+                    await milestoneTracker.RepairMissingMilestonesAsync(stoppingToken);
+                }
+
                 if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("reconcile", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }

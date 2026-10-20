@@ -55,7 +55,25 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
             created++;
         }
 
-        if (created > 0) await db.SaveChangesAsync(cancellationToken);
+        if (created > 0)
+        {
+            if (ownedTransaction is not null)
+            {
+                foreach (var inv in issuedInvoices)
+                {
+                    db.MilestoneOutboxEvents.Add(new MilestoneOutboxEvent
+                    {
+                        OwnerId = ownerId,
+                        EventType = "InvoiceIssued",
+                        TargetId = inv.Id.ToString(),
+                        OccurredAt = inv.IssuedAt,
+                        Status = "Pending"
+                    });
+                }
+            }
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         if (ownedTransaction is not null)
         {
             await ownedTransaction.CommitAsync(cancellationToken);
@@ -66,12 +84,13 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
                 {
                     foreach (var inv in issuedInvoices)
                     {
-                        await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, inv.Id, inv.Kind, actor, cancellationToken);
+                        await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, inv.Id, inv.Kind, actor, inv.IssuedAt, cancellationToken);
                     }
+                    await milestoneTracker.ProcessPendingOutboxEventsAsync(cancellationToken);
                 }
                 catch
                 {
-                    // Telemetry failure must not break invoice generation
+                    // Telemetry failure must not break invoice generation; outbox remains Pending
                 }
             }
         }
@@ -224,6 +243,12 @@ public sealed class InvoiceSweepService(IServiceScopeFactory scopeFactory, ILogg
                 var period = timeProvider.GetUtcNow().ToOffset(VietnamTimeZone.GetUtcOffset(timeProvider.GetUtcNow())).ToString("yyyy-MM");
                 var result = await service.GenerateForAllApprovedOwnersAsync(period, stoppingToken);
                 if (result.Created > 0) logger.LogInformation("Published {Count} invoices for {Period} by daily sweep.", result.Created, period);
+
+                var milestoneTracker = scope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker>();
+                if (milestoneTracker != null)
+                {
+                    await milestoneTracker.RepairMissingMilestonesAsync(stoppingToken);
+                }
 
                 if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("invoice-sweep", isEnabled: true, status: "Healthy", errorMessage: null, stoppingToken);
             }

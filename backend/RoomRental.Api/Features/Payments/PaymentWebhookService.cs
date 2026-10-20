@@ -12,6 +12,7 @@ namespace RoomRental.Api.Services;
 public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvider protectionProvider,
     IHttpClientFactory httpClientFactory, IConfiguration configuration, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
 {
+    public RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? MilestoneTracker => milestoneTracker;
     private string? WebhookUrl(Guid ownerId)
     {
         // Callback origin is controlled by the server, never by Host headers or client input.
@@ -105,6 +106,11 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
         if (duplicate is not null)
         {
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker is not null)
+            {
+                await milestoneTracker.EnsureSubscriptionPaidMilestoneAsync(attempt.OwnerId, cancellationToken);
+                await milestoneTracker.ProcessPendingOutboxEventsAsync(cancellationToken);
+            }
             return true;
         }
 
@@ -115,6 +121,11 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
             db.ProcessedWebhooks.Add(new ProcessedWebhook { OwnerId = attempt.OwnerId, Reference = reference, OrderCode = attempt.OrderCode });
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (milestoneTracker is not null)
+            {
+                await milestoneTracker.EnsureSubscriptionPaidMilestoneAsync(attempt.OwnerId, cancellationToken);
+                await milestoneTracker.ProcessPendingOutboxEventsAsync(cancellationToken);
+            }
             return true;
         }
 
@@ -131,6 +142,17 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
         trackedAttempt.PaidAt = DateTimeOffset.UtcNow;
 
         db.ProcessedWebhooks.Add(new ProcessedWebhook { OwnerId = attempt.OwnerId, Reference = reference, OrderCode = trackedAttempt.OrderCode });
+
+        var outbox = new MilestoneOutboxEvent
+        {
+            OwnerId = attempt.OwnerId,
+            EventType = "SubscriptionPaid",
+            TargetId = trackedAttempt.OrderCode.ToString(),
+            OccurredAt = trackedAttempt.PaidAt.Value,
+            Status = "Pending"
+        };
+        db.MilestoneOutboxEvents.Add(outbox);
+
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -139,10 +161,13 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
             try
             {
                 await milestoneTracker.TrackSubscriptionPaidAsync(attempt.OwnerId, trackedAttempt.OrderCode, (int)amount, ActorType.System, trackedAttempt.PaidAt, cancellationToken);
+                outbox.Status = "Completed";
+                outbox.ProcessedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
             }
             catch
             {
-                // Telemetry failure must not break payment processing
+                // Telemetry failure must not break payment processing; durable outbox remains Pending for replay/reconcile/restart
             }
         }
         return true;

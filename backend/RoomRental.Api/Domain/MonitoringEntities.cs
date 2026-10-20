@@ -123,6 +123,20 @@ public sealed class OwnerMilestone
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+public sealed class MilestoneOutboxEvent
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OwnerId { get; set; }
+    public required string EventType { get; set; } // InvoiceIssued, SubscriptionPaid
+    public required string TargetId { get; set; }  // InvoiceId (Guid string) or OrderCode (long string)
+    public DateTimeOffset OccurredAt { get; set; }
+    public string Status { get; set; } = "Pending"; // Pending, Completed, Failed
+    public int RetryCount { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ProcessedAt { get; set; }
+}
+
 public sealed class OwnerDailyActivity
 {
     public Guid Id { get; set; } = Guid.NewGuid();

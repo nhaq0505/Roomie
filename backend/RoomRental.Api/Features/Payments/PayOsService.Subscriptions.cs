@@ -188,7 +188,15 @@ public sealed partial class PayOsService
     {
         var attempt = await db.PayOsAttempts.SingleOrDefaultAsync(row => row.OwnerId == ownerId && row.OrderCode == orderCode && row.Kind == "Subscription", cancellationToken);
         if (attempt is null) throw new ApiException(StatusCodes.Status404NotFound, "Subscription order was not found.");
-        if (attempt.Status == PaymentAttemptStatus.Paid) return new { status = "Paid" };
+        if (attempt.Status == PaymentAttemptStatus.Paid)
+        {
+            if (_webhookService.MilestoneTracker is not null)
+            {
+                await _webhookService.MilestoneTracker.EnsureSubscriptionPaidMilestoneAsync(ownerId, cancellationToken);
+                await _webhookService.MilestoneTracker.ProcessPendingOutboxEventsAsync(cancellationToken);
+            }
+            return new { status = "Paid" };
+        }
         var providerStatus = await ReconcileSubscriptionAttemptAsync(ownerId, attempt, cancellationToken);
         return new { status = providerStatus, checkoutUrl = attempt.CheckoutUrl };
     }

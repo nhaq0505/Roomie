@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RoomRental.WebhookTests" />
+    <InternalsVisibleTo Include="RoomRental.ZaloTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Features/Payments/Banks.json" LogicalName="RoomRental.Payments.Banks.json" />
     <EmbeddedResource Include="EmailTemplates/RegistrationVerification.html" LogicalName="RoomRental.Email.RegistrationVerification.html" />
     <EmbeddedResource Include="Assets/roomie-email-logo.png" LogicalName="RoomRental.Email.Logo.png" />

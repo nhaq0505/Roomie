@@ -84,15 +84,28 @@ public static partial class BillingEndpoints
             await invoiceService.GenerateForOwnerAsync(ownerId, work.Period, cancellationToken);
             invoice = await db.Invoices.Include(x => x.DepositSettlements)
                 .SingleAsync(x => x.OccupancyId == work.Occupancy.Id && x.Period == work.Period && x.Kind == "Monthly", cancellationToken);
+            var outbox = new MilestoneOutboxEvent
+            {
+                OwnerId = ownerId,
+                EventType = "InvoiceIssued",
+                TargetId = invoice.Id.ToString(),
+                OccurredAt = invoice.IssuedAt,
+                Status = "Pending"
+            };
+            db.MilestoneOutboxEvents.Add(outbox);
+            await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             if (milestoneTracker != null)
             {
                 try
                 {
-                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, cancellationToken);
+                    await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, invoice.IssuedAt, cancellationToken);
                     await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "ReadingRecorded", cancellationToken);
+                    outbox.Status = "Completed";
+                    outbox.ProcessedAt = DateTimeOffset.UtcNow;
+                    await db.SaveChangesAsync(cancellationToken);
                 }
-                catch { /* Telemetry failure must not block product */ }
+                catch { /* Telemetry failure must not block product; outbox remains Pending for durable retry */ }
             }
             return Results.Created($"/api/readings?period={work.Period}", new ReadingDto(reading.Id, work.Room.Id, work.Occupancy.Id,
                 work.Room.Name, work.Building.Name, reading.Period, reading.PreviousReading, reading.CurrentReading,

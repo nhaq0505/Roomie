@@ -88,6 +88,7 @@ await AccountingBillingHttpTests.RunAsync();
 await PayOsOperationsHttpTests.RunAsync();
 await MonitoringFoundationTests.RunAsync();
 await MonitoringBusinessTests.RunAsync();
+await MonitoringAccuracyAndOutboxRegressionTests.RunAsync();
 
 await RoomRental.WebhookTests.OperationsMonitoringTests.RunAsync();
 
