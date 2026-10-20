@@ -32,7 +32,7 @@ test('email recovery requires OTP proof before accepting a new password', async 
   await expect(page.getByLabel('Mật khẩu mới', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Gửi lại mã sau/ })).toBeDisabled();
   await page.getByLabel('Mã xác nhận', { exact: true }).fill('000000');
-  await page.getByRole('button', { name: 'Xác minh mã OTP', exact: true }).click();
+  await page.getByRole('button', { name: /Xác minh mã OTP$/ }).click();
   await expect(page.getByText('Mã khôi phục không hợp lệ hoặc đã hết hạn.', { exact: true })).toBeVisible();
   expect(completes).toBe(0);
   // Ant Design's loading icon changes the button's accessible name while the
@@ -44,12 +44,12 @@ test('email recovery requires OTP proof before accepting a new password', async 
   await verifySubmit.click();
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill('12345678');
   await page.getByLabel('Xác nhận mật khẩu mới', { exact: true }).fill('12345678');
-  await page.getByRole('button', { name: 'Lưu mật khẩu', exact: true }).click();
+  await page.getByRole('button', { name: /Lưu mật khẩu$/ }).click();
   await expect(page.getByText('Mật khẩu mới cần từ 9 đến 256 ký tự.', { exact: true })).toBeVisible();
   expect(completes).toBe(0);
   await page.getByLabel('Mật khẩu mới', { exact: true }).fill('newpassword');
   await page.getByLabel('Xác nhận mật khẩu mới', { exact: true }).fill('newpassword');
-  await page.getByRole('button', { name: 'Lưu mật khẩu', exact: true }).click();
+  await page.getByRole('button', { name: /Lưu mật khẩu$/ }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByText('Đã đổi mật khẩu. Vui lòng đăng nhập lại.', { exact: true })).toBeVisible();
   expect(verifies).toBe(2); expect(completes).toBe(1);
@@ -93,6 +93,6 @@ test('recovery expiry and connection errors preserve a retry path', async ({ pag
   await expect(page.getByLabel('Email', { exact: true })).toHaveValue('owner@example.invalid');
   await page.getByRole('button', { name: 'Gửi mã khôi phục' }).click();
   await expect(page.getByText('Mã đã hết hạn. Vui lòng yêu cầu mã mới.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Xác minh mã OTP', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Xác minh mã OTP$/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Gửi lại mã', exact: true })).toBeEnabled();
 });

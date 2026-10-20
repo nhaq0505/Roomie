@@ -71,14 +71,14 @@ function EmailPasswordRecovery() {
       </div>
       {error && <Alert className="form-alert" type="error" showIcon message={errorText(error)} />}
       {expired && <Alert type="warning" showIcon message={t("Mã đã hết hạn. Vui lòng yêu cầu mã mới.")} style={{ marginBottom: 16 }} />}
-      {!challenge ? <Form form={emailForm} name="recovery-email" layout="vertical" size="large" requiredMark={false} onFinish={({ email }) => void send(email)} disabled={busy}>
+      {!challenge ? <Form form={emailForm} key="recovery-email" name="recovery-email" layout="vertical" size="large" requiredMark={false} onFinish={({ email }) => void send(email)} disabled={busy}>
         <Form.Item name="email" label={t("Email")} rules={[{ required: true, type: 'email', message: t("Email chưa đúng định dạng.") }]}><Input prefix={<MailOutlined />} autoComplete="email" maxLength={320} placeholder="name@example.com" /></Form.Item>
         <Button className="auth-submit" type="primary" htmlType="submit" block loading={busy}>{t("Gửi mã khôi phục")}</Button>
-      </Form> : grant ? <Form form={passwordForm} name="recovery-password" layout="vertical" size="large" requiredMark={false} onFinish={complete} disabled={busy}>
+      </Form> : grant ? <Form form={passwordForm} key="recovery-password" name="recovery-password" layout="vertical" size="large" requiredMark={false} onFinish={complete} disabled={busy}>
         <Form.Item name="newPassword" label={t("Mật khẩu mới")} extra={t("Từ 9 đến 256 ký tự, không bắt buộc chữ hoa, số hay ký tự đặc biệt.")} rules={[{ required: true, whitespace: true, min: 9, max: 256, message: t("Mật khẩu mới cần từ 9 đến 256 ký tự.") }]}><Input.Password prefix={<LockOutlined />} autoComplete="new-password" maxLength={256} /></Form.Item>
         <Form.Item name="confirmPassword" label={t("Xác nhận mật khẩu mới")} dependencies={['newPassword']} rules={[{ required: true }, ({ getFieldValue }) => ({ validator(_, value) { return value === getFieldValue('newPassword') ? Promise.resolve() : Promise.reject(new Error(t("Xác nhận mật khẩu không khớp."))); } })]}><Input.Password autoComplete="new-password" maxLength={256} /></Form.Item>
         <Button className="auth-submit" type="primary" htmlType="submit" block loading={busy} disabled={expired}>{t("Lưu mật khẩu")}</Button>
-      </Form> : <Form form={codeForm} name="recovery-code" layout="vertical" size="large" requiredMark={false} onFinish={verify} disabled={busy}>
+      </Form> : <Form form={codeForm} key="recovery-code" name="recovery-code" layout="vertical" size="large" requiredMark={false} onFinish={verify} disabled={busy}>
         <Form.Item name="code" label={t("Mã xác nhận")} rules={[{ required: true, pattern: /^[0-9]{6}$/, message: t("Nhập đủ 6 chữ số của mã xác nhận.") }]}><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" autoFocus /></Form.Item>
         <Typography.Paragraph type="secondary">{t("Mã có hiệu lực trong 10 phút. Nếu chưa nhận được, hãy kiểm tra thư rác.")}</Typography.Paragraph>
         <Button className="auth-submit" type="primary" htmlType="submit" block loading={busy} disabled={expired}>{t("Xác minh mã OTP")}</Button>
