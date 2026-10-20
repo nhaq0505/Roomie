@@ -617,6 +617,10 @@ def send_alert_email(
         return False
 
 
+MAX_ATTEMPTS_PER_CYCLE = 3
+SMTP_DEFAULT_CYCLE_BUDGET = 20.0  # Monotonic budget for SMTP stage
+
+
 def enqueue_notification(
     state: Dict[str, Any],
     target: str,
@@ -624,25 +628,21 @@ def enqueue_notification(
     notif_type: str,
     now: float,
 ) -> None:
-    """Enqueues a pending notification for delivery with retry tracking."""
+    """Enqueues a pending notification for delivery keyed strictly by incident_id + type."""
     pending: List[Dict[str, Any]] = state.setdefault("pending_notifications", [])
+    incident_id = inc.get("id") or f"inc_{target}_{int(now)}"
 
-    # Deduplicate pending notifications for the same target
+    # Keyed strictly by incident_id + notif_type so different incidents on same target never collide
     for p in pending:
-        if p.get("target") == target:
-            if notif_type in {"new", "reminder"} and p.get("notification_type") in {"new", "reminder"}:
-                p["current_value"] = inc.get("current_value")
-                p["consecutive_samples"] = inc.get("consecutive_samples", 0)
-                return
-            if p.get("notification_type") == notif_type:
-                p["current_value"] = inc.get("current_value")
-                p["consecutive_samples"] = inc.get("consecutive_samples", 0)
-                return
+        if p.get("incident_id") == incident_id and p.get("notification_type") == notif_type:
+            p["current_value"] = inc.get("current_value")
+            p["consecutive_samples"] = inc.get("consecutive_samples", 0)
+            return
 
     notif = {
-        "id": f"notif_{target}_{int(now)}_{notif_type}",
+        "id": f"notif_{incident_id}_{notif_type}",
         "target": target,
-        "incident_id": inc.get("id"),
+        "incident_id": incident_id,
         "notification_type": notif_type,
         "severity": inc.get("severity", "warning"),
         "title": inc.get("title", ""),
@@ -657,8 +657,12 @@ def enqueue_notification(
         "next_retry_at": now,
     }
     pending.append(notif)
+    # Bounded queue: preserve required recovery notices and newest incidents
     if len(pending) > MAX_PENDING_NOTIFICATIONS:
-        pending[:] = pending[-MAX_PENDING_NOTIFICATIONS:]
+        recoveries = [n for n in pending if n.get("notification_type") == "recovery"]
+        others = [n for n in pending if n.get("notification_type") != "recovery"]
+        remaining_slots = max(0, MAX_PENDING_NOTIFICATIONS - len(recoveries))
+        pending[:] = recoveries + others[-remaining_slots:]
 
 
 def process_pending_notifications(
@@ -666,28 +670,38 @@ def process_pending_notifications(
     config: Dict[str, Any],
     now_ts: float,
     smtp_client_factory: Optional[Callable[..., Any]] = None,
-    time_budget_seconds: float = SMTP_TIME_BUDGET_SECONDS,
+    time_budget_seconds: float = SMTP_DEFAULT_CYCLE_BUDGET,
+    state_save_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    start_monotonic: Optional[float] = None,
 ) -> None:
-    """Processes enqueued alert notifications while honoring execution time budget and backoff."""
+    """Processes enqueued alert notifications while honoring execution time budget, backoff, and state saves."""
     pending: List[Dict[str, Any]] = state.setdefault("pending_notifications", [])
     if not pending:
         return
 
-    start_wall = time.time()
+    mono_start = start_monotonic if start_monotonic is not None else time.monotonic()
     active_incidents = state.setdefault("active_incidents", {})
-    remaining_pending: List[Dict[str, Any]] = []
+    processed_indices = set()
+    attempts_this_cycle = 0
 
-    for notif in list(pending):
-        # Honor overall time budget to respect systemd 45s service bound
-        if time.time() - start_wall >= time_budget_seconds:
-            remaining_pending.append(notif)
-            continue
+    for idx, notif in enumerate(list(pending)):
+        if attempts_this_cycle >= MAX_ATTEMPTS_PER_CYCLE:
+            break
+
+        now_mono = time.monotonic()
+        remaining_budget = time_budget_seconds - (now_mono - mono_start)
+        # Monotonic cycle budget: leave at least 2.0s headroom for state save and clean exit
+        if remaining_budget <= 2.0:
+            break
 
         # Respect retry backoff schedule
         next_retry = notif.get("next_retry_at", 0)
         if now_ts < next_retry:
-            remaining_pending.append(notif)
             continue
+
+        attempts_this_cycle += 1
+        # Cap transport timeout to remaining budget minus safety margin
+        call_timeout = max(1.0, min(remaining_budget - 0.5, SMTP_PER_CALL_TIMEOUT))
 
         success = send_alert_email(
             incident=notif,
@@ -695,26 +709,40 @@ def process_pending_notifications(
             is_recovery=(notif.get("notification_type") == "recovery"),
             is_reminder=(notif.get("notification_type") == "reminder"),
             smtp_client_factory=smtp_client_factory,
+            timeout=call_timeout,
         )
 
         if success:
+            processed_indices.add(idx)
             target = notif.get("target")
-            # Mark last_notified_at only AFTER verified successful delivery
+            incident_id = notif.get("incident_id")
+            # Only update last_notified_at if the active incident matches this notification's incident_id!
             if notif.get("notification_type") in {"new", "reminder"} and target in active_incidents:
-                active_incidents[target]["last_notified_at"] = format_iso_utc(now_ts)
+                active_inc = active_incidents[target]
+                if active_inc.get("id") == incident_id:
+                    active_inc["last_notified_at"] = format_iso_utc(now_ts)
+
+            # Persist state after each accepted delivery where practical
+            if state_save_callback:
+                state["pending_notifications"] = [p for i, p in enumerate(pending) if i not in processed_indices]
+                try:
+                    state_save_callback(state)
+                except Exception as exc:
+                    print(f"[collector] Error in state save callback: {exc}", file=sys.stderr)
         else:
             attempts = notif.get("attempts", 0) + 1
             notif["attempts"] = attempts
-            if attempts < MAX_NOTIFICATION_RETRIES:
-                backoff = min(300.0, 30.0 * (2 ** (attempts - 1)))
-                notif["next_retry_at"] = now_ts + backoff
-                remaining_pending.append(notif)
-            else:
-                print(f"[collector] Dropping notification {notif.get('id')} after {attempts} failed attempts", file=sys.stderr)
+            # Cap backoff at 300s (5 minutes), but DO NOT permanently discard recovery notice
+            # or unresolved notices; retain until explicit success or coalesced outcome
+            backoff = min(300.0, 30.0 * (2 ** min(attempts - 1, 5)))
+            notif["next_retry_at"] = now_ts + backoff
 
-    if len(remaining_pending) > MAX_PENDING_NOTIFICATIONS:
-        remaining_pending = remaining_pending[-MAX_PENDING_NOTIFICATIONS:]
-    state["pending_notifications"] = remaining_pending
+    state["pending_notifications"] = [p for i, p in enumerate(pending) if i not in processed_indices]
+    if state_save_callback and attempts_this_cycle > 0:
+        try:
+            state_save_callback(state)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -729,6 +757,7 @@ def evaluate_incidents(
     services: Dict[str, Any],
     now_ts: Optional[float] = None,
     smtp_client_factory: Optional[Callable[..., Any]] = None,
+    state_save_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     now = now_ts if now_ts is not None else time.time()
     iso_now = format_iso_utc(now)
@@ -970,12 +999,20 @@ def evaluate_incidents(
 
             t_track["last_sample_ts"] = now
 
+    # Save pending state BEFORE network calls so pending notifications survive crashes/timeouts
+    if state_save_callback:
+        try:
+            state_save_callback(state)
+        except Exception as exc:
+            print(f"[collector] Error saving state before network calls: {exc}", file=sys.stderr)
+
     # Dispatch pending notifications honoring bounded retry & 45s service budget
     process_pending_notifications(
         state=state,
         config=config,
         now_ts=now,
         smtp_client_factory=smtp_client_factory,
+        state_save_callback=state_save_callback,
     )
 
     active_list = list(active_incidents.values())
@@ -993,6 +1030,7 @@ def run_collection_cycle(
     docker_runner: Optional[Callable[..., Any]] = None,
     http_getter: Optional[Callable[..., Any]] = None,
     smtp_client_factory: Optional[Callable[..., Any]] = None,
+    state_save_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     now = now_ts if now_ts is not None else time.time()
     iso_now = format_iso_utc(now)
@@ -1052,6 +1090,7 @@ def run_collection_cycle(
         services=services_section,
         now_ts=now,
         smtp_client_factory=smtp_client_factory,
+        state_save_callback=state_save_callback,
     )
 
     # 5. Sliding Sample History (Bounded to 60 minute samples)
@@ -1140,7 +1179,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     while True:
         state = load_state(state_file)
-        payload = run_collection_cycle(config, state)
+        payload = run_collection_cycle(
+            config,
+            state,
+            state_save_callback=lambda st: save_atomic_json(state_file, st, mode=0o600),
+        )
         save_atomic_json(output_file, payload, mode=0o644)
         save_atomic_json(state_file, state, mode=0o600)
 

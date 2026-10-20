@@ -912,5 +912,163 @@ class HostCollectorTests(unittest.TestCase):
         self.assertEqual(loaded["num"], 42)
 
 
+    # -----------------------------------------------------------------------
+    # 10. Requirement E / msg_e99e5fbbbe49 Review Fixes: Incident Identity,
+    #     Non-discarding Queue, Monotonic Budget & Pre-network Persistence
+    # -----------------------------------------------------------------------
+
+    def test_fail_recover_fail_before_smtp_restored_distinct_incident_identity(self):
+        # Target fails -> recovers -> fails again before SMTP restored:
+        # Notifications MUST be keyed by incident_id + type and delivered without collision.
+        state = collector.load_state(self.state_file)
+        now_ts = 1729438800.0
+
+        def failing_inspect(cmd, timeout):
+            if "rehouse-app-1" in cmd:
+                return 0, json.dumps({"Running": False, "Status": "exited"}), ""
+            return 0, json.dumps({"Running": True, "Status": "running", "Health": {"Status": "healthy"}}), ""
+
+        def healthy_inspect(cmd, timeout):
+            return 0, json.dumps({"Running": True, "Status": "running"}), ""
+
+        def ok_api(url, timeout):
+            return 200, 10.0
+
+        failing_client = FakeSmtpClient("smtp.example.invalid", 587, should_fail=True)
+
+        with patch("sys.stderr", new_callable=io.StringIO):
+            # Phase 1: First failure streak (3 samples) -> Incident 1 opens
+            for i in range(3):
+                collector.run_collection_cycle(
+                    self.config, state, now_ts=now_ts + (i * 60.0),
+                    docker_runner=failing_inspect, http_getter=ok_api,
+                    smtp_client_factory=lambda *a, **kw: failing_client,
+                )
+            self.assertIn("app", state["active_incidents"])
+            inc1_id = state["active_incidents"]["app"]["id"]
+            self.assertEqual(len(state["pending_notifications"]), 1)
+            self.assertEqual(state["pending_notifications"][0]["incident_id"], inc1_id)
+            self.assertEqual(state["pending_notifications"][0]["notification_type"], "new")
+
+            # Phase 2: App recovers -> Incident 1 resolves -> Recovery queued for Incident 1
+            now_ts += 180.0
+            collector.run_collection_cycle(
+                self.config, state, now_ts=now_ts,
+                docker_runner=healthy_inspect, http_getter=ok_api,
+                smtp_client_factory=lambda *a, **kw: failing_client,
+            )
+            self.assertNotIn("app", state["active_incidents"])
+            self.assertEqual(len(state["pending_notifications"]), 2)
+            self.assertEqual(state["pending_notifications"][1]["incident_id"], inc1_id)
+            self.assertEqual(state["pending_notifications"][1]["notification_type"], "recovery")
+
+            # Phase 3: App fails again -> Incident 2 opens with distinct ID!
+            for i in range(1, 4):
+                collector.run_collection_cycle(
+                    self.config, state, now_ts=now_ts + (i * 60.0),
+                    docker_runner=failing_inspect, http_getter=ok_api,
+                    smtp_client_factory=lambda *a, **kw: failing_client,
+                )
+            self.assertIn("app", state["active_incidents"])
+            inc2_id = state["active_incidents"]["app"]["id"]
+            self.assertNotEqual(inc1_id, inc2_id)
+
+            # Queue MUST preserve all 3 distinct notifications without stomping!
+            self.assertEqual(len(state["pending_notifications"]), 3)
+            self.assertEqual(state["pending_notifications"][0]["incident_id"], inc1_id)
+            self.assertEqual(state["pending_notifications"][0]["notification_type"], "new")
+            self.assertEqual(state["pending_notifications"][1]["incident_id"], inc1_id)
+            self.assertEqual(state["pending_notifications"][1]["notification_type"], "recovery")
+            self.assertEqual(state["pending_notifications"][2]["incident_id"], inc2_id)
+            self.assertEqual(state["pending_notifications"][2]["notification_type"], "new")
+
+            # Phase 4: SMTP restored -> delivers in order!
+            healthy_client = FakeSmtpClient("smtp.example.invalid", 587, should_fail=False)
+            now_ts += 600.0
+            collector.run_collection_cycle(
+                self.config, state, now_ts=now_ts,
+                docker_runner=failing_inspect, http_getter=ok_api,
+                smtp_client_factory=lambda *a, **kw: healthy_client,
+            )
+            # All 3 notifications successfully delivered!
+            self.assertEqual(len(healthy_client.sent_messages), 3)
+            self.assertEqual(len(state["pending_notifications"]), 0)
+            # Active incident 2 has last_notified_at set to current delivery time
+            self.assertIsNotNone(state["active_incidents"]["app"]["last_notified_at"])
+
+    def test_recovery_notices_retained_across_high_retry_attempts(self):
+        # Required notices (such as recovery) must NOT be permanently dropped after max retries
+        state = collector.load_state(self.state_file)
+        now_ts = 1729438800.0
+
+        state["pending_notifications"].append({
+            "id": "notif_inc1_recovery",
+            "target": "app",
+            "incident_id": "inc1",
+            "notification_type": "recovery",
+            "attempts": 0,
+            "next_retry_at": now_ts,
+        })
+
+        failing_client = FakeSmtpClient("smtp.example.invalid", 587, should_fail=True)
+
+        with patch("sys.stderr", new_callable=io.StringIO):
+            # Run 8 failed delivery attempts (exceeding 5)
+            for i in range(8):
+                collector.process_pending_notifications(
+                    state, self.config, now_ts=now_ts + (i * 300.0),
+                    smtp_client_factory=lambda *a, **kw: failing_client,
+                )
+
+        # Recovery notice MUST still be retained in queue!
+        self.assertEqual(len(state["pending_notifications"]), 1)
+        self.assertEqual(state["pending_notifications"][0]["attempts"], 8)
+        self.assertEqual(state["pending_notifications"][0]["notification_type"], "recovery")
+
+    def test_state_saved_before_network_calls_and_after_each_delivery(self):
+        # Verifies state_save_callback is invoked BEFORE network calls and AFTER each accepted delivery
+        state = collector.load_state(self.state_file)
+        now_ts = 1729438800.0
+        saved_snapshots: list[dict] = []
+
+        def save_callback(st):
+            saved_snapshots.append(copy.deepcopy(st))
+
+        def failing_inspect(cmd, timeout):
+            if "rehouse-app-1" in cmd:
+                return 0, json.dumps({"Running": False, "Status": "exited"}), ""
+            return 0, json.dumps({"Running": True, "Status": "running", "Health": {"Status": "healthy"}}), ""
+
+        def ok_api(url, timeout):
+            return 200, 10.0
+
+        # Trigger app incident
+        with patch("sys.stderr", new_callable=io.StringIO):
+            for i in range(3):
+                collector.run_collection_cycle(
+                    self.config, state, now_ts=now_ts + (i * 60.0),
+                    docker_runner=failing_inspect, http_getter=ok_api,
+                    state_save_callback=save_callback,
+                )
+
+        # At the 3rd sample, state_save_callback was called BEFORE network delivery
+        # (with notification enqueued in pending_notifications)
+        pre_network_saves = [s for s in saved_snapshots if len(s.get("pending_notifications", [])) > 0]
+        self.assertGreater(len(pre_network_saves), 0)
+
+        # Now test delivery save
+        delivery_saved_snapshots: list[dict] = []
+        healthy_client = FakeSmtpClient("smtp.example.invalid", 587, should_fail=False)
+        collector.process_pending_notifications(
+            state, self.config, now_ts=now_ts + 180.0,
+            smtp_client_factory=lambda *a, **kw: healthy_client,
+            state_save_callback=lambda st: delivery_saved_snapshots.append(copy.deepcopy(st)),
+        )
+        self.assertEqual(len(healthy_client.sent_messages), 1)
+        self.assertGreater(len(delivery_saved_snapshots), 0)
+        # Final snapshot has 0 pending notifications
+        self.assertEqual(len(delivery_saved_snapshots[-1]["pending_notifications"]), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
