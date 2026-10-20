@@ -186,3 +186,18 @@ If a rollback of the application container is required:
 1. Revert container image to the prior stable release tag.
 2. The database schema is additive and non-breaking: newly added tables and columns remain dormant without conflicting with older code versions.
 3. No destructive migration down-scripts should be run against live PostgreSQL during an active incident.
+
+### 5.3 Alert Drill & Verification Procedure
+Operators can verify the full alert pipeline end-to-end without impacting production users:
+1. **Host-to-App Health Probe Drill**:
+   - Inspect `/app/monitoring-host/host-metrics.json` inside the application container:
+     ```bash
+     cat /app/monitoring-host/host-metrics.json | jq .
+     ```
+   - Verify `status` is `"ok"` and `timestamp` is within 60 seconds of host time.
+2. **Alert Dispatch Drill**:
+   - To drill SMTP alerting, configure `MONITORING_ALERT_TO` to a test mailbox.
+   - Inject a synthetic transient incident or temporarily pause a non-critical worker (e.g. `recovery-email`) past its 5m SLA in staging.
+   - Verify an alert email arrives with subject `[CRITICAL]` or `[WARNING]` and formatted HTML incident details.
+   - Verify an incident record is created in `MonitoringIncidents` with `State == 'Active'`.
+   - Resume the worker; verify a follow-up email arrives with subject `[RESOLVED]` and incident state transitions to `Resolved` with `ResolvedAt` recorded.
