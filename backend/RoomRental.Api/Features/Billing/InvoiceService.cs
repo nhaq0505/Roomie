@@ -4,8 +4,10 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class InvoiceService(AppDbContext db)
+public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null)
 {
+    public Task StageZaloReminderAsync(Invoice invoice, CancellationToken ct) => zalo?.StageIssuedAsync(invoice, ct) ?? Task.CompletedTask;
+
     public async Task<(int Created, int Skipped)> GenerateForOwnerAsync(Guid ownerId, string period, CancellationToken cancellationToken = default)
     {
         await using var ownedTransaction = db.Database.CurrentTransaction is null
@@ -41,7 +43,9 @@ public sealed class InvoiceService(AppDbContext db)
                 row.Reading.BillingEndDate is null ||
                 (row.Reading.WaterPerPerson == true && row.Reading.OccupantsCount is null)) continue;
 
-            db.Invoices.Add(CreateMonthlyInvoice(ownerId, row.Room, row.Building, row.Occupancy, row.Reading, InvoiceLifecycleState.Issued));
+            var invoice = CreateMonthlyInvoice(ownerId, row.Room, row.Building, row.Occupancy, row.Reading, InvoiceLifecycleState.Issued);
+            db.Invoices.Add(invoice);
+            await StageZaloReminderAsync(invoice, cancellationToken);
             created++;
         }
 

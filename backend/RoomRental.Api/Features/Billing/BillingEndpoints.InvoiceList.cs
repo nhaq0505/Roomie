@@ -70,7 +70,7 @@ public static partial class BillingEndpoints
         });
 
         routes.MapPost("/rooms/{id:guid}/supplemental-invoices", async (Guid id, SupplementalInvoiceRequest request,
-            HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+            HttpContext context, AppDbContext db, InvoiceService invoiceService, CancellationToken cancellationToken) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             var description = request.Description?.Trim();
@@ -98,6 +98,7 @@ public static partial class BillingEndpoints
                 Total = request.Amount, DueDate = request.DueDate
             };
             db.Invoices.Add(invoice);
+            await invoiceService.StageZaloReminderAsync(invoice, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Results.Created($"/api/invoices/{invoice.Id}", InvoiceService.ToDto(invoice));
@@ -125,7 +126,7 @@ public static partial class BillingEndpoints
             return Results.Ok(InvoiceService.ToDto(invoice, pending, meterPolicy.Allowed, meterPolicy.Reason, tenantToken: token) with { HasMonthlyOverlap = overlap });
         });
 
-        routes.MapPost("/invoices/{id:guid}/publish", async (Guid id, PublishInvoiceRequest request, HttpContext context, AppDbContext db, CancellationToken ct) =>
+        routes.MapPost("/invoices/{id:guid}/publish", async (Guid id, PublishInvoiceRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, CancellationToken ct) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             if (request.RequestId == Guid.Empty || request.ExpectedVersion < 1)
@@ -164,6 +165,7 @@ public static partial class BillingEndpoints
             InvoiceService.RecalculateStatus(invoice);
             var after = SerializeSnapshot(invoice);
             await AddRevisionAsync(db, invoice, request.RequestId, fingerprint, reason, ApiSupport.UserId(context), before, after, ct);
+            await invoiceService.StageZaloReminderAsync(invoice, ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(InvoiceService.ToDto(invoice));

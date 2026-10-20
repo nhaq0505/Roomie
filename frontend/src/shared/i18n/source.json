@@ -1151,5 +1151,6 @@
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.",
   "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.",
   "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.",
-  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng."
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.",
+  "Hóa đơn mới được tự động thêm vào hàng đợi khi phát hành. Nút bên trên dùng để nhắc lại các hóa đơn còn nợ."
 ]

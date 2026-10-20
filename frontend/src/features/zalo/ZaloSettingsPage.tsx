@@ -85,6 +85,7 @@ export default function ZaloSettingsPage() {
       </SectionCard>
     </div>}
     <SectionCard title={t("Hàng đợi nhắc hóa đơn")} extra={<Popconfirm title={t("Thêm các hóa đơn còn nợ vào hàng đợi?")} onConfirm={() => queue.mutate()} okText={t("Thêm vào hàng đợi")} cancelText={t("Hủy")}><Button icon={<MessageOutlined />} disabled={!connected} loading={queue.isPending}>{t("Nhắc hóa đơn còn nợ")}</Button></Popconfirm>}>
+      <Typography.Paragraph type="secondary">{t("Hóa đơn mới được tự động thêm vào hàng đợi khi phát hành. Nút bên trên dùng để nhắc lại các hóa đơn còn nợ.")}</Typography.Paragraph>
       <Typography.Paragraph type="secondary">{t("Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Chỉ gửi đến người thuê đang ở có số di động Việt Nam hợp lệ.")}</Typography.Paragraph>
       {history.isError ? <LoadError error={history.error} onRetry={() => void history.refetch()} /> : <ResponsiveTable<ZaloReminder> rowKey="invoiceId" columns={columns} dataSource={history.data?.items ?? []} loading={history.isPending} locale={{ emptyText: t("Chưa có hóa đơn trong hàng đợi") }} pagination={{ current: page, pageSize: 20, total: history.data?.total ?? 0, onChange: setPage, showSizeChanger: false }} />}
     </SectionCard>

@@ -1151,5 +1151,6 @@
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.": "个人 Zalo 连接使用非官方库，可能中断或受到 Zalo 账号限制。",
   "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Roomie 连接时请勿为同一账号另开 Zalo Web。此处断开会删除 Roomie 保存的会话并关闭计划；您也可在手机上退出 Zalo Web 设备。",
   "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.": "通过您的 Zalo 发送账单信息和付款链接。",
-  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "租客链接已失效，请在房间页面检查或重新生成。"
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "租客链接已失效，请在房间页面检查或重新生成。",
+  "Hóa đơn mới được tự động thêm vào hàng đợi khi phát hành. Nút bên trên dùng để nhắc lại các hóa đơn còn nợ.": "新账单发布时会自动加入队列。使用上方按钮可再次提醒未付账单。"
 }

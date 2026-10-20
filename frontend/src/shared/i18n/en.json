@@ -1151,5 +1151,6 @@
   "Kết nối Zalo cá nhân sử dụng thư viện không chính thức; có thể bị gián đoạn hoặc bị Zalo hạn chế tài khoản.": "Personal Zalo connections use an unofficial library and may be interrupted or restricted by Zalo.",
   "Không mở thêm phiên Zalo Web cho cùng tài khoản khi đang kết nối Roomie. Ngắt kết nối tại đây xóa phiên lưu trên Roomie và tắt lịch; bạn có thể đăng xuất thiết bị Zalo Web trên điện thoại.": "Avoid opening another Zalo Web session for this account while Roomie is connected. Disconnecting here deletes the saved Roomie session and disables scheduling; you can sign out the Zalo Web device on your phone.",
   "Gửi thông tin hóa đơn và link thanh toán từ Zalo của bạn.": "Send invoice details and a payment link from your Zalo.",
-  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "The tenant link is no longer valid. Check or renew it on the rooms page."
+  "Link người thuê không còn hợp lệ. Kiểm tra hoặc cấp lại link trong trang phòng.": "The tenant link is no longer valid. Check or renew it on the rooms page.",
+  "Hóa đơn mới được tự động thêm vào hàng đợi khi phát hành. Nút bên trên dùng để nhắc lại các hóa đơn còn nợ.": "New invoices are queued automatically when issued. Use the button above to remind tenants about outstanding invoices."
 }

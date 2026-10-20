@@ -51,7 +51,7 @@ public static partial class OwnerManagementEndpoints
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, VietnamCalendar.CurrentVietnamPeriod(), ct));
         });
 
-        routes.MapPost("/rooms/{id:guid}/occupancy", async (Guid id, OccupancyRequest request, HttpContext context, AppDbContext db, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
+        routes.MapPost("/rooms/{id:guid}/occupancy", async (Guid id, OccupancyRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, TenantTokenService tokenService, PaymentWebhookService webhookService, CancellationToken cancellationToken) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
@@ -82,9 +82,13 @@ public static partial class OwnerManagementEndpoints
             };
             db.Occupancies.Add(occupancy);
             if (request.DepositAmount > 0)
-                db.Invoices.Add(new Invoice { OwnerId = ownerId, RoomId = room.Id, OccupancyId = occupancy.Id,
+            {
+                var deposit = new Invoice { OwnerId = ownerId, RoomId = room.Id, OccupancyId = occupancy.Id,
                     BuildingId = building.Id, RoomName = room.Name, BuildingName = building.Name, TenantName = occupancy.TenantName,
-                    Period = currentPeriod, Kind = "Deposit", Total = request.DepositAmount, DueDate = today });
+                    Period = currentPeriod, Kind = "Deposit", Total = request.DepositAmount, DueDate = today };
+                db.Invoices.Add(deposit);
+                await invoiceService.StageZaloReminderAsync(deposit, cancellationToken);
+            }
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, currentPeriod, cancellationToken));

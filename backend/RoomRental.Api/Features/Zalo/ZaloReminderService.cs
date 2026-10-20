@@ -34,6 +34,25 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
         return token is not null && TenantTokenService.Hash(token) == occupancy.TenantTokenHash ? token : null;
     }
 
+    // Called only on creation/publication; caller saves queue and invoice in the same transaction.
+    // Never sweep old invoices or requeue an existing reminder automatically.
+    public async Task StageIssuedAsync(Invoice invoice, CancellationToken ct)
+    {
+        if (!gateway.Enabled || invoice.LifecycleState != InvoiceLifecycleState.Issued || invoice.Total <= invoice.Paid) return;
+        var occupancy = db.Occupancies.Local.SingleOrDefault(x => x.Id == invoice.OccupancyId)
+            ?? await db.Occupancies.AsNoTracking().SingleOrDefaultAsync(x => x.Id == invoice.OccupancyId, ct);
+        if (occupancy is null || !occupancy.IsActive || NormalizePhone(occupancy.Phone) is null || ValidToken(occupancy) is null) return;
+        if (!await db.Users.AnyAsync(x => x.Id == invoice.OwnerId && x.Role == UserRole.Owner && x.Status == OwnerStatus.Approved, ct) ||
+            !await tokens.CanShareAsync(invoice.OwnerId, payments, ct)) return;
+        if (db.ZaloReminders.Local.Any(x => x.InvoiceId == invoice.Id) ||
+            await db.ZaloReminders.AnyAsync(x => x.InvoiceId == invoice.Id, ct)) return;
+        if (!db.ZaloSettings.Local.Any(x => x.OwnerId == invoice.OwnerId) &&
+            !await db.ZaloSettings.AnyAsync(x => x.OwnerId == invoice.OwnerId, ct))
+            db.ZaloSettings.Add(new() { OwnerId = invoice.OwnerId });
+        db.ZaloReminders.Add(new() { InvoiceId = invoice.Id, OwnerId = invoice.OwnerId,
+            QueuedAtMs = clock.GetUtcNow().ToUnixTimeMilliseconds() });
+    }
+
     public async Task<int> QueueScheduledAsync(Guid ownerId, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);

@@ -180,6 +180,67 @@ await db.Users.Where(x => x.Id == owner.Id).ExecuteUpdateAsync(s => s.SetPropert
 try { await service.QueueAsync(owner.Id, default); throw new Exception("payment sharing guard missing"); }
 catch (ApiException) { Assert(true, "existing tenant-link payment setup rule remains enforced"); }
 
+// Automatic enqueue is part of the billing transaction, without contacting Zalo.
+db.ChangeTracker.Clear();
+await db.Users.Where(x => x.Id == owner.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.ManualBankBin, "970436"));
+await db.ZaloReminders.ExecuteDeleteAsync(); await db.ZaloSettings.ExecuteDeleteAsync();
+db.ChangeTracker.Clear();
+var autoBilling = new InvoiceService(db, service);
+var oldUnsent = AddInvoice("Older invoice", owner.Id); await db.SaveChangesAsync();
+var autoInvoice = AddInvoice("Automatic", owner.Id);
+gateway.Connection = "Disconnected";
+var sendsBeforeAuto = gateway.Sends.Count;
+await autoBilling.StageZaloReminderAsync(autoInvoice, default);
+await autoBilling.StageZaloReminderAsync(autoInvoice, default);
+await db.SaveChangesAsync();
+Assert(await db.ZaloReminders.CountAsync() == 1 && await db.ZaloSettings.CountAsync() == 1, "first issued invoice creates queue and owner lease without Zalo bank configuration");
+Assert(gateway.Sends.Count == sendsBeforeAuto && (await db.ZaloReminders.SingleAsync()).Status == "Pending", "invoice creation queues while disconnected without sending synchronously");
+Assert(!await db.ZaloReminders.AnyAsync(x => x.InvoiceId == oldUnsent.Id), "new-invoice event never sweeps historical invoices");
+var existingAuto = await db.ZaloReminders.SingleAsync(); existingAuto.Status = "Unknown"; await db.SaveChangesAsync();
+clock.Advance(TimeSpan.FromDays(2));
+await autoBilling.StageZaloReminderAsync(autoInvoice, default); await db.SaveChangesAsync();
+Assert(await db.ZaloReminders.CountAsync() == 1 && existingAuto.Status == "Unknown", "replayed creation never retries an existing unknown reminder even after cooldown");
+var draftAuto = AddInvoice("DraftAuto", owner.Id, draft: true);
+await autoBilling.StageZaloReminderAsync(draftAuto, default); await db.SaveChangesAsync();
+Assert(!await db.ZaloReminders.AnyAsync(x => x.InvoiceId == draftAuto.Id), "draft is not automatically queued");
+draftAuto.LifecycleState = InvoiceLifecycleState.Issued;
+await autoBilling.StageZaloReminderAsync(draftAuto, default); await db.SaveChangesAsync();
+Assert(await db.ZaloReminders.AnyAsync(x => x.InvoiceId == draftAuto.Id), "publishing a draft queues its first reminder");
+var excludedAuto = new[] { AddInvoice("BadPhoneAuto", owner.Id, phone: "invalid"), AddInvoice("PaidAuto", owner.Id, paid: 100000), AddInvoice("InactiveAuto", owner.Id, active: false), AddInvoice("NoTokenAuto", owner.Id) };
+db.Occupancies.Local.Single(x => x.Id == excludedAuto[3].OccupancyId).ProtectedTenantToken = null;
+foreach (var candidate in excludedAuto) await autoBilling.StageZaloReminderAsync(candidate, default);
+await db.SaveChangesAsync();
+Assert(await db.ZaloReminders.CountAsync() == 2, "automatic enqueue excludes invalid phone, paid, inactive and missing tenant link");
+gateway.Enabled = false;
+var disabledAuto = AddInvoice("DisabledAuto", owner.Id);
+await autoBilling.StageZaloReminderAsync(disabledAuto, default); await db.SaveChangesAsync();
+Assert(!await db.ZaloReminders.AnyAsync(x => x.InvoiceId == disabledAuto.Id), "disabled gateway leaves billing operational without automatic queue");
+gateway.Enabled = true;
+Guid rolledBackId;
+await using (var tx = await db.Database.BeginTransactionAsync())
+{
+    var rollbackInvoice = AddInvoice("RollbackAuto", owner.Id); rolledBackId = rollbackInvoice.Id;
+    await autoBilling.StageZaloReminderAsync(rollbackInvoice, default); await db.SaveChangesAsync();
+    Assert(await db.ZaloReminders.AnyAsync(x => x.InvoiceId == rolledBackId), "queue is written within invoice transaction");
+    await tx.RollbackAsync();
+}
+db.ChangeTracker.Clear();
+Assert(!await db.Invoices.AnyAsync(x => x.Id == rolledBackId) && !await db.ZaloReminders.AnyAsync(x => x.InvoiceId == rolledBackId), "rollback removes both invoice and automatic reminder");
+// Exercise the real monthly generation path rather than just its staging helper.
+var autoBuilding = new Building { OwnerId = owner.Id, Name = "Auto fixture" };
+var autoRoom = new Room { BuildingId = autoBuilding.Id, Name = "Auto monthly" };
+var autoToken = tokens.Create();
+var autoOccupancy = new Occupancy { RoomId = autoRoom.Id, TenantName = "Fixture", Phone = "0912345678", StartDate = new(2026, 1, 1), TenantTokenHash = autoToken.Hash, ProtectedTenantToken = autoToken.ProtectedToken };
+db.Buildings.Add(autoBuilding); db.Rooms.Add(autoRoom); db.Occupancies.Add(autoOccupancy);
+db.Readings.Add(new() { RoomId = autoRoom.Id, OccupancyId = autoOccupancy.Id, Period = "2026-11", CurrentReading = 10, Consumption = 10,
+    MonthlyRentRate = 100000, ElectricityRate = 1000, WaterRate = 0, WaterPerPerson = false, ServiceRate = 0,
+    BillingStartDate = new(2026, 11, 1), BillingEndDate = new(2026, 11, 30), BillableDays = 30, MonthDays = 30 });
+await db.SaveChangesAsync();
+var generatedAuto = await autoBilling.GenerateForOwnerAsync(owner.Id, "2026-11");
+var monthlyAuto = await db.Invoices.SingleAsync(x => x.OccupancyId == autoOccupancy.Id);
+Assert(generatedAuto.Created == 1 && await db.ZaloReminders.AnyAsync(x => x.InvoiceId == monthlyAuto.Id), "monthly billing automatically commits its reminder");
+Assert((await autoBilling.GenerateForOwnerAsync(owner.Id, "2026-11")).Created == 0 && await db.ZaloReminders.CountAsync(x => x.InvoiceId == monthlyAuto.Id) == 1, "repeated monthly billing does not duplicate reminder");
+
 // Both generated migration sets must build and SQLite migration must preserve existing business data.
 var migratedPath = Path.Combine(Path.GetTempPath(), $"roomie-zalo-migration-{Guid.NewGuid():N}.db");
 try
@@ -204,7 +265,7 @@ sealed class FakeClock(DateTimeOffset initial) : TimeProvider
 }
 sealed class FakeGateway : IZaloGateway
 {
-    public bool Enabled => true;
+    public bool Enabled { get; set; } = true;
     public string Connection = "Connected";
     public string Result = "Sent";
     public bool ThrowOnSend;

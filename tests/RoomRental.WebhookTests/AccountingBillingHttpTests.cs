@@ -29,12 +29,48 @@ internal static class AccountingBillingHttpTests
 
     public static async Task RunAsync()
     {
+        await AutomaticZaloQueueAsync();
         await MeterReadingAntiRegressionAsync();
         await AutomaticMonthlyInvoiceCalculationAsync();
         await SupplementalInvoiceCreationAsync();
         await InvoiceCorrectionAndAuditRevisionsAsync();
         await CashReceiptIdempotencyAndOverpaymentAsync();
         await ClosedXmlExcelReportExportAsync();
+    }
+
+    private static async Task AutomaticZaloQueueAsync()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
+        await using var app = CreateTestApp(connection, autoZalo: true); await app.StartAsync();
+        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
+        var (roomId, occupancyId) = await SetupRoomAndOccupancyAsync(client, "Auto Zalo", "Auto 101", 100000, 1000, 0, false, 0, 0);
+        var reading = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-08", 10));
+        Assert(reading.StatusCode == HttpStatusCode.Created, "auto-Zalo reading endpoint still creates invoice while gateway disconnected");
+        var requestId = Guid.NewGuid();
+        var body = new SupplementalInvoiceRequest(requestId, occupancyId, "Auto charge", 1000, new DateOnly(2026, 10, 30));
+        Assert((await client.PostAsJsonAsync($"/api/rooms/{roomId}/supplemental-invoices", body)).StatusCode == HttpStatusCode.Created, "supplemental endpoint creates invoice with automatic queue");
+        await client.PostAsJsonAsync($"/api/rooms/{roomId}/supplemental-invoices", body);
+        Guid draftId;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert(await db.ZaloReminders.CountAsync() == 2 && await db.ZaloReminders.CountAsync(x => x.InvoiceId == requestId) == 1,
+                "HTTP monthly and supplemental creation queue once despite replay");
+            var room = await db.Rooms.SingleAsync(x => x.Id == roomId);
+            var draft = new Invoice { OwnerId = OwnerId, BuildingId = room.BuildingId, RoomId = roomId, OccupancyId = occupancyId,
+                RoomName = "Auto 101", BuildingName = "Auto Zalo", TenantName = "Fixture", Period = "2026-09", LifecycleState = InvoiceLifecycleState.Draft };
+            draftId = draft.Id; db.Invoices.Add(draft); await db.SaveChangesAsync();
+            Assert(!await db.ZaloReminders.AnyAsync(x => x.InvoiceId == draftId), "unpublished HTTP fixture draft has no reminder");
+        }
+        var publish = new PublishInvoiceRequest(Guid.NewGuid(), 1, 100000, 1000, 0, 0);
+        Assert((await client.PostAsJsonAsync($"/api/invoices/{draftId}/publish", publish)).StatusCode == HttpStatusCode.OK, "publish endpoint queues draft on publication");
+        await client.PostAsJsonAsync($"/api/invoices/{draftId}/publish", publish);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert(await db.ZaloReminders.CountAsync(x => x.InvoiceId == draftId) == 1 && await db.ZaloReminders.AllAsync(x => x.Status == "Pending"),
+                "publication replay leaves one pending reminder without provider calls");
+        }
     }
 
     private static async Task MeterReadingAntiRegressionAsync()
@@ -427,7 +463,14 @@ internal static class AccountingBillingHttpTests
         return (roomId, occupancyId);
     }
 
-    private static WebApplication CreateTestApp(SqliteConnection connection)
+    private sealed class QueueOnlyGateway : IZaloGateway
+    {
+        public bool Enabled => true;
+        public Task<ZaloConnection> ConnectionAsync(Guid ownerId, string action, CancellationToken ct) => Task.FromResult(new ZaloConnection("Disconnected"));
+        public Task<ZaloSendResult> SendAsync(Guid ownerId, ZaloSendRequest request, CancellationToken ct) => throw new Exception("No provider calls in automatic enqueue tests");
+    }
+
+    private static WebApplication CreateTestApp(SqliteConnection connection, bool autoZalo = false)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -443,6 +486,11 @@ internal static class AccountingBillingHttpTests
         var dataProtection = new EphemeralDataProtectionProvider();
         builder.Services.AddSingleton<IDataProtectionProvider>(dataProtection);
         builder.Services.AddSingleton<TenantTokenService>();
+        if (autoZalo)
+        {
+            builder.Services.AddSingleton<IZaloGateway, QueueOnlyGateway>();
+            builder.Services.AddScoped<ZaloReminderService>();
+        }
         builder.Services.AddScoped<InvoiceService>();
         builder.Services.AddScoped<ManualReceiptService>();
         builder.Services.AddScoped<PayOsService>();
@@ -461,7 +509,7 @@ internal static class AccountingBillingHttpTests
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.Database.EnsureCreated();
-            db.Users.Add(new AppUser { Id = OwnerId, Name = "Owner", Email = "owner@accounting.invalid", PasswordHash = "unused", Role = UserRole.Owner, SubscriptionTier = SubscriptionTier.Pro });
+            db.Users.Add(new AppUser { Id = OwnerId, Name = "Owner", Email = "owner@accounting.invalid", PasswordHash = "unused", Role = UserRole.Owner, Status = OwnerStatus.Approved, SubscriptionTier = SubscriptionTier.Pro });
             db.SaveChanges();
         }
 
