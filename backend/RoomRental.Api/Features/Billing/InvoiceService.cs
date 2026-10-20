@@ -65,7 +65,7 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
                     {
                         OwnerId = ownerId,
                         EventType = "InvoiceIssued",
-                        TargetId = inv.Id.ToString(),
+                        TargetId = $"{inv.Id}:{actor}",
                         OccurredAt = inv.IssuedAt,
                         Status = "Pending"
                     });

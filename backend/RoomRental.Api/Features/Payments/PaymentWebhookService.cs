@@ -147,7 +147,7 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
         {
             OwnerId = attempt.OwnerId,
             EventType = "SubscriptionPaid",
-            TargetId = trackedAttempt.OrderCode.ToString(),
+            TargetId = $"{trackedAttempt.OrderCode}:System",
             OccurredAt = trackedAttempt.PaidAt.Value,
             Status = "Pending"
         };
@@ -161,9 +161,13 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
             try
             {
                 await milestoneTracker.TrackSubscriptionPaidAsync(attempt.OwnerId, trackedAttempt.OrderCode, (int)amount, ActorType.System, trackedAttempt.PaidAt, cancellationToken);
-                outbox.Status = "Completed";
-                outbox.ProcessedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
+                var milestoneRecorded = await db.OwnerMilestones.AnyAsync(m => m.OwnerId == attempt.OwnerId && m.FirstPaidAt != null, cancellationToken);
+                if (milestoneRecorded)
+                {
+                    outbox.Status = "Completed";
+                    outbox.ProcessedAt = DateTimeOffset.UtcNow;
+                    await db.SaveChangesAsync(cancellationToken);
+                }
             }
             catch
             {

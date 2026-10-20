@@ -183,7 +183,7 @@ public static partial class BillingEndpoints
             {
                 OwnerId = ownerId,
                 EventType = "InvoiceIssued",
-                TargetId = invoice.Id.ToString(),
+                TargetId = $"{invoice.Id}:Owner",
                 OccurredAt = now,
                 Status = "Pending"
             };
@@ -195,9 +195,13 @@ public static partial class BillingEndpoints
                 try
                 {
                     await milestoneTracker.TrackInvoiceIssuedAsync(ownerId, invoice.Id, invoice.Kind, ActorType.Owner, now, ct);
-                    outbox.Status = "Completed";
-                    outbox.ProcessedAt = DateTimeOffset.UtcNow;
-                    await db.SaveChangesAsync(ct);
+                    var milestoneRecorded = await db.OwnerMilestones.AnyAsync(m => m.OwnerId == ownerId && m.ActivatedAt != null, ct);
+                    if (milestoneRecorded)
+                    {
+                        outbox.Status = "Completed";
+                        outbox.ProcessedAt = DateTimeOffset.UtcNow;
+                        await db.SaveChangesAsync(ct);
+                    }
                 }
                 catch { /* Telemetry failure must not block product; outbox remains Pending */ }
             }

@@ -33,6 +33,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         Console.WriteLine("\n=== RUNNING TASK T4B METRIC ACCURACY & OUTBOX REGRESSION TESTS ===");
         await TestSubscriptionPayment_FailFirst_Replay_Reconcile_Restart_Async();
         await TestInvoiceIssuance_Publish_And_ReadingsRollbackWithProductWrites_Async();
+        await TestOutboxAck_VerifiedSuccessOnly_SanitizedError_SystemActor_Async();
         await TestBoundaryCaps_Exceeding50k_FilteredOwnerBeyond50k_Daily_Retention_Funnel_Revenue_CAC_Async();
         Console.WriteLine("=== ALL TASK T4B METRIC ACCURACY & OUTBOX REGRESSION TESTS PASSED ===\n");
     }
@@ -471,6 +472,233 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         var mAfterRollback = await db.OwnerMilestones.SingleAsync(m => m.OwnerId == ownerRollbackId);
         Assert(mAfterRollback.ActivatedAt == null,
             "Rollback after meaningful writes leaves ActivatedAt null (NO fake rollback milestone)");
+    }
+
+    private static async Task TestOutboxAck_VerifiedSuccessOnly_SanitizedError_SystemActor_Async()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var _ = connection;
+        await using var __ = db;
+
+        var clock = TimeProvider.System;
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+        var serviceScopeFactory = new TestScopeFactory(db);
+        var realTracker = new OwnerMilestoneTracker(db, clock, serviceScopeFactory);
+
+        // 1. DRAFT EDIT REVISION VS PUBLISH REVISION TEST
+        // An owner creates a draft 20 days ago, edits it 15 days ago, and publishes it 2 days ago.
+        var ownerDraftId = Guid.NewGuid();
+        var userDraft = new AppUser
+        {
+            Id = ownerDraftId,
+            Email = "draft.publish.owner@example.test",
+            Name = "Draft Publish Owner",
+            PasswordHash = "fixture",
+            Role = UserRole.Owner,
+            Status = OwnerStatus.Approved,
+            CreatedAt = now.AddDays(-25)
+        };
+        var milestoneDraft = new OwnerMilestone
+        {
+            OwnerId = ownerDraftId,
+            RegisteredAt = now.AddDays(-25),
+            ActivatedAt = null
+        };
+        db.Users.Add(userDraft);
+        db.OwnerMilestones.Add(milestoneDraft);
+
+        var draftInvoice = new Invoice
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerDraftId,
+            OccupancyId = Guid.NewGuid(),
+            RoomName = "P101",
+            BuildingName = "B1",
+            TenantName = "Tenant",
+            Period = "2026-09",
+            Kind = "Monthly",
+            LifecycleState = InvoiceLifecycleState.Issued, // currently Issued
+            IssuedAt = now.AddDays(-2) // true issuance at publish time
+        };
+        db.Invoices.Add(draftInvoice);
+
+        // Draft edit revision (created 15 days ago - BEFORE issuance!)
+        var draftEditRevision = new InvoiceRevision
+        {
+            InvoiceId = draftInvoice.Id,
+            Revision = 1,
+            RequestId = Guid.NewGuid(),
+            RequestFingerprint = "fp-edit",
+            Reason = "Owner edited meter readings in draft mode.",
+            ActorId = ownerDraftId,
+            ActorName = userDraft.Name,
+            CreatedAt = now.AddDays(-15),
+            Version = 1,
+            BeforeJson = "{}",
+            AfterJson = "{}"
+        };
+        // True publish revision (created 2 days ago - at publish time!)
+        var publishTime = now.AddDays(-2);
+        var publishRevision = new InvoiceRevision
+        {
+            InvoiceId = draftInvoice.Id,
+            Revision = 2,
+            RequestId = Guid.NewGuid(),
+            RequestFingerprint = "fp-publish",
+            Reason = "Owner published the partial-month draft.",
+            ActorId = ownerDraftId,
+            ActorName = userDraft.Name,
+            CreatedAt = publishTime,
+            Version = 2,
+            BeforeJson = "{}",
+            AfterJson = "{}"
+        };
+        db.InvoiceRevisions.Add(draftEditRevision);
+        db.InvoiceRevisions.Add(publishRevision);
+        await db.SaveChangesAsync();
+
+        // Run repair: must match publishRevision (2 days ago), NOT draftEditRevision (15 days ago) or draft creation (20 days ago)
+        await realTracker.EnsureInvoiceIssuedMilestoneAsync(ownerDraftId, default);
+        var repairedDraftMilestone = await db.OwnerMilestones.SingleAsync(m => m.OwnerId == ownerDraftId);
+        Assert(repairedDraftMilestone.ActivatedAt.HasValue, "EnsureInvoiceIssuedMilestoneAsync sets ActivatedAt");
+        Assert(Math.Abs((repairedDraftMilestone.ActivatedAt!.Value - publishTime).TotalMilliseconds) < 1,
+            "EnsureInvoiceIssuedMilestoneAsync uses true publish revision time, ignoring draft edit revision!");
+
+        // 2. OUTBOX DURABLE ACK ONLY ON VERIFIED MILESTONE SUCCESS & SANITIZED ERROR
+        var ownerOutboxId = Guid.NewGuid();
+        var userOutbox = new AppUser
+        {
+            Id = ownerOutboxId,
+            Email = "outbox.fail@example.test",
+            Name = "Outbox Fail Owner",
+            PasswordHash = "fixture",
+            Role = UserRole.Owner,
+            Status = OwnerStatus.Approved,
+            CreatedAt = now.AddDays(-10)
+        };
+        db.Users.Add(userOutbox);
+
+        var pendingDraftInvoice = new Invoice
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerOutboxId,
+            OccupancyId = Guid.NewGuid(),
+            RoomName = "P101",
+            BuildingName = "B1",
+            TenantName = "Tenant",
+            Period = "2026-10",
+            Kind = "Monthly",
+            LifecycleState = InvoiceLifecycleState.Draft, // In draft state: cannot be verified as issued milestone
+            IssuedAt = now
+        };
+        db.Invoices.Add(pendingDraftInvoice);
+
+        // Outbox event referencing draft invoice where milestone cannot be recorded yet
+        var outboxPending = new MilestoneOutboxEvent
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerOutboxId,
+            EventType = "InvoiceIssued",
+            TargetId = $"{pendingDraftInvoice.Id}:System",
+            OccurredAt = now,
+            Status = "Pending"
+        };
+        db.MilestoneOutboxEvents.Add(outboxPending);
+        await db.SaveChangesAsync();
+
+        var customService = new OwnerMilestoneTracker(db, clock, serviceScopeFactory);
+
+        // Processing outbox when milestone does NOT record must NOT mark it Completed!
+        await customService.ProcessPendingOutboxEventsAsync(default);
+        var outboxAfterAttempt = await db.MilestoneOutboxEvents.SingleAsync(e => e.Id == outboxPending.Id);
+        Assert(outboxAfterAttempt.Status == "Pending",
+            "Outbox processing keeps Status == 'Pending' when milestone verification fails (never unconditional Completed!)");
+        Assert(outboxAfterAttempt.RetryCount >= 1, "RetryCount incremented upon verification failure");
+        Assert(outboxAfterAttempt.LastError == "ERR_MILESTONE_NOT_RECORDED", "Outbox LastError set to ERR_MILESTONE_NOT_RECORDED");
+        if (outboxAfterAttempt.LastError != null)
+        {
+            Assert(!outboxAfterAttempt.LastError.Contains("SELECT") && !outboxAfterAttempt.LastError.Contains("password") && !outboxAfterAttempt.LastError.Contains("@"),
+                "Outbox LastError contains sanitized error code without PII or raw SQL");
+        }
+
+        // Now issue the invoice and re-process: verification succeeds and outbox transitions to Completed!
+        pendingDraftInvoice.LifecycleState = InvoiceLifecycleState.Issued;
+        pendingDraftInvoice.IssuedAt = now;
+        await db.SaveChangesAsync();
+
+        await customService.ProcessPendingOutboxEventsAsync(default);
+        var outboxSuccess = await db.MilestoneOutboxEvents.SingleAsync(e => e.Id == outboxPending.Id);
+        Assert(outboxSuccess.Status == "Completed", "Outbox transitions to Completed once milestone verification succeeds in DB");
+        Assert(outboxSuccess.ProcessedAt.HasValue, "ProcessedAt recorded upon durable verification");
+
+        // 3. SYSTEM ACTOR INTEGRITY (ZERO FALSE WAU/MAU OWNER ACTIONS)
+        var ownerSystemId = Guid.NewGuid();
+        var userSystem = new AppUser
+        {
+            Id = ownerSystemId,
+            Email = "system.sweep@example.test",
+            Name = "System Sweep Owner",
+            PasswordHash = "fixture",
+            Role = UserRole.Owner,
+            Status = OwnerStatus.Approved,
+            CreatedAt = now.AddDays(-10)
+        };
+        var milestoneSystem = new OwnerMilestone
+        {
+            OwnerId = ownerSystemId,
+            RegisteredAt = now.AddDays(-10),
+            ActivatedAt = null
+        };
+        db.Users.Add(userSystem);
+        db.OwnerMilestones.Add(milestoneSystem);
+
+        var systemInvoice = new Invoice
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerSystemId,
+            OccupancyId = Guid.NewGuid(),
+            RoomName = "P101",
+            BuildingName = "B1",
+            TenantName = "Tenant",
+            Period = "2026-11",
+            Kind = "Monthly",
+            LifecycleState = InvoiceLifecycleState.Issued,
+            IssuedAt = now
+        };
+        db.Invoices.Add(systemInvoice);
+
+        // Outbox event generated by automated system sweep
+        var systemOutbox = new MilestoneOutboxEvent
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = ownerSystemId,
+            EventType = "InvoiceIssued",
+            TargetId = $"{systemInvoice.Id}:System", // actor is explicitly System!
+            OccurredAt = now,
+            Status = "Pending"
+        };
+        db.MilestoneOutboxEvents.Add(systemOutbox);
+        await db.SaveChangesAsync();
+
+        // Process the system outbox event
+        await customService.ProcessPendingOutboxEventsAsync(default);
+
+        var outboxProcessed = await db.MilestoneOutboxEvents.SingleAsync(e => e.Id == systemOutbox.Id);
+        Assert(outboxProcessed.Status == "Completed", "System invoice outbox processed to Completed");
+
+        var milestoneAfterSystem = await db.OwnerMilestones.SingleAsync(m => m.OwnerId == ownerSystemId);
+        Assert(milestoneAfterSystem.ActivatedAt.HasValue, "Milestone ActivatedAt is populated by system sweep");
+
+        // Verify OwnerDailyActivity: System action MUST NOT increment OwnerActionCount or set HasOwnerAction!
+        var activity = await db.OwnerDailyActivities.SingleOrDefaultAsync(a => a.OwnerId == ownerSystemId && a.ActivityDate == today);
+        Assert(activity != null, "OwnerDailyActivity record created for today");
+        Assert(activity!.OwnerActionCount == 0,
+            "System invoice sweep produces OwnerActionCount == 0 (zero false WAU/MAU owner activity!)");
+        Assert(activity.HasOwnerAction == false,
+            "System invoice sweep produces HasOwnerAction == false");
+        Assert(activity.SystemActionCount == 1,
+            "System invoice sweep correctly increments SystemActionCount == 1");
     }
 
     private static async Task TestBoundaryCaps_Exceeding50k_FilteredOwnerBeyond50k_Daily_Retention_Funnel_Revenue_CAC_Async()

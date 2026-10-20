@@ -689,13 +689,19 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
 
             if (earliestInvoice is not null)
             {
+                // Must filter for genuine publish transition, avoiding draft edit revisions created before issuance
                 var publishRevision = await db.InvoiceRevisions.AsNoTracking()
-                    .Where(r => r.InvoiceId == earliestInvoice.Id)
+                    .Where(r => r.InvoiceId == earliestInvoice.Id && EF.Functions.Like(r.Reason, "%publish%"))
                     .OrderBy(r => r.CreatedAt)
                     .FirstOrDefaultAsync(ct);
 
+                // Provable actor: Owner only if provable owner publish revision exists, otherwise System
+                var actor = (publishRevision != null && publishRevision.ActorId == ownerId)
+                    ? ActorType.Owner
+                    : ActorType.System;
+
                 var transitionTime = publishRevision?.CreatedAt ?? earliestInvoice.IssuedAt;
-                await TrackInvoiceIssuedAsync(ownerId, earliestInvoice.Id, earliestInvoice.Kind, ActorType.Owner, transitionTime, ct);
+                await TrackInvoiceIssuedAsync(ownerId, earliestInvoice.Id, earliestInvoice.Kind, actor, transitionTime, ct);
             }
         }
         catch
@@ -703,6 +709,15 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
             // Milestone repair must not crash callers
         }
     }
+
+    private static string SanitizeErrorCode(Exception ex) => ex switch
+    {
+        DbUpdateConcurrencyException => "ERR_CONCURRENCY_CONFLICT",
+        DbUpdateException => "ERR_DB_UPDATE",
+        TimeoutException or OperationCanceledException => "ERR_TIMEOUT",
+        InvalidOperationException => "ERR_INVALID_OP",
+        _ => "ERR_TELEMETRY_FAILED"
+    };
 
     public async Task<int> ProcessPendingOutboxEventsAsync(CancellationToken ct = default)
     {
@@ -726,33 +741,59 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
             {
                 try
                 {
+                    var milestoneRecorded = false;
                     if (ev.EventType == "SubscriptionPaid")
                     {
-                        if (long.TryParse(ev.TargetId, out var orderCode))
+                        var parts = ev.TargetId?.Split(':') ?? [];
+                        var codeStr = parts.Length > 0 ? parts[0] : ev.TargetId;
+                        if (long.TryParse(codeStr, out var orderCode))
                         {
-                            await TrackSubscriptionPaidAsync(ev.OwnerId, orderCode, 0, ActorType.System, ev.OccurredAt, ct);
+                            var actor = parts.Length > 1 && Enum.TryParse<ActorType>(parts[1], out var parsedActor) ? parsedActor : ActorType.System;
+                            await TrackSubscriptionPaidAsync(ev.OwnerId, orderCode, 0, actor, ev.OccurredAt, ct);
                         }
+
+                        // Authoritative durable verification: milestone must actually be persisted in DB
+                        milestoneRecorded = await db.OwnerMilestones.AnyAsync(
+                            m => m.OwnerId == ev.OwnerId && m.FirstPaidAt != null, ct);
                     }
                     else if (ev.EventType == "InvoiceIssued")
                     {
-                        if (Guid.TryParse(ev.TargetId, out var invoiceId))
+                        var parts = ev.TargetId?.Split(':') ?? [];
+                        var idStr = parts.Length > 0 ? parts[0] : ev.TargetId;
+                        if (Guid.TryParse(idStr, out var invoiceId))
                         {
                             var invoice = await db.Invoices.AsNoTracking().SingleOrDefaultAsync(i => i.Id == invoiceId, ct);
                             if (invoice != null && string.Equals(invoice.Kind, "Monthly", StringComparison.OrdinalIgnoreCase) && invoice.LifecycleState == InvoiceLifecycleState.Issued)
                             {
-                                await TrackInvoiceIssuedAsync(ev.OwnerId, invoice.Id, invoice.Kind, ActorType.Owner, ev.OccurredAt, ct);
+                                var actor = parts.Length > 1 && Enum.TryParse<ActorType>(parts[1], out var parsedActor) ? parsedActor : ActorType.System;
+                                await TrackInvoiceIssuedAsync(ev.OwnerId, invoice.Id, invoice.Kind, actor, ev.OccurredAt, ct);
                             }
                         }
+
+                        // Authoritative durable verification: milestone must actually be persisted in DB
+                        milestoneRecorded = await db.OwnerMilestones.AnyAsync(
+                            m => m.OwnerId == ev.OwnerId && m.ActivatedAt != null, ct);
                     }
 
-                    ev.Status = "Completed";
-                    ev.ProcessedAt = now;
-                    processed++;
+                    if (milestoneRecorded)
+                    {
+                        ev.Status = "Completed";
+                        ev.ProcessedAt = now;
+                        ev.LastError = null;
+                        processed++;
+                    }
+                    else
+                    {
+                        ev.RetryCount++;
+                        ev.LastError = "ERR_MILESTONE_NOT_RECORDED";
+                        if (ev.RetryCount >= 10)
+                            ev.Status = "Failed";
+                    }
                 }
                 catch (Exception ex)
                 {
                     ev.RetryCount++;
-                    ev.LastError = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
+                    ev.LastError = SanitizeErrorCode(ex);
                     if (ev.RetryCount >= 10)
                         ev.Status = "Failed";
                 }
