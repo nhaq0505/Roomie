@@ -65,8 +65,8 @@ public sealed record MonitoringFilterRequest(
 
 // Admin Growth Tab DTOs
 public sealed record GrowthSummaryDto(
-    int TotalSessions,
-    int UniqueVisitors,
+    int? TotalSessions,
+    int? UniqueVisitors,
     int Registrations,
     int ActivatedOwners,
     int CurrentWau,
@@ -76,7 +76,7 @@ public sealed record GrowthSummaryDto(
 public sealed record TrafficSourceStatsDto(
     string Source,
     string? Medium,
-    int Sessions,
+    int? Sessions,
     int Registrations,
     int ActivatedOwners
 );
@@ -102,7 +102,7 @@ public sealed record CohortMaturityDto(
 
 public sealed record DailyGrowthPointDto(
     DateOnly Date,
-    int Sessions,
+    int? Sessions,
     int Registrations,
     int Activations,
     int ActiveOwners
@@ -112,7 +112,8 @@ public sealed record RegistrationFunnelDto(
     int StartedCount,
     int CodeResentCount,
     int VerifiedCount,
-    int BypassedCount
+    int BypassedCount,
+    int UnknownAttemptCount = 0
 );
 
 public sealed record AdminMonitoringGrowthResponse(

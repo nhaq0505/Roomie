@@ -306,14 +306,29 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
             await using var context = GetDbContext();
             var db = context.Db;
             var now = _clock.GetUtcNow();
+            var startedFact = await db.RegistrationFacts
+                .FirstOrDefaultAsync(x => x.RegistrationAttemptId == attemptId && x.Stage == "Started", ct);
+
             var fact = new RegistrationLifecycleFact
             {
                 RegistrationAttemptId = attemptId,
                 OwnerId = ownerId,
                 Stage = stage,
                 VerificationMethod = stage == "Bypassed" ? "Bypass" : "Code",
+                BrowserId = startedFact?.BrowserId,
+                UtmSource = startedFact?.UtmSource,
+                UtmMedium = startedFact?.UtmMedium,
+                UtmCampaign = startedFact?.UtmCampaign,
+                UtmContent = startedFact?.UtmContent,
+                UtmTerm = startedFact?.UtmTerm,
+                LandingPage = startedFact?.LandingPage,
+                ReferrerPath = startedFact?.ReferrerPath,
                 OccurredAt = now
             };
+            if (startedFact != null && startedFact.OwnerId == null)
+            {
+                startedFact.OwnerId = ownerId;
+            }
             db.RegistrationFacts.Add(fact);
             await db.SaveChangesAsync(ct);
         }
@@ -332,11 +347,23 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
             await using var context = GetDbContext();
             var db = context.Db;
             var now = _clock.GetUtcNow();
+            var startedFact = await db.RegistrationFacts
+                .FirstOrDefaultAsync(x => x.RegistrationAttemptId == attemptId && x.Stage == "Started", ct);
+
             var fact = new RegistrationLifecycleFact
             {
                 RegistrationAttemptId = attemptId,
                 Stage = "CodeResent",
                 VerificationMethod = "Code",
+                BrowserId = startedFact?.BrowserId,
+                UtmSource = startedFact?.UtmSource,
+                UtmMedium = startedFact?.UtmMedium,
+                UtmCampaign = startedFact?.UtmCampaign,
+                UtmContent = startedFact?.UtmContent,
+                UtmTerm = startedFact?.UtmTerm,
+                LandingPage = startedFact?.LandingPage,
+                ReferrerPath = startedFact?.ReferrerPath,
+                OwnerId = startedFact?.OwnerId,
                 OccurredAt = now
             };
             db.RegistrationFacts.Add(fact);
@@ -676,6 +703,50 @@ public sealed class OwnerMilestoneTracker : IOwnerMilestoneTracker
 
 public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimeProvider clock) : IGrowthMonitoringQueryService
 {
+    internal static bool EvaluateTouchMatches(
+        string? source,
+        string? medium,
+        string? campaign,
+        MonitoringFilterRequest filter,
+        HashSet<string> campaignChannelCampaigns)
+    {
+        var hasSource = !string.IsNullOrWhiteSpace(filter.Source);
+        var hasChannel = !string.IsNullOrWhiteSpace(filter.Channel);
+        var hasCampaign = !string.IsNullOrWhiteSpace(filter.Campaign);
+
+        if (hasSource)
+        {
+            var isDirectQuery = string.Equals(filter.Source, "(direct)", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(filter.Source, "direct", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(filter.Source, "(none)", StringComparison.OrdinalIgnoreCase);
+            if (isDirectQuery)
+            {
+                if (!string.IsNullOrWhiteSpace(source) &&
+                    !string.Equals(source, "(direct)", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(source, "direct", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(source, "(none)", StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            else if (!string.Equals(source, filter.Source, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        if (hasCampaign && !string.Equals(campaign, filter.Campaign, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (hasChannel)
+        {
+            var matchMedium = string.Equals(medium, filter.Channel, StringComparison.OrdinalIgnoreCase);
+            var matchCamp = campaign != null && campaignChannelCampaigns.Contains(campaign);
+            if (!matchMedium && !matchCamp)
+                return false;
+        }
+
+        return true;
+    }
+
     internal static HashSet<Guid>? GetMatchingOwnerIds(
         IEnumerable<RegistrationAttribution> attributions,
         MonitoringFilterRequest filter,
@@ -688,25 +759,9 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         if (!hasSource && !hasChannel && !hasCampaign)
             return null;
 
-        bool TouchMatches(string? source, string? medium, string? campaign)
-        {
-            if (hasSource && !string.Equals(source, filter.Source, StringComparison.OrdinalIgnoreCase))
-                return false;
-            if (hasCampaign && !string.Equals(campaign, filter.Campaign, StringComparison.OrdinalIgnoreCase))
-                return false;
-            if (hasChannel)
-            {
-                var matchMedium = string.Equals(medium, filter.Channel, StringComparison.OrdinalIgnoreCase);
-                var matchCamp = campaign != null && campaignChannelCampaigns.Contains(campaign);
-                if (!matchMedium && !matchCamp)
-                    return false;
-            }
-            return true;
-        }
-
         return attributions
-            .Where(a => TouchMatches(a.FirstTouchSource, a.FirstTouchMedium, a.FirstTouchCampaign) ||
-                        (a.LastTouchSource != null && TouchMatches(a.LastTouchSource, a.LastTouchMedium, a.LastTouchCampaign)))
+            .Where(a => EvaluateTouchMatches(a.FirstTouchSource, a.FirstTouchMedium, a.FirstTouchCampaign, filter, campaignChannelCampaigns) ||
+                        (a.LastTouchSource != null && EvaluateTouchMatches(a.LastTouchSource, a.LastTouchMedium, a.LastTouchCampaign, filter, campaignChannelCampaigns)))
             .Select(a => a.OwnerId)
             .ToHashSet();
     }
@@ -721,6 +776,23 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         if (fromDate > toDate)
             (fromDate, toDate) = (toDate, fromDate);
 
+        // Clamp both to today (no future dates)
+        if (toDate > today)
+            toDate = today;
+        if (fromDate > today)
+            fromDate = today;
+
+        // Clamp historical depth: max 400 days (~13 months)
+        var minAllowedDate = today.AddDays(-400);
+        if (fromDate < minAllowedDate)
+            fromDate = minAllowedDate;
+        if (toDate < minAllowedDate)
+            toDate = minAllowedDate;
+
+        // Clamp maximum range span to 366 days
+        if ((toDate.DayNumber - fromDate.DayNumber) > 365)
+            fromDate = toDate.AddDays(-365);
+
         var startUtc = ApiSupport.StartOfVietnamDate(fromDate);
         var endUtc = ApiSupport.EndOfVietnamDate(toDate);
 
@@ -728,9 +800,15 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var attributions = await db.RegistrationAttributions.AsNoTracking().ToListAsync(ct);
+        var attributions = await db.RegistrationAttributions.AsNoTracking().Take(50_000).ToListAsync(ct);
         var matchingOwnerIds = GetMatchingOwnerIds(attributions, filter, campaignChannels);
         var attrMap = attributions.ToDictionary(a => a.OwnerId);
+
+        var rawRetentionCutoffDate = today.AddDays(-89);
+        var hasRawCoverageMissing = fromDate < rawRetentionCutoffDate;
+        var hasDimensionFilter = !string.IsNullOrWhiteSpace(filter.Source) ||
+                                 !string.IsNullOrWhiteSpace(filter.Channel) ||
+                                 !string.IsNullOrWhiteSpace(filter.Campaign);
 
         // 1. Client Analytics Events
         var eventsQuery = db.AnalyticsEvents.AsNoTracking()
@@ -745,12 +823,68 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             eventsQuery = eventsQuery.Where(e => e.UtmMedium == filter.Channel || (e.UtmCampaign != null && campaignChannels.Contains(e.UtmCampaign)));
         }
 
-        var events = await eventsQuery.ToListAsync(ct);
+        var events = await eventsQuery.Take(50_000).ToListAsync(ct);
 
-        var totalSessions = events.Select(e => e.SessionId).Distinct().Count();
-        var uniqueVisitors = events.Select(e => e.BrowserId).Distinct().Count();
+        // 2. Daily Aggregates (pre-fetch bounded)
+        var dailyAggregates = await db.DailyAggregateMetrics.AsNoTracking()
+            .Where(a => a.Date >= fromDate && a.Date <= toDate)
+            .Take(1000)
+            .ToDictionaryAsync(a => a.Date, ct);
 
-        // 2. Owner Milestones & Registrations in date range
+        // Summary TotalSessions & UniqueVisitors
+        int? totalSessions;
+        int? uniqueVisitors;
+
+        if (!hasRawCoverageMissing)
+        {
+            totalSessions = events.Select(e => e.SessionId).Distinct().Count();
+            uniqueVisitors = events.Select(e => e.BrowserId).Distinct().Count();
+        }
+        else
+        {
+            // Missing raw coverage: period distinct visitors cannot sum daily distinct as period distinct
+            uniqueVisitors = null;
+
+            if (hasDimensionFilter)
+            {
+                // DailyAggregateMetrics does not store dimensions
+                totalSessions = null;
+            }
+            else
+            {
+                // Unfiltered: can sum daily sessions if aggregates are complete
+                var canSum = true;
+                var sumSessions = 0;
+                for (var d = fromDate; d <= toDate; d = d.AddDays(1))
+                {
+                    if (d >= rawRetentionCutoffDate)
+                    {
+                        var dayStartUtc = ApiSupport.StartOfVietnamDate(d);
+                        var dayEndUtc = ApiSupport.EndOfVietnamDate(d);
+                        sumSessions += events
+                            .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
+                            .Select(e => e.SessionId)
+                            .Distinct()
+                            .Count();
+                    }
+                    else
+                    {
+                        if (dailyAggregates.TryGetValue(d, out var agg))
+                        {
+                            sumSessions += agg.TotalSessions;
+                        }
+                        else
+                        {
+                            canSum = false;
+                            break;
+                        }
+                    }
+                }
+                totalSessions = canSum ? sumSessions : null;
+            }
+        }
+
+        // 3. Owner Milestones & Registrations in date range
         var milestonesQuery = db.OwnerMilestones.AsNoTracking()
             .Where(m => m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc);
 
@@ -759,7 +893,7 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             milestonesQuery = milestonesQuery.Where(m => matchingOwnerIds.Contains(m.OwnerId));
         }
 
-        var registeredMilestones = await milestonesQuery.ToListAsync(ct);
+        var registeredMilestones = await milestonesQuery.Take(50_000).ToListAsync(ct);
         var registrations = registeredMilestones.Count;
 
         // Activations in date range
@@ -804,7 +938,7 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             currentMau
         );
 
-        // 3. Sources
+        // 4. Sources
         var sourceEventGroups = events
             .GroupBy(e => (Source: e.UtmSource ?? "(direct)", Medium: e.UtmMedium ?? "(none)"))
             .ToDictionary(g => g.Key, g => g.Select(x => x.SessionId).Distinct().Count());
@@ -825,25 +959,28 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var sources = allKeys.Select(k => {
             sourceEventGroups.TryGetValue(k, out var sCount);
             sourceRegGroups.TryGetValue(k, out var regInfo);
+            int? reportedSessions = hasRawCoverageMissing ? null : sCount;
             return new TrafficSourceStatsDto(
                 k.Source,
                 k.Medium == "(none)" ? null : k.Medium,
-                sCount,
+                reportedSessions,
                 regInfo.Registrations,
                 regInfo.Activated
             );
-        }).OrderByDescending(s => s.Sessions).ThenByDescending(s => s.Registrations).ToList();
+        }).OrderByDescending(s => s.Sessions ?? 0).ThenByDescending(s => s.Registrations).ToList();
 
-        // 4. Top CTAs
-        var topCtas = events
-            .Where(e => string.Equals(e.EventType, "cta_click", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(e.CtaId))
-            .GroupBy(e => (CtaId: e.CtaId!, Path: e.Path))
-            .Select(g => new CtaPerformanceDto(g.Key.CtaId, g.Key.Path, g.Count()))
-            .OrderByDescending(c => c.Clicks)
-            .Take(10)
-            .ToList();
+        // 5. Top CTAs
+        var topCtas = (toDate < rawRetentionCutoffDate)
+            ? new List<CtaPerformanceDto>()
+            : events
+                .Where(e => string.Equals(e.EventType, "cta_click", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(e.CtaId))
+                .GroupBy(e => (CtaId: e.CtaId!, Path: e.Path))
+                .Select(g => new CtaPerformanceDto(g.Key.CtaId, g.Key.Path, g.Count()))
+                .OrderByDescending(c => c.Clicks)
+                .Take(10)
+                .ToList();
 
-        // 5. Cohort Maturity
+        // 6. Cohort Maturity
         // 7-day cohort: registrations that occurred at least 7 full Vietnam days ago
         var activationCutoffUtc = ApiSupport.StartOfVietnamDate(today.AddDays(-6));
         var activationEligible = registeredMilestones
@@ -881,15 +1018,17 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             paidCohortMaturedCount
         );
 
-        // 6. Retention Matrix
+        // 7. Retention Matrix
         var retentionRows = new List<CohortRetentionRowDto>();
         var currentMonthStart = new DateOnly(today.Year, today.Month, 1);
         var allActivatedMilestones = await db.OwnerMilestones.AsNoTracking()
             .Where(m => m.ActivatedAt != null)
+            .Take(50_000)
             .ToListAsync(ct);
 
         var allActivities = await db.OwnerDailyActivities.AsNoTracking()
             .Where(a => a.HasOwnerAction)
+            .Take(50_000)
             .ToListAsync(ct);
 
         for (var i = 5; i >= 0; i--)
@@ -947,34 +1086,54 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             ));
         }
 
-        // 7. Daily Series & Aggregates fallback for 90d+ pruned telemetry
+        // 8. Daily Series & Aggregates fallback for 90d+ pruned telemetry
         var dailyPoints = new List<DailyGrowthPointDto>();
         var allDaysActivities = await db.OwnerDailyActivities.AsNoTracking()
             .Where(a => a.ActivityDate >= fromDate && a.ActivityDate <= toDate && a.HasOwnerAction)
+            .Take(50_000)
             .ToListAsync(ct);
 
         var allPeriodMilestones = await db.OwnerMilestones.AsNoTracking()
             .Where(m => (m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc) || (m.ActivatedAt >= startUtc && m.ActivatedAt < endUtc))
+            .Take(50_000)
             .ToListAsync(ct);
-
-        var dailyAggregates = await db.DailyAggregateMetrics.AsNoTracking()
-            .Where(a => a.Date >= fromDate && a.Date <= toDate)
-            .ToDictionaryAsync(a => a.Date, ct);
 
         for (var d = fromDate; d <= toDate; d = d.AddDays(1))
         {
             var dayStartUtc = ApiSupport.StartOfVietnamDate(d);
             var dayEndUtc = ApiSupport.EndOfVietnamDate(d);
 
-            var daySessions = events
-                .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
-                .Select(e => e.SessionId)
-                .Distinct()
-                .Count();
-
-            if (daySessions == 0 && dailyAggregates.TryGetValue(d, out var agg))
+            int? daySessions;
+            if (d >= rawRetentionCutoffDate)
             {
-                daySessions = agg.TotalSessions;
+                // Raw coverage is present for this date.
+                // A zero count here is a REAL ZERO, never fallback on aggregate!
+                daySessions = events
+                    .Where(e => e.ServerTimestamp >= dayStartUtc && e.ServerTimestamp < dayEndUtc)
+                    .Select(e => e.SessionId)
+                    .Distinct()
+                    .Count();
+            }
+            else
+            {
+                // Date is older than 90 days: raw coverage is missing!
+                if (hasDimensionFilter)
+                {
+                    // DailyAggregateMetric has no dimension breakdown:
+                    daySessions = null;
+                }
+                else
+                {
+                    // Unfiltered: dimensions match!
+                    if (dailyAggregates.TryGetValue(d, out var agg))
+                    {
+                        daySessions = agg.TotalSessions;
+                    }
+                    else
+                    {
+                        daySessions = null;
+                    }
+                }
             }
 
             var dayRegs = allPeriodMilestones
@@ -998,12 +1157,56 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
             ));
         }
 
-        // 8. Funnel facts (Started, CodeResent, Verified, Bypassed)
-        var funnelStarted = await db.RegistrationFacts.CountAsync(x => x.Stage == "Started" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
-        var funnelResent = await db.RegistrationFacts.CountAsync(x => x.Stage == "CodeResent" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
-        var funnelVerified = await db.RegistrationFacts.CountAsync(x => x.Stage == "Verified" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
-        var funnelBypassed = await db.RegistrationFacts.CountAsync(x => x.Stage == "Bypassed" && x.OccurredAt >= startUtc && x.OccurredAt < endUtc, ct);
-        var funnel = new RegistrationFunnelDto(funnelStarted, funnelResent, funnelVerified, funnelBypassed);
+        // 9. Funnel facts (Started, CodeResent, Verified, Bypassed) with attribution scoping
+        var factsQuery = db.RegistrationFacts.AsNoTracking()
+            .Where(x => x.OccurredAt >= startUtc && x.OccurredAt < endUtc);
+
+        var rawFacts = await factsQuery.Take(50_000).ToListAsync(ct);
+
+        var attemptAttributions = rawFacts
+            .Where(f => !string.IsNullOrWhiteSpace(f.UtmSource) || !string.IsNullOrWhiteSpace(f.UtmCampaign) || !string.IsNullOrWhiteSpace(f.UtmMedium))
+            .GroupBy(f => f.RegistrationAttemptId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        bool FactMatchesFilter(RegistrationLifecycleFact fact)
+        {
+            if (!hasDimensionFilter)
+                return true;
+
+            if (fact.OwnerId.HasValue && matchingOwnerIds != null)
+            {
+                return matchingOwnerIds.Contains(fact.OwnerId.Value);
+            }
+
+            var src = fact.UtmSource;
+            var med = fact.UtmMedium;
+            var cmp = fact.UtmCampaign;
+
+            if (string.IsNullOrWhiteSpace(src) && string.IsNullOrWhiteSpace(cmp) &&
+                attemptAttributions.TryGetValue(fact.RegistrationAttemptId, out var attemptFact))
+            {
+                src = attemptFact.UtmSource;
+                med = attemptFact.UtmMedium;
+                cmp = attemptFact.UtmCampaign;
+            }
+
+            return EvaluateTouchMatches(src, med, cmp, filter, campaignChannels);
+        }
+
+        var matchingFacts = rawFacts.Where(FactMatchesFilter).ToList();
+        var funnelStarted = matchingFacts.Count(x => x.Stage == "Started");
+        var funnelResent = matchingFacts.Count(x => x.Stage == "CodeResent");
+        var funnelVerified = matchingFacts.Count(x => x.Stage == "Verified");
+        var funnelBypassed = matchingFacts.Count(x => x.Stage == "Bypassed");
+
+        // Explicit unknown attempt coverage
+        var unknownAttemptCount = rawFacts
+            .Where(x => x.Stage == "Started" && string.IsNullOrWhiteSpace(x.UtmSource) && string.IsNullOrWhiteSpace(x.UtmCampaign))
+            .Select(x => x.RegistrationAttemptId)
+            .Distinct()
+            .Count();
+
+        var funnel = new RegistrationFunnelDto(funnelStarted, funnelResent, funnelVerified, funnelBypassed, unknownAttemptCount);
 
         return new AdminMonitoringGrowthResponse(
             summary,
@@ -1029,6 +1232,23 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         if (fromDate > toDate)
             (fromDate, toDate) = (toDate, fromDate);
 
+        // Clamp both to today (no future dates)
+        if (toDate > today)
+            toDate = today;
+        if (fromDate > today)
+            fromDate = today;
+
+        // Clamp historical depth: max 400 days (~13 months)
+        var minAllowedDate = today.AddDays(-400);
+        if (fromDate < minAllowedDate)
+            fromDate = minAllowedDate;
+        if (toDate < minAllowedDate)
+            toDate = minAllowedDate;
+
+        // Clamp maximum range span to 366 days
+        if ((toDate.DayNumber - fromDate.DayNumber) > 365)
+            fromDate = toDate.AddDays(-365);
+
         var startUtc = ApiSupport.StartOfVietnamDate(fromDate);
         var endUtc = ApiSupport.EndOfVietnamDate(toDate);
 
@@ -1036,7 +1256,7 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             ? (await db.MarketingCampaigns.Where(mc => mc.Channel == filter.Channel).Select(mc => mc.UtmCampaign ?? mc.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var attributions = await db.RegistrationAttributions.AsNoTracking().ToListAsync(ct);
+        var attributions = await db.RegistrationAttributions.AsNoTracking().Take(50_000).ToListAsync(ct);
         var matchingOwnerIds = DefaultGrowthMonitoringQueryService.GetMatchingOwnerIds(attributions, filter, campaignChannels);
 
         // 1. Subscription Orders (Confirmed Paid Subscription Only)
@@ -1048,7 +1268,7 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             ordersQuery = ordersQuery.Where(o => matchingOwnerIds.Contains(o.OwnerId));
         }
 
-        var attempts = await ordersQuery.OrderByDescending(x => x.PaidAt).ToListAsync(ct);
+        var attempts = await ordersQuery.OrderByDescending(x => x.PaidAt).Take(50_000).ToListAsync(ct);
         var subscriptionOrders = attempts.Select(a => new SubscriptionOrderRevenueDto(
             a.OrderCode,
             a.OwnerId,
@@ -1068,7 +1288,7 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         if (!string.IsNullOrWhiteSpace(filter.Source))
             costsQuery = costsQuery.Where(c => c.Source == filter.Source);
 
-        var costs = await costsQuery.ToListAsync(ct);
+        var costs = await costsQuery.Take(10_000).ToListAsync(ct);
 
         var campaignCosts = costs
             .GroupBy(c => (c.Campaign, Channel: c.Channel ?? "(none)"))

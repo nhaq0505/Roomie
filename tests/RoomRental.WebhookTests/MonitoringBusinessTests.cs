@@ -32,6 +32,10 @@ internal static class MonitoringBusinessTests
         await TestMilestonesAndActivityHooksAsync();
         await TestRevenueQueryAndCac30Async();
         await TestGrowthQueryAndMaturityAsync();
+        await TestFilteredZeroWithNonZeroAggregateAsync();
+        await TestOlderThan90DaysRawAbsentAsync();
+        await TestFilteredFunnelAttributionAsync();
+        await TestInvalidAndExtremeDateRangesAsync();
         await TestCampaignTrackingUrlAndEndpointAsync();
         await TestMonitoringMaintenanceServiceAsync();
         await TestHttpBusinessFlowsAndDegradedTelemetryAsync();
@@ -503,6 +507,305 @@ internal static class MonitoringBusinessTests
 
         // 5. Daily series points
         Assert(growth.DailySeries.Count >= 8, "Daily growth points contain all filtered dates");
+    }
+
+    private static async Task TestFilteredZeroWithNonZeroAggregateAsync()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var connectionScope = connection;
+        await using var dbScope = db;
+
+        var clock = TimeProvider.System;
+        var growthService = new DefaultGrowthMonitoringQueryService(db, clock);
+
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+        var targetDate = today.AddDays(-5); // within 90d raw retention
+        var dayStart = ApiSupport.StartOfVietnamDate(targetDate);
+
+        // 1. Raw event exists only for "google" on targetDate
+        db.AnalyticsEvents.Add(new ClientAnalyticsEvent
+        {
+            EventId = "evt-zero-google",
+            BrowserId = "b-zero-1",
+            SessionId = "s-zero-google",
+            EventType = "page_view",
+            Path = "/home",
+            UtmSource = "google",
+            ServerTimestamp = dayStart.AddHours(2)
+        });
+
+        // 2. DailyAggregateMetric has TotalSessions = 150 (all-traffic)
+        db.DailyAggregateMetrics.Add(new DailyAggregateMetric
+        {
+            Date = targetDate,
+            TotalSessions = 150,
+            DistinctVisitors = 120,
+            CalculatedAt = now
+        });
+        await db.SaveChangesAsync();
+
+        // 3. Query filtered by source="facebook"
+        // Target date has 0 facebook sessions. It MUST remain 0, NEVER fallback to 150!
+        var filteredResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: targetDate,
+            ToDate: targetDate,
+            Source: "facebook"
+        ), default);
+
+        var dayPoint = filteredResp.DailySeries.Single(p => p.Date == targetDate);
+        Assert(dayPoint.Sessions == 0,
+            $"Real filtered zero must stay 0 even with nonzero aggregate (got {dayPoint.Sessions})");
+        Assert(filteredResp.Summary.TotalSessions == 0,
+            $"Filtered summary TotalSessions must be 0, not all-traffic aggregate (got {filteredResp.Summary.TotalSessions})");
+
+        // 4. Unfiltered query inside 90d must report the 1 raw session, NOT fallback to 150
+        var unfiltResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: targetDate,
+            ToDate: targetDate
+        ), default);
+
+        var unfiltPoint = unfiltResp.DailySeries.Single(p => p.Date == targetDate);
+        Assert(unfiltPoint.Sessions == 1,
+            $"Unfiltered daily series with raw coverage must use raw events count (1), not aggregate (got {unfiltPoint.Sessions})");
+        Assert(unfiltResp.Summary.TotalSessions == 1,
+            $"Unfiltered summary TotalSessions with raw coverage must be 1 (got {unfiltResp.Summary.TotalSessions})");
+    }
+
+    private static async Task TestOlderThan90DaysRawAbsentAsync()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var connectionScope = connection;
+        await using var dbScope = db;
+
+        var clock = TimeProvider.System;
+        var growthService = new DefaultGrowthMonitoringQueryService(db, clock);
+
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+        var oldDate = today.AddDays(-120); // >90d raw retention cutoff: proven raw coverage missing
+
+        // Insert aggregate for oldDate
+        db.DailyAggregateMetrics.Add(new DailyAggregateMetric
+        {
+            Date = oldDate,
+            TotalSessions = 300,
+            DistinctVisitors = 220,
+            CalculatedAt = now
+        });
+        await db.SaveChangesAsync();
+
+        // 1. Unfiltered query >90d:
+        // Daily series sessions uses aggregate (dimensions match!)
+        // Summary UniqueVisitors must be NULL (cannot sum daily distinct as period distinct)
+        // Summary TotalSessions sums daily aggregate = 300
+        var unfiltResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: oldDate,
+            ToDate: oldDate
+        ), default);
+
+        var oldPoint = unfiltResp.DailySeries.Single(p => p.Date == oldDate);
+        Assert(oldPoint.Sessions == 300,
+            $"Unfiltered daily point >90d uses aggregate TotalSessions (expected 300, got {oldPoint.Sessions})");
+        Assert(unfiltResp.Summary.UniqueVisitors == null,
+            "Summary UniqueVisitors across missing raw coverage must be null (cannot sum daily distinct)");
+        Assert(unfiltResp.Summary.TotalSessions == 300,
+            $"Summary TotalSessions across missing raw coverage with complete aggregate must be 300 (got {unfiltResp.Summary.TotalSessions})");
+        Assert(unfiltResp.TopCtas.Count == 0,
+            "Top CTAs must be empty when raw events are pruned");
+
+        // 2. Filtered query >90d (source="facebook"):
+        // Dimensions DO NOT MATCH (DailyAggregateMetric is all-traffic).
+        // Must report explicit NULL, NEVER fallback to 300 and NEVER fake 0!
+        var filtResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: oldDate,
+            ToDate: oldDate,
+            Source: "facebook"
+        ), default);
+
+        var filtPoint = filtResp.DailySeries.Single(p => p.Date == oldDate);
+        Assert(filtPoint.Sessions == null,
+            "Filtered daily point >90d must report null (dimensions do not match aggregate)");
+        Assert(filtResp.Summary.TotalSessions == null,
+            "Filtered summary TotalSessions >90d must report null");
+        Assert(filtResp.Summary.UniqueVisitors == null,
+            "Filtered summary UniqueVisitors >90d must report null");
+    }
+
+    private static async Task TestFilteredFunnelAttributionAsync()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var connectionScope = connection;
+        await using var dbScope = db;
+
+        var clock = TimeProvider.System;
+        var growthService = new DefaultGrowthMonitoringQueryService(db, clock);
+
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+        var targetDate = today.AddDays(-2);
+        var dayTime = ApiSupport.StartOfVietnamDate(targetDate).AddHours(3);
+
+        var attemptA = Guid.NewGuid();
+        var attemptB = Guid.NewGuid();
+        var attemptC = Guid.NewGuid();
+
+        // Attempt A: facebook
+        db.RegistrationFacts.AddRange(
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptA,
+                Stage = "Started",
+                UtmSource = "facebook",
+                UtmCampaign = "spring",
+                OccurredAt = dayTime
+            },
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptA,
+                Stage = "Verified",
+                UtmSource = "facebook",
+                UtmCampaign = "spring",
+                OccurredAt = dayTime.AddMinutes(2)
+            }
+        );
+
+        // Attempt B: google
+        db.RegistrationFacts.AddRange(
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptB,
+                Stage = "Started",
+                UtmSource = "google",
+                UtmCampaign = "promo",
+                OccurredAt = dayTime
+            },
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptB,
+                Stage = "CodeResent",
+                UtmSource = "google",
+                UtmCampaign = "promo",
+                OccurredAt = dayTime.AddMinutes(1)
+            }
+        );
+
+        // Attempt C: Direct / Unattributed attempt
+        db.RegistrationFacts.AddRange(
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptC,
+                Stage = "Started",
+                UtmSource = null,
+                UtmCampaign = null,
+                OccurredAt = dayTime
+            },
+            new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = attemptC,
+                Stage = "Bypassed",
+                VerificationMethod = "Bypass",
+                UtmSource = null,
+                UtmCampaign = null,
+                OccurredAt = dayTime.AddMinutes(1)
+            }
+        );
+        await db.SaveChangesAsync();
+
+        // 1. Filtered by source=facebook
+        var fbResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: targetDate,
+            ToDate: targetDate,
+            Source: "facebook"
+        ), default);
+
+        Assert(fbResp.Funnel != null, "Funnel exists on filtered response");
+        Assert(fbResp.Funnel!.StartedCount == 1,
+            $"Filtered funnel StartedCount must be 1 (got {fbResp.Funnel.StartedCount})");
+        Assert(fbResp.Funnel.VerifiedCount == 1,
+            $"Filtered funnel VerifiedCount must be 1 (got {fbResp.Funnel.VerifiedCount})");
+        Assert(fbResp.Funnel.CodeResentCount == 0,
+            $"Filtered funnel CodeResentCount must be 0 (got {fbResp.Funnel.CodeResentCount})");
+        Assert(fbResp.Funnel.BypassedCount == 0,
+            $"Filtered funnel BypassedCount must be 0 (got {fbResp.Funnel.BypassedCount})");
+        Assert(fbResp.Funnel.UnknownAttemptCount == 1,
+            $"Filtered funnel UnknownAttemptCount must report 1 unattributed attempt (got {fbResp.Funnel.UnknownAttemptCount})");
+
+        // 2. Filtered by source=google
+        var googleResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: targetDate,
+            ToDate: targetDate,
+            Source: "google"
+        ), default);
+
+        Assert(googleResp.Funnel!.StartedCount == 1,
+            $"Google funnel StartedCount must be 1 (got {googleResp.Funnel.StartedCount})");
+        Assert(googleResp.Funnel.CodeResentCount == 1,
+            $"Google funnel CodeResentCount must be 1 (got {googleResp.Funnel.CodeResentCount})");
+        Assert(googleResp.Funnel.VerifiedCount == 0,
+            $"Google funnel VerifiedCount must be 0 (got {googleResp.Funnel.VerifiedCount})");
+
+        // 3. Unfiltered
+        var allResp = await growthService.GetGrowthMetricsAsync(new MonitoringFilterRequest(
+            FromDate: targetDate,
+            ToDate: targetDate
+        ), default);
+
+        Assert(allResp.Funnel!.StartedCount == 3,
+            $"Unfiltered funnel StartedCount must be 3 (got {allResp.Funnel.StartedCount})");
+        Assert(allResp.Funnel.CodeResentCount == 1,
+            $"Unfiltered funnel CodeResentCount must be 1 (got {allResp.Funnel.CodeResentCount})");
+        Assert(allResp.Funnel.VerifiedCount == 1,
+            $"Unfiltered funnel VerifiedCount must be 1 (got {allResp.Funnel.VerifiedCount})");
+        Assert(allResp.Funnel.BypassedCount == 1,
+            $"Unfiltered funnel BypassedCount must be 1 (got {allResp.Funnel.BypassedCount})");
+        Assert(allResp.Funnel.UnknownAttemptCount == 1,
+            $"Unfiltered funnel UnknownAttemptCount must be 1 (got {allResp.Funnel.UnknownAttemptCount})");
+    }
+
+    private static async Task TestInvalidAndExtremeDateRangesAsync()
+    {
+        var (connection, db) = await CreateTestDbAsync();
+        await using var connectionScope = connection;
+        await using var dbScope = db;
+
+        var clock = TimeProvider.System;
+        var growthService = new DefaultGrowthMonitoringQueryService(db, clock);
+        var revenueService = new DefaultRevenueMonitoringQueryService(db, clock);
+
+        var now = clock.GetUtcNow();
+        var today = ApiSupport.VietnamDate(now);
+
+        // 1. Extreme range: MinValue to MaxValue
+        var extremeFilter = new MonitoringFilterRequest(
+            FromDate: DateOnly.MinValue,
+            ToDate: DateOnly.MaxValue
+        );
+        var extremeGrowth = await growthService.GetGrowthMetricsAsync(extremeFilter, default);
+        var extremeRevenue = await revenueService.GetRevenueMetricsAsync(extremeFilter, default);
+
+        Assert(extremeGrowth.DailySeries.Count <= 366,
+            $"Extreme range must clamp to max 366 daily points (got {extremeGrowth.DailySeries.Count})");
+        Assert(extremeRevenue.Summary.PaidSubscriptionCount >= 0,
+            "Extreme revenue query completed without hanging or error");
+
+        // 2. Future dates: clamped to today
+        var futureFilter = new MonitoringFilterRequest(
+            FromDate: today.AddDays(10),
+            ToDate: today.AddDays(50)
+        );
+        var futureGrowth = await growthService.GetGrowthMetricsAsync(futureFilter, default);
+        Assert(futureGrowth.DailySeries.Count >= 1 && futureGrowth.DailySeries.All(p => p.Date <= today),
+            "Future range clamped to today");
+
+        // 3. Inverted range: fromDate > toDate
+        var invertedFilter = new MonitoringFilterRequest(
+            FromDate: today,
+            ToDate: today.AddDays(-10)
+        );
+        var invertedGrowth = await growthService.GetGrowthMetricsAsync(invertedFilter, default);
+        Assert(invertedGrowth.DailySeries.Count == 11,
+            $"Inverted range safely swapped and returned 11 points (got {invertedGrowth.DailySeries.Count})");
     }
 
     private static async Task TestCampaignTrackingUrlAndEndpointAsync()

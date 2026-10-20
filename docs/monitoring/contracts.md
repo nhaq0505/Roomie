@@ -148,10 +148,17 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   - `channel` (optional, string)
   - `campaign` (optional, string)
 - **Status in T1:** Fully implemented via `IGrowthMonitoringQueryService`.
-- **Funnel Facts (`funnel`):** Exposes `RegistrationFunnelDto` (`startedCount`, `codeResentCount`, `verifiedCount`, `bypassedCount`) from server-authoritative `RegistrationFacts`.
+- **Funnel Facts (`funnel`):** Exposes `RegistrationFunnelDto` (`startedCount`, `codeResentCount`, `verifiedCount`, `bypassedCount`, `unknownAttemptCount`) from server-authoritative `RegistrationFacts`. Funnel counts strictly apply the active `source`, `channel`, and `campaign` filters rather than global counts; `unknownAttemptCount` explicitly tracks unattributed registration attempts in the period.
 - **Retention Semantics:** `retentionPercentages` is `IReadOnlyList<double?>`. Incomplete current calendar month and future cohort cells are `null`, never mature `0.0`.
 - **Channel Mapping & Touchpoint Credit:** Filter parameters (`source`, `channel`, `campaign`) are evaluated consistently across all growth metrics, retention, WAU, MAU, revenue orders, CAC, and campaign costs. A touchpoint is evaluated as a cohesive unit (`FirstTouch` or `LastTouch`); filters never mix `FirstTouchSource` with unrelated `LastTouchCampaign`. Channel maps to attribution medium or campaign channel metadata.
-- **13-Month Continuity:** When raw client analytics events (`AnalyticsEvents`) are pruned after 90 days, historical daily series fallback to durable `DailyAggregateMetrics` to avoid false zeros.
+- **Raw Coverage, 13-Month Continuity & Null Semantics:**
+  - Inside the 90-day raw retention window, raw telemetry is proven present; numeric 0 is a real zero and never falls back to aggregates.
+  - Beyond 90 days (where raw `AnalyticsEvents` are pruned), aggregates are used only when matching dimensions exist (unfiltered all-traffic queries). When dimension filters (`source`, `channel`, `campaign`) are active, daily series sessions and period total sessions return explicit `null` (unavailable) rather than false zeros or all-traffic counts.
+  - Period `uniqueVisitors` returns `null` across ranges with missing raw coverage because daily distinct visitors cannot mathematically sum to period distinct visitors.
+  - `TrafficSourceStatsDto.sessions` is `null` when raw coverage is pruned.
+- **Date Range & Query Bounds:**
+  - Date parameters are strictly clamped: `toDate` cannot exceed `today` (future dates clamped), `fromDate` lookback clamped to 400 days (~13 months), and span clamped to maximum 365 days.
+  - Database queries are bounded with explicit `.Take(...)` caps preventing unbounded in-memory collection.
 - **Response Shape (`AdminMonitoringGrowthResponse`):**
 ```json
 {
