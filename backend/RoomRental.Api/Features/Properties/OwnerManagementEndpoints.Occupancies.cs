@@ -34,7 +34,7 @@ public static partial class OwnerManagementEndpoints
                 {
                     if (draft.Paid != 0 || draft.Status == InvoiceStatus.Paid ||
                         await db.Receipts.AnyAsync(x => x.InvoiceId == draft.Id, ct) ||
-                        await db.PayOsAttempts.AnyAsync(x => x.InvoiceId == draft.Id && x.Status == PaymentAttemptStatus.Pending, ct))
+                        await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == draft.Id || db.Invoices.Any(i => i.Id == draft.Id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct))
                         throw new ApiException(409, "Hóa đơn nháp có thanh toán hoặc giao dịch đang chờ. Cần xử lý trước khi đổi số người.");
                     if (draft.WaterRate is null) throw new ApiException(409, "Hóa đơn nháp thiếu bảng phí nước đã lưu.");
                     var before = BillingEndpoints.SerializeSnapshot(draft);

@@ -10,6 +10,7 @@ import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { type Invoice } from './index';
 import InvoiceDrawer from './InvoiceDrawer';
+import ManualPaymentRequests from './ManualPaymentRequests';
 import { useInvoicesPage } from './useInvoicesPage';
 
 function invoiceKindLabel(kind: Invoice['kind']) {
@@ -59,6 +60,7 @@ const state = useInvoicesPage();
 
   return <>
     <PageTitle eyebrow={t("THU TIỀN RÕ RÀNG")} title={t("Hóa đơn")} subtitle={t("Theo dõi tiền thuê, điện, nước và các khoản đã thu theo từng phòng.")} extra={kindFilter === 'Monthly' && period ? <Button title={t("Chỉ tạo hóa đơn còn thiếu; không phát hành các bản nháp.")} type="primary" icon={<PlusOutlined />} loading={generateMutation.isPending} onClick={() => generateMutation.mutate(period)}>{t("Tạo hóa đơn còn thiếu")}</Button> : undefined} />
+    <ManualPaymentRequests />
     {listQuery.isError ? <LoadError error={listQuery.error} onRetry={() => void listQuery.refetch()} /> : listQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
       <Row gutter={[14, 14]} className="invoice-totals-row"><Col xs={24} md={8}><div className="invoice-total-tile"><span>{t("Tổng giá trị hóa đơn")}</span><strong>{formatVnd(totals.billed)}</strong></div></Col><Col xs={24} md={8}><div className="invoice-total-tile invoice-total-paid"><span>{t("Đã ghi nhận trên hóa đơn")}</span><strong>{formatVnd(totals.paid)}</strong></div></Col><Col xs={24} md={8}><div className="invoice-total-tile invoice-total-due"><span>{t("Còn phải thu")}</span><strong>{formatVnd(totals.outstanding)}</strong></div></Col></Row>
       <p className="invoice-summary-scope">{t("Ba số liệu tính từ {0} hóa đơn đã phát hành phù hợp bộ lọc. Tiền cọc không phải doanh thu.", [issuedCount])}{draftCount > 0 && <> · {t("{0} bản nháp chưa phát hành", [draftCount])}</>}</p>

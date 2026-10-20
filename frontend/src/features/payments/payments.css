@@ -34,3 +34,7 @@
 .settings-state { display: flex; align-items: center; gap: 7px; padding-top: 14px; color: #74868a; font-size: 12px; }
 .connected-dot, .disconnected-dot { width: 7px; height: 7px; border-radius: 50%; background: #20a77e; }
 .disconnected-dot { background: #c7ceca; }
+
+.payment-mode-card { margin-bottom: 20px; }
+.payment-mode-options { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.payment-manual-fields { margin-top: 20px; max-width: 620px; }

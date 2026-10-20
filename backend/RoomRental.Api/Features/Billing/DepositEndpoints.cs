@@ -36,7 +36,7 @@ public static class DepositEndpoints
                 throw new ApiException(409, "Draft deposit invoices cannot be settled.");
             if (request.ExpectedVersion is long expectedVersion && invoice.Version != expectedVersion)
                 throw new ApiException(409, "Deposit invoice changed. Refresh it and retry the settlement.");
-            if (await db.PayOsAttempts.AnyAsync(x => x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, cancellationToken))
+            if (await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, cancellationToken))
                 throw new ApiException(409, "Đối soát giao dịch cọc đang chờ trước khi quyết toán.");
             if (request.Amount > invoice.Paid - invoice.DepositSettlements.Sum(x => x.Amount))
                 throw new ApiException(400, "Số tiền vượt quá cọc đã nhận và đang giữ.");
@@ -50,7 +50,7 @@ public static class DepositEndpoints
                     throw new ApiException(409, "Debt invoice changed. Refresh it and retry the settlement.");
                 if (request.Amount > target.Total - target.Paid)
                     throw new ApiException(400, "Khấu trừ vượt số tiền còn nợ của hóa đơn.");
-                if (await db.PayOsAttempts.AnyAsync(x => x.InvoiceId == targetId && x.Status == PaymentAttemptStatus.Pending, cancellationToken))
+                if (await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == targetId || db.Invoices.Any(i => i.Id == targetId && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, cancellationToken))
                     throw new ApiException(409, "Đối soát giao dịch hóa đơn đang chờ trước khi khấu trừ.");
                 db.Receipts.Add(new PaymentReceipt { OwnerId = ownerId, InvoiceId = target.Id, Amount = request.Amount,
                     Source = "Deposit", Note = request.Reason.Trim(), IdempotencyKey = request.IdempotencyKey });

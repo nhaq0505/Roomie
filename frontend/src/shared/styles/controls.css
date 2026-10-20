@@ -102,7 +102,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 .ant-table-cell { overflow-wrap: anywhere; }
 .mobile-record-heading .owner-name-cell span { word-break: break-word; }
 .mobile-menu-drawer .ant-drawer-header { background: var(--navy); border-bottom: 1px solid #36535b; }
-.mobile-menu-drawer .ant-drawer-title, .mobile-menu-drawer .ant-drawer-close { color: #fff; }
+.mobile-menu-drawer .ant-drawer-title,
+.mobile-menu-drawer .ant-drawer-header .ant-drawer-close { color: #fff; }
+.mobile-menu-drawer .ant-drawer-header .ant-drawer-close:hover { color: #fff; background: rgba(255, 255, 255, .12); }
+.mobile-menu-drawer .ant-drawer-header .ant-drawer-close:focus-visible { outline: 3px solid #9ce8d2; outline-offset: 3px; }
 
 /* All languages share the same layout; long labels may wrap. */
 .language-selector { width: 128px; flex-shrink: 0; }

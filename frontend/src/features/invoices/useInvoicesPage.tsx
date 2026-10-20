@@ -19,7 +19,7 @@ export function useInvoicesPage() {
   const [searchText, setSearchText] = useState('');
   const [adjustmentExpanded, setAdjustmentExpanded] = useState(false);
   const selectedId = searchParams.get('invoice');
-  const [receiptForm] = Form.useForm<{ amount: number; note?: string }>();
+  const [receiptForm] = Form.useForm<{ note?: string }>();
   const [correctionForm] = Form.useForm<{ amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; reason: string; dueDate?: Dayjs; description?: string }>();
   const receiptKeys = useRef(new Map<string, string>());
   const correctionKeys = useRef(new Map<string, string>());
@@ -73,18 +73,18 @@ export function useInvoicesPage() {
     onSuccess: async (_, variables) => { await Promise.all([client.invalidateQueries({ queryKey: ['invoice', variables.id] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['invoiceCorrections', variables.id] }), client.invalidateQueries({ queryKey: ['dashboard'] })]); correctionKeys.current.delete(variables.id); correctionForm.resetFields(); message.success(t("Đã lưu điều chỉnh hóa đơn.")); },
     onError: (error: Error) => message.error(error.message),
   });
-  useEffect(() => { if (invoice) receiptForm.setFieldsValue({ amount: invoice.outstanding }); }, [invoice, receiptForm]);
   useEffect(() => { if (invoice) correctionForm.setFieldsValue({ amount: invoice.total, rent: invoice.rent, electricityAmount: invoice.electricityAmount, waterAmount: invoice.waterAmount, serviceAmount: invoice.serviceAmount, currentReading: invoice.currentReading, dueDate: invoice.dueDate ? dayjs(invoice.dueDate) : undefined, description: invoice.description, reason: '' }); }, [invoice, correctionForm]);
   const showInvoice = (id: string) => setSearchParams({ invoice: id });
-  const confirmReceipt = (values: { amount: number; note?: string }) => {
+  const confirmReceipt = (values: { note?: string }) => {
     if (!invoice) return;
-    const normalized = { amount: values.amount, note: values.note?.trim() || '' };
+    const normalized = { amount: invoice.outstanding, note: values.note?.trim() || '' };
     const snapshot = `${invoice.id}:${JSON.stringify(normalized)}`;
     let idempotencyKey = receiptKeys.current.get(snapshot);
     if (!idempotencyKey) { idempotencyKey = crypto.randomUUID(); receiptKeys.current.set(snapshot, idempotencyKey); }
     modal.confirm({
       title: t("Ghi nhận khoản thu này?"),
       content: <>
+        <p>{t("Xác nhận này thanh toán toàn bộ số tiền còn lại của các hóa đơn đã chọn.")}</p>
         <p>{t("Bạn sắp ghi nhận {0}{1}. Khoản thu này sẽ được lưu vào sổ hóa đơn.", [formatVnd(normalized.amount), normalized.note ? ` (${normalized.note})` : ''])}</p>
         {invoice.hasPendingPayment && <p>{t("Hệ thống sẽ kiểm tra và hủy link payOS chưa thanh toán trước khi ghi nhận khoản thu này. Nếu payOS đã nhận tiền, hóa đơn sẽ được đối soát và không ghi thu thêm.")}</p>}
       </>,

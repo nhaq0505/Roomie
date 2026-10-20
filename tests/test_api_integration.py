@@ -716,7 +716,7 @@ class RoomApiIntegrationTests(unittest.TestCase):
             readings = as_list(self.owner.ok("GET", f"/api/readings?period={period}"))
             self.assertNotIn(room["id"], {reading.get("roomId") for reading in readings})
 
-    def test_manual_receipt_updates_partial_balance_and_rejects_invalid_amounts(self) -> None:
+    def test_manual_receipt_settles_full_balance_and_rejects_invalid_amounts(self) -> None:
         room = self.create_room(self.owner, label="receipt")
         self.start_occupancy(self.owner, room["id"], people=2)
         period = period_offset(0)
@@ -724,8 +724,11 @@ class RoomApiIntegrationTests(unittest.TestCase):
         self.owner.ok("POST", "/api/invoices/generate", {"period": period})
         invoice = self.invoice_for_room(self.owner, period, room["id"])
 
+        self.assertEqual(self.owner.request("POST", f"/api/invoices/{invoice['id']}/receipts",
+            {"amount": 500_000, "idempotencyKey": uuid.uuid4().hex})[0], 409)
+        self.assertEqual(self.owner.ok("GET", f"/api/invoices/{invoice['id']}")["paid"], 0)
         receipt = {
-            "amount": 500_000,
+            "amount": invoice["total"],
             "note": "Local integration test receipt",
             "idempotencyKey": f"receipt-{uuid.uuid4().hex}",
         }
@@ -734,15 +737,15 @@ class RoomApiIntegrationTests(unittest.TestCase):
             f"/api/invoices/{invoice['id']}/receipts",
             receipt,
         )
-        self.assertEqual(updated["paid"], 500_000)
-        self.assertEqual(updated["outstanding"], invoice["total"] - 500_000)
-        self.assertEqual(updated["status"], "Partial")
+        self.assertEqual(updated["paid"], invoice["total"])
+        self.assertEqual(updated["outstanding"], 0)
+        self.assertEqual(updated["status"], "Paid")
 
         retried = self.owner.ok(
             "POST", f"/api/invoices/{invoice['id']}/receipts", receipt
         )
-        self.assertEqual(retried["paid"], 500_000, "Receipt retry was counted twice")
-        self.assertEqual(retried["outstanding"], invoice["total"] - 500_000)
+        self.assertEqual(retried["paid"], invoice["total"], "Receipt retry was counted twice")
+        self.assertEqual(retried["outstanding"], 0)
 
         for amount in (0, -1, updated["outstanding"] + 1):
             status, body, _ = self.owner.request(
@@ -754,8 +757,8 @@ class RoomApiIntegrationTests(unittest.TestCase):
             self.assertLess(status, 500, f"Invalid receipt caused a server error: {body!r}")
 
         persisted = self.owner.ok("GET", f"/api/invoices/{invoice['id']}")
-        self.assertEqual(persisted["paid"], 500_000)
-        self.assertEqual(persisted["outstanding"], invoice["total"] - 500_000)
+        self.assertEqual(persisted["paid"], invoice["total"])
+        self.assertEqual(persisted["outstanding"], 0)
 
     def test_rotating_guest_link_revokes_the_previous_token(self) -> None:
         room = self.create_room(self.owner, label="token-rotation")

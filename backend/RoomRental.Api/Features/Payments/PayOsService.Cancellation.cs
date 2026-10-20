@@ -17,9 +17,10 @@ public sealed partial class PayOsService
     {
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Payment cancellation requires the manual receipt transaction.");
-        var attempt = await db.PayOsAttempts.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.InvoiceId == invoiceId &&
+        var attempt = await db.PayOsAttempts.SingleOrDefaultAsync(x => x.OwnerId == ownerId && (x.InvoiceId == invoiceId || db.Invoices.Any(i => i.Id == invoiceId && i.PaymentReservationId == x.Id)) &&
             x.Status == PaymentAttemptStatus.Pending, ct);
         if (attempt is null) return null;
+        if (attempt.InvoiceAllocationsJson is not null) throw new ApiException(409, "Hóa đơn đang thuộc thanh toán gộp. Vui lòng đối soát hoặc chờ giao dịch kết thúc trước khi ghi thu riêng.");
         // Even a legacy reservation without local link metadata must be verified by
         // order code. Never infer cancellation from missing metadata or a failed lookup.
         if (attempt.Kind != "Invoice") throw new ApiException(409, "Giao dịch payOS không thuộc loại hóa đơn.");

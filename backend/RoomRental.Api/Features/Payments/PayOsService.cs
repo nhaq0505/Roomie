@@ -40,7 +40,7 @@ public sealed partial class PayOsService
     public async Task<string> CreateOrGetCheckoutUrlAsync(Guid ownerId, Invoice invoice, string tenantToken, CancellationToken cancellationToken) =>
         (await CreateOrGetCheckoutAsync(ownerId, invoice, tenantToken, cancellationToken)).CheckoutUrl;
 
-    public async Task<PaymentCheckoutDto> CreateOrGetCheckoutAsync(Guid ownerId, Invoice invoice, string tenantToken, CancellationToken cancellationToken)
+    public async Task<PaymentCheckoutDto> CreateOrGetCheckoutAsync(Guid ownerId, Invoice invoice, string tenantToken, CancellationToken cancellationToken, bool allInvoices = false)
     {
         if (invoice.OwnerId != ownerId) throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found.");
         PayOsAttempt? existing = null;
@@ -55,18 +55,32 @@ public sealed partial class PayOsService
             if (owner is null || owner.Role != UserRole.Owner || owner.Status != OwnerStatus.Approved)
                 throw new ApiException(StatusCodes.Status403Forbidden, "The owner account is not approved to accept new payments.");
 
+            if (owner.PaymentConfirmationMode == PaymentConfirmationMode.Manual)
+                throw new ApiException(409, "Chủ trọ đang dùng xác nhận thanh toán thủ công. Vui lòng dùng VietQR trên hóa đơn.");
             var currentInvoice = await db.Invoices.SingleOrDefaultAsync(row => row.Id == invoice.Id && row.OwnerId == ownerId, cancellationToken)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found.");
             await db.Entry(currentInvoice).ReloadAsync(cancellationToken);
             if (currentInvoice.LifecycleState != InvoiceLifecycleState.Issued)
                 throw new ApiException(StatusCodes.Status409Conflict, "Draft invoices cannot accept payOS payments. Publish the invoice first.");
-            var outstanding = ApiSupport.RoundVnd(currentInvoice.Total - currentInvoice.Paid);
-            if (outstanding <= 0) throw new ApiException(StatusCodes.Status409Conflict, "This invoice is already paid.");
-
-            existing = await db.PayOsAttempts
-                .Where(row => row.OwnerId == ownerId && row.InvoiceId == currentInvoice.Id && row.Status == PaymentAttemptStatus.Pending)
-                .OrderByDescending(row => row.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+            var selected = allInvoices ? await db.Invoices.Where(i => i.OwnerId == ownerId && i.OccupancyId == currentInvoice.OccupancyId &&
+                i.LifecycleState == InvoiceLifecycleState.Issued && i.Total > i.Paid).OrderBy(i => i.Id).ToListAsync(cancellationToken)
+                : [currentInvoice];
+            if (allInvoices && selected.Any(i => i.Total - i.Paid != decimal.Truncate(i.Total - i.Paid)))
+                throw new ApiException(400, "Tổng tiền phải là số VND nguyên.");
+            var outstanding = selected.Sum(i => ApiSupport.RoundVnd(i.Total - i.Paid));
+            if (outstanding <= 0) throw new ApiException(409, "This invoice is already paid.");
+            var selectedIds = selected.Select(i => i.Id).ToArray();
+            var reservations = selected.Where(i => i.PaymentReservationId != null).Select(i => i.PaymentReservationId!.Value).ToArray();
+            var pending = await db.PayOsAttempts.Where(a => a.OwnerId == ownerId && a.Status == PaymentAttemptStatus.Pending &&
+                (selectedIds.Contains(a.InvoiceId) || reservations.Contains(a.Id))).ToListAsync(cancellationToken);
+            if (pending.Count > 1) throw new ApiException(409, "Vui lòng đối soát các giao dịch đang chờ trước khi thanh toán tất cả.");
+            existing = pending.SingleOrDefault();
+            if (existing is not null) {
+                var existingIds = existing.InvoiceAllocationsJson is null ? new[] { existing.InvoiceId } :
+                    JsonSerializer.Deserialize<InvoiceAllocation[]>(existing.InvoiceAllocationsJson)!.Select(x => x.InvoiceId).ToArray();
+                if (!existingIds.Order().SequenceEqual(selectedIds.Order()))
+                    throw new ApiException(409, "Các hóa đơn đang thuộc giao dịch thanh toán khác. Vui lòng đối soát giao dịch đó trước.");
+            }
 
             if (existing is null)
             {
@@ -85,6 +99,7 @@ public sealed partial class PayOsService
                 {
                     OwnerId = ownerId,
                     InvoiceId = currentInvoice.Id,
+                    InvoiceAllocationsJson = allInvoices ? JsonSerializer.Serialize(selected.Select(i => new InvoiceAllocation(i.Id, i.Total - i.Paid))) : null,
                     OrderCode = NewOrderCode(),
                     Amount = amount,
                     Status = PaymentAttemptStatus.Pending,
@@ -92,7 +107,7 @@ public sealed partial class PayOsService
                     ExpiresAt = expiresAt
                 };
                 db.PayOsAttempts.Add(attempt);
-                currentInvoice.Version++;
+                foreach (var item in selected) { item.PaymentReservationId = attempt.Id; item.Version++; }
                 await db.SaveChangesAsync(cancellationToken);
             }
             await transaction.CommitAsync(cancellationToken);

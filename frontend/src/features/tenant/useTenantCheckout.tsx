@@ -45,14 +45,17 @@ export function useTenantCheckout(token: string, invoiceId: string) {
 
   const query = useQuery({
     queryKey: ['tenant', token, 'invoice', invoiceId],
-    queryFn: () => tenantApi.overview(token, 1, invoiceId),
+    queryFn: () => tenantApi.overview(token, 1, invoiceId === 'all' ? undefined : invoiceId),
     enabled: !!token,
     retry: false,
     refetchOnMount: 'always',
     refetchInterval: checkout && tabVisible && checkout.status === 'pending' && !overviewPollingPaused ? overviewDelayMs : false,
     refetchIntervalInBackground: false,
   });
-  const invoice = query.data?.invoices.find((item) => item.id === invoiceId);
+  const first = query.data?.invoices[0];
+  const invoice = invoiceId === 'all' && first ? { ...first, id: 'all', paid: 0,
+    total: query.data!.totals.outstanding, outstanding: query.data!.totals.outstanding,
+    status: query.data!.totals.outstanding > 0 ? 'Unpaid' as const : 'Paid' as const } : query.data?.invoices.find((item) => item.id === invoiceId);
 
   useEffect(() => {
     const onVisibilityChange = () => setTabVisible(document.visibilityState === 'visible');
@@ -103,7 +106,7 @@ export function useTenantCheckout(token: string, invoiceId: string) {
   }, [query.dataUpdatedAt, query.isSuccess]);
 
   const paymentMutation = useMutation({
-    mutationFn: (_variables: { generation: number }) => tenantApi.createPayment(token, invoiceId),
+    mutationFn: (_variables: { generation: number }) => invoiceId === 'all' ? tenantApi.createAllPayment(token) : tenantApi.createPayment(token, invoiceId),
     onSuccess: async (result, variables) => {
       if (!mounted.current || requestGeneration.current !== variables.generation || !invoiceId) return;
       const generation = variables.generation;
@@ -125,12 +128,12 @@ export function useTenantCheckout(token: string, invoiceId: string) {
     },
   });
   const reconcileMutation = useMutation({
-    mutationFn: (_variables: { generation: number }) => tenantApi.reconcile(token, invoiceId),
+    mutationFn: async (_variables: { generation: number }) => invoiceId === 'all' ? { ...await tenantApi.reconcileOrder(token, checkoutRef.current!.orderCode), invoice: null } : await tenantApi.reconcile(token, invoiceId),
     onSuccess: async (result, variables) => {
       const current = checkoutRef.current;
       if (!mounted.current || !current || current.invoiceId !== invoiceId || current.generation !== variables.generation || requestGeneration.current !== variables.generation) return;
       const status = checkoutStatus(result.status);
-      const paidByInvoice = result.invoice.id === invoiceId && invoiceIsPaid(result.invoice);
+      const paidByInvoice = invoiceId === 'all' ? status === 'paid' : result.invoice?.id === invoiceId && invoiceIsPaid(result.invoice);
       const nextStatus: CheckoutStatus = paidByInvoice ? 'paid' : status === 'paid' ? 'pending' : status;
       setActiveCheckout({ ...current, status: nextStatus, verificationPending: !paidByInvoice && status === 'paid' });
       setCheckoutError('');
@@ -152,7 +155,7 @@ export function useTenantCheckout(token: string, invoiceId: string) {
   });
 
   function beginCreate() {
-    if (paymentMutation.isPending) return;
+    if (paymentMutation.isPending || query.data?.confirmationMode === 'Manual') return;
     const generation = ++requestGeneration.current;
     setActiveCheckout(null);
     setCreateError('');
@@ -160,6 +163,7 @@ export function useTenantCheckout(token: string, invoiceId: string) {
     paymentMutation.mutate({ generation });
   }
   useEffect(() => {
+    if (query.data?.confirmationMode === 'Manual') return;
     if (!query.isSuccess || !query.data || query.isFetching || tenantAccessError || isAccessError(query.error) || autoCreateStarted.current || !invoice) return;
     autoCreateStarted.current = true;
     if (!invoiceIsPaid(invoice) && invoice.outstanding > 0) beginCreate();

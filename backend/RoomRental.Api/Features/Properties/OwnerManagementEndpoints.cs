@@ -44,10 +44,7 @@ public static partial class OwnerManagementEndpoints
             if (depositRows.Any(invoice => invoice.Paid > settledByInvoice.GetValueOrDefault(invoice.Id)))
                 return "còn tiền cọc đang giữ.";
         }
-        if (await (from attempt in db.PayOsAttempts.AsNoTracking()
-                   join invoice in db.Invoices.AsNoTracking() on attempt.InvoiceId equals invoice.Id
-                   where invoice.OwnerId == ownerId && invoice.RoomId == roomId && attempt.Status == PaymentAttemptStatus.Pending
-                   select attempt.Id).AnyAsync(ct))
+        if (await PaymentReservations.Pending(db).AnyAsync(i => i.OwnerId == ownerId && i.RoomId == roomId, ct))
             return "còn giao dịch payOS đang chờ đối soát.";
         return null;
     }

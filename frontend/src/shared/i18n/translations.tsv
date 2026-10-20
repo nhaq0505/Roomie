@@ -598,7 +598,7 @@
 597|Issuance status|发布状态|발행 상태|जारी करने की स्थिति
 598|All issuance statuses|所有发布状态|모든 발행 상태|सभी जारी स्थितियाँ
 599|Draft not sent to tenant|草稿尚未发送给租客|초안이 임차인에게 전송되지 않았습니다|ड्राफ़्ट किरायेदार को नहीं भेजा गया है
-600|A draft has no payment status. Open Readings to edit and publish it.|草稿没有付款状态。请打开电表读数页面进行编辑并发布。|초안에는 결제 상태가 없습니다. 검침 페이지에서 수정하고 발행하세요.|ड्राफ़्ट की भुगतान स्थिति नहीं होती। इसे संपादित और जारी करने के लिए रीडिंग पृष्ठ खोलें।
+600|A draft has no payment status. Open Create invoices to edit and publish it.|草稿没有付款状态。请打开开具账单页面进行编辑并发布。|초안에는 결제 상태가 없습니다. 청구서 작성 페이지에서 수정하고 발행하세요.|ड्राफ़्ट में भुगतान स्थिति नहीं है। संपादित और जारी करने के लिए बिल बनाएं पेज खोलें।
 601|Adjust invoice|调整账单|청구서 조정|बिल में बदलाव
 602|Adjust deposit|调整押金|보증금 조정|जमा राशि में बदलाव
 603|Adjust supplemental invoice|调整附加账单|추가 청구서 조정|अतिरिक्त बिल में बदलाव
@@ -1054,3 +1054,36 @@
 1054|Recover by email|通过邮箱找回|이메일로 복구|ईमेल से पुनर्प्राप्त करें
 1055|The recovery code is invalid or has expired.|恢复验证码无效或已过期。|복구 코드가 유효하지 않거나 만료되었습니다.|पुनर्प्राप्ति कोड अमान्य है या उसकी समय-सीमा समाप्त हो गई है।
 1040|Building updated.|已更新楼栋。|건물이 업데이트되었습니다.|भवन अपडेट किया गया।
+1056|Create invoices|开具账单|청구서 작성|बिल बनाएं
+1057|Configuration|配置|설정|कॉन्फ़िगरेशन
+1058|VietQR bank transfer|VietQR 银行转账|VietQR 계좌이체|VietQR बैंक ट्रांसफ़र
+1059|Transfers awaiting confirmation|待确认的转账|확인 대기 중인 이체|पुष्टि की प्रतीक्षा में ट्रांसफ़र
+1060|No transfer requests yet.|暂无转账请求。|아직 이체 요청이 없습니다.|अभी कोई ट्रांसफ़र अनुरोध नहीं है।
+1061|Payment mode|付款模式|결제 방식|भुगतान मोड
+1062|Confirm only after checking the funds received in your bank account.|请在核实银行账户实际到账后再确认。|은행 계좌의 실제 입금을 확인한 후에만 확정하세요.|बैंक खाते में वास्तव में मिली राशि जाँचने के बाद ही पुष्टि करें।
+1063|Choose how to confirm payments and configure your receiving account.|选择付款确认方式并设置收款账户。|결제 확인 방식을 선택하고 입금 계좌를 설정하세요.|भुगतान की पुष्टि का तरीका चुनें और प्राप्तकर्ता खाता सेट करें।
+1064|Refresh QR code|更新二维码|QR 코드 새로고침|QR कोड अपडेट करें
+1065|The payment will update after the landlord confirms receipt of funds.|房东确认收款后才会更新付款状态。|임대인이 입금을 확인한 후 결제 상태가 업데이트됩니다.|मकान मालिक द्वारा राशि मिलने की पुष्टि के बाद भुगतान अपडेट होगा।
+1066|Check the recipient account in your banking app before transferring funds.|转账前请在银行应用中核对收款账户。|송금 전 은행 앱에서 수취인 계좌를 확인하세요.|पैसे भेजने से पहले बैंक ऐप में प्राप्तकर्ता खाता जाँचें।
+1067|Check the receiving account before saving. Generating a QR code does not confirm payment.|保存前请核对收款账户。生成二维码不代表已确认付款。|저장 전 입금 계좌를 확인하세요. QR 생성은 결제 확인을 의미하지 않습니다.|सहेजने से पहले प्राप्तकर्ता खाता जाँचें। QR बनाना भुगतान की पुष्टि नहीं है।
+1068|Refresh invoice status|刷新账单状态|청구서 상태 새로고침|बिल की स्थिति अपडेट करें
+1069|Save payment mode|保存付款模式|결제 방식 저장|भुगतान मोड सहेजें
+1070|VietQR transfer code|VietQR 转账二维码|VietQR 이체 코드|VietQR ट्रांसफ़र कोड
+1071|Bank BIN|银行 BIN 代码|은행 BIN 코드|बैंक BIN कोड
+1072|Receiving bank|收款银行|입금 은행|प्राप्तकर्ता बैंक
+1073|Tenants transfer via VietQR. Check received funds before confirming the receipt.|租客通过 VietQR 转账。请核实实际到账后确认收款。|임차인이 VietQR로 이체합니다. 실제 입금을 확인한 후 수납을 확정하세요.|किरायेदार VietQR से ट्रांसफ़र करते हैं। वास्तव में मिली राशि जाँचकर रसीद की पुष्टि करें।
+1074|Amount actually received|实际到账金额|실제 입금액|वास्तव में प्राप्त राशि
+1075|Pay all invoices|支付全部账单|모든 청구서 결제|सभी बिलों का भुगतान करें
+1076|Account holder name|账户持有人姓名|예금주명|खाताधारक का नाम
+1077|Automatic payment confirmation|自动确认付款|자동 결제 확인|भुगतान की स्वचालित पुष्टि
+1078|PAYMENT CONFIRMATION|付款确认|결제 확인|भुगतान की पुष्टि
+1079|Payment confirmation|付款确认|결제 확인|भुगतान की पुष्टि
+1080|Manual payment confirmation|手动确认付款|수동 결제 확인|भुगतान की मैन्युअल पुष्टि
+1081|Confirm funds received|确认收款|입금 확인|राशि मिलने की पुष्टि करें
+1082|payOS verifies transactions and automatically updates paid invoices.|payOS 验证交易并自动更新已付款账单。|payOS가 거래를 검증하고 결제된 청구서를 자동 업데이트합니다.|payOS लेनदेन सत्यापित करता है और भुगतान किए गए बिल अपने आप अपडेट करता है।
+1083|{0} invoices|{0} 张账单|청구서 {0}개|{0} बिल
+1084|Receipt recorded against the invoices.|已将收款记入账单。|청구서에 수납이 기록되었습니다.|बिलों में प्राप्त राशि दर्ज कर दी गई।
+1085|Payment mode saved.|付款模式已保存。|결제 방식이 저장되었습니다.|भुगतान मोड सहेजा गया।
+1086|Confirmed|已确认|확인됨|पुष्टि हो गई
+1087|Match the transfer reference, account and received amount before confirming.|确认前请核对转账备注、账户和实际到账金额。|확정 전 이체 메모, 계좌 및 실제 입금액을 대조하세요.|पुष्टि से पहले ट्रांसफ़र विवरण, खाता और मिली राशि का मिलान करें।
+1088|This confirmation settles the full remaining balance of the selected invoices.|此次确认将结清所选账单的全部剩余金额。|이 확인으로 선택한 청구서의 남은 잔액 전액이 결제됩니다.|इस पुष्टि से चुने गए बिलों की पूरी शेष राशि का भुगतान हो जाएगा।

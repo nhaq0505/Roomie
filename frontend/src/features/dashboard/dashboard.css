@@ -8,13 +8,13 @@
 .stat-blue { color: #527fa5; background: #edf4fb; }
 .stat-green { color: #218364; background: #e9f5ee; }
 .stat-amber { color: #bb8133; background: #fbf2e6; }
-.stat-card .ant-statistic-title { margin-bottom: 17px; color: #78898e; font-size: 13px; }
+.stat-card .ant-statistic-title { margin-bottom: 17px; color: var(--muted); font-size: 13px; }
 .stat-card .ant-statistic-content { color: #1b343c; font-family: Manrope, sans-serif; font-size: clamp(20px, 2vw, 25px); font-weight: 750; letter-spacing: -.8px; }
 .stat-card .ant-statistic-content-value { white-space: nowrap; }
-.stat-unit { margin-left: 5px; color: #839296; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; }
-.stat-foot { display: flex; gap: 5px; margin-top: 7px; color: #89979b; font-size: 13px; }
-.stat-muted { color: #88979a; }
-.stat-positive { color: #2b946e; }
+.stat-unit { margin-left: 5px; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.stat-foot { display: flex; gap: 5px; margin-top: 7px; color: var(--muted); font-size: 13px; }
+.stat-muted { color: var(--muted); }
+.stat-positive { color: var(--green); }
 .dashboard-main-grid { margin-bottom: 18px; }
 .task-list { display: flex; flex-direction: column; }
 .task-item { display: flex; align-items: center; gap: 13px; padding: 13px 9px; color: inherit; text-decoration: none; border-bottom: 1px solid #edf1f0; transition: background .15s ease; }
@@ -33,26 +33,26 @@
 .occupancy-percent small { padding-left: 2px; font-size: 17px; font-weight: 600; }
 .occupancy-summary .ant-progress-text { color: #38555a !important; font-size: 13px !important; font-weight: 650; }
 .occupancy-stats { display: flex; justify-content: space-between; padding: 13px 0; border-top: 1px solid #eef2f1; border-bottom: 1px solid #eef2f1; }
-.occupancy-stats > div { display: flex; align-items: center; gap: 6px; color: #74858a; font-size: 13px; }
+.occupancy-stats > div { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
 .occupancy-stats strong { padding-left: 3px; color: #354d53; font-size: 13px; }
 .legend-dot, .overview-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
 .dot-teal { background: #17a486; }
 .dot-gray { background: #c8d1ce; }
-.mini-room-note { display: flex; align-items: center; gap: 8px; padding-top: 13px; color: #879599; font-size: 13px; }
+.mini-room-note { display: flex; align-items: center; gap: 8px; padding-top: 13px; color: var(--muted); font-size: 13px; }
 .mini-room-note .anticon { color: #10a084; }
 .recent-invoice-list { display: flex; flex-direction: column; }
 .recent-invoice-row { display: flex; align-items: center; gap: 13px; min-height: 66px; padding: 10px 4px; color: inherit; text-decoration: none; border-top: 1px solid #edf1f0; }
 .recent-invoice-row:first-child { border-top: 0; }
-.recent-invoice-row:hover .recent-invoice-room strong { color: #0f947b; }
-.invoice-room-avatar, .room-avatar { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #138c77; background: #e8f6f2; font-family: Manrope, sans-serif; font-size: 13px; font-weight: 700; }
+.recent-invoice-row:hover .recent-invoice-room strong { color: var(--teal-dark); }
+.invoice-room-avatar, .room-avatar { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--teal-dark); background: #e8f6f2; font-family: Manrope, sans-serif; font-size: 13px; font-weight: 700; }
 .recent-invoice-room { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .recent-invoice-room strong { overflow: hidden; color: #3b5257; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.recent-invoice-room span, .recent-invoice-period { color: #8a989b; font-size: 13px; }
+.recent-invoice-room span, .recent-invoice-period { color: var(--muted); font-size: 13px; }
 .recent-invoice-amount { display: flex; min-width: 142px; align-items: flex-end; flex-direction: column; gap: 5px; }
 .recent-invoice-amount > strong { color: #334d53; font-size: 13px; }
 .status-pill { display: inline-flex; align-items: center; margin: 0; padding: 3px 8px; border: 0; border-radius: 20px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .status-paid { color: #267c60; background: #eaf6ef; }
-.status-partial { color: #a47027; background: #fbf3e5; }
-.status-unpaid { color: #bc6158; background: #fbefed; }
-.status-pending { color: #a36d24; background: #fbf3e5; }
+.status-partial { color: #8b5d1b; background: #fbf3e5; }
+.status-unpaid { color: #9f443b; background: #fbefed; }
+.status-pending { color: #8b5d1b; background: #fbf3e5; }
 .status-suspended { color: #805875; background: #f5edf4; }

@@ -30,9 +30,7 @@ public static class MoveoutEndpoints
                 .Where(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id)
                 .OrderBy(x => x.IssuedAt).ToListAsync(ct);
             var invoiceIds = invoices.Select(x => x.Id).ToArray();
-            var pendingInvoiceIds = await db.PayOsAttempts.AsNoTracking()
-                .Where(x => x.OwnerId == ownerId && x.Status == PaymentAttemptStatus.Pending && invoiceIds.Contains(x.InvoiceId))
-                .Select(x => x.InvoiceId).ToListAsync(ct);
+            var pendingInvoiceIds = await PaymentReservations.Pending(db).Where(x => x.OwnerId == ownerId && invoiceIds.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
             var deposit = invoices.SingleOrDefault(x => x.Kind == "Deposit");
             var held = deposit is null ? 0 : deposit.Paid - deposit.DepositSettlements.Sum(x => x.Amount);
             var blockedReason = CompletionBlockReason(invoices, pendingInvoiceIds);
@@ -120,9 +118,7 @@ public static class MoveoutEndpoints
         var invoices = await db.Invoices.Include(x => x.DepositSettlements)
             .Where(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id).ToListAsync(ct);
         var invoiceIds = invoices.Select(x => x.Id).ToArray();
-        var pendingInvoiceIds = await db.PayOsAttempts.AsNoTracking()
-            .Where(x => x.OwnerId == ownerId && x.Status == PaymentAttemptStatus.Pending && invoiceIds.Contains(x.InvoiceId))
-            .Select(x => x.InvoiceId).ToListAsync(ct);
+        var pendingInvoiceIds = await PaymentReservations.Pending(db).Where(x => x.OwnerId == ownerId && invoiceIds.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
         var blockedReason = CompletionBlockReason(invoices, pendingInvoiceIds);
         if (blockedReason is not null) throw new ApiException(409, blockedReason);
 

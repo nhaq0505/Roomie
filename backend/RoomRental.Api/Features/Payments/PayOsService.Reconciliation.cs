@@ -26,7 +26,7 @@ public sealed partial class PayOsService
 
     public async Task<string> ReconcileInvoiceAsync(Guid ownerId, Guid invoiceId, CancellationToken cancellationToken)
     {
-        var attempt = await db.PayOsAttempts.Where(row => row.OwnerId == ownerId && row.InvoiceId == invoiceId &&
+        var attempt = await db.PayOsAttempts.Where(row => row.OwnerId == ownerId && (row.InvoiceId == invoiceId || db.Invoices.Any(i => i.Id == invoiceId && i.PaymentReservationId == row.Id)) &&
                 (row.Status == PaymentAttemptStatus.Pending || row.Status == PaymentAttemptStatus.Paid))
             .OrderByDescending(row => row.CreatedAt).FirstOrDefaultAsync(cancellationToken);
         if (attempt is null) return "NoPayment";
@@ -152,27 +152,26 @@ public sealed partial class PayOsService
             return;
         }
 
-        var invoice = await db.Invoices.SingleAsync(row => row.Id == trackedAttempt.InvoiceId && row.OwnerId == ownerId, cancellationToken);
-        await db.Entry(invoice).ReloadAsync(cancellationToken);
-        if (invoice.LifecycleState != InvoiceLifecycleState.Issued)
-            throw new ApiException(StatusCodes.Status409Conflict, "A draft invoice cannot receive a payOS payment.");
-        if (amount != trackedAttempt.Amount || amount > invoice.Total - invoice.Paid)
-            throw new ApiException(StatusCodes.Status409Conflict, "Payment exceeds the invoice balance.");
-
-        db.Receipts.Add(new PaymentReceipt
-        {
-            OwnerId = ownerId,
-            InvoiceId = invoice.Id,
-            Amount = amount,
-            Note = "Thanh toán trực tuyến qua payOS",
-            Source = "payOS",
-            ExternalReference = reference,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
+        var allocations = trackedAttempt.InvoiceAllocationsJson is null
+            ? new[] { new InvoiceAllocation(trackedAttempt.InvoiceId, amount) }
+            : JsonSerializer.Deserialize<InvoiceAllocation[]>(trackedAttempt.InvoiceAllocationsJson)!;
+        if (amount != trackedAttempt.Amount || allocations.Length == 0 || allocations.Sum(x => x.Amount) != amount ||
+            allocations.Select(x => x.InvoiceId).Distinct().Count() != allocations.Length)
+            throw new ApiException(409, "Payment does not match the reserved invoices.");
+        foreach (var item in allocations.OrderBy(x => x.InvoiceId)) {
+            var invoice = await db.Invoices.SingleAsync(row => row.Id == item.InvoiceId && row.OwnerId == ownerId, cancellationToken);
+            await db.Entry(invoice).ReloadAsync(cancellationToken);
+            if (invoice.LifecycleState != InvoiceLifecycleState.Issued || item.Amount <= 0 || item.Amount > invoice.Total - invoice.Paid)
+                throw new ApiException(409, "Payment exceeds the invoice balance.");
+            db.Receipts.Add(new PaymentReceipt {
+                OwnerId = ownerId, InvoiceId = invoice.Id, Amount = item.Amount,
+                Note = "Thanh toán trực tuyến qua payOS", Source = "payOS",
+                ExternalReference = trackedAttempt.InvoiceAllocationsJson is null ? reference : $"batch:{trackedAttempt.Id:N}:{invoice.Id:N}",
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+            invoice.Paid += item.Amount; invoice.Version++; InvoiceService.RecalculateStatus(invoice);
+        }
         db.ProcessedWebhooks.Add(new ProcessedWebhook { OwnerId = ownerId, Reference = reference, OrderCode = trackedAttempt.OrderCode });
-        invoice.Paid += amount;
-        invoice.Version++;
-        InvoiceService.RecalculateStatus(invoice);
         trackedAttempt.Status = PaymentAttemptStatus.Paid;
         trackedAttempt.ProviderReference = reference;
         trackedAttempt.PaidAt = DateTimeOffset.UtcNow;

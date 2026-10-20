@@ -51,8 +51,8 @@ public static partial class BillingEndpoints
             var rows = await query.OrderByDescending(row => row.Period).ThenBy(row => row.BuildingName).ThenBy(row => row.RoomName).ThenBy(row => row.Id)
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(cancellationToken);
             var rowIds = rows.Select(x => x.Id).ToList();
-            var pendingIds = await db.PayOsAttempts.AsNoTracking().Where(x => x.OwnerId == ownerId && x.Status == PaymentAttemptStatus.Pending && rowIds.Contains(x.InvoiceId))
-                .Select(x => x.InvoiceId).ToListAsync(cancellationToken);
+            var pendingIds = await PaymentReservations.Pending(db).Where(x => x.OwnerId == ownerId && rowIds.Contains(x.Id))
+                .Select(x => x.Id).ToListAsync(cancellationToken);
             var pending = pendingIds.ToHashSet();
 
             var occupancyIds = rows.Select(x => x.OccupancyId).Distinct().ToList();
@@ -116,7 +116,7 @@ public static partial class BillingEndpoints
             var ownerId = ApiSupport.OwnerId(context);
             var invoice = await db.Invoices.Include(x => x.DepositSettlements).AsNoTracking().SingleOrDefaultAsync(row => row.Id == id && row.OwnerId == ownerId, cancellationToken)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found.");
-            var pending = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => x.OwnerId == ownerId && x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, cancellationToken);
+            var pending = await db.PayOsAttempts.AsNoTracking().AnyAsync(x => x.OwnerId == ownerId && (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, cancellationToken);
             var meterPolicy = await MeterCorrectionPolicyAsync(db, invoice, cancellationToken);
             var occupancy = await db.Occupancies.AsNoTracking().SingleOrDefaultAsync(x => x.Id == invoice.OccupancyId, cancellationToken);
             var token = occupancy is not null && await tokenService.CanShareAsync(invoice.OwnerId, webhookService, cancellationToken)
@@ -150,7 +150,7 @@ public static partial class BillingEndpoints
             if (invoice.Version != request.ExpectedVersion) throw new ApiException(409, "Invoice changed. Refresh it and retry.");
             if (invoice.Paid != 0 || await db.Receipts.AnyAsync(x => x.InvoiceId == id, ct))
                 throw new ApiException(409, "A draft with a recorded payment cannot be edited or published.");
-            if (await db.PayOsAttempts.AnyAsync(x => x.InvoiceId == id && x.Status == PaymentAttemptStatus.Pending, ct))
+            if (await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == id || db.Invoices.Any(i => i.Id == id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct))
                 throw new ApiException(409, "Reconcile the pending payOS attempt before publishing this invoice.");
 
             var before = SerializeSnapshot(invoice);

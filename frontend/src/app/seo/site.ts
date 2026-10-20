@@ -13,9 +13,9 @@ export const privatePageTitles: Record<string, string> = {
   '/login': 'Đăng nhập', '/register': 'Đăng ký làm chủ trọ',
   '/reset-password': 'Đặt lại mật khẩu', '/change-password': 'Đổi mật khẩu',
   '/account-status': 'Trạng thái tài khoản', '/dashboard': 'Tổng quan',
-  '/buildings': 'Dãy trọ', '/rooms': 'Phòng & người thuê', '/readings': 'Chỉ số điện',
+  '/buildings': 'Dãy trọ', '/rooms': 'Phòng & người thuê', '/readings': 'Lập hóa đơn',
   '/invoices': 'Hóa đơn', '/reports': 'Báo cáo',
-  '/settings/payment': 'Cấu hình thanh toán', '/admin/owners': 'Quản lý chủ trọ',
+  '/settings/payment': 'Cấu hình', '/admin/owners': 'Quản lý chủ trọ',
 };
 
 export function metadataFor(pathname: string) {

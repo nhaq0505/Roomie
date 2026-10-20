@@ -31,6 +31,18 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .HasMaxLength(320)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ManualAccountName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManualAccountNumber")
+                        .HasMaxLength(34)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManualBankBin")
+                        .HasMaxLength(6)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("MfaEnabled")
                         .HasColumnType("INTEGER");
 
@@ -60,6 +72,13 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .IsConcurrencyToken()
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentConfirmationMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Automatic");
 
                     b.Property<long?>("PendingMfaExpiresAt")
                         .HasColumnType("INTEGER");
@@ -289,6 +308,9 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("PaymentReservationId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Period")
                         .IsRequired()
                         .HasMaxLength(7)
@@ -446,6 +468,60 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.HasIndex("WindowStartedAt");
 
                     b.ToTable("LoginThrottles");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.ManualPaymentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AccountName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(34)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AllocationsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankBin")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ConfirmedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OccupancyId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccupancyId");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.ToTable("ManualPaymentRequests");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.MonthlyReading", b =>
@@ -768,6 +844,9 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.Property<long?>("ExpiresAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("InvoiceAllocationsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("InvoiceId")
                         .HasColumnType("TEXT");
 
@@ -1066,6 +1145,21 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                         .WithMany()
                         .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.ManualPaymentRequest", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.Occupancy", null)
+                        .WithMany()
+                        .HasForeignKey("OccupancyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

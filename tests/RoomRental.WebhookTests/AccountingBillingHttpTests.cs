@@ -266,26 +266,31 @@ internal static class AccountingBillingHttpTests
             version = inv.Version;
         }
 
-        // 1. Partial cash payment: pay 1,000,000
+        // Partial confirmation is rejected without writing a receipt.
+        var partialResp = await client.PostAsJsonAsync($"/api/invoices/{invoiceId}/receipts",
+            new ReceiptRequest(1_000_000, "Partial rejected", "partial-key", version));
+        Assert(partialResp.StatusCode == HttpStatusCode.Conflict, "partial cash confirmation is rejected");
+
+        // Full confirmation settles the invoice.
         const string idempotencyKey = "cash-receipt-key-001";
         var receiptResp = await client.PostAsJsonAsync($"/api/invoices/{invoiceId}/receipts",
-            new ReceiptRequest(1_000_000, "Thu tien mat dot 1", idempotencyKey, version));
-        Assert(receiptResp.StatusCode == HttpStatusCode.OK, "partial cash receipt recorded with 200 OK");
+            new ReceiptRequest(2_350_000, "Thu tien mat dot 1", idempotencyKey, version));
+        Assert(receiptResp.StatusCode == HttpStatusCode.OK, "full cash receipt recorded with 200 OK");
 
         using (var scope = app.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var inv = await db.Invoices.FindAsync(invoiceId);
-            Assert(inv!.Paid == 1_000_000 && inv.Status == InvoiceStatus.Partial && (inv.Total - inv.Paid) == 1_350_000,
-                "invoice reflects 1,000,000 paid, Partial status, and 1,350,000 outstanding");
+            Assert(inv!.Paid == 2_350_000 && inv.Status == InvoiceStatus.Paid && (inv.Total - inv.Paid) == 0,
+                "invoice is fully paid with zero outstanding");
             var receipt = await db.Receipts.SingleAsync(r => r.InvoiceId == invoiceId);
-            Assert(receipt.Amount == 1_000_000 && receipt.Source == "Manual" && receipt.IdempotencyKey == idempotencyKey,
+            Assert(receipt.Amount == 2_350_000 && receipt.Source == "Manual" && receipt.IdempotencyKey == idempotencyKey,
                 "payment receipt created with Source = 'Manual'");
         }
 
         // 2. Idempotent replay: sending identical receipt request returns existing receipt without double credit
         var replayResp = await client.PostAsJsonAsync($"/api/invoices/{invoiceId}/receipts",
-            new ReceiptRequest(1_000_000, "Thu tien mat dot 1", idempotencyKey));
+            new ReceiptRequest(2_350_000, "Thu tien mat dot 1", idempotencyKey));
         Assert(replayResp.StatusCode == HttpStatusCode.OK, "receipt retry is idempotent (200 OK)");
 
         using (var scope = app.Services.CreateScope())
@@ -294,10 +299,10 @@ internal static class AccountingBillingHttpTests
             Assert(await db.Receipts.CountAsync(r => r.InvoiceId == invoiceId) == 1,
                 "no duplicate receipt created on replay");
             var inv = await db.Invoices.FindAsync(invoiceId);
-            Assert(inv!.Paid == 1_000_000, "invoice paid amount unchanged by replay");
+            Assert(inv!.Paid == 2_350_000, "invoice paid amount unchanged by replay");
         }
 
-        // 3. Overpayment prevention: outstanding is 1,350,000. Attempting to pay 2,000,000 returns 409 Conflict
+        // A settled invoice cannot receive another receipt.
         var overpayResp = await client.PostAsJsonAsync($"/api/invoices/{invoiceId}/receipts",
             new ReceiptRequest(2_000_000, "Thu qua so tien", "overpay-key", null));
         Assert(overpayResp.StatusCode == HttpStatusCode.Conflict,
@@ -331,7 +336,7 @@ internal static class AccountingBillingHttpTests
         }
 
         var recResp = await client.PostAsJsonAsync($"/api/invoices/{invoiceId}/receipts",
-            new ReceiptRequest(500_000, "+cmd|' /C calc'!A1", "export-receipt-idem"));
+            new ReceiptRequest(2_350_000, "+cmd|' /C calc'!A1", "export-receipt-idem"));
         Assert(recResp.StatusCode == HttpStatusCode.OK, "receipt for export test created with 200 OK");
 
         // 1. Receipts export: GET /api/reports/receipts/export.xlsx
@@ -357,8 +362,8 @@ internal static class AccountingBillingHttpTests
 
             // Verify typed numeric amount in column 2 ("Số tiền")
             var amountCell = details.Cell(2, 2);
-            Assert(amountCell.DataType == XLDataType.Number && amountCell.GetValue<decimal>() == 500_000,
-                "amount cell is typed numeric with value 500,000");
+            Assert(amountCell.DataType == XLDataType.Number && amountCell.GetValue<decimal>() == 2_350_000,
+                "amount cell is typed numeric with value 2,350,000");
 
             // Verify formula injection sanitization in Note column and TenantName column (quotePrefix)
             var noteCell = details.Cell(2, 4);
@@ -371,6 +376,11 @@ internal static class AccountingBillingHttpTests
                 "formula injection character '=' in tenant name is sanitized via quotePrefix");
             Assert(tenantCell.Style.NumberFormat.Format == "@", "tenant cell format is plain text (@)");
         }
+
+        // A separate unpaid charge remains in the debt report after the original invoice is settled.
+        var debtCharge = await client.PostAsJsonAsync($"/api/rooms/{roomId}/supplemental-invoices",
+            new SupplementalInvoiceRequest(Guid.NewGuid(), occupancyId, "Export debt fixture", 500_000, DateOnly.FromDateTime(DateTime.UtcNow)));
+        Assert(debtCharge.StatusCode == HttpStatusCode.Created, "unpaid debt export fixture created");
 
         // 2. Debt export: GET /api/reports/debt/export.xlsx
         var debtExportResp = await client.GetAsync("/api/reports/debt/export.xlsx");

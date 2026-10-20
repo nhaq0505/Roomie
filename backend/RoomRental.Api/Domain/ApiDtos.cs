@@ -42,7 +42,11 @@ public sealed record InvoiceCorrectionRequest(Guid RequestId, long ExpectedVersi
 public sealed record InvoiceCorrectionDto(Guid Id, int Revision, Guid RequestId, string Reason, Guid ActorId, string ActorName, DateTimeOffset CreatedAt, long Version, string BeforeJson, string AfterJson);
 public sealed record PaymentSettingsRequest(string ClientId, string ApiKey, string ChecksumKey);
 public sealed record PaymentSettingsDto(bool Configured, string? ClientId, string? WebhookUrl,
-    string WebhookStatus, string? WebhookVerifiedAt, string? WebhookError);
+    string WebhookStatus, string? WebhookVerifiedAt, string? WebhookError)
+{
+    public string ConfirmationMode { get; init; } = "Automatic";
+    public ManualBankDto? ManualBank { get; init; }
+}
 public sealed record PaymentCheckoutDto(string CheckoutUrl, string? QrCode, int Amount, long OrderCode,
     string? AccountName, string? AccountNumber, string? BankBin, string? Description, string Status, long? ExpiresAt);
 public sealed record TenantSummaryDto(RoomDto Room, OccupancyDto Occupancy, IReadOnlyList<InvoiceDto> Invoices);

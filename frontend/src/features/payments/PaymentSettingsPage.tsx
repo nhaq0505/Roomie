@@ -7,6 +7,8 @@ import { t } from '../../shared/i18n/runtime';
 import { LoadError, PageTitle } from '../../shared/ui/Ui';
 import { paymentSettingsApi, type PaymentSettings } from './index';
 
+import { PaymentModeSettings } from './PaymentModeSettings';
+
 interface PaymentForm { clientId: string; apiKey: string; checksumKey: string; }
 
 export default function PaymentSettingsPage() {
@@ -33,6 +35,7 @@ export default function PaymentSettingsPage() {
   });
   const submit = (values: PaymentForm) => updateMutation.mutate(values);
   const webhookUrl = settingsQuery.data?.webhookUrl || '';
+  const isManual = settingsQuery.data?.confirmationMode === 'Manual';
   const verified = settingsQuery.data?.webhookStatus === 'Verified';
   const busy = updateMutation.isPending || verifyMutation.isPending;
   const copyWebhook = async () => {
@@ -42,10 +45,10 @@ export default function PaymentSettingsPage() {
 
   return <>
     <PageTitle
-      eyebrow={t("THU TIỀN TỰ ĐỘNG")}
-      title={t("Thanh toán trực tuyến")}
-      subtitle={t("Kết nối payOS để người thuê thanh toán hóa đơn qua liên kết riêng.")}
-      extra={
+      eyebrow={t("XÁC NHẬN THANH TOÁN")}
+      title={t("Cấu hình")}
+      subtitle={t("Chọn cách xác nhận thanh toán và cấu hình tài khoản nhận tiền.")}
+      extra={isManual ? undefined : (
         <Button
           type="primary"
           ghost
@@ -54,9 +57,9 @@ export default function PaymentSettingsPage() {
         >
           {t("Hướng dẫn thiết lập")}
         </Button>
-      }
+      )}
     />
-    {settingsQuery.isError ? <LoadError error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} /> : settingsQuery.isPending ? <div className="content-card"><Skeleton active paragraph={{ rows: 6 }} /></div> : <div className="settings-grid">
+    {settingsQuery.isError ? <LoadError error={settingsQuery.error} onRetry={() => void settingsQuery.refetch()} /> : settingsQuery.isPending ? <div className="content-card"><Skeleton active paragraph={{ rows: 6 }} /></div> : <><PaymentModeSettings settings={settingsQuery.data} />{isManual ? null : <div className="settings-grid">
       <div className="settings-main-column">
         <Card className="settings-card" bordered={false}>
           <div className="settings-card-heading"><div className="settings-heading-icon"><CreditCardOutlined /></div><div><Typography.Title level={4}>{t("Cấu hình payOS")}</Typography.Title><Typography.Text type="secondary">{t("Thông tin kết nối được mã hóa và lưu an toàn.")}</Typography.Text></div></div>
@@ -97,7 +100,7 @@ export default function PaymentSettingsPage() {
           {t("Hướng dẫn thiết lập payOS")}
         </Button>
       </Card>
-    </div>}
+    </div>}</>}
 
     <Drawer
       title={<Space><CreditCardOutlined style={{ color: 'var(--teal)' }} /><span>{t("Hướng dẫn thiết lập payOS")}</span></Space>}

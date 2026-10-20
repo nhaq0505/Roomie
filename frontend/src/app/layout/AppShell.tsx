@@ -29,11 +29,11 @@ const ownerItems = [
   { type: 'divider' as const },
   { key: '/buildings', icon: <BankOutlined />, label: t("Dãy trọ") },
   { key: '/rooms', icon: <HomeOutlined />, label: t("Phòng & người thuê") },
-  { key: '/readings', icon: <CalculatorOutlined />, label: t("Chỉ số điện") },
+  { key: '/readings', icon: <CalculatorOutlined />, label: t("Lập hóa đơn") },
   { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
   { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
   { type: 'divider' as const },
-  { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán trực tuyến") },
+  { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Cấu hình") },
   { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
 ];
 const adminItems = [{ key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") }];
