@@ -2,6 +2,7 @@ namespace RoomRental.Api.Domain;
 
 // Client Analytics Event Intake
 public sealed record AnalyticsEventItemDto(
+    string EventId,
     string EventType,
     string? EventName,
     string Path,
@@ -18,17 +19,32 @@ public sealed record AnalyticsEventItemDto(
 public sealed record AnalyticsEventBatchRequest(
     string BrowserId,
     string SessionId,
-    IReadOnlyList<AnalyticsEventItemDto> Events
+    IReadOnlyList<AnalyticsEventItemDto>? Events = null
 );
 
 public sealed record AnalyticsEventBatchResponse(
     int ProcessedCount,
-    int RejectedCount
+    int RejectedCount,
+    int DedupedCount = 0
 );
 
-// Backward-compatible registration attribution context
+// Authoritative Touch Point Attribution
+public sealed record AttributionTouchDto(
+    string? Source = null,
+    string? Medium = null,
+    string? Campaign = null,
+    string? Content = null,
+    string? Term = null,
+    string? LandingPage = null,
+    string? Referrer = null,
+    DateTimeOffset? OccurredAt = null
+);
+
+// Backward-compatible registration attribution context with independent First and Last Touch
 public sealed record RegistrationAttributionDto(
     string? BrowserId = null,
+    AttributionTouchDto? FirstTouch = null,
+    AttributionTouchDto? LastTouch = null,
     string? UtmSource = null,
     string? UtmMedium = null,
     string? UtmCampaign = null,
@@ -43,7 +59,8 @@ public sealed record MonitoringFilterRequest(
     DateOnly? FromDate = null,
     DateOnly? ToDate = null,
     string? Source = null,
-    string? Channel = null
+    string? Channel = null,
+    string? Campaign = null
 );
 
 // Admin Growth Tab DTOs
@@ -73,7 +90,7 @@ public sealed record CtaPerformanceDto(
 public sealed record CohortRetentionRowDto(
     string CohortPeriod,
     int CohortSize,
-    IReadOnlyList<double> RetentionPercentages
+    IReadOnlyList<double?> RetentionPercentages
 );
 
 public sealed record CohortMaturityDto(
@@ -110,7 +127,6 @@ public sealed record Cac30MetricDto(
 public sealed record RevenueSummaryDto(
     decimal TotalSubscriptionRevenueVnd,
     int PaidSubscriptionCount,
-    decimal MrrVnd,
     decimal TotalMarketingSpendVnd,
     decimal TotalMarketingHours,
     Cac30MetricDto Cac30
@@ -149,11 +165,12 @@ public sealed record AdminMonitoringRevenueResponse(
 // Admin Operations Tab DTOs
 public sealed record OpsOverviewDto(
     string OverallStatus,
-    double Api5xxRatePercent,
-    double LatencyP95Ms,
-    long TotalRequestsLastHour,
-    bool DatabaseConnected,
-    string DatabaseStatus
+    double? Api5xxRatePercent,
+    double? LatencyP95Ms,
+    long? TotalRequestsLastHour,
+    bool? DatabaseConnected,
+    string? DatabaseStatus,
+    string? Window = "1h"
 );
 
 public sealed record RouteLatencyMetricDto(
@@ -161,15 +178,15 @@ public sealed record RouteLatencyMetricDto(
     string HttpMethod,
     int RequestCount,
     int Status5xxCount,
-    double P95LatencyMs,
-    double AvgLatencyMs,
-    double MaxLatencyMs
+    double? P95LatencyMs,
+    double? AvgLatencyMs,
+    double? MaxLatencyMs
 );
 
 public sealed record HostMetricsDto(
-    double CpuPercent,
-    double MemoryPercent,
-    double DiskPercent,
+    double? CpuPercent,
+    double? MemoryPercent,
+    double? DiskPercent,
     int ContainerCount,
     string HealthEndpointStatus,
     string HostStatus,
@@ -189,10 +206,10 @@ public sealed record WorkerStatusDto(
 );
 
 public sealed record OperationalQueueStatsDto(
-    int ZaloPendingQueueCount,
-    int ZaloEligibleWindowCount,
-    int PayOsPendingReconcileCount,
-    long SmtpAcceptedNotDeliveredCount
+    int? ZaloPendingQueueCount,
+    int? ZaloEligibleWindowCount,
+    int? PayOsPendingReconcileCount,
+    long? SmtpAcceptedNotDeliveredCount
 );
 
 public sealed record AdminMonitoringOperationsResponse(
@@ -226,6 +243,46 @@ public sealed record AdminMonitoringIncidentsResponse(
 public sealed record UpdateIncidentRequest(
     string State,
     string? Note = null
+);
+
+// Campaign Metadata Management DTOs
+public sealed record MarketingCampaignDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Channel,
+    string? Source,
+    string? UtmCampaign,
+    string? UtmMedium,
+    string? UtmSource,
+    string? TargetUrl,
+    bool IsActive,
+    string CreatedByName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt
+);
+
+public sealed record CreateCampaignRequest(
+    string Code,
+    string Name,
+    string? Channel = null,
+    string? Source = null,
+    string? UtmCampaign = null,
+    string? UtmMedium = null,
+    string? UtmSource = null,
+    string? TargetUrl = null,
+    bool IsActive = true
+);
+
+public sealed record UpdateCampaignRequest(
+    string Name,
+    string? Channel = null,
+    string? Source = null,
+    string? UtmCampaign = null,
+    string? UtmMedium = null,
+    string? UtmSource = null,
+    string? TargetUrl = null,
+    bool? IsActive = null
 );
 
 // Campaign Costs Management DTOs

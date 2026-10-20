@@ -72,12 +72,13 @@ public static class MonitoringEndpoints
         });
 
         adminGroup.MapGet("/operations", async (
+            [FromQuery] string? window,
             IOperationsMonitoringService opsService,
             CancellationToken ct) =>
         {
             try
             {
-                var response = await opsService.GetOperationsMetricsAsync(ct);
+                var response = await opsService.GetOperationsMetricsAsync(window ?? "1h", ct);
                 return Results.Ok(response);
             }
             catch (NotImplementedException ex)
@@ -118,17 +119,79 @@ public static class MonitoringEndpoints
             }
         });
 
-        adminGroup.MapGet("/campaigns", async (
-            DateOnly? fromDate,
-            DateOnly? toDate,
+        // Campaign Metadata CRUD
+        adminGroup.MapGet("/campaigns/metadata", async (
+            bool? activeOnly,
+            string? channel,
+            string? source,
             IRevenueMonitoringQueryService revenueService,
             CancellationToken ct) =>
         {
-            var response = await revenueService.GetCampaignCostsAsync(fromDate, toDate, ct);
+            var response = await revenueService.GetCampaignsAsync(activeOnly, channel, source, ct);
+            return Results.Ok(response);
+        });
+
+        adminGroup.MapPost("/campaigns/metadata", async (
+            CreateCampaignRequest request,
+            HttpContext context,
+            IRevenueMonitoringQueryService revenueService,
+            CancellationToken ct) =>
+        {
+            var adminId = ApiSupport.UserId(context);
+            var adminName = context.User.Identity?.Name ?? "Admin";
+            var response = await revenueService.CreateCampaignAsync(request, adminId, adminName, ct);
+            return Results.Created($"/api/admin/monitoring/campaigns/metadata/{response.Id}", response);
+        });
+
+        adminGroup.MapPut("/campaigns/metadata/{id:guid}", async (
+            Guid id,
+            UpdateCampaignRequest request,
+            HttpContext context,
+            IRevenueMonitoringQueryService revenueService,
+            CancellationToken ct) =>
+        {
+            var adminId = ApiSupport.UserId(context);
+            var adminName = context.User.Identity?.Name ?? "Admin";
+            var response = await revenueService.UpdateCampaignAsync(id, request, adminId, adminName, ct);
+            return Results.Ok(response);
+        });
+
+        // Campaign Costs CRUD
+        adminGroup.MapGet("/campaigns", async (
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            string? campaign,
+            IRevenueMonitoringQueryService revenueService,
+            CancellationToken ct) =>
+        {
+            var response = await revenueService.GetCampaignCostsAsync(fromDate, toDate, campaign, ct);
+            return Results.Ok(response);
+        });
+
+        adminGroup.MapGet("/campaigns/costs", async (
+            DateOnly? fromDate,
+            DateOnly? toDate,
+            string? campaign,
+            IRevenueMonitoringQueryService revenueService,
+            CancellationToken ct) =>
+        {
+            var response = await revenueService.GetCampaignCostsAsync(fromDate, toDate, campaign, ct);
             return Results.Ok(response);
         });
 
         adminGroup.MapPost("/campaigns", async (
+            UpsertCampaignCostRequest request,
+            HttpContext context,
+            IRevenueMonitoringQueryService revenueService,
+            CancellationToken ct) =>
+        {
+            var adminId = ApiSupport.UserId(context);
+            var adminName = context.User.Identity?.Name ?? "Admin";
+            var response = await revenueService.UpsertCampaignCostAsync(request, adminId, adminName, ct);
+            return Results.Ok(response);
+        });
+
+        adminGroup.MapPost("/campaigns/costs", async (
             UpsertCampaignCostRequest request,
             HttpContext context,
             IRevenueMonitoringQueryService revenueService,

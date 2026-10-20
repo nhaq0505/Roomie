@@ -16,11 +16,10 @@ public sealed class ClientAnalyticsService(AppDbContext db, TimeProvider clock) 
         "landing_view",
         "pricing_view",
         "auth_attempt",
-        "registration_submit",
-        "custom"
+        "registration_submit"
     };
 
-    private static readonly Regex SafeLabelRegex = new(@"^[a-zA-Z0-9_\-\.]{1,64}$", RegexOptions.Compiled);
+    private static readonly Regex SafeLabelRegex = new(@"^[a-zA-Z0-9_\-\.\s\+]{1,64}$", RegexOptions.Compiled);
 
     public async Task<AnalyticsEventBatchResponse> RecordClientEventsAsync(
         AnalyticsEventBatchRequest request,
@@ -31,15 +30,53 @@ public sealed class ClientAnalyticsService(AppDbContext db, TimeProvider clock) 
         if (string.IsNullOrWhiteSpace(request.BrowserId) || string.IsNullOrWhiteSpace(request.SessionId))
             throw new ApiException(StatusCodes.Status400BadRequest, "BrowserId and SessionId are required.");
 
+        if (request.Events == null || request.Events.Count == 0)
+            return new AnalyticsEventBatchResponse(0, 0, 0);
+
+        if (request.Events.Count > 100)
+            throw new ApiException(StatusCodes.Status400BadRequest, "Batch size exceeds maximum limit of 100 events.");
+
         var browserId = SanitizeId(request.BrowserId);
         var sessionId = SanitizeId(request.SessionId);
         var now = clock.GetUtcNow();
 
         var processed = 0;
         var rejected = 0;
+        var deduped = 0;
 
-        foreach (var evt in request.Events.Take(50)) // Bound batch size to 50
+        var batchEvents = request.Events.Take(100).ToList();
+        var incomingEventIds = batchEvents
+            .Where(e => !string.IsNullOrWhiteSpace(e.EventId))
+            .Select(e => SanitizeId(e.EventId))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var existingDbIds = incomingEventIds.Count > 0
+            ? await db.AnalyticsEvents
+                .Where(x => incomingEventIds.Contains(x.EventId))
+                .Select(x => x.EventId)
+                .ToHashSetAsync(StringComparer.Ordinal, ct)
+            : new HashSet<string>(StringComparer.Ordinal);
+
+        var seenInBatch = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var evt in batchEvents)
         {
+            if (string.IsNullOrWhiteSpace(evt.EventId))
+            {
+                rejected++;
+                continue;
+            }
+
+            var eventId = SanitizeId(evt.EventId);
+
+            // Deduping: identical retries with same EventId are safely deduped without error
+            if (existingDbIds.Contains(eventId) || !seenInBatch.Add(eventId))
+            {
+                deduped++;
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(evt.EventType) || !AllowedEventTypes.Contains(evt.EventType.Trim()))
             {
                 rejected++;
@@ -53,22 +90,33 @@ public sealed class ClientAnalyticsService(AppDbContext db, TimeProvider clock) 
                 continue;
             }
 
+            var clientTs = evt.ClientTimestamp;
+            if (clientTs.HasValue)
+            {
+                // Validate client timestamp against server-known timing: clamp if in the future or too old
+                if (clientTs.Value > now.AddMinutes(5) || clientTs.Value < now.AddDays(-30))
+                {
+                    clientTs = now;
+                }
+            }
+
             var record = new ClientAnalyticsEvent
             {
+                EventId = eventId,
                 BrowserId = browserId,
                 SessionId = sessionId,
                 OwnerId = authenticatedOwnerId,
                 EventType = evt.EventType.Trim().ToLowerInvariant(),
-                EventName = Truncate(evt.EventName, 100),
+                EventName = SanitizeLabel(evt.EventName, 64),
                 Path = cleanPath,
                 ReferrerPath = SanitizePath(evt.ReferrerPath),
-                CtaId = SanitizeLabel(evt.CtaId),
-                UtmSource = SanitizeLabel(evt.UtmSource),
-                UtmMedium = SanitizeLabel(evt.UtmMedium),
-                UtmCampaign = SanitizeLabel(evt.UtmCampaign),
-                UtmContent = SanitizeLabel(evt.UtmContent),
-                UtmTerm = SanitizeLabel(evt.UtmTerm),
-                ClientTimestamp = evt.ClientTimestamp ?? now,
+                CtaId = SanitizeLabel(evt.CtaId, 64),
+                UtmSource = SanitizeLabel(evt.UtmSource, 64),
+                UtmMedium = SanitizeLabel(evt.UtmMedium, 64),
+                UtmCampaign = SanitizeLabel(evt.UtmCampaign, 64),
+                UtmContent = SanitizeLabel(evt.UtmContent, 64),
+                UtmTerm = SanitizeLabel(evt.UtmTerm, 64),
+                ClientTimestamp = clientTs ?? now,
                 ServerTimestamp = now
             };
 
@@ -81,45 +129,144 @@ public sealed class ClientAnalyticsService(AppDbContext db, TimeProvider clock) 
             await db.SaveChangesAsync(ct);
         }
 
-        return new AnalyticsEventBatchResponse(processed, rejected);
+        return new AnalyticsEventBatchResponse(processed, rejected, deduped);
     }
 
-    private static string SanitizeId(string value)
+    public static string SanitizeId(string value)
     {
         var trimmed = value.Trim();
         return trimmed.Length > 64 ? trimmed[..64] : trimmed;
     }
 
-    private static string? SanitizePath(string? path)
+    public static string? SanitizePath(string? rawPath)
     {
+        if (string.IsNullOrWhiteSpace(rawPath)) return null;
+        var trimmed = rawPath.Trim();
+
+        if (trimmed.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string path;
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+                return null;
+            path = uri.AbsolutePath;
+        }
+        else
+        {
+            path = trimmed;
+        }
+
+        var qIdx = path.IndexOf('?');
+        if (qIdx >= 0) path = path[..qIdx];
+        var hIdx = path.IndexOf('#');
+        if (hIdx >= 0) path = path[..hIdx];
+
         if (string.IsNullOrWhiteSpace(path)) return null;
-        var clean = path.Trim();
-        var qIdx = clean.IndexOf('?');
-        if (qIdx >= 0) clean = clean[..qIdx];
-        var hashIdx = clean.IndexOf('#');
-        if (hashIdx >= 0) clean = clean[..hashIdx];
-        if (clean.Length > 256) clean = clean[..256];
-        return clean;
+
+        if (!path.StartsWith('/'))
+            path = "/" + path;
+
+        // Strip GUIDs first
+        path = Regex.Replace(path, @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", ":id");
+        // Strip reset tokens, auth tokens, challenge tokens (20+ alphanumeric/underscore chars)
+        path = Regex.Replace(path, @"\b[0-9a-zA-Z_]{20,}\b", ":token");
+        // Deduplicate consecutive slashes
+        path = Regex.Replace(path, @"/{2,}", "/");
+        if (path.Length > 1 && path.EndsWith('/'))
+            path = path[..^1];
+
+        if (path.Length > 128)
+            path = path[..128];
+
+        if (!Regex.IsMatch(path, @"^/[a-zA-Z0-9_\-/:.]{0,127}$"))
+            return null;
+
+        return path;
     }
 
-    private static string? SanitizeLabel(string? value)
+    public static string? SanitizeLabel(string? value, int maxLen = 64)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
-        if (trimmed.Length > 64) trimmed = trimmed[..64];
+
+        // Reject PII: email addresses or long hex/base64 tokens
+        if (trimmed.Contains('@') || trimmed.Contains('%'))
+            return null;
+
+        if (trimmed.Length >= 20 && Regex.IsMatch(trimmed, @"^[0-9a-fA-F]{20,}$"))
+            return null;
+
+        if (trimmed.Length > maxLen)
+            trimmed = trimmed[..maxLen];
+
         return SafeLabelRegex.IsMatch(trimmed) ? trimmed : null;
-    }
-
-    private static string? Truncate(string? value, int maxLen)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        var trimmed = value.Trim();
-        return trimmed.Length > maxLen ? trimmed[..maxLen] : trimmed;
     }
 }
 
 public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) : IOwnerMilestoneTracker
 {
+    private static DateTimeOffset ValidateOccurredAt(DateTimeOffset? clientTime, DateTimeOffset serverNow)
+    {
+        if (!clientTime.HasValue) return serverNow;
+        var ts = clientTime.Value;
+        if (ts > serverNow.AddMinutes(5) || ts < serverNow.AddYears(-2))
+            return serverNow;
+        return ts;
+    }
+
+    public async Task TrackRegistrationStartedAsync(
+        Guid attemptId,
+        RegistrationAttributionDto? attribution,
+        string verificationMethod,
+        CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var touch = attribution?.FirstTouch;
+        var fact = new RegistrationLifecycleFact
+        {
+            RegistrationAttemptId = attemptId,
+            Stage = "Started",
+            VerificationMethod = verificationMethod,
+            BrowserId = ClientAnalyticsService.SanitizeLabel(attribution?.BrowserId),
+            UtmSource = ClientAnalyticsService.SanitizeLabel(touch?.Source ?? attribution?.UtmSource),
+            UtmMedium = ClientAnalyticsService.SanitizeLabel(touch?.Medium ?? attribution?.UtmMedium),
+            UtmCampaign = ClientAnalyticsService.SanitizeLabel(touch?.Campaign ?? attribution?.UtmCampaign),
+            UtmContent = ClientAnalyticsService.SanitizeLabel(touch?.Content ?? attribution?.UtmContent),
+            UtmTerm = ClientAnalyticsService.SanitizeLabel(touch?.Term ?? attribution?.UtmTerm),
+            LandingPage = ClientAnalyticsService.SanitizePath(touch?.LandingPage ?? attribution?.LandingPage),
+            ReferrerPath = ClientAnalyticsService.SanitizePath(touch?.Referrer ?? attribution?.Referrer),
+            OccurredAt = ValidateOccurredAt(touch?.OccurredAt, now)
+        };
+        db.RegistrationFacts.Add(fact);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task TrackRegistrationCompletedAsync(
+        Guid attemptId,
+        Guid ownerId,
+        string stage,
+        CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var fact = new RegistrationLifecycleFact
+        {
+            RegistrationAttemptId = attemptId,
+            OwnerId = ownerId,
+            Stage = stage,
+            VerificationMethod = stage == "Bypassed" ? "Bypass" : "Code",
+            OccurredAt = now
+        };
+        db.RegistrationFacts.Add(fact);
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task TrackOwnerRegisteredAsync(
         Guid ownerId,
         RegistrationAttributionDto? attribution,
@@ -140,35 +287,115 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
             db.OwnerMilestones.Add(milestone);
         }
 
+        if (attribution is null)
+        {
+            var startedFact = await db.RegistrationFacts
+                .FirstOrDefaultAsync(x => x.RegistrationAttemptId == ownerId && x.Stage == "Started", ct);
+            if (startedFact is not null)
+            {
+                attribution = new RegistrationAttributionDto(
+                    startedFact.BrowserId,
+                    FirstTouch: new AttributionTouchDto(
+                        startedFact.UtmSource,
+                        startedFact.UtmMedium,
+                        startedFact.UtmCampaign,
+                        startedFact.UtmContent,
+                        startedFact.UtmTerm,
+                        startedFact.LandingPage,
+                        startedFact.ReferrerPath,
+                        startedFact.OccurredAt
+                    ),
+                    LastTouch: null
+                );
+            }
+        }
+
         if (attribution is not null)
         {
             var existingAttribution = await db.RegistrationAttributions.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
             if (existingAttribution is null)
             {
+                var first = attribution.FirstTouch;
+                var last = attribution.LastTouch;
+
+                var firstSource = ClientAnalyticsService.SanitizeLabel(first?.Source ?? attribution.UtmSource);
+                var firstMedium = ClientAnalyticsService.SanitizeLabel(first?.Medium ?? attribution.UtmMedium);
+                var firstCampaign = ClientAnalyticsService.SanitizeLabel(first?.Campaign ?? attribution.UtmCampaign);
+                var firstContent = ClientAnalyticsService.SanitizeLabel(first?.Content ?? attribution.UtmContent);
+                var firstTerm = ClientAnalyticsService.SanitizeLabel(first?.Term ?? attribution.UtmTerm);
+                var firstLanding = ClientAnalyticsService.SanitizePath(first?.LandingPage ?? attribution.LandingPage);
+                var firstAt = first != null ? ValidateOccurredAt(first.OccurredAt, now) : (firstSource != null ? now : (DateTimeOffset?)null);
+
+                // Independent last-touch non-direct: NEVER duplicate first-touch into last-touch!
+                string? lastSource = null;
+                string? lastMedium = null;
+                string? lastCampaign = null;
+                string? lastContent = null;
+                string? lastTerm = null;
+                string? lastLanding = null;
+                DateTimeOffset? lastAt = null;
+
+                if (last != null)
+                {
+                    lastSource = ClientAnalyticsService.SanitizeLabel(last.Source);
+                    lastMedium = ClientAnalyticsService.SanitizeLabel(last.Medium);
+                    lastCampaign = ClientAnalyticsService.SanitizeLabel(last.Campaign);
+                    lastContent = ClientAnalyticsService.SanitizeLabel(last.Content);
+                    lastTerm = ClientAnalyticsService.SanitizeLabel(last.Term);
+                    lastLanding = ClientAnalyticsService.SanitizePath(last.LandingPage);
+                    lastAt = ValidateOccurredAt(last.OccurredAt, now);
+                    if (firstAt.HasValue && lastAt.HasValue && lastAt < firstAt)
+                    {
+                        lastAt = firstAt;
+                    }
+                }
+
                 var attrRecord = new RegistrationAttribution
                 {
                     OwnerId = ownerId,
-                    BrowserId = attribution.BrowserId,
-                    FirstTouchSource = attribution.UtmSource,
-                    FirstTouchMedium = attribution.UtmMedium,
-                    FirstTouchCampaign = attribution.UtmCampaign,
-                    FirstTouchContent = attribution.UtmContent,
-                    FirstTouchTerm = attribution.UtmTerm,
-                    FirstTouchLandingPage = attribution.LandingPage,
-                    FirstTouchAt = now,
-                    LastTouchSource = attribution.UtmSource,
-                    LastTouchMedium = attribution.UtmMedium,
-                    LastTouchCampaign = attribution.UtmCampaign,
-                    LastTouchContent = attribution.UtmContent,
-                    LastTouchTerm = attribution.UtmTerm,
-                    LastTouchLandingPage = attribution.LandingPage,
-                    LastTouchAt = now,
+                    BrowserId = ClientAnalyticsService.SanitizeLabel(attribution.BrowserId),
+                    FirstTouchSource = firstSource,
+                    FirstTouchMedium = firstMedium,
+                    FirstTouchCampaign = firstCampaign,
+                    FirstTouchContent = firstContent,
+                    FirstTouchTerm = firstTerm,
+                    FirstTouchLandingPage = firstLanding,
+                    FirstTouchAt = firstAt,
+                    LastTouchSource = lastSource,
+                    LastTouchMedium = lastMedium,
+                    LastTouchCampaign = lastCampaign,
+                    LastTouchContent = lastContent,
+                    LastTouchTerm = lastTerm,
+                    LastTouchLandingPage = lastLanding,
+                    LastTouchAt = lastAt,
                     VerificationMethod = verificationMethod,
                     AutoApproved = true,
                     RegisteredAt = now
                 };
                 db.RegistrationAttributions.Add(attrRecord);
             }
+        }
+
+        var existingFact = await db.RegistrationFacts.AnyAsync(x => x.OwnerId == ownerId, ct);
+        if (!existingFact)
+        {
+            var first = attribution?.FirstTouch;
+            db.RegistrationFacts.Add(new RegistrationLifecycleFact
+            {
+                RegistrationAttemptId = ownerId,
+                OwnerId = ownerId,
+                Stage = verificationMethod == "Bypass" ? "Bypassed" : "Verified",
+                VerificationMethod = verificationMethod,
+                BrowserId = ClientAnalyticsService.SanitizeLabel(attribution?.BrowserId),
+                UtmSource = ClientAnalyticsService.SanitizeLabel(first?.Source ?? attribution?.UtmSource),
+                UtmMedium = ClientAnalyticsService.SanitizeLabel(first?.Medium ?? attribution?.UtmMedium),
+                UtmCampaign = ClientAnalyticsService.SanitizeLabel(first?.Campaign ?? attribution?.UtmCampaign),
+                UtmContent = ClientAnalyticsService.SanitizeLabel(first?.Content ?? attribution?.UtmContent),
+                UtmTerm = ClientAnalyticsService.SanitizeLabel(first?.Term ?? attribution?.UtmTerm),
+                LandingPage = ClientAnalyticsService.SanitizePath(first?.LandingPage ?? attribution?.LandingPage),
+                ReferrerPath = ClientAnalyticsService.SanitizePath(first?.Referrer ?? attribution?.Referrer),
+                OccurredAt = now
+            });
         }
 
         await RecordOwnerActivityAsync(ownerId, ActorType.Owner, "Registered", ct);
@@ -179,7 +406,8 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         Guid ownerId,
         Guid invoiceId,
         string kind,
-        CancellationToken ct)
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default)
     {
         if (!string.Equals(kind, "Monthly", StringComparison.OrdinalIgnoreCase))
             return;
@@ -188,10 +416,21 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         var now = clock.GetUtcNow();
         if (milestone is null)
         {
+            var actualRegisteredAt = await db.Users
+                .Where(u => u.Id == ownerId)
+                .Select(u => (DateTimeOffset?)u.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (!actualRegisteredAt.HasValue)
+            {
+                // Owner does not exist in Users table; cannot add milestone due to FK constraint
+                return;
+            }
+
             milestone = new OwnerMilestone
             {
                 OwnerId = ownerId,
-                RegisteredAt = now,
+                RegisteredAt = actualRegisteredAt,
                 ActivatedAt = now,
                 FirstActivatedInvoiceId = invoiceId,
                 CreatedAt = now,
@@ -206,7 +445,7 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
             milestone.UpdatedAt = now;
         }
 
-        await RecordOwnerActivityAsync(ownerId, ActorType.Owner, "InvoiceIssued", ct);
+        await RecordOwnerActivityAsync(ownerId, actor, "InvoiceIssued", ct);
         await db.SaveChangesAsync(ct);
     }
 
@@ -214,16 +453,28 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         Guid ownerId,
         long orderCode,
         int amount,
-        CancellationToken ct)
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default)
     {
         var milestone = await db.OwnerMilestones.SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
         var now = clock.GetUtcNow();
         if (milestone is null)
         {
+            var actualRegisteredAt = await db.Users
+                .Where(u => u.Id == ownerId)
+                .Select(u => (DateTimeOffset?)u.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (!actualRegisteredAt.HasValue)
+            {
+                // Owner does not exist in Users table; cannot add milestone due to FK constraint
+                return;
+            }
+
             milestone = new OwnerMilestone
             {
                 OwnerId = ownerId,
-                RegisteredAt = now,
+                RegisteredAt = actualRegisteredAt,
                 FirstPaidAt = now,
                 FirstPaidOrderCode = orderCode,
                 CreatedAt = now,
@@ -238,7 +489,7 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
             milestone.UpdatedAt = now;
         }
 
-        await RecordOwnerActivityAsync(ownerId, ActorType.Owner, "SubscriptionPaid", ct);
+        await RecordOwnerActivityAsync(ownerId, actor, "SubscriptionPaid", ct);
         await db.SaveChangesAsync(ct);
     }
 
@@ -248,6 +499,9 @@ public sealed class OwnerMilestoneTracker(AppDbContext db, TimeProvider clock) :
         string actionType,
         CancellationToken ct)
     {
+        var userExists = await db.Users.AnyAsync(u => u.Id == ownerId, ct);
+        if (!userExists) return;
+
         var now = clock.GetUtcNow();
         var today = ApiSupport.VietnamDate(now);
 
@@ -307,11 +561,136 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         throw new NotImplementedException("Revenue monitoring queries are unimplemented in T0; will be implemented in T1.");
     }
 
-    public async Task<IReadOnlyList<AdminCampaignCostItemDto>> GetCampaignCostsAsync(DateOnly? fromDate, DateOnly? toDate, CancellationToken ct)
+    public async Task<IReadOnlyList<MarketingCampaignDto>> GetCampaignsAsync(
+        bool? activeOnly,
+        string? channel,
+        string? source,
+        CancellationToken ct)
+    {
+        var query = db.MarketingCampaigns.AsNoTracking();
+        if (activeOnly == true) query = query.Where(x => x.IsActive);
+        if (!string.IsNullOrWhiteSpace(channel)) query = query.Where(x => x.Channel == channel);
+        if (!string.IsNullOrWhiteSpace(source)) query = query.Where(x => x.Source == source);
+
+        var list = await query.OrderBy(x => x.Name).ToListAsync(ct);
+        return list.Select(x => new MarketingCampaignDto(
+            x.Id,
+            x.Code,
+            x.Name,
+            x.Channel,
+            x.Source,
+            x.UtmCampaign,
+            x.UtmMedium,
+            x.UtmSource,
+            x.TargetUrl,
+            x.IsActive,
+            x.CreatedByName,
+            x.CreatedAt,
+            x.UpdatedAt
+        )).ToList();
+    }
+
+    public async Task<MarketingCampaignDto> CreateCampaignAsync(
+        CreateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name))
+            throw new ApiException(StatusCodes.Status400BadRequest, "Campaign Code and Name are required.");
+
+        var code = request.Code.Trim().ToLowerInvariant();
+        if (await db.MarketingCampaigns.AnyAsync(x => x.Code == code, ct))
+            throw new ApiException(StatusCodes.Status409Conflict, "Campaign code already exists.");
+
+        var now = clock.GetUtcNow();
+        var campaign = new MarketingCampaign
+        {
+            Code = code,
+            Name = request.Name.Trim(),
+            Channel = request.Channel?.Trim(),
+            Source = request.Source?.Trim(),
+            UtmCampaign = request.UtmCampaign?.Trim() ?? code,
+            UtmMedium = request.UtmMedium?.Trim(),
+            UtmSource = request.UtmSource?.Trim(),
+            TargetUrl = request.TargetUrl?.Trim(),
+            IsActive = request.IsActive,
+            CreatedBy = adminUserId,
+            CreatedByName = adminUserName,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        db.MarketingCampaigns.Add(campaign);
+        await db.SaveChangesAsync(ct);
+
+        return new MarketingCampaignDto(
+            campaign.Id,
+            campaign.Code,
+            campaign.Name,
+            campaign.Channel,
+            campaign.Source,
+            campaign.UtmCampaign,
+            campaign.UtmMedium,
+            campaign.UtmSource,
+            campaign.TargetUrl,
+            campaign.IsActive,
+            campaign.CreatedByName,
+            campaign.CreatedAt,
+            campaign.UpdatedAt
+        );
+    }
+
+    public async Task<MarketingCampaignDto> UpdateCampaignAsync(
+        Guid id,
+        UpdateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct)
+    {
+        var campaign = await db.MarketingCampaigns.SingleOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new ApiException(StatusCodes.Status404NotFound, "Campaign not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.Name))
+            campaign.Name = request.Name.Trim();
+
+        if (request.Channel != null) campaign.Channel = request.Channel.Trim();
+        if (request.Source != null) campaign.Source = request.Source.Trim();
+        if (request.UtmCampaign != null) campaign.UtmCampaign = request.UtmCampaign.Trim();
+        if (request.UtmMedium != null) campaign.UtmMedium = request.UtmMedium.Trim();
+        if (request.UtmSource != null) campaign.UtmSource = request.UtmSource.Trim();
+        if (request.TargetUrl != null) campaign.TargetUrl = request.TargetUrl.Trim();
+        if (request.IsActive.HasValue) campaign.IsActive = request.IsActive.Value;
+
+        campaign.UpdatedAt = clock.GetUtcNow();
+        await db.SaveChangesAsync(ct);
+
+        return new MarketingCampaignDto(
+            campaign.Id,
+            campaign.Code,
+            campaign.Name,
+            campaign.Channel,
+            campaign.Source,
+            campaign.UtmCampaign,
+            campaign.UtmMedium,
+            campaign.UtmSource,
+            campaign.TargetUrl,
+            campaign.IsActive,
+            campaign.CreatedByName,
+            campaign.CreatedAt,
+            campaign.UpdatedAt
+        );
+    }
+
+    public async Task<IReadOnlyList<AdminCampaignCostItemDto>> GetCampaignCostsAsync(
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        string? campaign,
+        CancellationToken ct)
     {
         var query = db.CampaignCosts.AsNoTracking();
         if (fromDate.HasValue) query = query.Where(x => x.Date >= fromDate.Value);
         if (toDate.HasValue) query = query.Where(x => x.Date <= toDate.Value);
+        if (!string.IsNullOrWhiteSpace(campaign)) query = query.Where(x => x.Campaign == campaign);
 
         var list = await query.OrderByDescending(x => x.Date).ThenBy(x => x.Campaign).ToListAsync(ct);
         return list.Select(x => new AdminCampaignCostItemDto(
@@ -389,14 +768,13 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
 
 public sealed class DefaultOperationsMonitoringService : IOperationsMonitoringService
 {
-    public Task<AdminMonitoringOperationsResponse> GetOperationsMetricsAsync(CancellationToken ct)
+    public Task<AdminMonitoringOperationsResponse> GetOperationsMetricsAsync(string? window, CancellationToken ct)
     {
         throw new NotImplementedException("Operations monitoring queries are unimplemented in T0; will be implemented in T3.");
     }
 
     public Task RecordRouteMetricAsync(string routeTemplate, string httpMethod, int statusCode, double latencyMs, CancellationToken ct)
     {
-        // No-op in default foundation; Worker C instruments pipeline
         return Task.CompletedTask;
     }
 }
@@ -460,7 +838,7 @@ public sealed class DefaultWorkerStateTracker(AppDbContext db, TimeProvider cloc
             w.LastSuccessAt,
             w.LastErrorAt,
             w.LastErrorMessage,
-            w.UpdatedAt < now.AddMinutes(-10) // Stale if not updated in 10 minutes
+            w.UpdatedAt < now.AddMinutes(-10)
         )).ToList();
     }
 }
@@ -469,7 +847,6 @@ public sealed class DefaultHostMetricsReader : IHostMetricsReader
 {
     public Task<HostMetricsDto?> ReadHostMetricsAsync(CancellationToken ct)
     {
-        // Unimplemented in T0; Worker C integrates with Ubuntu host collector mounted JSON
         return Task.FromResult<HostMetricsDto?>(null);
     }
 }

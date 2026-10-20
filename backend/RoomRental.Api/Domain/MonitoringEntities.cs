@@ -7,8 +7,7 @@ public enum ClientEventType
     LandingView,
     PricingView,
     AuthAttempt,
-    RegistrationSubmit,
-    Custom
+    RegistrationSubmit
 }
 
 public enum ActorType
@@ -51,6 +50,7 @@ public enum CacNullReason
 public sealed class ClientAnalyticsEvent
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public required string EventId { get; set; }
     public required string BrowserId { get; set; }
     public required string SessionId { get; set; }
     public Guid? OwnerId { get; set; }
@@ -92,10 +92,28 @@ public sealed class RegistrationAttribution
     public DateTimeOffset RegisteredAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
+public sealed class RegistrationLifecycleFact
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid RegistrationAttemptId { get; set; }
+    public required string Stage { get; set; } // Started, CodeSent, CodeResent, Verified, Bypassed
+    public string VerificationMethod { get; set; } = "Code"; // Code vs Bypass
+    public string? BrowserId { get; set; }
+    public string? UtmSource { get; set; }
+    public string? UtmMedium { get; set; }
+    public string? UtmCampaign { get; set; }
+    public string? UtmContent { get; set; }
+    public string? UtmTerm { get; set; }
+    public string? LandingPage { get; set; }
+    public string? ReferrerPath { get; set; }
+    public Guid? OwnerId { get; set; }
+    public DateTimeOffset OccurredAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 public sealed class OwnerMilestone
 {
     public Guid OwnerId { get; set; }
-    public DateTimeOffset RegisteredAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? RegisteredAt { get; set; }
     public DateTimeOffset? ActivatedAt { get; set; }
     public Guid? FirstActivatedInvoiceId { get; set; }
     public DateTimeOffset? FirstPaidAt { get; set; }
@@ -116,6 +134,24 @@ public sealed class OwnerDailyActivity
     public string? LastActionType { get; set; }
     public DateTimeOffset FirstActionAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset LastActionAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed class MarketingCampaign
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public required string Code { get; set; }
+    public required string Name { get; set; }
+    public string? Channel { get; set; }
+    public string? Source { get; set; }
+    public string? UtmCampaign { get; set; }
+    public string? UtmMedium { get; set; }
+    public string? UtmSource { get; set; }
+    public string? TargetUrl { get; set; }
+    public bool IsActive { get; set; } = true;
+    public Guid CreatedBy { get; set; }
+    public required string CreatedByName { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class MarketingCampaignCost
@@ -172,9 +208,9 @@ public sealed class HostMetricsRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public DateTimeOffset RecordedAt { get; set; }
-    public double CpuPercent { get; set; }
-    public double MemoryPercent { get; set; }
-    public double DiskPercent { get; set; }
+    public double? CpuPercent { get; set; }
+    public double? MemoryPercent { get; set; }
+    public double? DiskPercent { get; set; }
     public int ContainerCount { get; set; }
     public string? ContainerStatusJson { get; set; }
     public string HealthEndpointStatus { get; set; } = "ok";

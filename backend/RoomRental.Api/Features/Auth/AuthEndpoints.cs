@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -15,7 +16,7 @@ public static class AuthEndpoints
     {
         var routes = app.MapGroup("/api/auth");
 
-        routes.MapPost("/register", async (RegisterRequest request, AppDbContext db, IPasswordHasher<AppUser> hasher, RegistrationVerificationService verification, IConfiguration configuration, CancellationToken cancellationToken) =>
+        routes.MapPost("/register", async (RegisterRequest request, AppDbContext db, IPasswordHasher<AppUser> hasher, RegistrationVerificationService verification, IConfiguration configuration, CancellationToken cancellationToken, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null) =>
         {
             var name = request.Name?.Trim();
             var email = request.Email?.Trim().ToLowerInvariant();
@@ -40,17 +41,24 @@ public static class AuthEndpoints
                 CreatedAt = DateTimeOffset.UtcNow
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password!);
-            if (configuration.GetValue("EmailVerification:Enabled", true))
+            var isVerificationEnabled = configuration.GetValue("EmailVerification:Enabled", true);
+            if (milestoneTracker != null)
+                await milestoneTracker.TrackRegistrationStartedAsync(user.Id, request.Attribution, isVerificationEnabled ? "Code" : "Bypass", cancellationToken);
+            if (isVerificationEnabled)
                 return Results.Json(await verification.StartAsync(user, cancellationToken), statusCode: 202);
             db.Users.Add(user);
             await db.SaveChangesAsync(cancellationToken);
+            if (milestoneTracker != null)
+                await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, request.Attribution, "Bypass", cancellationToken);
             return Results.Created("/api/auth/me", ToDto(user));
         }).RequireRateLimiting("auth");
 
         routes.MapPost("/verify-registration", async (VerifyRegistrationRequest request,
-            RegistrationVerificationService verification, CancellationToken ct) =>
+            RegistrationVerificationService verification, CancellationToken ct, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null) =>
         {
             var user = await verification.VerifyAsync(request.ChallengeToken, request.Code, ct);
+            if (milestoneTracker != null)
+                await milestoneTracker.TrackOwnerRegisteredAsync(user.Id, null, "Code", ct);
             return Results.Created("/api/auth/me", ToDto(user));
         }).RequireRateLimiting("auth");
 

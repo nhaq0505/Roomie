@@ -37,6 +37,8 @@ public class AppDbContext : DbContext
     public DbSet<OwnerMilestone> OwnerMilestones => Set<OwnerMilestone>();
     public DbSet<OwnerDailyActivity> OwnerDailyActivities => Set<OwnerDailyActivity>();
     public DbSet<MarketingCampaignCost> CampaignCosts => Set<MarketingCampaignCost>();
+    public DbSet<MarketingCampaign> MarketingCampaigns => Set<MarketingCampaign>();
+    public DbSet<RegistrationLifecycleFact> RegistrationFacts => Set<RegistrationLifecycleFact>();
     public DbSet<OperationalRouteMinuteBucket> RouteMinuteBuckets => Set<OperationalRouteMinuteBucket>();
     public DbSet<WorkerHeartbeatState> WorkerHeartbeats => Set<WorkerHeartbeatState>();
     public DbSet<HostMetricsRecord> HostMetrics => Set<HostMetricsRecord>();
@@ -308,6 +310,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ClientAnalyticsEvent>(entity =>
         {
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.EventId).HasMaxLength(64);
             entity.Property(x => x.BrowserId).HasMaxLength(64);
             entity.Property(x => x.SessionId).HasMaxLength(64);
             entity.Property(x => x.EventType).HasMaxLength(50);
@@ -321,6 +324,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.UtmContent).HasMaxLength(64);
             entity.Property(x => x.UtmTerm).HasMaxLength(64);
             entity.Property(x => x.RequestFingerprint).HasMaxLength(64);
+            entity.HasIndex(x => x.EventId).IsUnique();
             entity.HasIndex(x => new { x.BrowserId, x.ServerTimestamp });
             entity.HasIndex(x => new { x.SessionId, x.ServerTimestamp });
             entity.HasIndex(x => new { x.OwnerId, x.ServerTimestamp });
@@ -378,6 +382,40 @@ public class AppDbContext : DbContext
             entity.Property(x => x.UpdatedByName).HasMaxLength(160);
             entity.HasIndex(x => new { x.Date, x.Campaign });
             entity.HasIndex(x => x.Date);
+        });
+
+        modelBuilder.Entity<MarketingCampaign>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(100);
+            entity.Property(x => x.Name).HasMaxLength(160);
+            entity.Property(x => x.Channel).HasMaxLength(100);
+            entity.Property(x => x.Source).HasMaxLength(100);
+            entity.Property(x => x.UtmCampaign).HasMaxLength(100);
+            entity.Property(x => x.UtmMedium).HasMaxLength(100);
+            entity.Property(x => x.UtmSource).HasMaxLength(100);
+            entity.Property(x => x.TargetUrl).HasMaxLength(256);
+            entity.Property(x => x.CreatedByName).HasMaxLength(160);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => new { x.Channel, x.Source });
+        });
+
+        modelBuilder.Entity<RegistrationLifecycleFact>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Stage).HasMaxLength(30);
+            entity.Property(x => x.VerificationMethod).HasMaxLength(20);
+            entity.Property(x => x.BrowserId).HasMaxLength(64);
+            entity.Property(x => x.UtmSource).HasMaxLength(64);
+            entity.Property(x => x.UtmMedium).HasMaxLength(64);
+            entity.Property(x => x.UtmCampaign).HasMaxLength(64);
+            entity.Property(x => x.UtmContent).HasMaxLength(64);
+            entity.Property(x => x.UtmTerm).HasMaxLength(64);
+            entity.Property(x => x.LandingPage).HasMaxLength(256);
+            entity.Property(x => x.ReferrerPath).HasMaxLength(256);
+            entity.HasIndex(x => new { x.RegistrationAttemptId, x.Stage });
+            entity.HasIndex(x => x.OwnerId);
+            entity.HasIndex(x => x.OccurredAt);
         });
 
         modelBuilder.Entity<OperationalRouteMinuteBucket>(entity =>

@@ -13,6 +13,18 @@ public interface IClientAnalyticsService
 
 public interface IOwnerMilestoneTracker
 {
+    Task TrackRegistrationStartedAsync(
+        Guid attemptId,
+        RegistrationAttributionDto? attribution,
+        string verificationMethod,
+        CancellationToken ct);
+
+    Task TrackRegistrationCompletedAsync(
+        Guid attemptId,
+        Guid ownerId,
+        string stage,
+        CancellationToken ct);
+
     Task TrackOwnerRegisteredAsync(
         Guid ownerId,
         RegistrationAttributionDto? attribution,
@@ -23,13 +35,15 @@ public interface IOwnerMilestoneTracker
         Guid ownerId,
         Guid invoiceId,
         string kind,
-        CancellationToken ct);
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default);
 
     Task TrackSubscriptionPaidAsync(
         Guid ownerId,
         long orderCode,
         int amount,
-        CancellationToken ct);
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default);
 
     Task RecordOwnerActivityAsync(
         Guid ownerId,
@@ -51,9 +65,29 @@ public interface IRevenueMonitoringQueryService
         MonitoringFilterRequest filter,
         CancellationToken ct);
 
+    Task<IReadOnlyList<MarketingCampaignDto>> GetCampaignsAsync(
+        bool? activeOnly,
+        string? channel,
+        string? source,
+        CancellationToken ct);
+
+    Task<MarketingCampaignDto> CreateCampaignAsync(
+        CreateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct);
+
+    Task<MarketingCampaignDto> UpdateCampaignAsync(
+        Guid id,
+        UpdateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct);
+
     Task<IReadOnlyList<AdminCampaignCostItemDto>> GetCampaignCostsAsync(
         DateOnly? fromDate,
         DateOnly? toDate,
+        string? campaign,
         CancellationToken ct);
 
     Task<AdminCampaignCostItemDto> UpsertCampaignCostAsync(
@@ -66,6 +100,7 @@ public interface IRevenueMonitoringQueryService
 public interface IOperationsMonitoringService
 {
     Task<AdminMonitoringOperationsResponse> GetOperationsMetricsAsync(
+        string? window,
         CancellationToken ct);
 
     Task RecordRouteMetricAsync(

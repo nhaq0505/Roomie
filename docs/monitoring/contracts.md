@@ -35,9 +35,17 @@ The monitoring subsystem provides an internal, privacy-first, first-party analyt
 - **Same-Origin Enforcement:** Enforced even for anonymous requests (`Origin` or `Referer` header must match server origin; foreign origins rejected with `403 Forbidden`).
 - **Privacy & Safety Rules:** 
   - URL paths stripped of query parameters (`?`) and URL fragments (`#`).
-  - No PII (emails, phone numbers, passwords, OTPs, raw tokens, IP addresses, bank account numbers) stored.
-  - Client timestamps bounded; server authoritative timestamp (`ServerTimestamp`) attached on receipt.
-  - Batch size bounded to maximum 50 events per request.
+  - Absolute raw URLs (`https://...`) normalized to relative paths.
+  - Dangerous schemes (`javascript:`, `data:`, `mailto:`) rejected.
+  - Reset tokens and challenge tokens in path normalized to `:token`; GUIDs normalized to `:id`. Max path length 128 chars.
+  - Event names and CTA identifiers restricted to bounded safe identifiers (max 64 chars; no PII or free-text injections).
+  - UTM parameters and labels validated and sanitized: no PII (`@` emails, phone numbers, or tokens); max length 64 chars.
+  - Client timestamps bounded and validated against server timing; server authoritative timestamp (`ServerTimestamp`) attached on receipt.
+  - Batch size bounded to maximum 100 events per request; null or empty collections handled gracefully.
+- **Idempotency & Deduping:**
+  - Every event item requires an `eventId` (max 64 chars).
+  - Network retries with the same `eventId` are safely deduped without error (`dedupedCount` returned in response).
+  - Distinct real clicks/actions with unique `eventId`s are preserved.
 
 #### Request Body (`AnalyticsEventBatchRequest`)
 ```json
@@ -46,8 +54,9 @@ The monitoring subsystem provides an internal, privacy-first, first-party analyt
   "sessionId": "s-882f07ab-3f41",
   "events": [
     {
+      "eventId": "evt-c4b18f8e-1",
       "eventType": "page_view",
-      "eventName": "Pricing Page",
+      "eventName": "pricing_page",
       "path": "/pricing",
       "referrerPath": "/home",
       "ctaId": "btn_hero_signup",
@@ -70,21 +79,23 @@ The monitoring subsystem provides an internal, privacy-first, first-party analyt
 - `pricing_view`
 - `auth_attempt`
 - `registration_submit`
-- `custom`
+
+*(Generic `custom` event type is eliminated to prevent allowlist bypass)*
 
 #### Response Body (`AnalyticsEventBatchResponse`) — `200 OK`
 ```json
 {
   "processedCount": 1,
-  "rejectedCount": 0
+  "rejectedCount": 0,
+  "dedupedCount": 0
 }
 ```
 
 ---
 
-### 2.2 Registration Attribution Extension
+### 2.2 Registration Attribution Extension & Funnel Lifecycle Facts
 
-To carry campaign attribution through registration, `RegisterRequest` supports an optional backward-compatible `attribution` object:
+To carry campaign attribution through registration, `RegisterRequest` supports an `attribution` object with independent `firstTouch` and `lastTouch` non-direct touchpoints:
 
 ```json
 {
@@ -94,19 +105,32 @@ To carry campaign attribution through registration, `RegisterRequest` supports a
   "phone": "0901234567",
   "attribution": {
     "browserId": "c4b18f8e-d4c3-4d82-841f-11758f504381",
-    "utmSource": "facebook",
-    "utmMedium": "cpc",
-    "utmCampaign": "fall_promo",
-    "utmContent": "variant_a",
-    "utmTerm": "room_management",
-    "landingPage": "/landing",
-    "referrer": "https://facebook.com"
+    "firstTouch": {
+      "source": "google",
+      "medium": "cpc",
+      "campaign": "fall_launch",
+      "landingPage": "/pricing",
+      "referrer": "https://google.com/search",
+      "occurredAt": "2026-10-10T08:00:00Z"
+    },
+    "lastTouch": {
+      "source": "facebook",
+      "medium": "retargeting",
+      "campaign": "retargeting_q4",
+      "landingPage": "/dang-ky",
+      "referrer": "https://facebook.com",
+      "occurredAt": "2026-10-20T08:50:00Z"
+    }
   }
 }
 ```
 
-- **OTP Carry-Through:** When email verification is required, `RegistrationVerification` reserves the attribution context. Upon successful OTP verification (`/api/auth/verify-registration`), attribution is committed with `VerificationMethod = "Code"`.
-- **OTP Bypass Tracking:** When `EmailVerification:Enabled = false` (in test or bypass mode), attribution is committed with `VerificationMethod = "Bypass"`.
+- **Independent Touches:** First touch and last-known non-direct touch are tracked independently with their own server-validated timing (`occurredAt <= ServerNow`). First touch is never blindly duplicated into last touch.
+- **Backward-Compatible Flat Fields:** Flat fields (`utmSource`, `utmCampaign`, `landingPage`, etc.) map to `firstTouch` if nested objects are absent.
+- **Durable Funnel Facts (`RegistrationLifecycleFacts`):**
+  - Append-only authoritative fact records track registration progress through stages: `Started`, `CodeSent`, `CodeResent`, `Verified`, `Bypassed`.
+  - Facts persist independently of challenge token resets or resends.
+  - Attribution is linked to the registration attempt and carried through to `RegistrationAttributions` upon verification.
 - **Auto-Approval:** All registered owners are auto-approved (`AutoApproved = true`).
 
 ---
@@ -122,7 +146,9 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   - `toDate` (optional, `YYYY-MM-DD`)
   - `source` (optional, string)
   - `channel` (optional, string)
+  - `campaign` (optional, string)
 - **Status in T0:** Explicitly `501 Not Implemented` (implemented in T1).
+- **Retention Semantics:** `retentionPercentages` is `IReadOnlyList<double?>`. Immature future cohort cells are `null`, never `0.0`.
 - **Response Shape (`AdminMonitoringGrowthResponse`):**
 ```json
 {
@@ -154,7 +180,7 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
     {
       "cohortPeriod": "2026-08",
       "cohortSize": 25,
-      "retentionPercentages": [100.0, 72.0, 64.0]
+      "retentionPercentages": [100.0, 72.0, 64.0, null]
     }
   ],
   "cohortMaturity": {
@@ -177,11 +203,11 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
 
 #### 2.3.2 Revenue Tab Metrics
 - **Route:** `GET /api/admin/monitoring/revenue`
-- **Query Parameters:** `fromDate`, `toDate`, `source`, `channel`
+- **Query Parameters:** `fromDate`, `toDate`, `source`, `channel`, `campaign`
 - **Status in T0:** Explicitly `501 Not Implemented` (implemented in T1).
 - **Metric Invariants:**
   - Pro revenue includes ONLY server-confirmed, paid subscription attempts (`PayOsAttempt` with `Kind == "Subscription"` and `Status == PaymentAttemptStatus.Paid`).
-  - Central webhook and manual reconciliation deduplicate receipts.
+  - Unapproved or speculative `mrrVnd` is explicitly removed from `RevenueSummaryDto`.
   - Tenant rent and admin-granted complimentary Pro tiers are strictly excluded from revenue metrics.
   - CAC30 = Spend in signup cohort period / New first-paid owners within 30 days. When costs are missing or the denominator is zero, CAC returns `null` with an explicit reason (`MissingCostData`, `ZeroDenominator`, `CohortImmature`, `NoRegistrations`).
 - **Response Shape (`AdminMonitoringRevenueResponse`):**
@@ -190,7 +216,6 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   "summary": {
     "totalSubscriptionRevenueVnd": 15000000.0,
     "paidSubscriptionCount": 15,
-    "mrrVnd": 15000000.0,
     "totalMarketingSpendVnd": 5000000.0,
     "totalMarketingHours": 42.5,
     "cac30": {
@@ -229,9 +254,12 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
 ```
 
 #### 2.3.3 Operations Tab Metrics
-- **Route:** `GET /api/admin/monitoring/operations`
+- **Route:** `GET /api/admin/monitoring/operations?window=1h`
+- **Query Parameters:** `window` (optional, default `"1h"`, e.g. `"1h"`, `"24h"`, `"7d"`)
 - **Status in T0:** Explicitly `501 Not Implemented` (implemented in T3).
-- **Invariants:** Missing metrics return `isStale = true` or `null`, never healthy zeros.
+- **Invariants:** 
+  - Missing or unknown host/queue metrics return `null`, never healthy zeros.
+  - Host metric doubles (`cpuPercent`, `memoryPercent`, `diskPercent`) and queue counts are nullable (`double?`, `int?`, `long?`).
 - **Response Shape (`AdminMonitoringOperationsResponse`):**
 ```json
 {
@@ -241,7 +269,8 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
     "latencyP95Ms": 145.0,
     "totalRequestsLastHour": 8420,
     "databaseConnected": true,
-    "databaseStatus": "ok"
+    "databaseStatus": "ok",
+    "window": "1h"
   },
   "routeMetrics": [
     {
@@ -299,18 +328,40 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
   6. `worker_stalled`: Enabled workers exceeding SLA (recovery-email: 5 min, Zalo: 5 min, reconcile: 10 min, invoice-sweep: 26 h).
 - **Reminder & Recovery Rules:** Reminders cooldown <= 1 hour; recovery notice dispatched upon incident resolution.
 
-#### 2.3.5 Campaign Costs Management
+#### 2.3.5 Campaign Metadata CRUD
 - **Routes:**
-  - `GET /api/admin/monitoring/campaigns?fromDate=...&toDate=...`
-  - `POST /api/admin/monitoring/campaigns`
+  - `GET /api/admin/monitoring/campaigns/metadata?activeOnly=true&channel=...&source=...`
+  - `POST /api/admin/monitoring/campaigns/metadata`
+  - `PUT /api/admin/monitoring/campaigns/metadata/{id}`
+- **Status in T0:** Implemented in T0 foundation!
+- **Create Campaign Request Body (`CreateCampaignRequest`):**
+```json
+{
+  "code": "google_search_q4",
+  "name": "Google Search Q4 Brand",
+  "channel": "google",
+  "source": "search",
+  "utmCampaign": "q4_brand",
+  "utmMedium": "cpc",
+  "utmSource": "google",
+  "targetUrl": "https://roomie.io.vn/pricing",
+  "isActive": true
+}
+```
+- **Response Body (`MarketingCampaignDto`):** Returns persisted metadata record with audit info. Allows campaigns to exist before spend data is entered. Unique index enforced on `Code`.
+
+#### 2.3.6 Campaign Costs Management
+- **Routes:**
+  - `GET /api/admin/monitoring/campaigns/costs?fromDate=...&toDate=...&campaign=...`
+  - `POST /api/admin/monitoring/campaigns/costs`
 - **Status in T0:** Implemented in T0 foundation!
 - **Upsert Request Body (`UpsertCampaignCostRequest`):**
 ```json
 {
   "date": "2026-10-20",
-  "campaign": "facebook_launch",
-  "channel": "facebook",
-  "source": "fb_ads",
+  "campaign": "google_search_q4",
+  "channel": "google",
+  "source": "search",
   "cashVnd": 1500000,
   "personHours": 3.5,
   "hourlyRate": 200000,
@@ -330,8 +381,11 @@ All `/api/admin/monitoring/*` endpoints require the `Admin` role (`401 Unauthori
 ### 3.2 Milestones and Activity Definitions
 - **Activation Milestone:** An owner activates when their first **Monthly** invoice enters the `Issued` state (either created directly as Issued or published from Draft). Deposit invoices and Draft invoices do not activate an owner. Activation happens once per owner lifecycle and is preserved while the owner exists.
 - **First Paid Milestone:** Recorded when an owner's first Pro subscription order is confirmed Paid. Excludes complimentary Admin grants and tenant payments.
-- **Meaningful Owner Activity:** Daily activity distinguishes `ActorType.Owner`, `ActorType.Admin`, and `ActorType.System`.
-  - Only actions performed by the Owner themselves set `HasOwnerAction = true`.
+- **Milestone Fallback (Historical Owners):** When an un-tracked existing owner triggers their first activation or payment milestone, `RegisteredAt` is set using the authoritative historical registration date from `Users.CreatedAt` (or remains `null` if unknown). `RegisteredAt = now` is NEVER fabricated.
+- **Meaningful Owner Activity & Actor Separation:** Daily activity distinguishes `ActorType.Owner`, `ActorType.Admin`, and `ActorType.System`.
+  - System background tasks (e.g., automated invoice generation sweeps, payment webhook reconciliations) pass `ActorType.System` to milestone tracking and activity recording.
+  - System actions increment `SystemActionCount` and do NOT increment `OwnerActionCount` or set `HasOwnerAction = true`.
+  - Only actions performed explicitly by the Owner themselves (`ActorType.Owner`) increment `OwnerActionCount` and set `HasOwnerAction = true`.
   - WAU (last 7 Vietnam calendar days) and MAU (last 30 Vietnam calendar days) count only distinct owners where `HasOwnerAction == true`.
   - Monthly retention matrix calculates whether owners in an activation cohort had `HasOwnerAction == true` in subsequent calendar months.
 
@@ -366,6 +420,18 @@ public interface IClientAnalyticsService
 
 public interface IOwnerMilestoneTracker
 {
+    Task TrackRegistrationStartedAsync(
+        Guid attemptId,
+        RegistrationAttributionDto? attribution,
+        string verificationMethod,
+        CancellationToken ct);
+
+    Task TrackRegistrationCompletedAsync(
+        Guid attemptId,
+        Guid ownerId,
+        string stage,
+        CancellationToken ct);
+
     Task TrackOwnerRegisteredAsync(
         Guid ownerId,
         RegistrationAttributionDto? attribution,
@@ -376,13 +442,15 @@ public interface IOwnerMilestoneTracker
         Guid ownerId,
         Guid invoiceId,
         string kind,
-        CancellationToken ct);
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default);
 
     Task TrackSubscriptionPaidAsync(
         Guid ownerId,
         long orderCode,
         int amount,
-        CancellationToken ct);
+        ActorType actor = ActorType.Owner,
+        CancellationToken ct = default);
 
     Task RecordOwnerActivityAsync(
         Guid ownerId,
@@ -404,9 +472,29 @@ public interface IRevenueMonitoringQueryService
         MonitoringFilterRequest filter,
         CancellationToken ct);
 
+    Task<IReadOnlyList<MarketingCampaignDto>> GetCampaignsAsync(
+        bool? activeOnly,
+        string? channel,
+        string? source,
+        CancellationToken ct);
+
+    Task<MarketingCampaignDto> CreateCampaignAsync(
+        CreateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct);
+
+    Task<MarketingCampaignDto> UpdateCampaignAsync(
+        Guid id,
+        UpdateCampaignRequest request,
+        Guid adminUserId,
+        string adminUserName,
+        CancellationToken ct);
+
     Task<IReadOnlyList<AdminCampaignCostItemDto>> GetCampaignCostsAsync(
         DateOnly? fromDate,
         DateOnly? toDate,
+        string? campaign,
         CancellationToken ct);
 
     Task<AdminCampaignCostItemDto> UpsertCampaignCostAsync(
@@ -419,6 +507,7 @@ public interface IRevenueMonitoringQueryService
 public interface IOperationsMonitoringService
 {
     Task<AdminMonitoringOperationsResponse> GetOperationsMetricsAsync(
+        string? window,
         CancellationToken ct);
 
     Task RecordRouteMetricAsync(

@@ -211,6 +211,11 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("EventName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -265,6 +270,9 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
 
                     b.HasIndex("ServerTimestamp");
 
@@ -384,10 +392,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<double>("CpuPercent")
+                    b.Property<double?>("CpuPercent")
                         .HasColumnType("double precision");
 
-                    b.Property<double>("DiskPercent")
+                    b.Property<double?>("DiskPercent")
                         .HasColumnType("double precision");
 
                     b.Property<string>("HealthEndpointStatus")
@@ -400,7 +408,7 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<double>("MemoryPercent")
+                    b.Property<double?>("MemoryPercent")
                         .HasColumnType("double precision");
 
                     b.Property<DateTimeOffset>("RecordedAt")
@@ -707,6 +715,73 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasIndex("OwnerId", "CreatedAt");
 
                     b.ToTable("ManualPaymentRequests");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.MarketingCampaign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TargetUrl")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("Channel", "Source");
+
+                    b.ToTable("MarketingCampaigns");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.MarketingCampaignCost", b =>
@@ -1175,7 +1250,7 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.Property<long?>("FirstPaidOrderCode")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTimeOffset>("RegisteredAt")
+                    b.Property<DateTimeOffset?>("RegisteredAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -1615,6 +1690,74 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasKey("OwnerId");
 
                     b.ToTable("RegistrationAttributions");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.RegistrationLifecycleFact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BrowserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("LandingPage")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReferrerPath")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("RegistrationAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmContent")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmMedium")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmSource")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UtmTerm")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("VerificationMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("RegistrationAttemptId", "Stage");
+
+                    b.ToTable("RegistrationFacts");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.RegistrationVerification", b =>
