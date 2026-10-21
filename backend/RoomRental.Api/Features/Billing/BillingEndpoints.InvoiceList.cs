@@ -43,12 +43,18 @@ public static partial class BillingEndpoints
             }
             if (occupancyId is not null) query = query.Where(x => x.OccupancyId == occupancyId);
             var paging = PageRequest.Parse(page, pageSize);
-            var total = await query.CountAsync(cancellationToken);
-            var issued = query.Where(x => x.LifecycleState == InvoiceLifecycleState.Issued);
-            var totals = new { billed = await QueryAggregates.SumMoneyAsync(db, issued.Select(x => x.Total), cancellationToken),
-                paid = await QueryAggregates.SumMoneyAsync(db, issued.Select(x => x.Paid), cancellationToken),
-                outstanding = await QueryAggregates.SumMoneyAsync(db, issued.Select(x => x.Total - x.Paid), cancellationToken) };
-            var draftCount = await query.CountAsync(x => x.LifecycleState == InvoiceLifecycleState.Draft, cancellationToken);
+            var summary = await query.GroupBy(_ => 1).Select(group => new
+            {
+                total = group.Count(),
+                billed = group.Sum(x => x.LifecycleState == InvoiceLifecycleState.Issued ? x.Total : 0m),
+                paid = group.Sum(x => x.LifecycleState == InvoiceLifecycleState.Issued ? x.Paid : 0m),
+                outstanding = group.Sum(x => x.LifecycleState == InvoiceLifecycleState.Issued ? x.Total - x.Paid : 0m),
+                draftCount = group.Count(x => x.LifecycleState == InvoiceLifecycleState.Draft)
+            }).SingleOrDefaultAsync(cancellationToken);
+            var total = summary?.total ?? 0;
+            var totals = new { billed = summary?.billed ?? 0m, paid = summary?.paid ?? 0m,
+                outstanding = summary?.outstanding ?? 0m };
+            var draftCount = summary?.draftCount ?? 0;
             var rows = await query.OrderByDescending(row => row.Period).ThenBy(row => row.BuildingName).ThenBy(row => row.RoomName).ThenBy(row => row.Id)
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(cancellationToken);
             var rowIds = rows.Select(x => x.Id).ToList();

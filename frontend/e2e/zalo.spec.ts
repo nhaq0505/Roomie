@@ -59,24 +59,24 @@ for (const width of [375, 1280]) test(`settings menu groups payment and Zalo at 
   await page.goto('/settings/zalo');
   if (width > 991) {
     const menu = page.locator('.app-sider');
-    await expect(menu.getByRole('menuitem', { name: 'Zalo', exact: true })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: /Zalo$/ })).toBeVisible();
     const settings = menu.locator('.ant-menu-submenu-title').filter({ hasText: 'Cấu hình' });
     await settings.click();
-    await expect(menu.getByRole('menuitem', { name: 'Zalo', exact: true })).not.toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: /Zalo$/ })).not.toBeVisible();
     await expect(page).toHaveURL(/settings\/zalo$/);
     await settings.click();
-    await menu.getByRole('menuitem', { name: 'Thanh toán', exact: true }).click();
+    await menu.getByRole('menuitem', { name: /Thanh toán$/ }).click();
     await expect(page).toHaveURL(/settings\/payment$/);
-    await menu.getByRole('menuitem', { name: 'Zalo', exact: true }).click();
+    await menu.getByRole('menuitem', { name: /Zalo$/ }).click();
   } else {
     const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
     await expect(nav.getByRole('link', { name: 'Zalo', exact: true })).toHaveCount(0);
     await nav.getByRole('button', { name: /Cấu hình/ }).click();
-    await page.locator('.ant-dropdown:visible').getByRole('menuitem', { name: 'Thanh toán', exact: true }).click();
+    await page.locator('.ant-dropdown:visible').getByRole('menuitem', { name: /Thanh toán$/ }).click();
     await expect(page).toHaveURL(/settings\/payment$/);
     await page.getByRole('button', { name: 'Mở menu', exact: true }).click();
     const drawer = page.locator('.mobile-menu-drawer');
-    await drawer.getByRole('menuitem', { name: 'Zalo', exact: true }).click();
+    await drawer.getByRole('menuitem', { name: /Zalo$/ }).click();
     await expect(drawer).not.toBeVisible();
   }
   await expect(page).toHaveURL(/settings\/zalo$/);

@@ -206,6 +206,7 @@ export interface AdminMonitoringOperationsResponse {
   hostMetrics: HostMetricsDto | null;
   workers: WorkerStatusDto[];
   queues: OperationalQueueStatsDto;
+  histogramBuckets?: { range: string; count: number; isViolating: boolean }[];
 }
 
 // 4. Incidents Types

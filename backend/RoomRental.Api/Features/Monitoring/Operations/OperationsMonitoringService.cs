@@ -142,7 +142,8 @@ public sealed class OperationsMonitoringService(
             RouteMetrics: routeMetrics,
             HostMetrics: hostMetrics,
             Workers: workersList,
-            Queues: queueStats
+            Queues: queueStats,
+            HistogramBuckets: routeAggregator.GetWindowSummary(timeWindow).HistogramBuckets
         );
     }
 }

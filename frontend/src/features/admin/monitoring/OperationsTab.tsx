@@ -441,10 +441,9 @@ export function OperationsTab({
           title={t("Phân phối độ trễ (Histogram p95)")}
           extra={<span style={{ fontSize: 12, color: '#7a8c91' }}>{windowText}</span>}
         >
-          {Array.isArray((data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] })?.histogramBuckets) &&
-          (data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] }).histogramBuckets!.length > 0 ? (
+          {data?.histogramBuckets && data.histogramBuckets.length > 0 ? (
             <NativeLatencyHistogram
-              buckets={(data as unknown as { histogramBuckets?: { range: string; count: number; isViolating?: boolean }[] }).histogramBuckets!}
+              buckets={data.histogramBuckets}
               height={160}
             />
           ) : (

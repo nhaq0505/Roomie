@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -33,9 +34,66 @@ internal static class AccountingBillingHttpTests
         await MeterReadingAntiRegressionAsync();
         await AutomaticMonthlyInvoiceCalculationAsync();
         await SupplementalInvoiceCreationAsync();
+        await InvoiceListSummaryAsync();
         await InvoiceCorrectionAndAuditRevisionsAsync();
         await CashReceiptIdempotencyAndOverpaymentAsync();
         await ClosedXmlExcelReportExportAsync();
+    }
+
+    private static async Task InvoiceListSummaryAsync()
+    {
+        await using var fixture = await PostgresTestDb.CreateAsync();
+        var commands = new List<string>();
+        await using var app = CreateTestApp(fixture.ConnectionString, commandLog: commands.Add);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
+        var (roomId, occupancyId) = await SetupRoomAndOccupancyAsync(client, "Summary", "Room", 100, 1, 0, false, 0, 0);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var buildingId = await db.Rooms.Where(x => x.Id == roomId).Select(x => x.BuildingId).SingleAsync();
+            Invoice Row(string kind, string period, decimal total, decimal paid, InvoiceLifecycleState state, string tenant) => new()
+            {
+                OwnerId = OwnerId, BuildingId = buildingId, RoomId = roomId, OccupancyId = occupancyId,
+                BuildingName = "Summary", RoomName = "Room", TenantName = tenant, Kind = kind, Period = period,
+                Total = total, Paid = paid, LifecycleState = state,
+                Status = paid >= total ? InvoiceStatus.Paid : paid > 0 ? InvoiceStatus.Partial : InvoiceStatus.Unpaid
+            };
+            var foreign = Row("Supplemental", "2026-08", 9999, 0, InvoiceLifecycleState.Issued, "Foreign");
+            foreign.OwnerId = Guid.NewGuid();
+            db.Invoices.AddRange(
+                Row("Supplemental", "2026-08", 100, 40, InvoiceLifecycleState.Issued, "Match"),
+                Row("Monthly", "2026-08", 200, 250, InvoiceLifecycleState.Issued, "Paid"),
+                Row("Deposit", "2026-08", 500, 100, InvoiceLifecycleState.Issued, "Deposit"),
+                Row("Supplemental", "2026-09", 900, 0, InvoiceLifecycleState.Draft, "Match"), foreign);
+            await db.SaveChangesAsync();
+        }
+
+        async Task Check(string filter, int count, decimal billed, decimal paid, decimal outstanding, int drafts)
+        {
+            commands.Clear();
+            var response = await client.GetAsync("/api/invoices?page=1&pageSize=1" + filter);
+            Assert(response.StatusCode == HttpStatusCode.OK, "invoice summary returns 200: " + filter);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var totals = body.GetProperty("totals");
+            Assert(body.GetProperty("total").GetInt32() == count && body.GetProperty("draftCount").GetInt32() == drafts &&
+                totals.GetProperty("billed").GetDecimal() == billed && totals.GetProperty("paid").GetDecimal() == paid &&
+                totals.GetProperty("outstanding").GetDecimal() == outstanding && body.GetProperty("items").GetArrayLength() == Math.Min(1, count),
+                "invoice summary preserves scope, filters, full-result totals and empty zeros: " + filter);
+            Assert(commands.Count == 4 && commands.Count(x => x.Contains("GROUP BY", StringComparison.Ordinal)) == 1,
+                "invoice list uses one summary plus page/reservations/occupancies queries: " + filter);
+        }
+        await Check("", 4, 800, 390, 410, 1);
+        await Check("&period=2026-08", 3, 800, 390, 410, 0);
+        await Check("&lifecycleState=Draft", 1, 0, 0, 0, 1);
+        await Check("&status=Paid", 1, 200, 250, -50, 0);
+        await Check("&kind=Deposit", 1, 500, 100, 400, 0);
+        await Check("&search=match", 2, 100, 40, 60, 1);
+        await Check("&occupancyId=" + Guid.NewGuid(), 0, 0, 0, 0, 0);
+        var legacy = await client.GetFromJsonAsync<JsonElement>("/api/invoices");
+        Assert(legacy.ValueKind == JsonValueKind.Array && legacy.GetArrayLength() == 4,
+            "invoice list without page retains legacy array response");
     }
 
     private static async Task AutomaticZaloQueueAsync()
@@ -464,7 +522,7 @@ internal static class AccountingBillingHttpTests
         public Task<ZaloSendResult> SendAsync(Guid ownerId, ZaloSendRequest request, CancellationToken ct) => throw new Exception("No provider calls in automatic enqueue tests");
     }
 
-    private static WebApplication CreateTestApp(string connectionString, bool autoZalo = false)
+    private static WebApplication CreateTestApp(string connectionString, bool autoZalo = false, Action<string>? commandLog = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -476,7 +534,11 @@ internal static class AccountingBillingHttpTests
             ["RequireVerifiedPaymentForTenantLink"] = "false"
         });
 
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+        builder.Services.AddDbContext<AppDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString);
+            if (commandLog is not null) options.LogTo(commandLog, [RelationalEventId.CommandExecuted]);
+        });
         var dataProtection = new EphemeralDataProtectionProvider();
         builder.Services.AddSingleton<IDataProtectionProvider>(dataProtection);
         builder.Services.AddSingleton<TenantTokenService>();

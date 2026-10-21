@@ -28,7 +28,8 @@ public sealed record WindowLatencySummary(
     int TotalRequests,
     int Status5xxCount,
     double? Api5xxRatePercent,
-    double? LatencyP95Ms
+    double? LatencyP95Ms,
+    IReadOnlyList<LatencyHistogramBucketDto> HistogramBuckets
 );
 
 public interface IRouteLatencyAggregator
@@ -44,7 +45,9 @@ public interface IRouteLatencyAggregator
 public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 {
     private readonly TimeProvider _clock;
+    // ponytail: one process, up to 24h since restart; use persisted buckets for cross-restart/multi-replica views.
     private readonly ConcurrentDictionary<long, MinuteBucketCollection> _minuteBuckets = new();
+    private readonly ConcurrentDictionary<long, byte> _flushedMinutes = new();
 
     public RouteLatencyAggregator(TimeProvider clock)
     {
@@ -61,8 +64,8 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         var collection = _minuteBuckets.GetOrAdd(minuteEpoch, _ => new MinuteBucketCollection(minuteEpoch));
         collection.Record(normalizedRoute, normalizedMethod, statusCode, latencyMs);
 
-        // Prune buckets older than 120 minutes to prevent unbounded memory growth
-        PruneOldBuckets(minuteEpoch - 120);
+        // Keep the longest supported window, including minutes already flushed to the DB.
+        PruneOldBuckets(minuteEpoch - 1440);
     }
 
     public IReadOnlyList<RouteLatencySnapshot> GetRouteSnapshots(TimeSpan window)
@@ -134,7 +137,16 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
             TotalRequests: totalRequests,
             Status5xxCount: total5xx,
             Api5xxRatePercent: rate5xx,
-            LatencyP95Ms: p95
+            LatencyP95Ms: p95,
+            HistogramBuckets: totalRequests == 0 ? [] : [
+                new("≤50 ms", globalAcc.Le50),
+                new("50–100 ms", globalAcc.Le100),
+                new("100–250 ms", globalAcc.Le250),
+                new("250–500 ms", globalAcc.Le500),
+                new("500–1000 ms", globalAcc.Le1000),
+                new("1000–2000 ms", globalAcc.Le2000),
+                new(">2000 ms", globalAcc.Gt2000, true)
+            ]
         );
     }
 
@@ -173,7 +185,7 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         {
             if (minute < beforeMinuteEpoch)
             {
-                if (_minuteBuckets.TryRemove(minute, out var collection))
+                if (_minuteBuckets.TryGetValue(minute, out var collection) && _flushedMinutes.TryAdd(minute, 0))
                 {
                     drained.AddRange(collection.ToEntityBuckets());
                 }
@@ -185,6 +197,7 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
     public void Reset()
     {
         _minuteBuckets.Clear();
+        _flushedMinutes.Clear();
     }
 
     private void PruneOldBuckets(long cutoffMinute)
@@ -194,6 +207,7 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
             if (minute < cutoffMinute)
             {
                 _minuteBuckets.TryRemove(minute, out _);
+                _flushedMinutes.TryRemove(minute, out _);
             }
         }
     }

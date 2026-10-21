@@ -257,12 +257,34 @@ public static class OperationsMonitoringTests
         Assert(overview.Api5xxRatePercent == 5.0, "5xx rate is 5.0%");
         Assert(overview.OverallStatus == "Degraded", "Status is Degraded due to 5% 5xx rate");
 
+        var histogram = aggregator.GetWindowSummary(TimeSpan.FromHours(1)).HistogramBuckets;
+        Assert(histogram.Select(b => b.Count).SequenceEqual(new[] { 90, 5, 0, 5, 0, 0, 0 }),
+            "Histogram exposes exclusive latency bucket counts");
+        fakeClock.Advance(TimeSpan.FromMinutes(1));
+        var flushed = aggregator.DrainCompletedMinuteBuckets(fakeClock.GetUtcNow().ToUnixTimeSeconds() / 60);
+        Assert(flushed.Sum(b => b.RequestCount) == 100, "Minute flush writes all recorded requests");
+        Assert(aggregator.DrainCompletedMinuteBuckets(fakeClock.GetUtcNow().ToUnixTimeSeconds() / 60).Count == 0,
+            "Completed minute is not flushed twice");
+        Assert(aggregator.GetWindowSummary(TimeSpan.FromHours(1)).TotalRequests == 100,
+            "Minute flush preserves the reporting window");
+
         // Test 4: Pruning expired requests
-        fakeClock.Advance(TimeSpan.FromMinutes(65));
+        fakeClock.Advance(TimeSpan.FromMinutes(185));
         var prunedOverview = aggregator.GetOverviewSnapshot(TimeSpan.FromHours(1), dbConnected: true, dbStatus: "Healthy");
         Assert(prunedOverview.TotalRequestsLastHour == 0, "Requests older than 1h expired from 1h window");
         Assert(prunedOverview.Api5xxRatePercent == null, "Api5xxRatePercent is null when 0 requests");
         Assert(prunedOverview.OverallStatus == "Healthy", "Status healthy after old traffic expired");
+
+        aggregator.Record("/api/current", "GET", 200, 2500);
+        Assert(aggregator.GetWindowSummary(TimeSpan.FromHours(24)).TotalRequests == 101,
+            "24h window includes traffic older than one hour");
+        fakeClock.Advance(TimeSpan.FromHours(23));
+        aggregator.Record("/api/current", "GET", 200, 20);
+        Assert(aggregator.GetWindowSummary(TimeSpan.FromHours(24)).TotalRequests == 2,
+            "24h window expires old traffic after pruning");
+        aggregator.Reset();
+        Assert(aggregator.GetWindowSummary(TimeSpan.FromHours(24)).HistogramBuckets.Count == 0,
+            "Empty window exposes no fabricated histogram");
 
         return Task.CompletedTask;
     }
@@ -927,6 +949,8 @@ public static class OperationsMonitoringTests
         adminClient.BaseAddress = new Uri("http://localhost");
         adminClient.DefaultRequestHeaders.Add("X-Fixture-Role", "Admin");
 
+        app.Services.GetRequiredService<IRouteLatencyAggregator>().Record("/api/histogram-fixture", "GET", 200, 2500);
+
         // 1. GET /api/admin/monitoring/operations returns 200 OK
         var opsResp = await adminClient.GetAsync("/api/admin/monitoring/operations");
         Assert(opsResp.StatusCode == HttpStatusCode.OK, "Admin operations endpoint returns 200 OK with T3 implemented");
@@ -940,6 +964,8 @@ public static class OperationsMonitoringTests
         Assert(opsData.Workers.Where(w => w.WorkerName != "backup-watchdog" && w.IsEnabled).All(w => w.Status == "Healthy"), "All enabled application workers healthy");
         Assert(opsData.Workers.Single(w => w.WorkerName == "backup-watchdog").Status == "Unknown", "Missing collector surfaces backup-watchdog as Unknown");
         Assert(opsData.Queues != null, "Operational queues stats present");
+        Assert(opsData.HistogramBuckets?.Count == 7 && opsData.HistogramBuckets[^1].Count == 1 && opsData.HistogramBuckets[^1].IsViolating,
+            "Operations endpoint serializes histogram counts and slow-request marker");
 
         // 2. Query with custom window
         var ops24hResp = await adminClient.GetAsync("/api/admin/monitoring/operations?window=24h");

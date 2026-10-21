@@ -229,8 +229,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
 
         var revenueResp = await revenueQueryService.GetRevenueMetricsAsync(new MonitoringFilterRequest
         {
-            FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-20)),
-            ToDate = DateOnly.FromDateTime(DateTime.UtcNow)
+            FromDate = ApiSupport.VietnamDate(persistedPaidAt).AddDays(-20),
+            ToDate = ApiSupport.VietnamDate(persistedPaidAt)
         }, default);
 
         Assert(revenueResp.Summary.PaidSubscriptionCount == 1,
@@ -240,8 +240,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
 
         var growthResp = await growthQueryService.GetGrowthMetricsAsync(new MonitoringFilterRequest
         {
-            FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-20)),
-            ToDate = DateOnly.FromDateTime(DateTime.UtcNow)
+            FromDate = ApiSupport.VietnamDate(persistedPaidAt).AddDays(-20),
+            ToDate = ApiSupport.VietnamDate(persistedPaidAt)
         }, default);
 
         Assert(growthResp.Summary.Registrations == 1, "Growth query shows 1 registered owner");

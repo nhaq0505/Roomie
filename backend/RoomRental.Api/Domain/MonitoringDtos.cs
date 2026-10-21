@@ -225,12 +225,15 @@ public sealed record OperationalQueueStatsDto(
     long? SmtpAcceptedNotDeliveredCount
 );
 
+public sealed record LatencyHistogramBucketDto(string Range, int Count, bool IsViolating = false);
+
 public sealed record AdminMonitoringOperationsResponse(
     OpsOverviewDto Overview,
     IReadOnlyList<RouteLatencyMetricDto> RouteMetrics,
     HostMetricsDto? HostMetrics,
     IReadOnlyList<WorkerStatusDto> Workers,
-    OperationalQueueStatsDto Queues
+    OperationalQueueStatsDto Queues,
+    IReadOnlyList<LatencyHistogramBucketDto>? HistogramBuckets = null
 );
 
 // Admin Incidents DTOs
