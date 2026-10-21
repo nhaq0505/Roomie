@@ -5,7 +5,7 @@
 .status-brand .brand-mark { color: white; }
 .status-card { width: min(600px, 100%); padding: 15px 22px; border: 1px solid #e7eeec; border-radius: 18px; background: white; box-shadow: 0 12px 36px rgba(20,54,59,.055); }
 .status-card .ant-result { padding: 28px 15px; }
-.status-card .ant-result-title { color: #233d44; font-family: Manrope, sans-serif; font-size: 21px; font-weight: 700; }
+.status-card .ant-result-title { color: #233d44; font-family: 'Be Vietnam Pro', sans-serif; font-size: 21px; font-weight: 700; }
 .status-card .ant-result-subtitle { color: #76878b; font-size: 13px; line-height: 1.7; }
 .status-email { display: inline-block; margin-top: 9px; color: #3b6065; font-weight: 600; }
 .status-actions { display: flex; justify-content: center; gap: 9px; }

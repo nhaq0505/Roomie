@@ -4,6 +4,6 @@
 .admin-summary-symbol { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #537f9b; background: #edf4f8; }
 .admin-summary-card > div:nth-child(2) { display: flex; flex-direction: column; gap: 1px; }
 .admin-summary-card > div:nth-child(2) span { color: #809094; font-size: 12px; }
-.admin-summary-card > div:nth-child(2) strong { color: #2d4750; font-family: Manrope, sans-serif; font-size: 20px; }
+.admin-summary-card > div:nth-child(2) strong { color: #2d4750; font-family: 'Be Vietnam Pro', sans-serif; font-size: 20px; }
 .admin-summary-note { margin-left: auto; color: #869599; font-size: 13px; }
 .owner-list-card .section-card-header { margin-bottom: 14px; }

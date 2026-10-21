@@ -16,7 +16,7 @@ export const appTheme: ThemeConfig = {
     colorTextDescription: '#526970',
     colorTextPlaceholder: '#69787d',
     borderRadius: 12,
-    fontFamily: 'DM Sans, sans-serif',
+    fontFamily: 'Be Vietnam Pro, sans-serif',
     controlHeight: 42,
   },
   components: {

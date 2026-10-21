@@ -9,9 +9,9 @@
 .stat-green { color: #218364; background: #e9f5ee; }
 .stat-amber { color: #bb8133; background: #fbf2e6; }
 .stat-card .ant-statistic-title { margin-bottom: 17px; color: var(--muted); font-size: 13px; }
-.stat-card .ant-statistic-content { color: #1b343c; font-family: Manrope, sans-serif; font-size: clamp(20px, 2vw, 25px); font-weight: 750; letter-spacing: -.8px; }
+.stat-card .ant-statistic-content { color: #1b343c; font-family: 'Be Vietnam Pro', sans-serif; font-size: clamp(20px, 2vw, 25px); font-weight: 750; letter-spacing: -.8px; }
 .stat-card .ant-statistic-content-value { white-space: nowrap; }
-.stat-unit { margin-left: 5px; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.stat-unit { margin-left: 5px; color: var(--muted); font-family: 'Be Vietnam Pro', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; }
 .stat-foot { display: flex; gap: 5px; margin-top: 7px; color: var(--muted); font-size: 13px; }
 .stat-muted { color: var(--muted); }
 .stat-positive { color: var(--green); }
@@ -29,7 +29,7 @@
 .task-copy span { color: #839196; font-size: 13px; line-height: 1.5; }
 .task-arrow { color: #a1b0b0; font-size: 14px; }
 .occupancy-summary { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px 17px; }
-.occupancy-percent { margin-top: 8px; color: #18353d; font-family: Manrope, sans-serif; font-size: 36px; font-weight: 750; letter-spacing: -1.5px; }
+.occupancy-percent { margin-top: 8px; color: #18353d; font-family: 'Be Vietnam Pro', sans-serif; font-size: 36px; font-weight: 750; letter-spacing: -1.5px; }
 .occupancy-percent small { padding-left: 2px; font-size: 17px; font-weight: 600; }
 .occupancy-summary .ant-progress-text { color: #38555a !important; font-size: 13px !important; font-weight: 650; }
 .occupancy-stats { display: flex; justify-content: space-between; padding: 13px 0; border-top: 1px solid #eef2f1; border-bottom: 1px solid #eef2f1; }
@@ -44,7 +44,7 @@
 .recent-invoice-row { display: flex; align-items: center; gap: 13px; min-height: 66px; padding: 10px 4px; color: inherit; text-decoration: none; border-top: 1px solid #edf1f0; }
 .recent-invoice-row:first-child { border-top: 0; }
 .recent-invoice-row:hover .recent-invoice-room strong { color: var(--teal-dark); }
-.invoice-room-avatar, .room-avatar { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--teal-dark); background: #e8f6f2; font-family: Manrope, sans-serif; font-size: 13px; font-weight: 700; }
+.invoice-room-avatar, .room-avatar { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--teal-dark); background: #e8f6f2; font-family: 'Be Vietnam Pro', sans-serif; font-size: 13px; font-weight: 700; }
 .recent-invoice-room { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
 .recent-invoice-room strong { overflow: hidden; color: #3b5257; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .recent-invoice-room span, .recent-invoice-period { color: var(--muted); font-size: 13px; }

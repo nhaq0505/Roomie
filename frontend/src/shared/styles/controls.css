@@ -114,7 +114,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 .auth-main { padding-top: 76px; }
 .tenant-header .language-selector { margin-left: auto; }
 .tenant-header-secure { margin-left: 12px; }
-html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'DM Sans', system-ui, sans-serif; }
+html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'Be Vietnam Pro', system-ui, sans-serif; }
 @media (max-width: 600px) {
   .public-language { right: 16px; top: 16px; }
   .language-selector { width: 116px; }

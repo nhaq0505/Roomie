@@ -8,11 +8,11 @@
   --landing-line: #e3ece8;
   background: #fff;
   color: var(--ink);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
 .landing-page *, .landing-page *::before, .landing-page *::after { box-sizing: border-box; }
 .landing-page figure, .landing-page p, .landing-page h1, .landing-page h2, .landing-page h3 { margin: 0; }
-.landing-page h1, .landing-page h2, .landing-page h3 { font-family: Manrope, 'DM Sans', sans-serif; text-wrap: balance; }
+.landing-page h1, .landing-page h2, .landing-page h3 { font-family: 'Be Vietnam Pro', sans-serif; text-wrap: balance; }
 .landing-page p, .landing-page li { text-wrap: pretty; }
 .landing-page section[id] { scroll-margin-top: 100px; }
 .landing-page a { text-decoration: none; }
@@ -27,7 +27,7 @@
 .landing-header { position: sticky; top: 0; z-index: 30; background: var(--landing-deep); border-bottom: 1px solid #2a444d; }
 .landing-header-inner { max-width: 1328px; padding: 16px 24px; min-height: 80px; margin: auto; display: flex; align-items: center; gap: 40px; }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; color: #fff; }
-.landing-brand strong { font: 700 24px/1 Manrope, sans-serif; letter-spacing: -.5px; }
+.landing-brand strong { font: 700 24px/1 'Be Vietnam Pro', sans-serif; letter-spacing: -.5px; }
 .landing-brand .brand-mark { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; background: var(--roomie-brand-color); color: #fff; }
 .landing-nav { display: flex; align-items: center; gap: 28px; }
 .landing-nav a { display: inline-flex; align-items: center; min-height: 40px; color: #edf9f4; font-size: 14px; }
@@ -62,7 +62,7 @@
 .window-dots i { width: 7px; height: 7px; background: #b8c9c6; border-radius: 50%; }
 .dashboard-layout { display: grid; grid-template-columns: 192px minmax(0,1fr); }
 .dashboard-nav { background: var(--navy); color: #c9dcd8; padding: 24px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
-.dashboard-nav-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 24px; font: 700 18px Manrope,sans-serif; color: #fff; }
+.dashboard-nav-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 24px; font: 700 18px 'Be Vietnam Pro',sans-serif; color: #fff; }
 .dashboard-nav-brand .brand-mark { width: 30px; height: 30px; flex-basis: 30px; border-radius: 8px; }
 .dashboard-nav > span { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; }
 .dashboard-nav > .dashboard-nav-active { background: #28574f; color: #f1fff8; }
@@ -153,7 +153,7 @@
 .tenant-steps { list-style: none; display: grid; gap: 24px; padding: 0; margin: 28px 0 0; }
 .tenant-steps > li { display: flex; align-items: start; gap: 16px; }
 .tenant-steps > li > span { display: grid; place-items: center; flex: 0 0 32px; height: 32px; border-radius: 8px; background: #e7f7f0; color: var(--landing-teal); font-size: 12px; }
-.tenant-steps h3 { font: 600 16px/1.5 'DM Sans',sans-serif; margin: 2px 0 6px; }
+.tenant-steps h3 { font: 600 16px/1.5 'Be Vietnam Pro',sans-serif; margin: 2px 0 6px; }
 .tenant-steps p { font-size: 14px; color: var(--landing-muted); line-height: 1.7; }
 .tenant-art { background: radial-gradient(ellipse at 65% 30%, #167866, #143a40 65%, #102b34); padding-top: 32px; }
 .tenant-art figcaption { color: #d4e4df; }
@@ -177,7 +177,7 @@
 .landing-security { max-width: 1120px; margin: 0 auto 80px; padding: 28px 0 0; border-top: 1px solid var(--landing-line); }
 .security-intro { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
 .security-intro > .anticon { color: var(--landing-teal); font-size: 20px; }
-.security-intro h2 { font: 600 18px/1.5 'DM Sans',sans-serif; }
+.security-intro h2 { font: 600 18px/1.5 'Be Vietnam Pro',sans-serif; }
 .security-points { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 32px; }
 .security-points p { display: flex; gap: 10px; font-size: 13px; line-height: 1.8; color: var(--landing-muted); }
 .security-points .anticon { margin-top: 5px; color: var(--landing-teal); flex-shrink: 0; }

@@ -47,7 +47,7 @@
 .auth-page .back-link:hover { text-decoration: underline; }
 .onboarding-steps { display: flex; flex-direction: column; gap: 16px; margin-top: 28px; }
 .onboarding-steps > div { display: flex; align-items: center; gap: 12px; }
-.onboarding-steps > div > span { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(117,216,194,.3); border-radius: 10px; color: #7ad8c3; font-family: Manrope, sans-serif; font-size: 12px; font-weight: 700; }
+.onboarding-steps > div > span { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(117,216,194,.3); border-radius: 10px; color: #7ad8c3; font-family: 'Be Vietnam Pro', sans-serif; font-size: 12px; font-weight: 700; }
 .onboarding-steps > div > div { display: flex; flex-direction: column; gap: 4px; }
 .onboarding-steps strong { color: #e0f1ed; font-size: 13px; }
 .onboarding-steps small { color: #a9c3be; font-size: 12px; }

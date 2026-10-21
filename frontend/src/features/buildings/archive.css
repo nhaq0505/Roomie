@@ -1,5 +1,5 @@
 .archive-filter-toolbar { display: flex; justify-content: flex-end; margin: -7px 0 16px; }
 .archive-filter-toolbar > label { display: grid; width: min(100%, 260px); gap: 6px; color: #526970; font-size: 12px; font-weight: 600; }
 .building-card-archived { opacity: .91; }
-.building-archived-tag { position: absolute; top: 14px; right: 14px; z-index: 1; margin: 0; }
+.building-archived-tag { margin: 0; white-space: normal; }
 .archived-summary .summary-icon { color: #79673d; background: #f8f1dd; }

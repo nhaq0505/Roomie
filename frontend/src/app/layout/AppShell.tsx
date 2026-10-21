@@ -7,7 +7,7 @@ import { App, Avatar, Button, Drawer, Dropdown, Layout, Menu, Space, Typography 
 import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined,
+  AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
   SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
@@ -28,8 +28,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     if (location.pathname.startsWith('/settings/')) setOpenKeys(keys => keys.includes('settings') ? keys : [...keys, 'settings']);
   }, [location.pathname]);
   const settingsItems = [
-    { key: '/settings/payment', label: t("Thanh toán") },
-    { key: '/settings/zalo', label: 'Zalo' },
+    { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
+    { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
   ];
   useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [location.pathname]);
 const ownerItems = [

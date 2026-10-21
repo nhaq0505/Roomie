@@ -3,7 +3,7 @@
 .invoice-totals-row { margin-bottom: 18px; }
 .invoice-total-tile { display: flex; flex-direction: column; gap: 9px; min-height: 82px; padding: 16px 18px; border: 1px solid #e7eeec; border-radius: 14px; background: white; }
 .invoice-total-tile span { color: var(--muted); font-size: 13px; }
-.invoice-total-tile strong { color: #304a51; font-family: Manrope, sans-serif; font-size: 17px; font-weight: 700; }
+.invoice-total-tile strong { color: #304a51; font-family: 'Be Vietnam Pro', sans-serif; font-size: 17px; font-weight: 700; }
 .invoice-total-paid strong { color: #237e60; }
 .invoice-total-due strong { color: #965c21; }
 .invoice-summary-scope { margin: -7px 0 18px; color: #5c7178; font-size: 13px; line-height: 1.55; }
@@ -24,7 +24,7 @@
 .balance-due { color: #9c5528 !important; }
 .balance-clear { color: var(--green) !important; }
 .invoice-drawer .ant-drawer-header { padding: 21px 24px; border-bottom: 1px solid #edf1ef; }
-.invoice-drawer .ant-drawer-title { color: #29434a; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 700; }
+.invoice-drawer .ant-drawer-title { color: #29434a; font-family: 'Be Vietnam Pro', sans-serif; font-size: 15px; font-weight: 700; }
 .invoice-drawer .ant-drawer-body { padding: 22px 24px 28px; }
 /* Keep the body as the only scroll pane in these long, right-side detail drawers. AntD 5 sets overflow:auto on both content and body by default. */
 .ant-drawer-content.invoice-drawer, .ant-drawer-content.moveout-drawer { overflow: hidden; }

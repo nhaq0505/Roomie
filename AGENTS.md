@@ -75,7 +75,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - `frontend/src/api.ts` là facade tương thích cho consumer/test cũ, không phải nơi thêm logic nghiệp vụ. Không xóa vì thấy app không import trực tiếp.
 - Trang phức tạp dùng hook `use*Page` và component nhận dữ liệu/handler; giữ vòng đời idempotency key, query key và invalidation khi refactor.
 - HTTP qua `shared/http/client.ts`: same-origin cookie, Accept-Language, timeout, unwrap envelope, `ApiError`; mutation không retry tự động. Excel dùng `requestBlob`.
-- `app/styles.css` ghép CSS theo thứ tự có chủ đích. Giữ cascade khi di chuyển rule. Nền/brand nằm ở `shared/styles/foundation.css`, Ant token ở `shared/design/antdTheme.ts`; font hiện có DM Sans/Manrope.
+- `app/styles.css` ghép CSS theo thứ tự có chủ đích. Giữ cascade khi di chuyển rule. Nền/brand nằm ở `shared/styles/foundation.css`, Ant token ở `shared/design/antdTheme.ts`; font toàn hệ thống Be Vietnam Pro (nội dung, tiêu đề, số liệu và Ant Design); giữ monospace cho mã/nội dung chuyển khoản.
 - Tiếng Việt là nguồn; `shared/i18n/source.json` và `translations.tsv` cùng các catalog en/zh/ko/hi. Dùng `t()`; sau đổi copy chạy `i18n:build`, `i18n:check`; đọc script trước khi sửa trực tiếp catalog sinh ra.
 - Routes private phải đồng bộ `app/App.tsx`, `app/seo/site.ts`, `Shared/SeoMiddleware.cs`. Router React không đủ để hard-refresh chạy trên server.
 - Prerender sinh `dist/index.html` cho trang chủ, `app.html` cho SPA và sitemap. Không xuất renderer build-only vào production. Trang lạ/API lạ phải trả 404 thật.

@@ -15,7 +15,7 @@
 .tenant-summary { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 23px; padding: 17px 19px; border: 1px solid #d9ede6; border-radius: 15px; background: linear-gradient(120deg,#f7fcf9,#eef8f3); }
 .tenant-summary > div:first-child { display: flex; flex-direction: column; gap: 5px; }
 .tenant-summary span { color: #72868a; font-size: 12px; }
-.tenant-summary strong { font-family: Manrope, sans-serif; font-size: 20px; }
+.tenant-summary strong { font-family: 'Be Vietnam Pro', sans-serif; font-size: 20px; }
 .tenant-summary-lock { display: flex; align-items: center; gap: 5px; color: #558878; font-size: 12px; }
 .tenant-section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
 .tenant-section-heading h4.ant-typography { margin: 0 0 4px; font-size: 15px; }
@@ -27,7 +27,7 @@
 .tenant-invoice-top { display: flex; align-items: center; justify-content: space-between; }
 .tenant-invoice-top > div:first-child { display: flex; align-items: center; gap: 9px; }
 .tenant-invoice-period { color: #334c52; font-size: 13px; font-weight: 700; }
-.tenant-total { color: #27434a; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 750; }
+.tenant-total { color: #27434a; font-family: 'Be Vietnam Pro', sans-serif; font-size: 16px; font-weight: 750; }
 .tenant-invoice-card .ant-collapse { margin: 8px -4px 1px; border: 0; background: transparent; }
 .tenant-invoice-card .ant-collapse-header { align-items: center !important; padding: 6px 4px !important; }
 .tenant-detail-toggle { color: #74878b; font-size: 12px; }

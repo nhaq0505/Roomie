@@ -8,7 +8,7 @@
   --room-hover: #f4f7f6;
   --room-accent: #0a796a;
   --room-danger: #a93241;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
 .rooms-workspace .page-heading { align-items: center; gap: 16px; margin-bottom: 24px; }
 .rooms-workspace .page-heading h2.ant-typography { font-family: inherit; font-size: 22px; font-weight: 600; letter-spacing: 0; }

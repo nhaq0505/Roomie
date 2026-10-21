@@ -1,5 +1,5 @@
 :root {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Be Vietnam Pro', sans-serif;
   color: #19333b;
   background: #f4f7f6;
   font-synthesis: none;
@@ -23,7 +23,7 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas)
 button, input, textarea { font: inherit; }
 a { color: var(--teal-dark); }
 .ant-typography { color: var(--ink); }
-.ant-typography h1, .ant-typography h2, .ant-typography h3, .ant-typography h4 { font-family: Manrope, 'DM Sans', sans-serif; color: var(--ink); }
+.ant-typography h1, .ant-typography h2, .ant-typography h3, .ant-typography h4 { font-family: 'Be Vietnam Pro', sans-serif; color: var(--ink); }
 .ant-btn { box-shadow: none; }
 .ant-btn-primary { box-shadow: 0 5px 13px rgba(16, 157, 131, .12); }
 .ant-input-affix-wrapper, .ant-input, .ant-input-number, .ant-picker, .ant-select-selector { box-shadow: none !important; }

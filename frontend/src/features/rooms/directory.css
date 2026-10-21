@@ -2,7 +2,7 @@
 /* Rooms and tables */
 .room-overview-strip { gap: 20px; padding: 14px 19px; margin-bottom: 18px; }
 .room-overview-strip > div { display: flex; align-items: center; gap: 7px; color: #7b8b8f; font-size: 13px; }
-.room-overview-strip > div strong { color: #344d53; font-family: Manrope, sans-serif; font-size: 18px; }
+.room-overview-strip > div strong { color: #344d53; font-family: 'Be Vietnam Pro', sans-serif; font-size: 18px; }
 .room-overview-strip > i { width: 1px; height: 25px; background: #e9efed; }
 .room-overview-strip .overview-total { margin-left: auto; }
 .rooms-card .section-card-header { margin-bottom: 14px; }

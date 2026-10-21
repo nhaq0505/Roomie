@@ -7,7 +7,7 @@
 .report-total-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 11px; margin: 18px 0; }
 .report-total-tile { display: flex; min-width: 0; min-height: 93px; flex-direction: column; justify-content: space-between; gap: 7px; padding: 14px 15px; border: 1px solid #e0ebe7; border-radius: 12px; background: #fbfdfc; }
 .report-total-tile > span { color: #647a7e; font-size: 12px; line-height: 1.4; }
-.report-total-tile > strong { color: #25484d; font-family: Manrope, sans-serif; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.report-total-tile > strong { color: #25484d; font-family: 'Be Vietnam Pro', sans-serif; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
 .report-total-tile > small { color: #73878a; font-size: 11px; }
 .report-total-accent { background: #eef8f4; border-color: #d3e9e1; }
 .report-total-loading { min-height: 93px; background: linear-gradient(100deg,#f5f8f7 20%,#edf3f1 38%,#f5f8f7 60%); background-size: 200% 100%; animation: report-shimmer 1.4s ease infinite; }

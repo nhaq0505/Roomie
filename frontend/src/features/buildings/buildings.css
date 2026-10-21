@@ -9,28 +9,21 @@
 .building-summary-strip > a { font-size: 13px; font-weight: 600; }
 .building-card { overflow: hidden; height: 100%; border-radius: 16px; border: 1px solid #e6edeb; box-shadow: 0 2px 10px rgba(19,48,55,.03); }
 .building-card .ant-card-body { padding: 0; }
-.building-art { position: relative; height: 135px; overflow: hidden; background: linear-gradient(135deg,#d9eee8,#c2e2db); }
-.building-art-1 { background: linear-gradient(135deg,#e7e4d7,#d7d8c5); }
-.building-art-2 { background: linear-gradient(135deg,#dce7ef,#c7dbe4); }
-.building-art-3 { background: linear-gradient(135deg,#f0e3d6,#e5d4c1); }
-.building-art-grid { position: absolute; right: 40px; bottom: -1px; display: grid; grid-template-columns: repeat(3, 31px); gap: 7px; transform: perspective(230px) rotateX(0deg) skewY(-6deg); }
-.building-art-grid span { width: 31px; height: 43px; border-radius: 6px 6px 0 0; background: rgba(255,255,255,.65); box-shadow: 0 0 0 1px rgba(74, 124, 115, .07); }
-.building-art-grid span:nth-child(2n) { height: 55px; background: rgba(255,255,255,.82); }
-.building-art-grid span:nth-child(3n) { height: 36px; }
-.building-art-1 .building-art-grid span { background: rgba(255,255,255,.62); }
-.building-art-2 .building-art-grid span { background: rgba(255,255,255,.7); }
-.building-art-3 .building-art-grid span { background: rgba(255,255,255,.7); }
-.building-art-tag { position: absolute; top: 14px; left: 15px; color: rgba(35,85,77,.52); font-family: Manrope, sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1px; }
-.building-art-icon { position: absolute; right: 20px; bottom: 20px; display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid rgba(255,255,255,.6); border-radius: 13px; color: #267b69; background: rgba(255,255,255,.62); backdrop-filter: blur(4px); }
-.building-card-body { padding: 17px 17px 14px; }
-.building-card-title { display: flex; justify-content: space-between; gap: 10px; min-height: 62px; }
-.building-card-title h4.ant-typography { margin: 0 0 8px; font-size: 14px; }
-.building-card-title > div:first-child > span { display: flex; align-items: flex-start; gap: 5px; color: #87969a; font-size: 13px; line-height: 1.5; }
-.building-room-count { display: flex; flex: 0 0 auto; align-items: center; flex-direction: column; gap: 1px; min-width: 42px; padding: 5px 7px; align-self: flex-start; border-radius: 10px; color: #168b75; background: #eaf7f3; }
-.building-room-count strong { font-family: Manrope, sans-serif; font-size: 17px; line-height: 1; }
-.building-room-count small { font-size: 12px; }
-.building-card-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; margin-top: 10px; border-top: 1px solid #eef2f1; color: #94a0a2; font-size: 12px; }
-.building-card-footer a { font-size: 13px; font-weight: 600; }
+.building-card-header { display: flex; align-items: center; gap: 12px; padding: 20px 20px 0; }
+.building-card-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: #eaf7f3; color: var(--teal-dark); font-size: 21px; }
+.building-room-count { margin-left: auto; display: flex; align-items: baseline; gap: 5px; color: var(--muted); white-space: nowrap; }
+.building-room-count strong { color: var(--ink); font-size: 24px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.building-room-count small { font-size: 13px; }
+.building-card-body { padding: 18px 20px 12px; }
+.building-card-title { min-width: 0; min-height: 78px; }
+.building-card-title h4.ant-typography { margin: 0 0 8px; color: var(--ink); font-size: 17px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.building-card-title > div > span { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.building-card-title .anticon { flex: 0 0 auto; margin-top: 4px; }
+.building-card-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-top: 12px; margin-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.building-card-footer .ant-btn { min-height: 44px; padding-inline: 10px; }
+.building-view-rooms { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border-radius: 8px; background: #eaf7f3; color: var(--teal-dark); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.building-view-rooms:hover { background: #daf0e8; color: var(--teal-dark); }
+.building-view-rooms:focus-visible { outline: 2px solid var(--teal-dark); outline-offset: 3px; }
 .building-tip-card { margin-top: 18px; padding: 14px 19px; }
 .building-tip { display: flex; align-items: center; gap: 13px; }
 .tip-illustration { display: grid; flex: 0 0 43px; place-items: center; width: 43px; height: 43px; border-radius: 14px; color: #15957d; background: #e8f6f1; }

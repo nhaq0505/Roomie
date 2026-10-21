@@ -5,8 +5,8 @@
 .app-sider .ant-layout-sider-children { min-height: 100%; display: flex; flex-direction: column; }
 .brand, .auth-brand, .auth-small-brand, .status-brand, .tenant-header { display: flex; align-items: center; gap: 11px; }
 .brand { color: white; padding: 0 8px 34px; }
-.brand-mark { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; color: #f1fffc; border-radius: 12px; background: var(--roomie-brand-color); font-size: 23px; font-family: Manrope, sans-serif; line-height: 1; }
-.brand strong, .tenant-header strong, .auth-brand strong, .auth-small-brand strong, .status-brand strong { display: block; font-family: Manrope, sans-serif; font-size: 20px; line-height: 1.1; font-weight: 800; letter-spacing: -.75px; }
+.brand-mark { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; color: #f1fffc; border-radius: 12px; background: var(--roomie-brand-color); font-size: 23px; font-family: 'Be Vietnam Pro', sans-serif; line-height: 1; }
+.brand strong, .tenant-header strong, .auth-brand strong, .auth-small-brand strong, .status-brand strong { display: block; font-family: 'Be Vietnam Pro', sans-serif; font-size: 20px; line-height: 1.1; font-weight: 800; letter-spacing: -.75px; }
 .brand span, .tenant-brand-copy > span, .auth-brand span { display: block; margin-top: 5px; color: rgba(233, 246, 243, .56); font-size: 12px; font-weight: 700; letter-spacing: 1.1px; }
 .sider-label { margin: 0 11px 10px; color: #9db5b2; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; }
 .app-sider .ant-menu { flex: 0 0 auto; border-inline-end: 0 !important; color: #c5d7d5; background: transparent !important; font-size: 13px; }

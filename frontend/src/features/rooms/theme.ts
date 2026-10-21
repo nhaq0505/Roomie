@@ -10,7 +10,7 @@ export const roomDesignTokens = {
   controlBorder: '#c8d7d1',
   surface: '#ffffff',
   hover: '#f4f7f6',
-  font: 'DM Sans, sans-serif',
+  font: 'Be Vietnam Pro, sans-serif',
 } as const;
 
 export function roomTheme(compact: boolean): ThemeConfig {
