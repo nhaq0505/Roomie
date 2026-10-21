@@ -160,7 +160,8 @@ test('stale transfer conflict refreshes balances, explains the invoice error and
   await dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true }).click();
   await expect(dialog).toContainText('Các hóa đơn của yêu cầu này đã được thu đủ');
   await expect(dialog.locator('.ant-btn-loading')).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true })).toBeDisabled();
+  // Ant Design keeps the loading icon in the accessible name during its exit animation.
+  await expect(dialog.getByRole('button', { name: /Ghi nhận khoản thu$/ })).toBeDisabled();
   await expect(page.getByText('Lượt thuê đã thay đổi', { exact: false })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Bỏ khỏi danh sách', exact: true }).click();
