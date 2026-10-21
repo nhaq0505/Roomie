@@ -42,7 +42,7 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 | `deploy/` | Production Compose, migration overlay, backup/restore, role DB, Caddy, firewall, host collector |
 | `scripts/` | Tiện ích webhook tunnel |
 | `rehouse-video/` | Dự án Remotion độc lập, mock quảng cáo dùng tên ReHouse cũ; không nằm trong runtime/build app |
-| `.agents/skills/ui-ux/` | Skill thiết kế của dự án; không phải output build |
+| `.agents/skills/ui-ux-pro-max/` | Skill UI/UX Pro Max từ nextlevelbuilder, thay skill ui-ux cũ; dữ liệu và công cụ tìm kiếm chạy local, tuân thủ stack/quy ước dự án |
 | `output/`, `artifacts/`, `out/` | Deliverables, bằng chứng QA hoặc bản sao công việc; không tự coi mọi file trong đây là rác |
 
 Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/rehouse`, path host `/opt/rehouse` vẫn giữ tên cũ. Đổi tên thương hiệu không có nghĩa được đổi những định danh này đồng loạt.

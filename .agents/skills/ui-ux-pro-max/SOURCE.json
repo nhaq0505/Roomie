@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+  "commit": "56ea9cf174ed86786187daa9de0e6247cb0747e4",
+  "path": ".claude/skills/ui-ux-pro-max",
+  "modifications": [
+    "Adapted search command paths for project-local Codex installation.",
+    "Removed trailing whitespace from Python sources."
+  ]
+}
