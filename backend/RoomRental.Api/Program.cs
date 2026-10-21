@@ -18,29 +18,20 @@ if (builder.Environment.IsDevelopment())
         .AddJsonFile("appsettings.Email.local.json", optional: true, reloadOnChange: true)
         .AddEnvironmentVariables().AddCommandLine(args);
 
-var provider = builder.Configuration["DatabaseProvider"] ?? "SQLite";
+var provider = builder.Configuration["DatabaseProvider"];
+if (!string.IsNullOrWhiteSpace(provider) &&
+    !provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase) &&
+    !provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("DatabaseProvider must be Postgres or PostgreSQL.");
+}
+
 var configuredConnection = builder.Configuration.GetConnectionString("DefaultConnection");
-if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase) || provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
-{
-    if (string.IsNullOrWhiteSpace(configuredConnection))
-        throw new InvalidOperationException("ConnectionStrings__DefaultConnection is required when DatabaseProvider is Postgres.");
-    builder.Services.AddDbContext<PostgresAppDbContext>(options => options.UseNpgsql(configuredConnection));
-    builder.Services.AddScoped<AppDbContext>(services => services.GetRequiredService<PostgresAppDbContext>());
-}
-else if (provider.Equals("SQLite", StringComparison.OrdinalIgnoreCase))
-{
-    var defaultDbPath = Path.Combine(builder.Environment.ContentRootPath, ".local-data", "room-rental.db");
-    var sqliteConnection = configuredConnection ?? $"Data Source={defaultDbPath}";
-    var sqliteFile = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(sqliteConnection).DataSource;
-    if (!string.IsNullOrWhiteSpace(sqliteFile) && sqliteFile != ":memory:")
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(sqliteFile))!);
-    builder.Services.AddDbContext<SqliteAppDbContext>(options => options.UseSqlite(sqliteConnection));
-    builder.Services.AddScoped<AppDbContext>(services => services.GetRequiredService<SqliteAppDbContext>());
-}
-else
-{
-    throw new InvalidOperationException("DatabaseProvider must be SQLite or Postgres.");
-}
+if (string.IsNullOrWhiteSpace(configuredConnection))
+    throw new InvalidOperationException("ConnectionStrings__DefaultConnection is required.");
+
+builder.Services.AddDbContext<PostgresAppDbContext>(options => options.UseNpgsql(configuredConnection));
+builder.Services.AddScoped<AppDbContext>(services => services.GetRequiredService<PostgresAppDbContext>());
 
 var dataProtection = builder.Services.AddDataProtection();
 var keyPath = builder.Configuration["DataProtection:KeysPath"];

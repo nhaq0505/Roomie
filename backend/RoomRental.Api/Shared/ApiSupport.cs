@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -143,8 +142,6 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
         for (Exception? current = exception; current is not null; current = current.InnerException)
         {
             if (current is PostgresException postgres && postgres.SqlState is "40001" or "40P01" or "23505" or "55P03")
-                return true;
-            if (current is SqliteException sqlite && sqlite.SqliteErrorCode is 5 or 6 or 19)
                 return true;
         }
         return false;

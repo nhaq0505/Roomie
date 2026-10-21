@@ -23,7 +23,7 @@ SSH deploy dùng tài khoản bị giới hạn forced-command, pinned known_hos
 | Thành phần | Đường dẫn / quy tắc |
 | --- | --- |
 | Compose vận hành | `/opt/rehouse/compose.yaml` (root-owned), nguồn `deploy/compose.yaml` |
-| Migration overlay | `deploy/migrate.yaml`; không dùng project import `RoomRental.DbMigrator` |
+| Migration overlay | `deploy/migrate.yaml`; áp EF Core PostgreSQL migration |
 | Runtime config | `/etc/rehouse/runtime.env`, quyền 0600, không commit |
 | Helper | `/usr/local/sbin/rehouse-deploy`, `rehouse-backup`, `rehouse-restore`, `rehouse-db-roles` |
 | State/digest | `/var/lib/rehouse/current-image`, `/var/lib/rehouse/ops.lock` |

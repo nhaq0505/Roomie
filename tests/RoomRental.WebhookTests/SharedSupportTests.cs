@@ -1,8 +1,8 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class SharedSupportTests
 {
@@ -15,10 +15,8 @@ internal static class SharedSupportTests
         if (fingerprint == RequestFingerprint.Fingerprint(new { Amount = 30001, Note = "fixture" }))
             throw new Exception("Different financial requests must not share a fingerprint");
 
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
         var owner = new AppUser { Name = "Fixture", Email = "shared@example.invalid", PasswordHash = "fixture" };
         var building = new Building { OwnerId = owner.Id, Name = "Fixture building" };
         var room = new Room { BuildingId = building.Id, Name = "Fixture room" };

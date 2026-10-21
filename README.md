@@ -1,6 +1,6 @@
 # Roomie — Quản lý phòng trọ
 
-Ứng dụng cho nhiều chủ trọ: dãy/phòng, người thuê, hóa đơn, cọc, thanh toán payOS/VietQR, nhắc Zalo và báo cáo. Backend ASP.NET Core .NET 10 + EF Core; frontend React 19/TypeScript/Vite/Ant Design; PostgreSQL vận hành, SQLite hỗ trợ local/test.
+Ứng dụng cho nhiều chủ trọ: dãy/phòng, người thuê, hóa đơn, cọc, thanh toán payOS/VietQR, nhắc Zalo và báo cáo. Backend ASP.NET Core .NET 10 + EF Core; frontend React 19/TypeScript/Vite/Ant Design; PostgreSQL là cơ sở dữ liệu duy nhất (vận hành và local/test).
 
 **Agent tiếp quản: đọc [AGENTS.md](AGENTS.md) trước.** File này chứa bản đồ code, quy tắc nghiệp vụ, giới hạn hiện tại và lệnh kiểm chứng. Source là căn cứ cho hành vi; trạng thái VPS phải được kiểm tra riêng.
 

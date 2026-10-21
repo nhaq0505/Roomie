@@ -63,7 +63,7 @@ public sealed class RegistrationVerificationService(AppDbContext db, IRegistrati
         await transaction.CommitAsync(ct);
         await transaction.DisposeAsync();
         await DeliverAsync(pending, code, previous, ct);
-        // The tracker opens its own context. Release the reservation's SQLite write
+        // The tracker opens its own context. Release the reservation's write
         // lock before recording telemetry, and count only successful deliveries.
         if (milestoneTracker is not null)
         {

@@ -1,7 +1,6 @@
 """Occupancy, credential recovery and monthly KPIs on a disposable local API."""
 import os
 import concurrent.futures
-import sqlite3
 import unittest
 import uuid
 from pathlib import Path
@@ -29,16 +28,10 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
             'people': 3, **changes})
 
     def fixture_db(self):
-        path = os.environ.get('TEST_SQLITE_DB')
-        if not path:
-            self.skipTest('Requires disposable SQLite fixture database')
-        self.assertIn(urlsplit(BASE_URL).hostname, {'localhost', '127.0.0.1', '::1'})
-        database = Path(path)
-        self.assertTrue(database.is_absolute() and database.is_file() and not database.is_symlink())
-        db = sqlite3.connect(database, timeout=10)
-        self.assertIsNotNone(db.execute('SELECT Id FROM Users WHERE Email=?', (self.user['email'],)).fetchone(),
+        from pg_fixture import get_pg_fixture
+        db = get_pg_fixture(BASE_URL)
+        self.assertIsNotNone(db.execute('SELECT "Id" FROM "Users" WHERE "Email"=?', (self.user['email'],)).fetchone(),
             'Fixture database must belong to the same disposable API')
-        self.addCleanup(db.close)
         return db
 
     def test_edit_preserves_issued_unpaid_paid_and_uses_new_count(self):
@@ -82,7 +75,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         occupancy = self.start_occupancy(room['id'])
         invoice = self.save_reading(room['id'], period_offset(0), 110)['invoice']
         db = self.fixture_db()
-        db.execute('UPDATE Invoices SET LifecycleState=? WHERE Id=?', ('Draft', invoice['id'].upper()))
+        db.execute('UPDATE "Invoices" SET "LifecycleState"=? WHERE "Id"=?', ('Draft', invoice['id'].upper()))
         db.commit()
         self.assertEqual(self.edit(room, occupancy)[0], 200)
         draft = self.owner.ok('GET', f"/api/invoices/{invoice['id']}")
@@ -99,19 +92,19 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         occupancy = self.start_occupancy(room['id'])
         invoice = self.save_reading(room['id'], period_offset(0), 110)['invoice']
         db = self.fixture_db()
-        db.execute("UPDATE Invoices SET LifecycleState='Draft' WHERE Id=?", (invoice['id'].upper(),))
-        recorded = db.execute('SELECT CreatedAt FROM AuthSessions WHERE UserId=? LIMIT 1', (self.user['id'].upper(),)).fetchone()[0]
+        db.execute('UPDATE "Invoices" SET "LifecycleState"=\'Draft\' WHERE "Id"=?', (invoice['id'].upper(),))
+        recorded = db.execute('SELECT "CreatedAt" FROM "AuthSessions" WHERE "UserId"=? LIMIT 1', (self.user['id'].upper(),)).fetchone()[0]
         order = uuid.uuid4().int % 10**12
-        db.execute("INSERT INTO PayOsAttempts (Id,OwnerId,InvoiceId,OrderCode,Amount,Status,CreatedAt,Kind) VALUES (?,?,?,?,?,'Pending',?,'Invoice')",
+        db.execute('INSERT INTO "PayOsAttempts" ("Id","OwnerId","InvoiceId","OrderCode","Amount","Status","CreatedAt","Kind") VALUES (?,?,?,?,?,\'Pending\',?,\'Invoice\')',
             (str(uuid.uuid4()).upper(), self.user['id'].upper(), invoice['id'].upper(), order, invoice['total'], recorded)); db.commit()
         try:
             self.assertEqual(self.edit(room, occupancy)[0], 409)
             self.assertEqual(self.owner.ok('GET', f"/api/rooms/{room['id']}")['occupancy']['people'], 1)
         finally:
-            db.execute("UPDATE PayOsAttempts SET Status='Failed' WHERE OrderCode=?", (order,)); db.commit()
+            db.execute('UPDATE "PayOsAttempts" SET "Status"=\'Failed\' WHERE "OrderCode"=?', (order,)); db.commit()
         # Simulate a missing invoice after a reading was finalized; recovery uses the saved count.
-        db.execute('DELETE FROM PayOsAttempts WHERE OrderCode=?', (order,))
-        db.execute('DELETE FROM Invoices WHERE Id=?', (invoice['id'].upper(),)); db.commit()
+        db.execute('DELETE FROM "PayOsAttempts" WHERE "OrderCode"=?', (order,))
+        db.execute('DELETE FROM "Invoices" WHERE "Id"=?', (invoice['id'].upper(),)); db.commit()
         self.assertEqual(self.edit(room, occupancy)[0], 200)
         self.owner.ok('POST', '/api/invoices/generate', {'period': period_offset(0)})
         invoices = self.owner.ok('GET', f"/api/invoices?period={period_offset(0)}")
@@ -123,7 +116,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         invoice = self.save_reading(room['id'], period_offset(0), 110)['invoice']
         self.owner.ok('POST', f"/api/invoices/{invoice['id']}/receipts", {'amount': invoice['outstanding'], 'note': '', 'idempotencyKey': uuid.uuid4().hex})
         db = self.fixture_db()
-        db.execute('UPDATE Invoices SET LifecycleState=? WHERE Id=?', ('Draft', invoice['id'].upper()))
+        db.execute('UPDATE "Invoices" SET "LifecycleState"=? WHERE "Id"=?', ('Draft', invoice['id'].upper()))
         db.commit()
         self.assertEqual(self.edit(room, occupancy)[0], 409)
         self.assertEqual(self.owner.ok('GET', f"/api/rooms/{room['id']}")['occupancy']['people'], 1)
@@ -159,11 +152,10 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         second = self.issue_reset()
         self.assertEqual(self.reset(first['token'])[0], 400)
         self.assertEqual(self.reset('0' * 64)[0], 400)
-        if os.environ.get('TEST_SQLITE_DB'):
-            db = self.fixture_db()
-            stored = db.execute('SELECT PasswordResetHash,PasswordHash FROM Users WHERE Email=?', (self.user['email'],)).fetchone()
-            self.assertNotEqual(stored[0], second['token'])
-            self.assertNotIn(OWNER_PASSWORD, stored[1])
+        db = self.fixture_db()
+        stored = db.execute('SELECT "PasswordResetHash","PasswordHash" FROM "Users" WHERE "Email"=?', (self.user['email'],)).fetchone()
+        self.assertNotEqual(stored[0], second['token'])
+        self.assertNotIn(OWNER_PASSWORD, stored[1])
         self.assertEqual(self.reset(second['token'])[0], 200)
         self.assertEqual(self.reset(second['token'])[0], 400)
         self.owner.ok('POST', '/api/auth/login', {'email': self.user['email'], 'password': self.new_password})
@@ -177,7 +169,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
 
     def test_admin_can_change_own_password(self):
         db = self.fixture_db()
-        db.execute("UPDATE Users SET Role='Admin' WHERE Email=?", (self.user['email'],)); db.commit()
+        db.execute('UPDATE "Users" SET "Role"=\'Admin\' WHERE "Email"=?', (self.user['email'],)); db.commit()
         admin = ApiSession()
         admin.ok('POST', '/api/auth/login', {'email': self.user['email'], 'password': OWNER_PASSWORD})
         admin.ok('POST', '/api/auth/change-password', {'currentPassword': OWNER_PASSWORD,
@@ -189,7 +181,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
     def test_expired_token_cannot_reset(self):
         token = self.issue_reset()['token']
         db = self.fixture_db()
-        db.execute('UPDATE Users SET PasswordResetExpiresAt=0 WHERE Email=?', (self.user['email'],)); db.commit()
+        db.execute('UPDATE "Users" SET "PasswordResetExpiresAt"=\'1970-01-01T00:00:00Z\' WHERE "Email"=?', (self.user['email'],)); db.commit()
         self.assertEqual(self.reset(token)[0], 400)
 
     def test_monthly_kpis_preserve_all_time_exclude_deposit_and_draft(self):
@@ -210,9 +202,8 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         empty = self.create_room(rent=1000)
         self.start_occupancy(empty['id'])
         draft = self.save_reading(empty['id'], period_offset(0), 110)['invoice']
-        if os.environ.get('TEST_SQLITE_DB'):
-            db = self.fixture_db(); db.execute('UPDATE Invoices SET LifecycleState=? WHERE Id=?', ('Draft', draft['id'].upper())); db.commit()
-            self.assertEqual(self.owner.ok('GET', '/api/dashboard')['monthlyBilled'], summary['monthlyBilled'])
+        db = self.fixture_db(); db.execute('UPDATE "Invoices" SET "LifecycleState"=? WHERE "Id"=?', ('Draft', draft['id'].upper())); db.commit()
+        self.assertEqual(self.owner.ok('GET', '/api/dashboard')['monthlyBilled'], summary['monthlyBilled'])
 
     def test_empty_dashboard_has_zero_collection_rate(self):
         summary = self.owner.ok('GET', '/api/dashboard')

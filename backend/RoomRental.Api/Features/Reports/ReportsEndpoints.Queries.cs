@@ -104,18 +104,7 @@ public static partial class ReportsEndpoints
                         let settledAmount = db.DepositSettlements.Where(settlement => settlement.InvoiceId == invoice.Id)
                             .Select(settlement => (decimal?)settlement.Amount).Sum() ?? 0m
                         select invoice.Paid > settledAmount ? invoice.Paid - settledAmount : 0m;
-        decimal currentHeld;
-        if (db.Database.IsNpgsql()) currentHeld = await SumMoneyAsync(db, heldQuery, ct);
-        else
-        {
-            var invoiceBalances = await invoiceQuery.Select(invoice => new { invoice.Id, invoice.Paid }).ToListAsync(ct);
-            var settlementRows = await (from settlement in db.DepositSettlements.AsNoTracking()
-                                        join invoice in invoiceQuery on settlement.InvoiceId equals invoice.Id
-                                        select new { settlement.InvoiceId, settlement.Amount }).ToListAsync(ct);
-            var settledByInvoice = settlementRows.GroupBy(row => row.InvoiceId)
-                .ToDictionary(group => group.Key, group => group.Sum(row => row.Amount));
-            currentHeld = invoiceBalances.Sum(invoice => Math.Max(0, invoice.Paid - settledByInvoice.GetValueOrDefault(invoice.Id)));
-        }
+        var currentHeld = await SumMoneyAsync(db, heldQuery, ct);
         var totals = new DepositReportTotals(
             await SumMoneyAsync(db, receiptQuery.Select(row => row.Amount), ct),
             await SumMoneyAsync(db, periodSettlementQuery.Where(row => row.Kind == "Refund").Select(row => row.Amount), ct),

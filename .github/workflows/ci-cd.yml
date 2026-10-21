@@ -62,6 +62,20 @@ jobs:
   test-backend:
     name: Backend tests and migration checks
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_DB: roomie_qa_ci
+          POSTGRES_USER: room_rental
+          POSTGRES_PASSWORD: ci-only-db-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U room_rental -d roomie_qa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,7 +111,9 @@ jobs:
 
       - name: Run payment service tests
         run: >-
-          docker run --rm
+          docker run --rm --network host
+          --env TEST_HTTP_POSTGRES_CONTAINER=${{ job.services.postgres.id }}
+          --env TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=ci-only-db-password"
           --volume "$HOME/.nuget/packages:/root/.nuget/packages"
           --volume "$GITHUB_WORKSPACE:/workspace"
           --workdir /workspace
@@ -107,13 +123,15 @@ jobs:
 
       - name: Run Zalo reminder service tests
         run: >-
-          docker run --rm
+          docker run --rm --network host
+          --env TEST_HTTP_POSTGRES_CONTAINER=${{ job.services.postgres.id }}
+          --env TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=ci-only-db-password"
           --volume "$HOME/.nuget/packages:/root/.nuget/packages"
           --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace
           mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa
           dotnet run --project tests/RoomRental.ZaloTests --configuration Release
 
-      - name: Check migration snapshots for both providers
+      - name: Check migration snapshots for PostgreSQL
         run: >-
           docker run --rm
           --volume "$HOME/.nuget/packages:/root/.nuget/packages"
@@ -122,7 +140,6 @@ jobs:
           mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa
           sh -ec 'dotnet tool restore &&
           dotnet restore backend/RoomRental.Api --force &&
-          dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context SqliteAppDbContext --configuration Release --no-build &&
           dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context PostgresAppDbContext --configuration Release --no-build'
 
   test-e2e:
@@ -201,10 +218,8 @@ jobs:
           expected = "MONITORING_ALERT_TO=" + os.environ.get("MONITORING_ALERT_TO", "")
           assert expected in json.load(sys.stdin), "Image alert recipient differs from deployment setting"
           print("Deployment alert recipient embedded successfully")'
-          python3 tests/run_disposable.py --image "$image" --provider sqlite
           TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=${CI_POSTGRES_PASSWORD}" \
             python3 tests/run_disposable.py --image "$image" --provider postgres
-          python3 tests/run_disposable.py --image "$image" --provider otp
           TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=${CI_POSTGRES_PASSWORD}" \
             python3 tests/run_disposable.py --image "$image" --provider otp-postgres
           mkdir -p artifacts

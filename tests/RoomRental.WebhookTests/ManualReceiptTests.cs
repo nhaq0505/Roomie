@@ -124,7 +124,6 @@ internal static class ManualReceiptTests
 
     private static async Task ConcurrentCashOnPostgresAsync()
     {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TEST_PAYMENT_POSTGRES_CONNECTION"))) return;
         using var f = new PayOsFixture();
         var attempt = await Pending(f);
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

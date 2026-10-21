@@ -25,20 +25,17 @@ class OperationalHardeningTests(unittest.TestCase):
             client.ok('POST', '/api/auth/register', {'email': email, 'name': 'Password fixture', 'password': password, 'phone': ''})
             ApiSession().ok('POST', '/api/auth/login', {'email': email, 'password': password})
     def test_password_only_login_with_legacy_mfa_state(self):
-        # Only the disposable SQLite admin row is changed, then restored exactly.
-        import os, sqlite3
-        from pathlib import Path
-        path = os.environ.get('TEST_SQLITE_DB')
-        if not path:
-            self.skipTest('Legacy MFA row mutation requires the disposable SQLite fixture')
-        fixture = Path(path).resolve()
-        self.assertTrue(fixture.parent.name.startswith('roomie-ci-') and fixture.name == 'fixture.db')
-        with sqlite3.connect(path) as db:
-            previous = db.execute('SELECT MfaEnabled,ProtectedMfaSecret FROM Users WHERE Email=?', (ADMIN_EMAIL,)).fetchone()
+        # Only the disposable PostgreSQL admin row is changed, then restored exactly.
+        from pg_fixture import get_pg_fixture
+        from test_api_integration import BASE_URL
+        db = get_pg_fixture(BASE_URL)
+        previous = db.query_row('SELECT "MfaEnabled", "ProtectedMfaSecret" FROM "Users" WHERE "Email" = ?', (ADMIN_EMAIL,))
+        self.assertIsNotNone(previous, "Disposable PostgreSQL missing admin user")
+        prev_enabled = (previous[0] == 't')
+        prev_secret = previous[1] if len(previous) > 1 and previous[1] != 'NULL' else None
         try:
-            for enabled in (0, 1):
-                with sqlite3.connect(path) as db:
-                    db.execute('UPDATE Users SET MfaEnabled=?,ProtectedMfaSecret=? WHERE Email=?', (enabled, 'unused-legacy-secret', ADMIN_EMAIL))
+            for enabled in (False, True):
+                db.execute('UPDATE "Users" SET "MfaEnabled" = ?, "ProtectedMfaSecret" = ? WHERE "Email" = ?', (enabled, 'unused-legacy-secret', ADMIN_EMAIL))
                 for extra in ({}, {'code': 'invalid-legacy-code'}):
                     client = ApiSession()
                     user = client.ok('POST', '/api/auth/login', {'email': ADMIN_EMAIL, 'password': ADMIN_PASSWORD, **extra})
@@ -52,5 +49,4 @@ class OperationalHardeningTests(unittest.TestCase):
             for endpoint in ('setup', 'confirm'):
                 self.assertEqual(self.admin.request('POST', '/api/auth/mfa/' + endpoint, {'currentPassword': ADMIN_PASSWORD, 'code': '123456'})[0], 404)
         finally:
-            with sqlite3.connect(path) as db:
-                db.execute('UPDATE Users SET MfaEnabled=?,ProtectedMfaSecret=? WHERE Email=?', (*previous, ADMIN_EMAIL))
+            db.execute('UPDATE "Users" SET "MfaEnabled" = ?, "ProtectedMfaSecret" = ? WHERE "Email" = ?', (prev_enabled, prev_secret, ADMIN_EMAIL))

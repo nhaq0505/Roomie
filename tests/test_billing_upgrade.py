@@ -6,7 +6,6 @@ import calendar
 import concurrent.futures
 import math
 import os
-import sqlite3
 import time
 import unittest
 import uuid
@@ -384,20 +383,13 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         self.assertEqual({row["occupancyId"] for row in room_rows}, {first["id"], second["id"]})
 
     def test_moveout_blocks_legacy_draft_and_pending_payos(self) -> None:
-        configured_path = os.environ.get("TEST_SQLITE_DB")
-        if not configured_path:
-            self.skipTest("Set TEST_SQLITE_DB to the disposable SQLite API database for synthetic attempt coverage")
-        parsed_api = urlsplit(BASE_URL)
-        self.assertEqual(parsed_api.scheme, "http")
-        self.assertIn(parsed_api.hostname, {"localhost", "127.0.0.1", "::1"})
-        database_path = Path(configured_path).expanduser()
-        self.assertTrue(database_path.is_absolute() and database_path.is_file() and not database_path.is_symlink())
+        from pg_fixture import get_pg_fixture
+        db = get_pg_fixture(BASE_URL)
         period = period_offset(0)
         room = self.create_room(rent=0, electricity=0, water=0, service=0)
         occupancy = self.start_occupancy(room["id"], date.fromisoformat(first_day(period)))
         invoice = self.save_reading(room["id"], period, 100)["invoice"]
-        with closing(sqlite3.connect(database_path, timeout=10)) as db, db:
-            db.execute("UPDATE Invoices SET LifecycleState = 'Draft' WHERE Id = ?", (invoice["id"].upper(),))
+        db.execute('UPDATE "Invoices" SET "LifecycleState" = \'Draft\' WHERE "Id" = ?', (invoice["id"].upper(),))
         completion = self.completion_payload(room["id"], occupancy["id"])
         status, body, _ = self.owner.request("POST", f"/api/rooms/{room['id']}/complete-moveout", completion)
         self.assertEqual(status, 409, body)
@@ -405,16 +397,15 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
 
         order_code = time.time_ns() // 1_000_000 + 300_000_000 + (uuid.uuid4().int % 1_000_000)
         owner_id = self.user["id"].upper()
-        with closing(sqlite3.connect(database_path, timeout=10)) as db, db:
-            db.execute("UPDATE Invoices SET LifecycleState = 'Issued' WHERE Id = ?", (invoice["id"].upper(),))
-            session = db.execute("SELECT CreatedAt FROM AuthSessions WHERE UserId = ? ORDER BY CreatedAt DESC LIMIT 1", (owner_id,)).fetchone()
-            self.assertIsNotNone(session)
-            db.execute("""INSERT INTO PayOsAttempts
-                (Id, OwnerId, InvoiceId, OrderCode, Amount, PaymentLinkId, CheckoutUrl,
-                 Status, ProviderReference, CreatedAt, PaidAt, Kind)
-                VALUES (?, ?, ?, ?, ?, NULL, NULL, 'Pending', NULL, ?, NULL, 'Invoice')""",
-                (str(uuid.uuid4()).upper(), owner_id, invoice["id"].upper(), order_code, int(invoice["total"]), session[0]))
-        self.addCleanup(self._fail_synthetic_attempt, database_path, order_code)
+        db.execute('UPDATE "Invoices" SET "LifecycleState" = \'Issued\' WHERE "Id" = ?', (invoice["id"].upper(),))
+        session = db.execute('SELECT "CreatedAt" FROM "AuthSessions" WHERE "UserId" = ? ORDER BY "CreatedAt" DESC LIMIT 1', (owner_id,)).fetchone()
+        self.assertIsNotNone(session)
+        db.execute("""INSERT INTO "PayOsAttempts"
+            ("Id", "OwnerId", "InvoiceId", "OrderCode", "Amount", "PaymentLinkId", "CheckoutUrl",
+             "Status", "ProviderReference", "CreatedAt", "PaidAt", "Kind")
+            VALUES (?, ?, ?, ?, ?, NULL, NULL, 'Pending', NULL, ?, NULL, 'Invoice')""",
+            (str(uuid.uuid4()).upper(), owner_id, invoice["id"].upper(), order_code, int(invoice["total"]), session[0]))
+        self.addCleanup(self._fail_synthetic_attempt, order_code)
         status, body, _ = self.owner.request("POST", f"/api/rooms/{room['id']}/complete-moveout", completion)
         self.assertEqual(status, 409, body)
         self.assertIn("payOS", body["message"])
@@ -422,32 +413,22 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         self.assertIn(invoice["id"], summary["pendingInvoiceIds"])
 
     def test_pending_payos_blocks_correction_without_provider_calls(self) -> None:
-        configured_path = os.environ.get("TEST_SQLITE_DB")
-        if not configured_path:
-            self.skipTest("Set TEST_SQLITE_DB to the disposable SQLite API database for synthetic pending-attempt coverage")
-        parsed_api = urlsplit(BASE_URL)
-        self.assertEqual(parsed_api.scheme, "http")
-        self.assertIn(parsed_api.hostname, {"localhost", "127.0.0.1", "::1"})
-        database_path = Path(configured_path).expanduser()
-        self.assertTrue(database_path.is_absolute())
-        self.assertTrue(database_path.is_file())
-        self.assertFalse(database_path.is_symlink())
-
+        from pg_fixture import get_pg_fixture
+        db = get_pg_fixture(BASE_URL)
         room = self.create_room()
         occupancy = self.start_occupancy(room["id"], date.fromisoformat(first_day(period_offset(0))))
         invoice = self.save_reading(room["id"], period_offset(0), 101)["invoice"]
         owner_id = self.user["id"].upper()
         order_code = time.time_ns() // 1_000_000 + 200_000_000 + (uuid.uuid4().int % 1_000_000)
         attempt_id = str(uuid.uuid4()).upper()
-        with closing(sqlite3.connect(database_path, timeout=10)) as db, db:
-            session = db.execute("SELECT CreatedAt FROM AuthSessions WHERE UserId = ? ORDER BY CreatedAt DESC LIMIT 1", (owner_id,)).fetchone()
-            self.assertIsNotNone(session, "Could not find the registered owner's API session")
-            db.execute("""INSERT INTO PayOsAttempts
-                (Id, OwnerId, InvoiceId, OrderCode, Amount, PaymentLinkId, CheckoutUrl,
-                 Status, ProviderReference, CreatedAt, PaidAt, Kind)
-                VALUES (?, ?, ?, ?, ?, NULL, NULL, 'Pending', NULL, ?, NULL, 'Invoice')""",
-                (attempt_id, owner_id, invoice["id"].upper(), order_code, int(invoice["total"]), session[0]))
-        self.addCleanup(self._fail_synthetic_attempt, database_path, order_code)
+        session = db.execute('SELECT "CreatedAt" FROM "AuthSessions" WHERE "UserId" = ? ORDER BY "CreatedAt" DESC LIMIT 1', (owner_id,)).fetchone()
+        self.assertIsNotNone(session, "Could not find the registered owner's API session")
+        db.execute("""INSERT INTO "PayOsAttempts"
+            ("Id", "OwnerId", "InvoiceId", "OrderCode", "Amount", "PaymentLinkId", "CheckoutUrl",
+             "Status", "ProviderReference", "CreatedAt", "PaidAt", "Kind")
+            VALUES (?, ?, ?, ?, ?, NULL, NULL, 'Pending', NULL, ?, NULL, 'Invoice')""",
+            (attempt_id, owner_id, invoice["id"].upper(), order_code, int(invoice["total"]), session[0]))
+        self.addCleanup(self._fail_synthetic_attempt, order_code)
         response = self.owner.request("POST", f"/api/invoices/{invoice['id']}/corrections", {
             "requestId": str(uuid.uuid4()), "expectedVersion": invoice["version"],
             "reason": "Pending payment must be reconciled", "description": "Should not apply",
@@ -456,9 +437,10 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         self.assertIn("Reconcile", response[1]["message"])
 
     @staticmethod
-    def _fail_synthetic_attempt(database_path: Path, order_code: int) -> None:
-        with closing(sqlite3.connect(database_path, timeout=10)) as db, db:
-            db.execute("UPDATE PayOsAttempts SET Status = 'Failed' WHERE OrderCode = ? AND Status = 'Pending'", (order_code,))
+    def _fail_synthetic_attempt(order_code: int) -> None:
+        from pg_fixture import get_pg_fixture
+        db = get_pg_fixture()
+        db.execute('UPDATE "PayOsAttempts" SET "Status" = \'Failed\' WHERE "OrderCode" = ? AND "Status" = \'Pending\'', (order_code,))
 
     def test_free_tier_enforces_five_rooms_quota(self) -> None:
         sub = self.owner.ok("GET", "/api/subscription")

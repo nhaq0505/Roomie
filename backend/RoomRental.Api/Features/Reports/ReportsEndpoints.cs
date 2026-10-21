@@ -102,17 +102,11 @@ public static partial class ReportsEndpoints
         });
     }
 
-    private static async Task<decimal> SumMoneyAsync(AppDbContext db, IQueryable<decimal> values, CancellationToken ct)
-    {
-        if (db.Database.IsNpgsql()) return await values.SumAsync(ct);
-        // SQLite cannot aggregate decimal values. Keep the fallback to one decimal projection per matching row.
-        return (await values.ToListAsync(ct)).Sum();
-    }
+    private static Task<decimal> SumMoneyAsync(AppDbContext db, IQueryable<decimal> values, CancellationToken ct) =>
+        values.SumAsync(ct);
 
     private static Task<IDbContextTransaction> BeginReadSnapshotAsync(AppDbContext db, CancellationToken ct) =>
-        db.Database.BeginTransactionAsync(db.Database.IsNpgsql()
-            ? System.Data.IsolationLevel.RepeatableRead
-            : System.Data.IsolationLevel.Serializable, ct);
+        db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, ct);
 
     private static ReportFilters ParseFilters(DateOnly? dateFrom, DateOnly? dateTo, Guid? buildingId, Guid? roomId,
         int? page, int? pageSize)

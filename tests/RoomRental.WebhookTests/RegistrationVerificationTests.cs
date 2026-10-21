@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class RegistrationVerificationTests
 {
@@ -106,14 +106,15 @@ internal static class RegistrationVerificationTests
     private sealed class Fixture : IDisposable
     {
         public const string Password = "OtpFixturePassword123!";
-        private readonly SqliteConnection connection = new("Data Source=:memory:");
+        private readonly PostgresTestDb testDb;
         public AppDbContext Db { get; }
         public Clock Clock { get; } = new();
         public Sender Sender { get; } = new();
         public RegistrationVerificationService Service { get; }
         public Fixture()
         {
-            connection.Open(); Db = new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options); Db.Database.EnsureCreated();
+            testDb = PostgresTestDb.CreateSync(ensureCreated: true);
+            Db = testDb.CreateDbContext();
             Sender.CheckTransaction = () => Db.Database.CurrentTransaction is null;
             Service = new(Db, Sender, Clock);
         }
@@ -123,7 +124,7 @@ internal static class RegistrationVerificationTests
             user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, Password);
             return Service.StartAsync(user, default);
         }
-        public void Dispose() { Db.Dispose(); connection.Dispose(); }
+        public void Dispose() { Db.Dispose(); testDb.Dispose(); }
     }
     private sealed class Sender : IRegistrationEmailSender
     {

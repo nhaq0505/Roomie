@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +20,7 @@ using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class RoomTenantLifecycleHttpTests
 {
@@ -39,9 +39,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task BuildingArchiveCascadeAndRestoreAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
@@ -106,9 +105,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task LandlordMultiTenantIsolationAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -163,9 +161,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task FreeTierRoomQuotaAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
@@ -208,9 +205,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task OccupancyHeadcountInvoiceRecalculationAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
@@ -287,9 +283,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task DepositLedgerDeductionAndRefundAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
@@ -385,9 +380,8 @@ internal static class RoomTenantLifecycleHttpTests
 
     private static async Task MoveoutSettlementAndMeterBaselineAdvancementAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
@@ -511,7 +505,7 @@ internal static class RoomTenantLifecycleHttpTests
             "deposit settlement after completed move-out is rejected with 409 Conflict");
     }
 
-    private static WebApplication CreateTestApp(SqliteConnection connection)
+    private static WebApplication CreateTestApp(string connectionString)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -523,7 +517,7 @@ internal static class RoomTenantLifecycleHttpTests
             ["RequireVerifiedPaymentForTenantLink"] = "false"
         });
 
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
         var dataProtection = new EphemeralDataProtectionProvider();
         builder.Services.AddSingleton<IDataProtectionProvider>(dataProtection);
         builder.Services.AddSingleton<TenantTokenService>();

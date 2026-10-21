@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +8,7 @@ using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Features.Monitoring;
 using RoomRental.Api.Features.Monitoring.Operations;
+using RoomRental.Tests;
 
 namespace RoomRental.WebhookTests;
 
@@ -115,13 +115,12 @@ public static class MonitoringSchedulerTests
 
     private static async Task TestRealMaintenanceAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
         var clock = new ManualClock(DateTimeOffset.Parse("2026-10-21T18:00:00Z"));
         var services = new ServiceCollection();
         services.AddLogging(x => x.ClearProviders());
         services.AddSingleton<TimeProvider>(clock);
-        services.AddDbContext<AppDbContext>(o => o.UseSqlite(connection));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(fixture.ConnectionString));
         services.AddMonitoringCore(new ConfigurationBuilder().Build());
         services.AddMonitoringOperations(new ConfigurationBuilder().Build());
         services.Configure<MonitoringScheduleOptions>(o => o.IncidentChecksEnabled = false);
@@ -132,7 +131,7 @@ public static class MonitoringSchedulerTests
         await worker.StartAsync(default);
         await UntilAsync(() => clock.TimerCount == 1);
         Assert(provider.GetRequiredService<IWorkerTelemetryTracker>().GetStatuses().Single(x => x.WorkerName == "monitoring-maintenance").Status == "Healthy",
-            "DI scheduler executes actual SQLite rollup and retention services");
+            "DI scheduler executes actual PostgreSQL rollup and retention services");
         await using (var scope = provider.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -149,19 +148,20 @@ public static class MonitoringSchedulerTests
     private static async Task TestDisconnectedDatabaseAsync()
     {
         IncidentMonitoringService.ResetDbProbeHistory();
-        var dbPath = Path.Combine(Path.GetTempPath(), $"roomie-monitoring-{Guid.NewGuid():N}.db");
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
         try
         {
-            await using var connection = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+            var noPoolBuilder = new Npgsql.NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Pooling = false };
+            var connection = new Npgsql.NpgsqlConnection(noPoolBuilder.ConnectionString);
             await connection.OpenAsync();
-            await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options);
-            await db.Database.EnsureCreatedAsync();
+            var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options;
+            var db = new AppDbContext(options);
             var clock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-21T12:00:00Z"));
             var notifier = new RecordingNotifier();
             var service = new IncidentMonitoringService(db, new RouteLatencyAggregator(clock), new EmptyHostReader(),
                 new WorkerTelemetryTracker(clock), notifier, clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<IncidentMonitoringService>.Instance);
             service.DbProbeOverride = _ => Task.FromResult(false);
-            // Dispose the underlying connection: any attempted DB access now throws.
+            // Dispose the underlying connection: any attempted DB access now throws controlled Npgsql failure.
             await connection.DisposeAsync();
             await service.TriggerIncidentCheckAsync(default);
             await service.TriggerIncidentCheckAsync(default);
@@ -182,9 +182,9 @@ public static class MonitoringSchedulerTests
             Assert(notifier.Messages.Count == 2, "DB outage reminder sends after one hour");
 
             // Reconnect using a new scoped context, preserving singleton/process outage state.
-            await using var restored = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+            await using var restored = new Npgsql.NpgsqlConnection(noPoolBuilder.ConnectionString);
             await restored.OpenAsync();
-            await using var restoredDb = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(restored).Options);
+            await using var restoredDb = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(restored).Options);
             var recovered = new IncidentMonitoringService(restoredDb, new RouteLatencyAggregator(clock), new EmptyHostReader(),
                 new WorkerTelemetryTracker(clock), notifier, clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<IncidentMonitoringService>.Instance);
             notifier.Fail = true;
@@ -202,7 +202,6 @@ public static class MonitoringSchedulerTests
         finally
         {
             IncidentMonitoringService.ResetDbProbeHistory();
-            File.Delete(dbPath);
         }
     }
 

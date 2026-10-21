@@ -1,21 +1,18 @@
-"""Opt-in webhook replay tests using synthetic rows in a local SQLite DB.
+"""Opt-in webhook replay tests using synthetic rows in a disposable PostgreSQL DB.
 
-This module is skipped unless TEST_SQLITE_DB is an explicit absolute path to
-the SQLite database used by the local Development API. It never calls payOS.
+This module runs against the disposable PostgreSQL database used by the local API.
+It never calls payOS.
 """
 
 from __future__ import annotations
 
 import os
-import sqlite3
 import time
 import unittest
 import urllib.error
 import uuid
-from contextlib import closing
-from pathlib import Path
-from urllib.parse import urlsplit
 from typing import Any
+from urllib.parse import urlsplit
 
 from test_api_integration import (
     ADMIN_EMAIL,
@@ -34,16 +31,6 @@ from test_api_integration import (
 class PayOsWebhookFixtureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        configured_path = os.environ.get("TEST_SQLITE_DB")
-        if not configured_path:
-            raise unittest.SkipTest("Set TEST_SQLITE_DB to opt into the local SQLite webhook fixture")
-        candidate = Path(configured_path).expanduser()
-        if not candidate.is_absolute():
-            raise AssertionError("TEST_SQLITE_DB must be an absolute path")
-        if candidate.is_symlink() or not candidate.is_file():
-            raise AssertionError("TEST_SQLITE_DB must be an existing, regular local SQLite file")
-        cls.database_path = candidate.resolve(strict=True)
-
         parsed_api = urlsplit(API_BASE_URL)
         if parsed_api.scheme != "http" or parsed_api.hostname not in {"localhost", "127.0.0.1", "::1"}:
             raise AssertionError("The payment fixture is allowed to call only a localhost HTTP API")
@@ -57,20 +44,14 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         if status != 200:
             raise unittest.SkipTest(f"Local API health check returned {status}: {body!r}")
 
-        with closing(cls.connect_db()) as db, db:
-            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            required = {"Users", "AuthSessions", "PayOsAttempts", "Invoices", "Receipts", "ProcessedWebhooks"}
-            missing = required - tables
-            if missing:
-                raise AssertionError(f"TEST_SQLITE_DB is missing required Development API tables: {sorted(missing)}")
-            if not db.execute("PRAGMA integrity_check").fetchone()[0] == "ok":
-                raise AssertionError("TEST_SQLITE_DB failed SQLite integrity_check")
-            seeded_admin = db.execute(
-                "SELECT 1 FROM Users WHERE Email = ? AND Role = 'Admin' AND Status = 'Approved'",
-                (ADMIN_EMAIL.lower(),),
-            ).fetchone()
-            if seeded_admin is None:
-                raise AssertionError("TEST_SQLITE_DB is not the expected seeded local Development database")
+        from pg_fixture import get_pg_fixture
+        cls.db = get_pg_fixture(API_BASE_URL)
+        seeded_admin = cls.db.execute(
+            'SELECT 1 FROM "Users" WHERE "Email" = ? AND "Role" = \'Admin\' AND "Status" = \'Approved\'',
+            (ADMIN_EMAIL.lower(),),
+        ).fetchone()
+        if seeded_admin is None:
+            raise AssertionError("Disposable PostgreSQL database is missing the expected seeded admin")
 
         cls.admin = ApiSession()
         status, body, _ = cls.admin.request(
@@ -78,12 +59,6 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         )
         if status not in (200, 201):
             raise AssertionError(f"Could not log in with the local Development admin: {status} {body!r}")
-
-    @classmethod
-    def connect_db(cls) -> sqlite3.Connection:
-        connection = sqlite3.connect(cls.database_path, timeout=10)
-        connection.execute("PRAGMA busy_timeout = 10000")
-        return connection
 
     def create_owner(self, label: str) -> tuple[ApiSession, dict[str, Any]]:
         suffix = uuid.uuid4().hex
@@ -105,11 +80,10 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         )
         session.ok("POST", "/api/auth/login", {"email": user["email"], "password": OWNER_PASSWORD})
         user_id = user["id"].upper()
-        with closing(self.connect_db()) as db, db:
-            row = db.execute("SELECT Email FROM Users WHERE Id = ?", (user_id,)).fetchone()
+        row = self.db.execute('SELECT "Email" FROM "Users" WHERE "Id" = ?', (user_id,)).fetchone()
         if row is None or row[0] != user["email"]:
             raise AssertionError(
-                "TEST_SQLITE_DB is not the database behind API_BASE_URL; refusing to seed an unrelated file"
+                "Disposable PostgreSQL database is not behind API_BASE_URL; refusing to seed an unrelated database"
             )
         return session, user
 
@@ -180,31 +154,29 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         attempt_id = str(uuid.uuid4()).upper()
         owner_id = owner_id.upper()
         invoice_id = invoice_id.upper()
-        with closing(self.connect_db()) as db, db:
-            session_created = db.execute(
-                "SELECT CreatedAt FROM AuthSessions WHERE UserId = ? ORDER BY CreatedAt DESC LIMIT 1",
-                (owner_id,),
-            ).fetchone()
-            if session_created is None:
-                raise AssertionError("Could not find the API-created local owner session for the fixture")
-            db.execute(
-                """INSERT INTO PayOsAttempts
-                   (Id, OwnerId, InvoiceId, OrderCode, Amount, PaymentLinkId, CheckoutUrl,
-                    Status, ProviderReference, CreatedAt, PaidAt, Kind)
-                   VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, NULL, ?, NULL, 'Invoice')""",
-                (attempt_id, owner_id, invoice_id, order_code, amount, status, session_created[0]),
-            )
+        session_created = self.db.execute(
+            'SELECT "CreatedAt" FROM "AuthSessions" WHERE "UserId" = ? ORDER BY "CreatedAt" DESC LIMIT 1',
+            (owner_id,),
+        ).fetchone()
+        if session_created is None:
+            raise AssertionError("Could not find the API-created local owner session for the fixture")
+        self.db.execute(
+            """INSERT INTO "PayOsAttempts"
+               ("Id", "OwnerId", "InvoiceId", "OrderCode", "Amount", "PaymentLinkId", "CheckoutUrl",
+                "Status", "ProviderReference", "CreatedAt", "PaidAt", "Kind")
+               VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, NULL, ?, NULL, 'Invoice')""",
+            (attempt_id, owner_id, invoice_id, order_code, amount, status, session_created[0]),
+        )
         return order_code, attempt_id
 
     def mark_pending_failed(self, order_codes: list[int]) -> None:
         if not order_codes:
             return
         placeholders = ",".join("?" for _ in order_codes)
-        with closing(self.connect_db()) as db, db:
-            db.execute(
-                f"UPDATE PayOsAttempts SET Status = 'Failed' WHERE Status = 'Pending' AND OrderCode IN ({placeholders})",
-                order_codes,
-            )
+        self.db.execute(
+            f'UPDATE "PayOsAttempts" SET "Status" = \'Failed\' WHERE "Status" = \'Pending\' AND "OrderCode" IN ({placeholders})',
+            order_codes,
+        )
 
     @staticmethod
     def webhook_data(order_code: int, amount: int, reference: str) -> dict[str, Any]:
@@ -255,8 +227,7 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         wrong_status, wrong_body = self.post_webhook(user_a["id"], key_a, wrong_data)
         self.assertEqual(wrong_status, 409, f"Mismatched payment amount was not rejected: {wrong_body!r}")
         self.assertEqual(self.owner_invoice(owner_a, invoice_a["id"])["paid"], 0)
-        with closing(self.connect_db()) as db, db:
-            db.execute("UPDATE PayOsAttempts SET Status = 'Failed' WHERE OrderCode = ?", (wrong_order,))
+        self.db.execute('UPDATE "PayOsAttempts" SET "Status" = \'Failed\' WHERE "OrderCode" = ?', (wrong_order,))
 
         valid_order, _ = self.insert_attempt(user_a["id"], invoice_a["id"], amount)
         synthetic_orders.append(valid_order)
@@ -278,22 +249,21 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         self.assertEqual(paid_invoice["outstanding"], 0)
         self.assertEqual(paid_invoice["status"], "Paid")
 
-        with closing(self.connect_db()) as db, db:
-            owner_db_id = user_a["id"].upper()
-            invoice_db_id = invoice_a["id"].upper()
-            receipt_count = db.execute(
-                """SELECT COUNT(*) FROM Receipts
-                   WHERE OwnerId = ? AND InvoiceId = ? AND Source = 'payOS' AND ExternalReference = ?""",
-                (owner_db_id, invoice_db_id, reference),
-            ).fetchone()[0]
-            webhook_count = db.execute(
-                "SELECT COUNT(*) FROM ProcessedWebhooks WHERE OwnerId = ? AND Reference = ? AND OrderCode = ?",
-                (owner_db_id, reference, valid_order),
-            ).fetchone()[0]
-            attempt = db.execute(
-                "SELECT Status, ProviderReference FROM PayOsAttempts WHERE OrderCode = ?",
-                (valid_order,),
-            ).fetchone()
+        owner_db_id = user_a["id"].upper()
+        invoice_db_id = invoice_a["id"].upper()
+        receipt_count = int(self.db.execute(
+            """SELECT COUNT(*) FROM "Receipts"
+               WHERE "OwnerId" = ? AND "InvoiceId" = ? AND "Source" = 'payOS' AND "ExternalReference" = ?""",
+            (owner_db_id, invoice_db_id, reference),
+        ).fetchone()[0])
+        webhook_count = int(self.db.execute(
+            'SELECT COUNT(*) FROM "ProcessedWebhooks" WHERE "OwnerId" = ? AND "Reference" = ? AND "OrderCode" = ?',
+            (owner_db_id, reference, valid_order),
+        ).fetchone()[0])
+        attempt = tuple(self.db.execute(
+            'SELECT "Status", "ProviderReference" FROM "PayOsAttempts" WHERE "OrderCode" = ?',
+            (valid_order,),
+        ).fetchone())
         self.assertEqual(receipt_count, 1, "Replay created an extra payment receipt")
         self.assertEqual(webhook_count, 1, "Replay created duplicate processed-webhook records")
         self.assertEqual(attempt, ("Paid", reference))
@@ -314,8 +284,7 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         self.assertEqual(result["paid"], 750_000)
         self.assertEqual(result["depositHeld"], 750_000)
         self.assertEqual(result["status"], "Paid")
-        with closing(self.connect_db()) as db:
-            count = db.execute("SELECT COUNT(*) FROM Receipts WHERE InvoiceId = ? AND Source = 'payOS'", (invoice["id"].upper(),)).fetchone()[0]
+        count = int(self.db.execute('SELECT COUNT(*) FROM "Receipts" WHERE "InvoiceId" = ? AND "Source" = \'payOS\'', (invoice["id"].upper(),)).fetchone()[0])
         self.assertEqual(count, 1)
 
     def test_supplemental_signed_webhook_replay(self) -> None:
@@ -333,8 +302,7 @@ class PayOsWebhookFixtureTests(unittest.TestCase):
         self.assertEqual(result["paid"], 25000)
         self.assertEqual(result["kind"], "Supplemental")
         self.assertEqual(self.owner_invoice(owner, monthly["id"])["paid"], 0)
-        with closing(self.connect_db()) as db:
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM Receipts WHERE InvoiceId = ?", (invoice["id"].upper(),)).fetchone()[0], 1)
+        self.assertEqual(int(self.db.execute('SELECT COUNT(*) FROM "Receipts" WHERE "InvoiceId" = ?', (invoice["id"].upper(),)).fetchone()[0]), 1)
 
     def test_moveout_pending_payment_blocks_completion(self) -> None:
         owner, user = self.create_owner("Pending moveout")

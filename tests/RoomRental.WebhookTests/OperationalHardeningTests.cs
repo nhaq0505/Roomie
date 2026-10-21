@@ -1,10 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class OperationalHardeningTests
 {
@@ -15,9 +15,8 @@ internal static class OperationalHardeningTests
             var dto = RoomRental.Api.Endpoints.AuthEndpoints.ToDto(new AppUser { Name = "Fixture", Email = "fixture@example.invalid", PasswordHash = "fixture", MfaEnabled = enabled, Role = UserRole.Admin });
             if (dto.MfaEnabled || dto.MfaRequired) throw new Exception("Legacy MFA flags must always be false");
         }
-        using var c = new SqliteConnection("Data Source=:memory:"); c.Open();
-        using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(c).Options);
-        db.Database.EnsureCreated();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
         var now = DateTimeOffset.UtcNow;
         foreach (var enabled in new[] { false, true })
         {

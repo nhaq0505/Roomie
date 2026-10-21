@@ -1,10 +1,9 @@
-"""Opt-in OTP HTTP tests; requires the loopback sink and a /tmp disposable SQLite API."""
+"""Opt-in OTP HTTP tests; requires the loopback sink and a disposable PostgreSQL API."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 import json
 import os
 from pathlib import Path
-import sqlite3
 import unittest
 from urllib.parse import urlsplit
 import uuid
@@ -17,14 +16,15 @@ class RegistrationOtpTests(unittest.TestCase):
         if not os.environ.get('TEST_OTP_OUTBOX'):
             raise unittest.SkipTest('Requires opt-in disposable OTP SMTP sink')
         cls.outbox = Path(os.environ['TEST_OTP_OUTBOX']).resolve()
-        cls.database = Path(os.environ.get('TEST_SQLITE_DB', '')).resolve()
         tmp = str(Path('/tmp').resolve()) + os.sep
-        if not str(cls.outbox).startswith(tmp) or not str(cls.database).startswith(tmp):
+        if not str(cls.outbox).startswith(tmp):
             raise AssertionError('OTP fixtures must use disposable /tmp directories')
         if urlsplit(BASE_URL).hostname not in {'localhost', '127.0.0.1', '::1'} or urlsplit(BASE_URL).scheme != 'http':
             raise AssertionError('OTP fixtures require HTTP localhost API')
-        if not cls.outbox.is_dir() or not cls.database.is_file():
+        if not cls.outbox.is_dir():
             raise AssertionError('Start disposable SMTP sink and API first')
+        from pg_fixture import get_pg_fixture
+        cls.db = get_pg_fixture(BASE_URL)
 
     def setUp(self):
         self.client = ApiSession()
@@ -48,14 +48,14 @@ class RegistrationOtpTests(unittest.TestCase):
     def change(self, **values):
         allowed = {'LastSentAt', 'CodeExpiresAt', 'ExpiresAt'}
         self.assertTrue(set(values).issubset(allowed))
-        with closing(sqlite3.connect(self.database, timeout=10)) as db, db:
-            db.execute('UPDATE RegistrationVerifications SET ' + ','.join(f'"{key}"=?' for key in values) + ' WHERE Email=?', [*values.values(), self.email])
+        pg_vals = [('1970-01-01T00:00:00Z' if v == 0 else v) for v in values.values()]
+        set_clause = ', '.join(f'"{k}" = ?' for k in values)
+        self.db.execute(f'UPDATE "RegistrationVerifications" SET {set_clause} WHERE "Email" = ?', [*pg_vals, self.email])
 
     def test_only_correct_otp_creates_login_capable_owner(self):
         challenge = self.register()
         self.assertEqual(self.client.request('POST', '/api/auth/login', {'email': self.email, 'password': self.body['password']})[0], 401)
-        with closing(sqlite3.connect(self.database)) as db:
-            pending = db.execute('SELECT CodeHash,ChallengeHash,PasswordHash FROM RegistrationVerifications WHERE Email=?', (self.email,)).fetchone()
+        pending = self.db.execute('SELECT "CodeHash","ChallengeHash","PasswordHash" FROM "RegistrationVerifications" WHERE "Email"=?', (self.email,)).fetchone()
         self.assertNotEqual(pending[0], self.code())
         self.assertNotEqual(pending[1], challenge['challengeToken'])
         self.assertNotEqual(pending[2], self.body['password'])
@@ -98,10 +98,9 @@ class RegistrationOtpTests(unittest.TestCase):
             self.client.ok('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})
         # Exercise the real tracker on its separate DB connection: successful
         # resends must return within the HTTP timeout and persist each fact.
-        with closing(sqlite3.connect(self.database)) as db:
-            count = db.execute('''SELECT count(*) FROM RegistrationFacts
-                WHERE Stage='CodeResent' AND RegistrationAttemptId IN
-                (SELECT UserId FROM RegistrationVerifications WHERE Email=?)''', (self.email,)).fetchone()[0]
+        count = int(self.db.execute('''SELECT count(*) FROM "RegistrationFacts"
+            WHERE "Stage"='CodeResent' AND "RegistrationAttemptId" IN
+            (SELECT "UserId" FROM "RegistrationVerifications" WHERE "Email"=?)''', (self.email,)).fetchone()[0])
         self.assertEqual(count, 4)
         self.change(LastSentAt=0)
         self.assertEqual(self.client.request('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})[0], 429)
@@ -124,8 +123,7 @@ class RegistrationOtpTests(unittest.TestCase):
             self.assertEqual(self.client.request('POST', '/api/auth/register', self.body)[0], 503)
         finally:
             marker.unlink(missing_ok=True)
-        with closing(sqlite3.connect(self.database)) as db:
-            self.assertEqual(db.execute('SELECT count(*) FROM RegistrationVerifications WHERE Email=?', (self.email,)).fetchone()[0], 0)
+        self.assertEqual(int(self.db.execute('SELECT count(*) FROM "RegistrationVerifications" WHERE "Email"=?', (self.email,)).fetchone()[0]), 0)
         challenge = self.register(); code = self.code()
         self.change(LastSentAt=0)
         try:
@@ -133,10 +131,9 @@ class RegistrationOtpTests(unittest.TestCase):
             self.assertEqual(self.client.request('POST', '/api/auth/resend-registration', {'challengeToken': challenge['challengeToken']})[0], 503)
         finally:
             marker.unlink(missing_ok=True)
-        with closing(sqlite3.connect(self.database)) as db:
-            count = db.execute('''SELECT count(*) FROM RegistrationFacts
-                WHERE Stage='CodeResent' AND RegistrationAttemptId IN
-                (SELECT UserId FROM RegistrationVerifications WHERE Email=?)''', (self.email,)).fetchone()[0]
+        count = int(self.db.execute('''SELECT count(*) FROM "RegistrationFacts"
+            WHERE "Stage"='CodeResent' AND "RegistrationAttemptId" IN
+            (SELECT "UserId" FROM "RegistrationVerifications" WHERE "Email"=?)''', (self.email,)).fetchone()[0])
         self.assertEqual(count, 0, 'Failed SMTP delivery must not count as a successful resend')
         self.assertEqual(self.verify(challenge, code)[0], 201)
 
@@ -148,8 +145,7 @@ class RegistrationOtpTests(unittest.TestCase):
             statuses = list(pool.map(lambda _: verify_once(), range(2)))
         self.assertEqual(statuses.count(201), 1, statuses)
         self.assertTrue(all(status in (201, 400, 409) for status in statuses), statuses)
-        with closing(sqlite3.connect(self.database)) as db:
-            self.assertEqual(db.execute('SELECT count(*) FROM Users WHERE Email=?', (self.email,)).fetchone()[0], 1)
+        self.assertEqual(int(self.db.execute('SELECT count(*) FROM "Users" WHERE "Email"=?', (self.email,)).fetchone()[0]), 1)
 
 
 class RegistrationOtpHttpTests(unittest.TestCase):

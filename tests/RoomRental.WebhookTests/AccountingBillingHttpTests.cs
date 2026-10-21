@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +21,7 @@ using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class AccountingBillingHttpTests
 {
@@ -40,8 +40,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task AutomaticZaloQueueAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
-        await using var app = CreateTestApp(connection, autoZalo: true); await app.StartAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString, autoZalo: true); await app.StartAsync();
         using var client = app.GetTestClient(); client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
         var (roomId, occupancyId) = await SetupRoomAndOccupancyAsync(client, "Auto Zalo", "Auto 101", 100000, 1000, 0, false, 0, 0);
         var reading = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-08", 10));
@@ -75,9 +75,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task MeterReadingAntiRegressionAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -148,9 +147,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task AutomaticMonthlyInvoiceCalculationAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -185,9 +183,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task SupplementalInvoiceCreationAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -224,9 +221,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task InvoiceCorrectionAndAuditRevisionsAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -279,9 +275,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task CashReceiptIdempotencyAndOverpaymentAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -347,9 +342,8 @@ internal static class AccountingBillingHttpTests
 
     private static async Task ClosedXmlExcelReportExportAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        await using var app = CreateTestApp(connection);
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
         await app.StartAsync();
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
@@ -470,7 +464,7 @@ internal static class AccountingBillingHttpTests
         public Task<ZaloSendResult> SendAsync(Guid ownerId, ZaloSendRequest request, CancellationToken ct) => throw new Exception("No provider calls in automatic enqueue tests");
     }
 
-    private static WebApplication CreateTestApp(SqliteConnection connection, bool autoZalo = false)
+    private static WebApplication CreateTestApp(string connectionString, bool autoZalo = false)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -482,7 +476,7 @@ internal static class AccountingBillingHttpTests
             ["RequireVerifiedPaymentForTenantLink"] = "false"
         });
 
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
         var dataProtection = new EphemeralDataProtectionProvider();
         builder.Services.AddSingleton<IDataProtectionProvider>(dataProtection);
         builder.Services.AddSingleton<TenantTokenService>();

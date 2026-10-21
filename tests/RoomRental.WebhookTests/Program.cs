@@ -2,18 +2,15 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
-using var connection = new SqliteConnection("Data Source=:memory:");
-connection.Open();
-var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-using var db = new AppDbContext(options);
-db.Database.EnsureCreated();
+await using var testDb = await PostgresTestDb.CreateAsync(ensureCreated: true);
+using var db = testDb.CreateDbContext();
 var protection = new EphemeralDataProtectionProvider();
 var protector = protection.CreateProtector("RoomRental.OwnerPayOsCredentials.v1");
 var owner = new OwnerPaymentSettings { OwnerId = Guid.NewGuid(), ClientId = "fixture-client",
@@ -36,7 +33,7 @@ void Assert(bool condition, string name)
 handler.Body = JsonSerializer.Serialize(new { code = "00", data = new { webhookUrl = callback } });
 var result = await service.ConfirmAsync(owner.OwnerId, default);
 Assert(result.WebhookStatus == "Verified" && result.WebhookVerifiedAt != null, "successful confirmation");
-using (var anotherDb = new AppDbContext(options))
+using (var anotherDb = testDb.CreateDbContext())
 {
     var anotherService = new PaymentWebhookService(anotherDb, protection, handler, config);
     Assert((await anotherService.GetAsync(owner.OwnerId, default)).WebhookStatus == "Verified", "verification persists across service instances");

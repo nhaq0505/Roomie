@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Data;
@@ -67,12 +66,6 @@ public class AppDbContext : DbContext
             e.HasOne<Invoice>().WithMany().HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<PaymentWebhookRegistration>().HasKey(x => x.OwnerId);
-        if (Database.IsSqlite())
-        {
-            foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(entity => entity.GetProperties())
-                         .Where(property => property.ClrType == typeof(DateTimeOffset) || property.ClrType == typeof(DateTimeOffset?)))
-                property.SetValueConverter(new DateTimeOffsetToBinaryConverter());
-        }
 
         modelBuilder.Entity<AppUser>(entity =>
         {

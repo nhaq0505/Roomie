@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +18,7 @@ using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Features.Monitoring;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class MonitoringAccuracyAndOutboxRegressionTests
 {
@@ -35,19 +35,16 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         await TestInvoiceIssuance_Publish_And_ReadingsRollbackWithProductWrites_Async();
         await TestOutboxAck_VerifiedSuccessOnly_SanitizedError_SystemActor_Async();
         await TestBoundaryCaps_Exceeding50k_FilteredOwnerBeyond50k_Daily_Retention_Funnel_Revenue_CAC_Async();
-        await TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_SQLite_Npgsql_Async();
+        await TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_Npgsql_Async();
         await TestPruneExpiredTelemetry_CompletedOutboxPruned_PendingFailedPreserved_Async();
         Console.WriteLine("=== ALL TASK T4B METRIC ACCURACY & OUTBOX REGRESSION TESTS PASSED ===\n");
     }
 
-    private static async Task<(SqliteConnection Connection, SqliteAppDbContext Db)> CreateTestDbAsync()
+    private static async Task<(PostgresTestDb Connection, PostgresAppDbContext Db)> CreateTestDbAsync()
     {
-        var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<SqliteAppDbContext>().UseSqlite(connection).Options;
-        var db = new SqliteAppDbContext(options);
-        await db.Database.MigrateAsync();
-        return (connection, db);
+        var fixture = await PostgresTestDb.CreateAsync(migrate: true);
+        var db = fixture.CreatePostgresDbContext();
+        return (fixture, db);
     }
 
     private static async Task TestSubscriptionPayment_FailFirst_Replay_Reconcile_Restart_Async()
@@ -712,14 +709,15 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         var clock = TimeProvider.System;
         var now = clock.GetUtcNow();
         var today = ApiSupport.VietnamDate(now);
-        var converter = new DateTimeOffsetToBinaryConverter();
-        var binaryNow = (long)converter.ConvertToProvider(now)!;
+        var pgNow = now.ToString("yyyy-MM-dd HH:mm:ss.ffffffzzz");
+
+        await using var rawConn = connection.OpenConnection();
 
         // 1. BOUNDARY CAP TEST: Filtered owner beyond first 50,000 attributions
         // Bulk insert 50,000 direct attributions using raw SQL for maximum performance
-        using (var transaction = connection.BeginTransaction())
+        using (var transaction = rawConn.BeginTransaction())
         {
-            var insertCmd = connection.CreateCommand();
+            var insertCmd = rawConn.CreateCommand();
             insertCmd.Transaction = transaction;
 
             // Insert 50,000 dummy direct users and attributions in batches of 500
@@ -730,8 +728,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
                 for (var i = 0; i < 500; i++)
                 {
                     var id = Guid.NewGuid();
-                    userValues.Add($"('{id}', 'Bulk User', 'bulk_{batch}_{i}@example.test', 'pwd', 'Owner', 'Approved', 'Free', {binaryNow})");
-                    attrValues.Add($"('{id}', 'Code', 1, {binaryNow}, '(direct)', '(none)', NULL, NULL)");
+                    userValues.Add($"('{id}', 'Bulk User', 'bulk_{batch}_{i}@example.test', 'pwd', 'Owner', 'Approved', 'Free', '{pgNow}')");
+                    attrValues.Add($"('{id}', 'Code', true, '{pgNow}', '(direct)', '(none)', NULL, NULL)");
                 }
 
                 insertCmd.CommandText = $"INSERT INTO \"Users\" (\"Id\",\"Name\",\"Email\",\"PasswordHash\",\"Role\",\"Status\",\"SubscriptionTier\",\"CreatedAt\") VALUES {string.Join(",", userValues)}";
@@ -790,9 +788,9 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             "Only the matching 50,001st owner is returned in matchingOwnerIds");
 
         // 2. BOUNDARY CAP TEST: Registration Funnel Facts > 50,000
-        using (var transaction = connection.BeginTransaction())
+        using (var transaction = rawConn.BeginTransaction())
         {
-            var insertCmd = connection.CreateCommand();
+            var insertCmd = rawConn.CreateCommand();
             insertCmd.Transaction = transaction;
 
             // Insert 25,005 Started facts and 25,005 Verified facts
@@ -804,8 +802,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
                     var fid1 = Guid.NewGuid();
                     var fid2 = Guid.NewGuid();
                     var attemptId = Guid.NewGuid();
-                    factValues.Add($"('{fid1}', '{attemptId}', 'Started', 'Code', {binaryNow}, 'bulk-source', 'bulk-med', 'bulk-camp')");
-                    factValues.Add($"('{fid2}', '{attemptId}', 'Verified', 'Code', {binaryNow}, NULL, NULL, NULL)");
+                    factValues.Add($"('{fid1}', '{attemptId}', 'Started', 'Code', '{pgNow}', 'bulk-source', 'bulk-med', 'bulk-camp')");
+                    factValues.Add($"('{fid2}', '{attemptId}', 'Verified', 'Code', '{pgNow}', NULL, NULL, NULL)");
                 }
                 insertCmd.CommandText = $"INSERT INTO \"RegistrationFacts\" (\"Id\",\"RegistrationAttemptId\",\"Stage\",\"VerificationMethod\",\"OccurredAt\",\"UtmSource\",\"UtmMedium\",\"UtmCampaign\") VALUES {string.Join(",", factValues)}";
                 await insertCmd.ExecuteNonQueryAsync();
@@ -818,8 +816,8 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
                 var fid1 = Guid.NewGuid();
                 var fid2 = Guid.NewGuid();
                 var attemptId = Guid.NewGuid();
-                lastValues.Add($"('{fid1}', '{attemptId}', 'Started', 'Code', {binaryNow}, 'bulk-source', 'bulk-med', 'bulk-camp')");
-                lastValues.Add($"('{fid2}', '{attemptId}', 'Verified', 'Code', {binaryNow}, NULL, NULL, NULL)");
+                lastValues.Add($"('{fid1}', '{attemptId}', 'Started', 'Code', '{pgNow}', 'bulk-source', 'bulk-med', 'bulk-camp')");
+                lastValues.Add($"('{fid2}', '{attemptId}', 'Verified', 'Code', '{pgNow}', NULL, NULL, NULL)");
             }
             insertCmd.CommandText = $"INSERT INTO \"RegistrationFacts\" (\"Id\",\"RegistrationAttemptId\",\"Stage\",\"VerificationMethod\",\"OccurredAt\",\"UtmSource\",\"UtmMedium\",\"UtmCampaign\") VALUES {string.Join(",", lastValues)}";
             await insertCmd.ExecuteNonQueryAsync();
@@ -843,9 +841,9 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             $"Funnel VerifiedCount is exact without Take(50k) truncation (expected 25,005, got {growthMetrics.Funnel.VerifiedCount})");
 
         // 3. BOUNDARY CAP TEST: Revenue orders > 50,000
-        using (var transaction = connection.BeginTransaction())
+        using (var transaction = rawConn.BeginTransaction())
         {
-            var insertCmd = connection.CreateCommand();
+            var insertCmd = rawConn.CreateCommand();
             insertCmd.Transaction = transaction;
 
             // Insert 50,005 paid subscription attempts
@@ -856,7 +854,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
                 {
                     var id = Guid.NewGuid();
                     var code = 1000000000L + (batch * 500) + i;
-                    orderValues.Add($"('{id}', '{specialOwnerId}', '{Guid.Empty}', {code}, 'Subscription', 10000, 'Paid', {binaryNow}, {binaryNow})");
+                    orderValues.Add($"('{id}', '{specialOwnerId}', '{Guid.Empty}', {code}, 'Subscription', 10000, 'Paid', '{pgNow}', '{pgNow}')");
                 }
                 insertCmd.CommandText = $"INSERT INTO \"PayOsAttempts\" (\"Id\",\"OwnerId\",\"InvoiceId\",\"OrderCode\",\"Kind\",\"Amount\",\"Status\",\"CreatedAt\",\"PaidAt\") VALUES {string.Join(",", orderValues)}";
                 await insertCmd.ExecuteNonQueryAsync();
@@ -868,7 +866,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             {
                 var id = Guid.NewGuid();
                 var code = 2000000000L + i;
-                lastOrders.Add($"('{id}', '{specialOwnerId}', '{Guid.Empty}', {code}, 'Subscription', 10000, 'Paid', {binaryNow}, {binaryNow})");
+                lastOrders.Add($"('{id}', '{specialOwnerId}', '{Guid.Empty}', {code}, 'Subscription', 10000, 'Paid', '{pgNow}', '{pgNow}')");
             }
             insertCmd.CommandText = $"INSERT INTO \"PayOsAttempts\" (\"Id\",\"OwnerId\",\"InvoiceId\",\"OrderCode\",\"Kind\",\"Amount\",\"Status\",\"CreatedAt\",\"PaidAt\") VALUES {string.Join(",", lastOrders)}";
             await insertCmd.ExecuteNonQueryAsync();
@@ -892,9 +890,9 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             $"Revenue Summary.TotalSubscriptionRevenueVnd sums ALL 50,005 orders exactly (expected 500,050,000 VND, got {revMetrics.Summary.TotalSubscriptionRevenueVnd})");
 
         // 4. BOUNDARY CAP TEST: Marketing Costs & CAC30 without Take(10k) cap
-        using (var transaction = connection.BeginTransaction())
+        using (var transaction = rawConn.BeginTransaction())
         {
-            var insertCmd = connection.CreateCommand();
+            var insertCmd = rawConn.CreateCommand();
             insertCmd.Transaction = transaction;
 
             // Insert 10,005 campaign cost entries
@@ -905,7 +903,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
                 for (var i = 0; i < 500; i++)
                 {
                     var id = Guid.NewGuid();
-                    costValues.Add($"('{id}', '{dateStr}', 'BigCampaign', 'cpc', '1000', '0', NULL, {binaryNow}, {binaryNow}, '{Guid.Empty}', 'System')");
+                    costValues.Add($"('{id}', '{dateStr}', 'BigCampaign', 'cpc', '1000', '0', NULL, '{pgNow}', '{pgNow}', '{Guid.Empty}', 'System')");
                 }
                 insertCmd.CommandText = $"INSERT INTO \"CampaignCosts\" (\"Id\",\"Date\",\"Campaign\",\"Channel\",\"CashVnd\",\"PersonHours\",\"HourlyRate\",\"CreatedAt\",\"UpdatedAt\",\"UpdatedBy\",\"UpdatedByName\") VALUES {string.Join(",", costValues)}";
                 await insertCmd.ExecuteNonQueryAsync();
@@ -916,7 +914,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             for (var i = 0; i < 5; i++)
             {
                 var id = Guid.NewGuid();
-                lastCosts.Add($"('{id}', '{dateStr}', 'BigCampaign', 'cpc', '1000', '0', NULL, {binaryNow}, {binaryNow}, '{Guid.Empty}', 'System')");
+                lastCosts.Add($"('{id}', '{dateStr}', 'BigCampaign', 'cpc', '1000', '0', NULL, '{pgNow}', '{pgNow}', '{Guid.Empty}', 'System')");
             }
             insertCmd.CommandText = $"INSERT INTO \"CampaignCosts\" (\"Id\",\"Date\",\"Campaign\",\"Channel\",\"CashVnd\",\"PersonHours\",\"HourlyRate\",\"CreatedAt\",\"UpdatedAt\",\"UpdatedBy\",\"UpdatedByName\") VALUES {string.Join(",", lastCosts)}";
             await insertCmd.ExecuteNonQueryAsync();
@@ -937,7 +935,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             $"TotalMarketingSpendVnd sums ALL 10,005 entries exactly without Take(10k) cap (expected 10,005,000 VND, got {costMetrics.Summary.TotalMarketingSpendVnd})");
     }
 
-    private static async Task TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_SQLite_Npgsql_Async()
+    private static async Task TestRelationalSubquery_ManyMatchingOwners_SqlTranslation_Npgsql_Async()
     {
         var (connection, db) = await CreateTestDbAsync();
         await using var _ = connection;
@@ -947,26 +945,13 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         var now = clock.GetUtcNow();
         var today = ApiSupport.VietnamDate(now);
 
-        // 1. OFFLINE SQL TRANSLATION TEST: SQLite & Npgsql (PostgreSQL)
+        // 1. SQL TRANSLATION TEST: PostgreSQL (Npgsql)
         var filter = new MonitoringFilterRequest(Source: "multi-source");
         var campaignChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // SQLite Translation Check
-        var sqliteQuery = db.OwnerMilestones.Where(m =>
+        // PostgreSQL Translation Check
+        var pgQuery = db.OwnerMilestones.Where(m =>
             DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsQuery(db, filter, campaignChannels)!.Contains(m.OwnerId));
-        var sqliteSql = sqliteQuery.ToQueryString();
-        Assert(sqliteSql.Contains("IN (SELECT") || sqliteSql.Contains("in (select") || (sqliteSql.Contains("IN (") && sqliteSql.Contains("RegistrationAttributions")),
-            "SQLite generates relational SQL subquery for matching owner IDs without materialization");
-        Assert(!sqliteSql.Contains("@__matchingOwnerIds_"),
-            "SQLite SQL does not inline or parameterize matching owner IDs");
-
-        // Npgsql (PostgreSQL) Offline Translation Check (offline without network connection)
-        var pgOptions = new DbContextOptionsBuilder<PostgresAppDbContext>()
-            .UseNpgsql("Host=localhost;Database=roomie_test;Username=roomie")
-            .Options;
-        using var pgDb = new PostgresAppDbContext(pgOptions);
-        var pgQuery = pgDb.OwnerMilestones.Where(m =>
-            DefaultGrowthMonitoringQueryService.GetMatchingOwnerIdsQuery(pgDb, filter, campaignChannels)!.Contains(m.OwnerId));
         var pgSql = pgQuery.ToQueryString();
         Assert(pgSql.Contains("IN (SELECT") || pgSql.Contains("in (select") || (pgSql.Contains("IN (") && pgSql.Contains("RegistrationAttributions")),
             "PostgreSQL (Npgsql) generates relational SQL subquery for matching owner IDs without materialization");
@@ -1278,7 +1263,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
         {
             public object? GetService(Type serviceType)
             {
-                if (serviceType == typeof(AppDbContext)) return db;
+                if (serviceType == typeof(AppDbContext) || serviceType == typeof(PostgresAppDbContext)) return db;
                 return null;
             }
         }

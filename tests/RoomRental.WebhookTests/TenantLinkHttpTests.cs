@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +17,7 @@ using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 // Actual production route handlers, in-memory HTTP/database and synthetic authentication.
 // Every provider request is handled in-process; no live payOS connection is possible.
@@ -27,8 +27,7 @@ internal static class TenantLinkHttpTests
 
     public static async Task RunAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         using var provider = new ConfirmWebhookHandler();
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -39,7 +38,7 @@ internal static class TenantLinkHttpTests
             ["WebhookBaseUrl"] = "https://callbacks.example.invalid",
             ["RequireVerifiedPaymentForTenantLink"] = "true"
         });
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
         builder.Services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
         builder.Services.AddSingleton<TenantTokenService>();
         builder.Services.AddScoped<PaymentWebhookService>();

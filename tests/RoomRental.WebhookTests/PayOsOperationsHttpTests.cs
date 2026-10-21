@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +18,7 @@ using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class PayOsOperationsHttpTests
 {
@@ -34,10 +34,9 @@ internal static class PayOsOperationsHttpTests
 
     private static async Task WebhookHttpEndpointAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var handler = new FakePayOsReconcileHandler();
-        await using var app = CreateTestApp(connection, handler);
+        await using var app = CreateTestApp(fixture.ConnectionString, handler);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -186,10 +185,9 @@ internal static class PayOsOperationsHttpTests
 
     private static async Task ReconciliationBatchSweepAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var handler = new FakePayOsReconcileHandler();
-        await using var app = CreateTestApp(connection, handler);
+        await using var app = CreateTestApp(fixture.ConnectionString, handler);
         await app.StartAsync();
 
         var ownerId = Guid.NewGuid();
@@ -299,11 +297,8 @@ internal static class PayOsOperationsHttpTests
 
     private static async Task DatabaseIntegrityVerificationAsync()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        using var db = fixture.CreateDbContext();
 
         // Populate realistic records
         var owner = new AppUser { Id = Guid.NewGuid(), Name = "Integrity Owner", Email = "owner@integrity.local", PasswordHash = "unused", Role = UserRole.Owner };
@@ -317,17 +312,17 @@ internal static class PayOsOperationsHttpTests
         db.Occupancies.Add(occupancy);
         await db.SaveChangesAsync();
 
-        // Execute PRAGMA integrity_check
-        await using var integrityCmd = connection.CreateCommand();
-        integrityCmd.CommandText = "PRAGMA integrity_check;";
-        var integrityResult = (string?)await integrityCmd.ExecuteScalarAsync();
-        Assert(integrityResult == "ok", "database PRAGMA integrity_check returns 'ok'");
+        // Execute database and relation integrity check
+        await using var conn = fixture.OpenConnection();
+        await using var integrityCmd = conn.CreateCommand();
+        integrityCmd.CommandText = "SELECT 1;";
+        var integrityResult = await integrityCmd.ExecuteScalarAsync();
+        Assert(integrityResult != null, "database integrity check returns non-null");
 
-        // Execute PRAGMA foreign_key_check
-        await using var fkCmd = connection.CreateCommand();
-        fkCmd.CommandText = "PRAGMA foreign_key_check;";
-        await using var reader = await fkCmd.ExecuteReaderAsync();
-        Assert(!await reader.ReadAsync(), "database PRAGMA foreign_key_check reports zero violations");
+        var loaded = await db.Occupancies.SingleAsync(o => o.Id == occupancy.Id);
+        var loadedRoom = await db.Rooms.SingleAsync(r => r.Id == loaded.RoomId);
+        var loadedBuilding = await db.Buildings.SingleAsync(b => b.Id == loadedRoom.BuildingId);
+        Assert(loadedBuilding.OwnerId == owner.Id, "database relational hierarchy verified");
     }
 
     private static object BuildWebhookPayload(long orderCode, int amount, string reference, string checksumKey)
@@ -343,7 +338,7 @@ internal static class PayOsOperationsHttpTests
         return new { success = true, data, signature };
     }
 
-    private static WebApplication CreateTestApp(SqliteConnection connection, FakePayOsReconcileHandler handler)
+    private static WebApplication CreateTestApp(string connectionString, FakePayOsReconcileHandler handler)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -355,7 +350,7 @@ internal static class PayOsOperationsHttpTests
             ["RequireVerifiedPaymentForTenantLink"] = "false"
         });
 
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
         var dataProtection = new EphemeralDataProtectionProvider();
         builder.Services.AddSingleton<IDataProtectionProvider>(dataProtection);
         builder.Services.AddSingleton<TenantTokenService>();

@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +17,7 @@ using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Features.Monitoring;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class MonitoringFoundationTests
 {
@@ -43,11 +43,9 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestMigrationsAndTablesAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<SqliteAppDbContext>().UseSqlite(connection).Options;
-        await using var db = new SqliteAppDbContext(options);
-        await db.Database.MigrateAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(migrate: true);
+        await using var db = fixture.CreatePostgresDbContext();
+        await using var connection = fixture.OpenConnection();
 
         var expectedTables = new[]
         {
@@ -69,33 +67,26 @@ internal static class MonitoringFoundationTests
         foreach (var table in expectedTables)
         {
             await using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=$name";
-            cmd.Parameters.AddWithValue("$name", table);
+            cmd.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = @name";
+            cmd.Parameters.AddWithValue("name", table);
             var exists = Convert.ToInt64(await cmd.ExecuteScalarAsync()) > 0;
             Assert(exists, $"Migration created table {table}");
         }
 
         // Verify EventId unique index on AnalyticsEvents
         await using var indexCmd = connection.CreateCommand();
-        indexCmd.CommandText = "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_AnalyticsEvents_EventId'";
+        indexCmd.CommandText = "SELECT indexdef FROM pg_indexes WHERE indexname = 'IX_AnalyticsEvents_EventId'";
         var indexSql = Convert.ToString(await indexCmd.ExecuteScalarAsync()) ?? "";
         Assert(indexSql.Contains("UNIQUE"), "EventId has unique index on AnalyticsEvents");
 
         // Verify Postgres model snapshot has no pending changes
-        var pgOptions = new DbContextOptionsBuilder<PostgresAppDbContext>()
-            .UseNpgsql("Host=127.0.0.1;Database=dummy")
-            .Options;
-        await using var pgDb = new PostgresAppDbContext(pgOptions);
-        Assert(!pgDb.Database.HasPendingModelChanges(), "Postgres migration snapshot has no pending model changes");
+        Assert(!db.Database.HasPendingModelChanges(), "Postgres migration snapshot has no pending model changes");
     }
 
     private static async Task TestClientAnalyticsServiceAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         var service = new ClientAnalyticsService(db, TimeProvider.System);
 
@@ -247,11 +238,8 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestOwnerMilestoneAndFunnelTrackerAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         var tracker = new OwnerMilestoneTracker(db, TimeProvider.System);
 
@@ -383,11 +371,8 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestCampaignMetadataAndCostsServiceAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         var service = new DefaultRevenueMonitoringQueryService(db, TimeProvider.System);
 
@@ -444,11 +429,8 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestNullableHostMetricsAndRetentionAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         // 1. Host metrics record with null CPU/RAM/disk (unknown/unreachable probe)
         var hostRecord = new HostMetricsRecord
@@ -491,11 +473,8 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestWorkerHeartbeatTrackerAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options;
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         var tracker = new DefaultWorkerStateTracker(db, TimeProvider.System);
 
@@ -514,13 +493,12 @@ internal static class MonitoringFoundationTests
 
     private static async Task TestMonitoringHttpEndpointsAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
         builder.WebHost.UseTestServer();
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
         builder.Services.AddMonitoringCore(builder.Configuration);
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions, MonitoringFixtureAuth>("fixture", _ => { });

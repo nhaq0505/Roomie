@@ -5,7 +5,7 @@ services:
     image: postgres:17-alpine
     container_name: rehouse-pg-migration-db
     env_file:
-      - ../../backend/RoomRental.Api/.local-data/postgres-migration/postgres.env
+      - backend/RoomRental.Api/.local-data/postgres-migration/postgres.env
     ports:
       - "127.0.0.1:15432:5432"
     volumes:

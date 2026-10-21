@@ -26,11 +26,11 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 | `backend/RoomRental.Api/Program.cs` | DI, provider DB, workers, cookie, limiter, middleware, đăng ký routes, SPA fallback |
 | `backend/RoomRental.Api/Domain/` | Entities và DTO; monitoring, Zalo, manual payments, recovery có file riêng |
 | `backend/RoomRental.Api/Data/AppDbContext.cs` | Toàn bộ mapping, indexes, concurrency tokens, DbSets |
-| `backend/RoomRental.Api/Data/ProviderDbContexts.cs` | Hai context/factory SQLite và PostgreSQL |
-| `backend/RoomRental.Api/Data/Migrations/{Sqlite,Postgres}/` | Migration, designer và snapshot riêng cho mỗi provider |
+| `backend/RoomRental.Api/Data/ProviderDbContexts.cs` | Context/factory PostgreSQL |
+| `backend/RoomRental.Api/Data/Migrations/Postgres/` | Migration, designer và snapshot cho PostgreSQL |
 | `backend/RoomRental.Api/Features/` | Endpoint/service chia theo Auth, Admin, Properties, Billing, Payments, Reports, Zalo, Monitoring |
 | `backend/RoomRental.Api/Shared/` | Security, SEO, calendar, lookup owner/property, pagination, fingerprint, cleanup |
-| `backend/RoomRental.DbMigrator/` | Công cụ **import dữ liệu SQLite cũ sang PostgreSQL**, không phải runner EF migrations |
+| `compose.postgres-dev.yaml` | Compose PostgreSQL dev local (container `rehouse-pg-migration-db`, port 15432) |
 | `frontend/src/app/` | Entry React, routing, layout, CSS assembly, metadata và prerender entry |
 | `frontend/src/features/` | API, types, page, hook và CSS theo nghiệp vụ |
 | `frontend/src/shared/` | HTTP, i18n, analytics, format, theme, UI dùng chung |
@@ -40,7 +40,7 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 | `tests/` | Console C# suites, HTTP Python harness, SMTP sink, tests backup/host collector |
 | `.github/workflows/ci-cd.yml` | Các cổng CI, image đã kiểm thử, GHCR và deploy theo digest |
 | `deploy/` | Production Compose, migration overlay, backup/restore, role DB, Caddy, firewall, host collector |
-| `scripts/` | Tiện ích webhook tunnel và import SQLite→PostgreSQL cũ |
+| `scripts/` | Tiện ích webhook tunnel |
 | `rehouse-video/` | Dự án Remotion độc lập, mock quảng cáo dùng tên ReHouse cũ; không nằm trong runtime/build app |
 | `.agents/skills/ui-ux/` | Skill thiết kế của dự án; không phải output build |
 | `output/`, `artifacts/`, `out/` | Deliverables, bằng chứng QA hoặc bản sao công việc; không tự coi mọi file trong đây là rác |
@@ -84,11 +84,11 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 
 ### Backend
 
-- ASP.NET Core .NET 10 Minimal APIs, EF Core 10 + SQLite/Npgsql, ClosedXML cho Excel, MailKit cho SMTP. Chỉ một API project; namespaces cũ `RoomRental.Api.Endpoints`/`Services` vẫn được dùng trong nhiều thư mục Features.
+- ASP.NET Core .NET 10 Minimal APIs, EF Core 10 + Npgsql, ClosedXML cho Excel, MailKit cho SMTP. Chỉ một API project; namespaces cũ `RoomRental.Api.Endpoints`/`Services` vẫn được dùng trong nhiều thư mục Features.
 - Middleware: trusted forwarded headers → latency → exception/security headers → SEO/static → routing/limiter → authentication → request security → authorization. Thứ tự ảnh hưởng đo lỗi, HTTPS, cookie và same-origin.
 - Mỗi query nghiệp vụ phải scope owner và occupancy đúng; `PropertyLookup` giữ kiểm tra owner/archive, `PaymentReservations.Pending` nhận diện cả thành viên batch và attempt đơn cũ.
 - Ngày/kỳ dùng `VietnamCalendar`/`ApiSupport.VietnamDate`, không dùng ngày UTC của máy để chốt tháng Việt Nam. Fingerprint qua `RequestFingerprint`; đổi serializer/chuẩn hóa có thể phá replay đã lưu.
-- Model change: tạo migration **cả hai provider**, commit Up/Down/designer/snapshot. Không chỉnh migration đã phát hành hoặc xóa lịch sử migration để “dọn code”.
+- Model change: tạo migration cho PostgresAppDbContext, commit Up/Down/designer/snapshot. Không chỉnh migration đã phát hành hoặc xóa lịch sử migration để “dọn code”.
 - Startup Development có thể migrate; Production chỉ kiểm tra pending migrations. Runner schema hiện tại là **API image với `Database__MigrateOnly=true`**, dùng `deploy/migrate.yaml` và role riêng trước khi thay app.
 
 ## 5. Những bất biến không được làm mất
@@ -147,13 +147,16 @@ npm --prefix zalo-gateway ci
 dotnet tool restore
 ```
 
-Development còn nạp `appsettings.Development.local.json`, `appsettings.Email.local.json` đã ignore. Env/command line override chúng. Kiểm tra cấu hình riêng tại máy trước khi chạy; không in secrets. Nếu chỉ cần thử app, chủ động dùng DB riêng bằng đường dẫn tuyệt đối:
+Development còn nạp `appsettings.Development.local.json`, `appsettings.Email.local.json` đã ignore. Env/command line override chúng. Kiểm tra cấu hình riêng tại máy trước khi chạy; không in secrets. Chạy dev database PostgreSQL qua `compose.postgres-dev.yaml`:
 
 ```sh
-# Terminal API: thư mục này dành riêng cho thao tác local của bạn.
+# Chạy PostgreSQL dev container (nếu chưa chạy):
+docker compose -f compose.postgres-dev.yaml up -d
+
+# Terminal API:
 ROOMIE_DEV_DIR=$(mktemp -d /tmp/roomie-dev.XXXXXX)
-ASPNETCORE_ENVIRONMENT=Development DatabaseProvider=SQLite \
-ConnectionStrings__DefaultConnection="Data Source=$ROOMIE_DEV_DIR/dev.db" \
+ASPNETCORE_ENVIRONMENT=Development DatabaseProvider=Postgres \
+ConnectionStrings__DefaultConnection="Host=127.0.0.1;Port=15432;Database=room_rental;Username=room_rental;Password=<password>" \
 DataProtection__KeysPath="$ROOMIE_DEV_DIR/keys" SeedDemo=true \
 Zalo__Enabled=false EnableInvoiceSweep=false EnablePaymentReconciliation=false \
 EmailVerification__Enabled=false RequireVerifiedPaymentForTenantLink=false \
@@ -174,7 +177,6 @@ Chọn nhóm test theo phần sửa. Các test console C# là **executable**, d�
 
 ```sh
 dotnet build backend/RoomRental.Api
-dotnet build backend/RoomRental.DbMigrator
 dotnet run --project tests/RoomRental.WebhookTests
 dotnet run --project tests/RoomRental.ZaloTests
 npm --prefix zalo-gateway test
@@ -186,27 +188,27 @@ npm --prefix frontend run test:http
 npm --prefix frontend run test:analytics
 npm --prefix frontend run test:dates
 npm --prefix frontend run test:e2e -- --workers=4
-dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context SqliteAppDbContext
 dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context PostgresAppDbContext
 git diff --check
 ```
 
 Frontend build phải xong trước Playwright. Browser config tự chạy preview `127.0.0.1:4178`, API trong tests được giả lập. Không trỏ suite vào production hoặc dùng login thật để né fixture lỗi.
 
-HTTP regression dùng **API publish có đầy đủ `wwwroot`**, database tạm và SMTP sink do harness quản lý:
+HTTP regression dùng **API publish có đầy đủ `wwwroot`**, database PostgreSQL disposable và SMTP sink do harness quản lý:
 
 ```sh
 npm --prefix frontend run build
 ROOMIE_QA_APP=$(mktemp -d /tmp/roomie-qa-app.XXXXXX)
 dotnet publish backend/RoomRental.Api -c Release -o "$ROOMIE_QA_APP"
 cp -R frontend/dist "$ROOMIE_QA_APP/wwwroot"
-python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider sqlite
-python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp
+
+export TEST_HTTP_POSTGRES_CONTAINER=rehouse-pg-migration-db
+export TEST_HTTP_POSTGRES_CONNECTION='Host=127.0.0.1;Port=15432;Database=roomie_qa_local;Username=room_rental;Password=<password>'
+python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider postgres
+python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp-postgres
 ```
 
-Harness tạo DB/keys trong `/tmp/roomie-ci-*`, chặn outbound bằng proxy loopback, callback HTTP localhost; không dùng payOS/SMTP/Zalo thật. macOS: nếu Python Homebrew lỗi `pyexpat`, dùng `/usr/bin/python3` như lần QA này. Thiếu webroot gây SEO 404, không chữa bằng bỏ test.
-
-PostgreSQL/otp-postgres: xem [tests/README.md](tests/README.md); phải cấp container QA riêng, connection loopback có database `roomie_qa_*`. Harness tự tạo/drop DB ngẫu nhiên, không dùng DB/container app. Các fixture service PostgreSQL khác có guard riêng (`TEST_ALLOW_DISPOSABLE_PAYMENT_POSTGRES`, port 15496; `ZALO_TEST_POSTGRES`); đọc test trước khi cấp biến.
+Harness tạo database ngẫu nhiên `roomie_qa_*` trong container chỉ định, keys trong `/tmp/roomie-ci-*`, chặn outbound bằng proxy loopback, callback HTTP localhost; không dùng payOS/SMTP/Zalo thật. Cả hai provider kỳ vọng 0 skip. macOS: nếu Python Homebrew lỗi `pyexpat`, dùng `/usr/bin/python3` như lần QA này. Thiếu webroot gây SEO 404, không chữa bằng bỏ test.
 
 Backup/collector thuần local:
 
@@ -221,7 +223,7 @@ Không chạy `unittest discover -s tests` tùy tiện: các module HTTP có th�
 
 1. **Monitoring scheduler:** `MonitoringBackgroundWorker` gọi incident checks mỗi phút và maintenance mỗi giờ, hai vòng độc lập, scope riêng, không overlap trong process. Cấu hình `Monitoring:Schedule` được validate startup; xem monitoring runbook. DB outage gửi SMTP không phụ thuộc DB sau 3 probe cách ≥1 phút, cooldown 1 giờ; trạng thái outage trong RAM đến reconnect nên restart có thể gửi lại. Host collector/systemd gửi cảnh báo host/backup riêng. Chưa xác minh delivery/live VPS.
 2. **Monitoring maintenance:** scheduler tính lại 7 ngày đã kết thúc theo Việt Nam trước khi prune raw 90 ngày/activity và aggregate 13 tháng/Completed outbox 30 ngày. Rollup lỗi thì không prune, thử lại chu kỳ sau. Ngày thiếu/chỉnh sửa cũ hơn lookback phải gọi admin rollup trước khi raw hết retention; chưa có backfill toàn lịch sử tự động. Scheduler chưa có distributed lease; không scale nhiều replica hoặc thêm external scheduler trùng mà chưa thiết kế khóa. `DataMaintenanceService` vẫn chỉ dọn auth records.
-3. **Legacy import không theo kịp schema:** `RoomRental.DbMigrator` hardcode danh sách bảng cũ, thiếu payment modes/recovery/Zalo/monitoring mới. Không dùng nó cho data hiện tại hoặc để áp EF migration. Cần cập nhật/test đầy đủ trước một đợt import thực sự. Các script import/reset cũ là công cụ chuyên biệt, không đưa vào startup.
+3. **Dự án chuyển hoàn toàn sang PostgreSQL:** Toàn bộ dữ liệu SQLite cũ và công cụ `RoomRental.DbMigrator` đã được dọn sạch; hệ thống dùng PostgreSQL duy nhất cho cả phát triển, kiểm thử và vận hành. Cấu hình container local chuyển sang `compose.postgres-dev.yaml`.
 4. **Mở rộng nhiều replica cần thiết kế thêm:** IP rate limiter/latency aggregator/worker telemetry ở process; invoice sweep và payment reconciliation chạy theo app instance. Zalo có DB lease nhưng gateway volume vẫn chỉ cho một process. Không tự scale Compose rồi suy ra đã HA.
 5. **Restore/SMTP/provider thật:** fake tests không chứng minh bank settlement, mailbox delivery, phiên Zalo thực hay production recovery point. Không lấy số test/throughput lịch sử làm capacity hoặc SLA hiện tại.
 6. **Source không đại diện toàn bộ host:** Compose repo chưa chứa mọi override Zalo/runtime hiện có trên VPS. Push code không tự cập nhật mọi helper/Compose/env trên host; đọc runbook và đối chiếu trước thay đổi hạ tầng.
@@ -275,3 +277,20 @@ Không kiểm tra trạng thái live, không chạy migration vào DB vận hàn
 - Kiểm chứng local: build frontend, i18n 1366 keys × 4, architecture, API/HTTP client đạt; C# suite 864 PASS; Playwright toàn bộ 69/69; HTTP SQLite 87/87 không skip; PostgreSQL 62 đạt/8 skip vì các fixture sửa DB chỉ hỗ trợ SQLite. Cả hai migration snapshots khớp model. Không xác nhận/bỏ yêu cầu thật hoặc ghi tiền trên production để thử nghiệm.
 
 CI lần đầu của bản sửa VietQR: backend/integration đạt, Playwright 68 đạt/1 lỗi selector tên nút khi Ant Design thêm loading icon vào accessible name. Test stale conflict đã sửa để đợi loading kết thúc trước khi kiểm nút vẫn disabled; lặp local 8/8 đạt. Không thêm retry hoặc bỏ assertion chống xác nhận trùng.
+
+## 13. Chuyển đổi toàn diện sang PostgreSQL — 21/10/2026
+
+- Đã xoá toàn bộ 18 file dữ liệu/sidecar/WAL/SHM SQLite và công cụ import cũ `backend/RoomRental.DbMigrator`, `scripts/sqlite-to-postgres/`. Cấu hình container local chuyển sang `compose.postgres-dev.yaml` ở thư mục gốc (giữ nguyên container `rehouse-pg-migration-db` cổng 15432 và volume).
+- Loại bỏ SQLite provider khỏi test harness (`tests/run_disposable.py`) và CI workflow (`.github/workflows/ci-cd.yml`); chỉ chạy `postgres` và `otp-postgres` với 0 skip kỳ vọng.
+- Chuyển toàn bộ các fixture sửa DB trực tiếp trong Python sang PostgreSQL qua stdlib và `docker exec psql` (`tests/pg_fixture.py`), ràng buộc loopback database tạm `roomie_qa_*` và escape SQL an toàn.
+- CI bổ sung service PostgreSQL chuyên biệt và host networking cho các suite C#.
+- Kết quả kiểm chứng HTTP disposable thực tế trên container QA `roomie-qa-pg-only-8f80de26` (cổng 50472):
+  - `postgres`: 87/87 tests PASS, 0 skip, 0 lỗi (bao gồm đầy đủ 8 ca nghiệp vụ trước đây bị skip, payOS webhook fixture và SEO HTTP). Log tại `/tmp/roomie-pg-only-http-postgres.log`.
+  - `otp-postgres`: 15/15 tests PASS, 0 skip, 0 lỗi. Log tại `/tmp/roomie-pg-only-http-otp-postgres.log`.
+  - Template database `roomie_qa_bootstrap` được bảo toàn nguyên vẹn, không bị mutate.
+- Kết quả kiểm chứng console C# trên PostgreSQL: cả hai suite chạy thành công, 0 dòng FAIL, mã thoát 0:
+  - `RoomRental.WebhookTests`: 849 dòng `PASS:`. Log tại `/tmp/roomie-pg-only-csharp-webhook.log`.
+  - `RoomRental.ZaloTests`: 54 dòng `PASS:` (dòng tổng kết xác nhận 53 assertions đạt; không gọi provider ngoài). Log tại `/tmp/roomie-pg-only-csharp-zalo.log`.
+- Playwright E2E: 69/69 passed.
+- PostgreSQL migrations và model snapshot được bảo toàn nguyên vẹn; startup fail-fast đã được xác nhận khi cấu hình `DatabaseProvider=SQLite` hoặc để trống chuỗi kết nối.
+- Tiến hành phát hành qua luồng CI/CD chính thức lên VPS 116.118.3.40 sau khi dọn container QA tạm thời; bảo toàn container dev `rehouse-pg-migration-db` cổng 15432.

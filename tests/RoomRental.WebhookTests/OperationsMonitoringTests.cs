@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +17,7 @@ using RoomRental.Api.Endpoints;
 using RoomRental.Api.Features.Monitoring;
 using RoomRental.Api.Features.Monitoring.Operations;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 namespace RoomRental.WebhookTests;
 
@@ -315,15 +315,8 @@ public static class OperationsMonitoringTests
 
     private static async Task TestIncidentEngineAndAlertsAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite(connection)
-            .Options;
-
-        await using var db = new AppDbContext(options);
-        await db.Database.EnsureCreatedAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
+        await using var db = fixture.CreateDbContext();
 
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
         var routeAggregator = new RouteLatencyAggregator(fakeClock);
@@ -587,15 +580,14 @@ public static class OperationsMonitoringTests
 
     private static async Task TestProductionDiAlertTransportAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
 
         var fakeSink = new FakeEmailSender();
         var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
-        builder.Services.AddDbContext<AppDbContext>(opts => opts.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(fixture.ConnectionString));
         builder.Services.AddSingleton<TimeProvider>(fakeClock);
         builder.Services.AddMonitoringCore(builder.Configuration);
         builder.Services.AddMonitoringOperations(builder.Configuration);
@@ -888,13 +880,12 @@ public static class OperationsMonitoringTests
 
     private static async Task TestOperationsAndIncidentsHttpEndpointsAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: true);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
         builder.WebHost.UseTestServer();
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
         builder.Services.AddMonitoringCore(builder.Configuration);
         builder.Services.AddMonitoringOperations(builder.Configuration);
         // Endpoint fixture controls incident state explicitly; scheduler has its own integration tests.

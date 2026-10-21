@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 internal static class PasswordRecoveryTests
 {
@@ -124,7 +124,7 @@ internal static class PasswordRecoveryTests
     }
     private sealed class Fixture : IDisposable
     {
-        private readonly SqliteConnection connection = new("Data Source=:memory:");
+        private readonly PostgresTestDb testDb;
         public AppDbContext Db { get; }
         public Sender Sender { get; } = new();
         public Clock Clock { get; } = new();
@@ -134,8 +134,8 @@ internal static class PasswordRecoveryTests
         public PasswordRecoveryService Service { get; }
         public Fixture()
         {
-            connection.Open();
-            Db = new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options); Db.Database.EnsureCreated();
+            testDb = PostgresTestDb.CreateSync(ensureCreated: true);
+            Db = testDb.CreateDbContext();
             User = new AppUser { Name = "Fixture", Email = "recovery@example.invalid", PasswordHash = "" };
             User.PasswordHash = Hasher.HashPassword(User, "oldpassword");
             Db.Users.Add(User); Db.AuthSessions.Add(new AuthSession { Id = "fixture-session", UserId = User.Id, ExpiresAt = Clock.GetUtcNow().AddDays(1) }); Db.SaveChanges();
@@ -143,6 +143,6 @@ internal static class PasswordRecoveryTests
         }
         public Task<PasswordRecoveryChallengeDto> Start(string email = "recovery@example.invalid") => Service.StartAsync(email, default);
         public Task Deliver() => PasswordRecoveryEmailWorker.DeliverPendingAsync(Db, Sender, Protection, Clock, default);
-        public void Dispose() { Db.Dispose(); connection.Dispose(); }
+        public void Dispose() { Db.Dispose(); testDb.Dispose(); }
     }
 }

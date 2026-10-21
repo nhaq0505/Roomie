@@ -1,26 +1,14 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 
 var clock = new FakeClock(DateTimeOffset.Parse("2026-10-20T01:00:00Z")); // 08:00 Vietnam
-using var connection = new SqliteConnection("Data Source=:memory:");
-await connection.OpenAsync();
-var postgres = Environment.GetEnvironmentVariable("ZALO_TEST_POSTGRES");
-if (postgres is not null && (!postgres.Contains("Database=roomie_qa_zalo") || !postgres.Contains("Host=127.0.0.1;")))
-    throw new InvalidOperationException("Use an isolated loopback roomie_qa_zalo database only.");
-if (postgres is not null)
-{
-    await using var migrations = new PostgresAppDbContext(new DbContextOptionsBuilder<PostgresAppDbContext>().UseNpgsql(postgres).Options);
-    await migrations.Database.MigrateAsync();
-}
-var options = postgres is null ? new DbContextOptionsBuilder<AppDbContext>().UseSqlite(connection).Options :
-    new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(postgres).Options;
-await using var db = new AppDbContext(options);
-await db.Database.EnsureCreatedAsync();
+await using var testDb = await PostgresTestDb.CreateAsync(migrate: true);
+await using var db = testDb.CreateDbContext();
 var gateway = new FakeGateway();
 var protection = new EphemeralDataProtectionProvider();
 var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
@@ -241,19 +229,16 @@ var monthlyAuto = await db.Invoices.SingleAsync(x => x.OccupancyId == autoOccupa
 Assert(generatedAuto.Created == 1 && await db.ZaloReminders.AnyAsync(x => x.InvoiceId == monthlyAuto.Id), "monthly billing automatically commits its reminder");
 Assert((await autoBilling.GenerateForOwnerAsync(owner.Id, "2026-11")).Created == 0 && await db.ZaloReminders.CountAsync(x => x.InvoiceId == monthlyAuto.Id) == 1, "repeated monthly billing does not duplicate reminder");
 
-// Both generated migration sets must build and SQLite migration must preserve existing business data.
-var migratedPath = Path.Combine(Path.GetTempPath(), $"roomie-zalo-migration-{Guid.NewGuid():N}.db");
-try
+// PostgreSQL migration must build and preserve existing business data.
+await using (var migrationDb = await PostgresTestDb.CreateAsync(migrate: false, ensureCreated: false))
 {
-    var migrationOptions = new DbContextOptionsBuilder<SqliteAppDbContext>().UseSqlite($"Data Source={migratedPath}").Options;
-    await using var migrated = new SqliteAppDbContext(migrationOptions);
+    await using var migrated = migrationDb.CreatePostgresDbContext();
     await migrated.Database.MigrateAsync();
     migrated.Users.Add(new() { Name = "Keep", Email = "keep@example.invalid", PasswordHash = "fixture" });
     await migrated.SaveChangesAsync();
     await migrated.Database.MigrateAsync();
-    Assert(await migrated.Users.CountAsync() == 1 && await migrated.ZaloReminders.CountAsync() == 0, "SQLite migrations and rerun preserve data");
+    Assert(await migrated.Users.CountAsync() == 1 && await migrated.ZaloReminders.CountAsync() == 0, "PostgreSQL migrations and rerun preserve data");
 }
-finally { SqliteConnection.ClearAllPools(); File.Delete(migratedPath); }
 Console.WriteLine($"PASS: {checks} Zalo assertions; no external provider calls.");
 
 sealed class FakeClock(DateTimeOffset initial) : TimeProvider

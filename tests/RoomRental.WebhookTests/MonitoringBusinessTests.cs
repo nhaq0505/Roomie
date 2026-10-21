@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +15,7 @@ using RoomRental.Api.Domain;
 using RoomRental.Api.Endpoints;
 using RoomRental.Api.Features.Monitoring;
 using RoomRental.Api.Services;
+using RoomRental.Tests;
 using static MonitoringFoundationTests;
 
 internal static class MonitoringBusinessTests
@@ -36,20 +36,17 @@ internal static class MonitoringBusinessTests
         await TestOlderThan90DaysRawAbsentAsync();
         await TestFilteredFunnelAttributionAsync();
         await TestInvalidAndExtremeDateRangesAsync();
-        await TestRealSqlitePostReadingsSuccessRollbackAndNoStallAsync();
+        await TestPostReadingsSuccessRollbackAndNoStallAsync();
         await TestCampaignTrackingUrlAndEndpointAsync();
         await TestMonitoringMaintenanceServiceAsync();
         await TestHttpBusinessFlowsAndDegradedTelemetryAsync();
     }
 
-    private static async Task<(SqliteConnection Connection, SqliteAppDbContext Db)> CreateTestDbAsync()
+    private static async Task<(PostgresTestDb Connection, PostgresAppDbContext Db)> CreateTestDbAsync()
     {
-        var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<SqliteAppDbContext>().UseSqlite(connection).Options;
-        var db = new SqliteAppDbContext(options);
-        await db.Database.MigrateAsync();
-        return (connection, db);
+        var fixture = await PostgresTestDb.CreateAsync(migrate: true);
+        var db = fixture.CreatePostgresDbContext();
+        return (fixture, db);
     }
 
     private static async Task TestOtpAndRegistrationAttributionFlowAsync()
@@ -809,17 +806,13 @@ internal static class MonitoringBusinessTests
             $"Inverted range safely swapped and returned 11 points (got {invertedGrowth.DailySeries.Count})");
     }
 
-    private static async Task TestRealSqlitePostReadingsSuccessRollbackAndNoStallAsync()
+    private static async Task TestPostReadingsSuccessRollbackAndNoStallAsync()
     {
-        var dbFilePath = Path.Combine(Path.GetTempPath(), $"roomie_readings_test_{Guid.NewGuid():N}.db");
-        var connectionString = $"Data Source={dbFilePath};Mode=ReadWriteCreate;Cache=Shared";
-
-        try
-        {
-            var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
-            builder.Logging.ClearProviders();
-            builder.WebHost.UseTestServer();
-            builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
             builder.Services.AddMonitoringCore(builder.Configuration);
             builder.Services.AddScoped<InvoiceService>();
             builder.Services.AddSingleton(TimeProvider.System);
@@ -925,7 +918,7 @@ internal static class MonitoringBusinessTests
             Assert(await db.Invoices.CountAsync(i => i.OccupancyId == occupancy.Id) == 0,
                 "Rollback path does not insert invoice");
 
-            // 2. Success case: POST /readings with valid reading must succeed without stalling SQLite, commit outer transaction, and activate owner
+            // 2. Success case: POST /readings with valid reading must succeed without stalling PostgreSQL, commit outer transaction, and activate owner
             var goodReadingReq = new HttpRequestMessage(HttpMethod.Post, "/api/readings")
             {
                 Content = JsonContent.Create(new
@@ -937,11 +930,11 @@ internal static class MonitoringBusinessTests
             };
             var goodResp = await client.SendAsync(goodReadingReq);
             Assert(goodResp.StatusCode == HttpStatusCode.Created,
-                $"Valid reading succeeds with 201 Created without SQLite stalls (got {goodResp.StatusCode})");
+                $"Valid reading succeeds with 201 Created without stalls (got {goodResp.StatusCode})");
 
             var createdReading = await db.Readings.AsNoTracking().SingleAsync(r => r.OccupancyId == occupancy.Id);
             Assert(createdReading.CurrentReading == 150m && createdReading.Period == "2026-09",
-                "Reading successfully committed to disposable SQLite DB");
+                "Reading successfully committed to disposable PostgreSQL DB");
 
             var createdInvoice = await db.Invoices.AsNoTracking().SingleAsync(i => i.OccupancyId == occupancy.Id && i.Period == "2026-09");
             Assert(createdInvoice.LifecycleState == InvoiceLifecycleState.Issued,
@@ -952,13 +945,6 @@ internal static class MonitoringBusinessTests
                 "Owner milestone successfully activated after outer transaction commit");
             Assert(activatedMilestone.FirstActivatedInvoiceId == createdInvoice.Id,
                 $"FirstActivatedInvoiceId matches committed invoice (got {activatedMilestone.FirstActivatedInvoiceId})");
-        }
-        finally
-        {
-            // Clean up temporary database file
-            SqliteConnection.ClearAllPools();
-            try { if (File.Exists(dbFilePath)) File.Delete(dbFilePath); } catch { }
-        }
     }
 
     private static async Task TestCampaignTrackingUrlAndEndpointAsync()
@@ -1094,13 +1080,12 @@ internal static class MonitoringBusinessTests
 
     private static async Task TestHttpBusinessFlowsAndDegradedTelemetryAsync()
     {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
         builder.WebHost.UseTestServer();
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(fixture.ConnectionString));
         builder.Services.AddMonitoringCore(builder.Configuration);
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions, MonitoringFixtureAuth>("fixture", _ => { });
