@@ -159,6 +159,7 @@ test('stale transfer conflict refreshes balances, explains the invoice error and
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true }).click();
   await expect(dialog).toContainText('Các hóa đơn của yêu cầu này đã được thu đủ');
+  await expect(dialog.locator('.ant-btn-loading')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true })).toBeDisabled();
   await expect(page.getByText('Lượt thuê đã thay đổi', { exact: false })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
