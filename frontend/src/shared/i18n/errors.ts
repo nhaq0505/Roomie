@@ -101,7 +101,7 @@ const rules: readonly [RegExp, string][] = [
  [/Please sign in/, 'auth'], [/access is required|cannot.*sign in|không thể đăng nhập/, 'access'],
  [/not approved/, 'approved'], [/Tenant link.*active/, 'inactiveLink'], [/not found|was not found|Không tìm thấy/, 'missing'],
  [/already has an active occupancy/, 'occupied'], [/no active occupancy|chưa có người thuê|người thuê đang ở/, 'noTenant'],
- [/đã thay đổi|Người thuê đã thay đổi/, 'stale'], [/không thể thấp hơn|không được thấp hơn|Chỉ số điện phải/, 'reading'],
+ [/[Ll]ượt thuê đã thay đổi|Người thuê đã thay đổi/, 'stale'], [/không thể thấp hơn|không được thấp hơn|Chỉ số điện phải/, 'reading'],
  [/tháng.*tương lai|tháng bắt đầu thuê|thứ tự tháng/, 'readingPeriod'],
  [/đã có chỉ số|đã được phát hành|meter reading already exists/, 'readingExists'],
  [/Đã chốt điện trả phòng|đã có hóa đơn chốt/, 'finalExists'], [/Cần chốt điện cuối/, 'finalRequired'],

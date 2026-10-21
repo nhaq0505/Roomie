@@ -82,6 +82,7 @@ RegistrationEmailTemplateTests.Run();
 await RegistrationVerificationTests.RunAsync();
 await PasswordRecoveryTests.RunAsync();
 await ManualReceiptTests.RunAsync();
+await ManualPaymentAssessmentTests.RunAsync();
 await AuthSecurityHttpTests.RunAsync();
 await RoomTenantLifecycleHttpTests.RunAsync();
 await AccountingBillingHttpTests.RunAsync();

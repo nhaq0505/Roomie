@@ -1352,5 +1352,17 @@
   "Bỏ qua mã OTP": "ओटीपी बाईपास किया गया",
   "Lượt đăng ký chưa rõ nguồn": "अज्ञात स्रोत पंजीकरण",
   "Chi phí nhân công quy đổi (VND)": "अनुमानित श्रम लागत (VND)",
-  "Dữ liệu thực tế: {0} đến {1}": "वास्तविक डेटा सीमा: {0} से {1}"
+  "Dữ liệu thực tế: {0} đến {1}": "वास्तविक डेटा सीमा: {0} से {1}",
+  "Yêu cầu chuyển khoản": "ट्रांसफर अनुरोध",
+  "Danh sách mã QR đã tạo, không phải bằng chứng chuyển tiền. Đối chiếu tài khoản và số tiền thực nhận trước khi xác nhận.": "बनाए गए QR कोड भुगतान का प्रमाण नहीं हैं। पुष्टि से पहले प्राप्तकर्ता खाते और प्राप्त राशि की जाँच करें।",
+  "Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu.": "अनुरोध सूची से हटा दिया गया। कोई अतिरिक्त प्राप्ति दर्ज नहीं की गई।",
+  "Bỏ yêu cầu này khỏi danh sách?": "इस अनुरोध को सूची से हटाएँ?",
+  "Chỉ bỏ yêu cầu đã đối chiếu; không ghi thêm khoản thu.": "मिलान के बाद ही हटाएँ; कोई अतिरिक्त प्राप्ति दर्ज नहीं होगी।",
+  "Bỏ khỏi danh sách": "सूची से हटाएँ",
+  "Yêu cầu này đã được bỏ khỏi danh sách. Không ghi thêm khoản thu.": "यह अनुरोध सूची से हटा दिया गया था। कोई अतिरिक्त प्राप्ति दर्ज नहीं की गई।",
+  "Hóa đơn của yêu cầu này không còn khả dụng. Vui lòng đối chiếu trước khi bỏ khỏi danh sách.": "इस अनुरोध के बिल उपलब्ध नहीं हैं। सूची से हटाने से पहले मिलान करें।",
+  "Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.": "इन बिलों का पूरा भुगतान पहले ही हो चुका है। दोबारा प्राप्ति दर्ज न करें।",
+  "Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.": "बिल बदल गए हैं। प्राप्ति दर्ज करने से पहले वास्तव में प्राप्त राशि की जाँच करें।",
+  "Vui lòng đối soát giao dịch payOS đang chờ trước khi ghi thu.": "प्राप्ति दर्ज करने से पहले लंबित payOS भुगतान का मिलान करें।",
+  "Yêu cầu vẫn còn hiệu lực. Vui lòng kiểm tra hóa đơn trước khi bỏ khỏi danh sách.": "यह अनुरोध अभी मान्य है। सूची से हटाने से पहले बिल जाँचें।"
 }

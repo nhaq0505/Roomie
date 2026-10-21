@@ -50,3 +50,7 @@ respond = () => ({ ok: false, status: 401, text: async () => 'fixture-unauthoriz
 await assert.rejects(api.reports.export('debt', { dateFrom: '2026-10-01', dateTo: '2026-10-31' }), error =>
   error instanceof ApiError && error.status === 401);
 console.log('PASS: extracted HTTP transport preserves headers, errors, envelopes, single financial submissions and exports');
+
+respond = () => ({ ok: false, status: 409, text: async () => JSON.stringify({ message: 'Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.' }) });
+await assert.rejects(api.invoices.addReceipt('fixture-invoice', { amount: 100, idempotencyKey: 'stale-invoice' }), error =>
+  error.message === 'Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.');

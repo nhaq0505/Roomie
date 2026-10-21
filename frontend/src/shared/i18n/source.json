@@ -1352,5 +1352,17 @@
   "Bỏ qua mã OTP",
   "Lượt đăng ký chưa rõ nguồn",
   "Chi phí nhân công quy đổi (VND)",
-  "Dữ liệu thực tế: {0} đến {1}"
+  "Dữ liệu thực tế: {0} đến {1}",
+  "Yêu cầu chuyển khoản",
+  "Danh sách mã QR đã tạo, không phải bằng chứng chuyển tiền. Đối chiếu tài khoản và số tiền thực nhận trước khi xác nhận.",
+  "Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu.",
+  "Bỏ yêu cầu này khỏi danh sách?",
+  "Chỉ bỏ yêu cầu đã đối chiếu; không ghi thêm khoản thu.",
+  "Bỏ khỏi danh sách",
+  "Yêu cầu này đã được bỏ khỏi danh sách. Không ghi thêm khoản thu.",
+  "Hóa đơn của yêu cầu này không còn khả dụng. Vui lòng đối chiếu trước khi bỏ khỏi danh sách.",
+  "Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.",
+  "Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.",
+  "Vui lòng đối soát giao dịch payOS đang chờ trước khi ghi thu.",
+  "Yêu cầu vẫn còn hiệu lực. Vui lòng kiểm tra hóa đơn trước khi bỏ khỏi danh sách."
 ]

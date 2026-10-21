@@ -255,6 +255,8 @@ public class AppDbContext : DbContext
             entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Occupancy>().WithMany().HasForeignKey(x => x.OccupancyId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.ConfirmedAt).IsConcurrencyToken();
+            entity.Property(x => x.DismissedAt).IsConcurrencyToken();
+            entity.Property(x => x.DismissalReason).HasMaxLength(40);
             entity.Property(x => x.Amount).HasPrecision(18, 2);
             entity.Property(x => x.BankBin).HasMaxLength(6);
             entity.Property(x => x.AccountNumber).HasMaxLength(34);

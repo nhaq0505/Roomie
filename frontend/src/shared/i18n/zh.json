@@ -1352,5 +1352,17 @@
   "Bỏ qua mã OTP": "跳过验证码",
   "Lượt đăng ký chưa rõ nguồn": "来源未知的注册数",
   "Chi phí nhân công quy đổi (VND)": "折算人工成本 (VND)",
-  "Dữ liệu thực tế: {0} đến {1}": "实际数据范围：{0} 至 {1}"
+  "Dữ liệu thực tế: {0} đến {1}": "实际数据范围：{0} 至 {1}",
+  "Yêu cầu chuyển khoản": "转账请求",
+  "Danh sách mã QR đã tạo, không phải bằng chứng chuyển tiền. Đối chiếu tài khoản và số tiền thực nhận trước khi xác nhận.": "已生成的二维码并非付款凭证。确认前请核对收款账户和实际到账金额。",
+  "Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu.": "请求已从列表移除，未新增收款记录。",
+  "Bỏ yêu cầu này khỏi danh sách?": "从列表中移除此请求？",
+  "Chỉ bỏ yêu cầu đã đối chiếu; không ghi thêm khoản thu.": "仅在核对后移除，不会新增收款记录。",
+  "Bỏ khỏi danh sách": "从列表移除",
+  "Yêu cầu này đã được bỏ khỏi danh sách. Không ghi thêm khoản thu.": "此请求已从列表移除，未新增收款记录。",
+  "Hóa đơn của yêu cầu này không còn khả dụng. Vui lòng đối chiếu trước khi bỏ khỏi danh sách.": "此请求的账单已不可用。请核对后再从列表移除。",
+  "Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.": "此请求的账单已全部收款。请勿重复记录收款。",
+  "Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.": "账单已变更。记录收款前请核对实际到账金额。",
+  "Vui lòng đối soát giao dịch payOS đang chờ trước khi ghi thu.": "记录收款前请先核对待处理的 payOS 交易。",
+  "Yêu cầu vẫn còn hiệu lực. Vui lòng kiểm tra hóa đơn trước khi bỏ khỏi danh sách.": "此请求仍有效。请检查账单后再从列表移除。"
 }

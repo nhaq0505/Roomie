@@ -18,4 +18,6 @@ public sealed class ManualPaymentRequest
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset ExpiresAt { get; set; } = DateTimeOffset.UtcNow.AddDays(1);
     public DateTimeOffset? ConfirmedAt { get; set; }
+    public DateTimeOffset? DismissedAt { get; set; }
+    public string? DismissalReason { get; set; }
 }

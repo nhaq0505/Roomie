@@ -694,6 +694,14 @@ namespace RoomRental.Api.Data.Migrations.Sqlite
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("DismissalReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DismissedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("ExpiresAt")
                         .HasColumnType("INTEGER");
 

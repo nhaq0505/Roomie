@@ -36,7 +36,7 @@ export function useInvoicesPage() {
   const totals = listQuery.data?.totals ?? {billed:0, paid:0, outstanding:0};
   const generateMutation = useMutation({
     mutationFn: (selectedPeriod: string) => invoicesApi.generate(selectedPeriod),
-    onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['rooms'] })]); message.success(t("Đã kiểm tra và tạo các hóa đơn còn thiếu.")); },
+    onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: ['manual-payments'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['rooms'] })]); message.success(t("Đã kiểm tra và tạo các hóa đơn còn thiếu.")); },
     onError: (e: Error) => message.error(e.message),
   });
   const reconcileMutation = useMutation({
@@ -44,7 +44,7 @@ export function useInvoicesPage() {
     onSuccess: async (result, id) => {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['invoice', id] }),
-        client.invalidateQueries({ queryKey: ['invoices'] }),
+        client.invalidateQueries({ queryKey: ['manual-payments'] }), client.invalidateQueries({ queryKey: ['invoices'] }),
         client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['rooms'] }),
       ]);
       const status = result.status.toLowerCase();
@@ -56,7 +56,7 @@ export function useInvoicesPage() {
     onError: (e: Error) => message.error(e.message),
   });
   const refreshPayments = (id: string) => Promise.all([
-    client.invalidateQueries({ queryKey: ['invoice', id] }), client.invalidateQueries({ queryKey: ['invoices'] }),
+    client.invalidateQueries({ queryKey: ['invoice', id] }), client.invalidateQueries({ queryKey: ['manual-payments'] }), client.invalidateQueries({ queryKey: ['invoices'] }),
     client.invalidateQueries({ queryKey: ['invoiceCorrections', id] }), client.invalidateQueries({ queryKey: ['dashboard'] }),
     client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['reports'] }),
   ]);
@@ -70,7 +70,7 @@ export function useInvoicesPage() {
   const correctionQuery = useQuery({ queryKey: ['invoiceCorrections', selectedId], queryFn: () => invoicesApi.corrections(selectedId!), enabled: !!selectedId && invoice?.lifecycleState !== 'Draft' });
   const correctionMutation = useMutation({
     mutationFn: ({ id, values, requestId, version }: { id: string; values: { amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; reason: string; dueDate?: string; description?: string }; requestId: string; version: number }) => invoicesApi.correct(id, { ...values, expectedVersion: version, requestId }),
-    onSuccess: async (_, variables) => { await Promise.all([client.invalidateQueries({ queryKey: ['invoice', variables.id] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['invoiceCorrections', variables.id] }), client.invalidateQueries({ queryKey: ['dashboard'] })]); correctionKeys.current.delete(variables.id); correctionForm.resetFields(); message.success(t("Đã lưu điều chỉnh hóa đơn.")); },
+    onSuccess: async (_, variables) => { await Promise.all([client.invalidateQueries({ queryKey: ['invoice', variables.id] }), client.invalidateQueries({ queryKey: ['manual-payments'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['invoiceCorrections', variables.id] }), client.invalidateQueries({ queryKey: ['dashboard'] })]); correctionKeys.current.delete(variables.id); correctionForm.resetFields(); message.success(t("Đã lưu điều chỉnh hóa đơn.")); },
     onError: (error: Error) => message.error(error.message),
   });
   useEffect(() => { if (invoice) correctionForm.setFieldsValue({ amount: invoice.total, rent: invoice.rent, electricityAmount: invoice.electricityAmount, waterAmount: invoice.waterAmount, serviceAmount: invoice.serviceAmount, currentReading: invoice.currentReading, dueDate: invoice.dueDate ? dayjs(invoice.dueDate) : undefined, description: invoice.description, reason: '' }); }, [invoice, correctionForm]);

@@ -45,7 +45,7 @@ test('owner saves manual bank details separately from payOS credentials', async 
   await page.getByLabel('Số tài khoản', { exact: true }).fill('12345678');
   await page.getByLabel('Tên chủ tài khoản', { exact: true }).fill('SYNTHETIC TEST ONLY');
   await page.getByRole('button', { name: 'Lưu chế độ thanh toán', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Chuyển khoản chờ xác nhận', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Yêu cầu chuyển khoản', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Client ID', { exact: true })).toHaveCount(0);
   expect(saves).toBe(1);
 });
@@ -57,6 +57,7 @@ test('tenant can pay one invoice or all pages with manual VietQR without confirm
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/auth/me') return route.fulfill({ status: 401, json: { message: 'Guest' } });
     if (path.endsWith('/manual-payments')) { selections.push(route.request().postDataJSON()); return route.fulfill({ json: manual }); }
+    if (path.endsWith('/manual-payments/fixture-request')) return route.fulfill({ json: { ...manual, canConfirm: true, status: 'Ready' } });
     if (path.endsWith('/payment')) { payosCalls++; return route.fulfill({ status: 409, json: { message: 'No payOS in manual mode' } }); }
     return route.fulfill({ json: overview() });
   });
@@ -113,7 +114,7 @@ for (const width of [375, 1440]) {
       return route.fulfill({ json: [] });
     });
     await page.goto('/invoices');
-    await expect(page.getByRole('heading', { name: 'Chuyển khoản chờ xác nhận', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Yêu cầu chuyển khoản', exact: true })).toBeVisible();
     await page.screenshot({ path: `/tmp/roomie-ui-review/payments/pending-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Xác nhận đã nhận tiền', exact: true }).click();
     const dialog = page.getByRole('dialog');
@@ -124,7 +125,7 @@ for (const width of [375, 1440]) {
     await expect(submit).toBeEnabled();
     await submit.click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole('heading', { name: 'Chuyển khoản chờ xác nhận', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Yêu cầu chuyển khoản', exact: true })).toHaveCount(0);
     await expect(page.locator('.manual-payment-request')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Xác nhận đã nhận tiền', exact: true })).toHaveCount(0);
     expect(confirmations).toBe(1);
@@ -133,3 +134,62 @@ for (const width of [375, 1440]) {
     await page.screenshot({ path: `/tmp/roomie-ui-review/payments/invoices-${width}.png`, fullPage: true });
   });
 }
+
+
+test('stale transfer conflict refreshes balances, explains the invoice error and can be dismissed without another receipt', async ({ page }) => {
+  await isolated(page);
+  let stale = false, dismissed = false, confirmations = 0, dismissals = 0;
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/me') return route.fulfill({ json: owner });
+    if (path === '/api/manual-payments') return route.fulfill({ json: { items: dismissed ? [] : [{ ...manual,
+      canConfirm: !stale, canDismiss: stale, status: stale ? 'AlreadyPaid' : 'Ready',
+      statusMessage: stale ? 'Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.' : null
+    }], total: dismissed ? 0 : 1 } });
+    if (path.endsWith('/confirm')) {
+      confirmations++; stale = true;
+      return route.fulfill({ status: 409, json: { message: 'Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.' } });
+    }
+    if (path.endsWith('/dismiss')) { dismissals++; dismissed = true; return route.fulfill({ json: { ...manual, status: 'Dismissed' } }); }
+    if (path === '/api/invoices') return route.fulfill({ json: { items: [], total: 0, totals: { billed: 300000, paid: stale ? 300000 : 0, outstanding: stale ? 0 : 300000 } } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto('/invoices');
+  await page.getByRole('button', { name: 'Xác nhận đã nhận tiền', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true }).click();
+  await expect(dialog).toContainText('Các hóa đơn của yêu cầu này đã được thu đủ');
+  await expect(dialog.getByRole('button', { name: 'Ghi nhận khoản thu', exact: true })).toBeDisabled();
+  await expect(page.getByText('Lượt thuê đã thay đổi', { exact: false })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Bỏ khỏi danh sách', exact: true }).click();
+  await page.getByRole('tooltip').getByRole('button', { name: 'Bỏ khỏi danh sách', exact: true }).click();
+  await expect(page.locator('.manual-payment-request')).toHaveCount(0);
+  expect(confirmations).toBe(1); expect(dismissals).toBe(1);
+});
+
+
+test('tenant checks QR status with GET and hides an obsolete QR before offering a new one', async ({ page }) => {
+  await isolated(page);
+  let stale = false, creates = 0, statusReads = 0;
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/me') return route.fulfill({ status: 401, json: { message: 'Guest' } });
+    if (path.endsWith('/manual-payments')) { creates++; stale = false; return route.fulfill({ json: { ...manual, id: `request-${creates}` } }); }
+    if (path.includes('/manual-payments/request-')) {
+      statusReads++;
+      return route.fulfill({ json: { ...manual, status: stale ? 'InvoiceChanged' : 'Ready', canConfirm: !stale,
+        statusMessage: stale ? 'Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.' : null } });
+    }
+    return route.fulfill({ json: overview() });
+  });
+  await page.goto('/t/fixture-token/invoices/i1/checkout');
+  await expect(page.getByRole('img', { name: 'Mã VietQR chuyển khoản', exact: true })).toBeVisible();
+  stale = true;
+  await expect(page.getByRole('img', { name: 'Mã VietQR chuyển khoản', exact: true })).toHaveCount(0, { timeout: 10000 });
+  await expect(page.getByText('Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.', { exact: true })).toBeVisible();
+  expect(creates).toBe(1); expect(statusReads).toBeGreaterThan(1);
+  await page.getByRole('button', { name: 'Cập nhật mã QR', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Mã VietQR chuyển khoản', exact: true })).toBeVisible();
+  expect(creates).toBe(2);
+});

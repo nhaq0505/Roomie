@@ -1352,3 +1352,15 @@
 1351|Registrations with unknown source|来源未知的注册数|출처 불명 등록 건수|अज्ञात स्रोत पंजीकरण
 1352|Imputed labor cost (VND)|折算人工成本 (VND)|환산 인건비 (VND)|अनुमानित श्रम लागत (VND)
 1353|Effective data range: {0} to {1}|实际数据范围：{0} 至 {1}|실제 데이터 범위: {0} ~ {1}|वास्तविक डेटा सीमा: {0} से {1}
+1354|Transfer requests|转账请求|이체 요청|ट्रांसफर अनुरोध
+1355|Generated QR codes are not proof of payment. Check the receiving account and funds received before confirming.|已生成的二维码并非付款凭证。确认前请核对收款账户和实际到账金额。|생성된 QR 코드는 입금 증빙이 아닙니다. 확인 전에 수취 계좌와 실제 입금액을 확인하세요.|बनाए गए QR कोड भुगतान का प्रमाण नहीं हैं। पुष्टि से पहले प्राप्तकर्ता खाते और प्राप्त राशि की जाँच करें।
+1356|Request removed from the list. No additional receipt was recorded.|请求已从列表移除，未新增收款记录。|목록에서 요청을 제거했습니다. 추가 수납은 기록되지 않았습니다.|अनुरोध सूची से हटा दिया गया। कोई अतिरिक्त प्राप्ति दर्ज नहीं की गई।
+1357|Remove this request from the list?|从列表中移除此请求？|목록에서 이 요청을 제거할까요?|इस अनुरोध को सूची से हटाएँ?
+1358|Remove only after reconciliation; no additional receipt will be recorded.|仅在核对后移除，不会新增收款记录。|대조한 요청만 제거하세요. 추가 수납은 기록되지 않습니다.|मिलान के बाद ही हटाएँ; कोई अतिरिक्त प्राप्ति दर्ज नहीं होगी।
+1359|Remove from list|从列表移除|목록에서 제거|सूची से हटाएँ
+1360|This request was removed from the list. No additional receipt was recorded.|此请求已从列表移除，未新增收款记录。|이 요청은 목록에서 제거되었습니다. 추가 수납은 기록되지 않았습니다.|यह अनुरोध सूची से हटा दिया गया था। कोई अतिरिक्त प्राप्ति दर्ज नहीं की गई।
+1361|The invoices for this request are unavailable. Reconcile before removing it from the list.|此请求的账单已不可用。请核对后再从列表移除。|이 요청의 청구서를 사용할 수 없습니다. 대조 후 목록에서 제거하세요.|इस अनुरोध के बिल उपलब्ध नहीं हैं। सूची से हटाने से पहले मिलान करें।
+1362|These invoices are already fully paid. Do not record another receipt.|此请求的账单已全部收款。请勿重复记录收款。|이 요청의 청구서는 모두 납부되었습니다. 수납을 다시 기록하지 마세요.|इन बिलों का पूरा भुगतान पहले ही हो चुका है। दोबारा प्राप्ति दर्ज न करें।
+1363|The invoices changed. Check the funds actually received before recording a receipt.|账单已变更。记录收款前请核对实际到账金额。|청구서가 변경되었습니다. 수납을 기록하기 전에 실제 입금액을 확인하세요.|बिल बदल गए हैं। प्राप्ति दर्ज करने से पहले वास्तव में प्राप्त राशि की जाँच करें।
+1364|Reconcile the pending payOS payment before recording a receipt.|记录收款前请先核对待处理的 payOS 交易。|수납을 기록하기 전에 대기 중인 payOS 결제를 대조하세요.|प्राप्ति दर्ज करने से पहले लंबित payOS भुगतान का मिलान करें।
+1365|This request is still valid. Check the invoices before removing it from the list.|此请求仍有效。请检查账单后再从列表移除。|이 요청은 아직 유효합니다. 목록에서 제거하기 전에 청구서를 확인하세요.|यह अनुरोध अभी मान्य है। सूची से हटाने से पहले बिल जाँचें।

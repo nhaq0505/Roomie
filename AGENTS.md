@@ -114,7 +114,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
 - Manual receipt bằng toàn bộ dư nợ. Với pending payOS đơn: phải xác minh hủy an toàn; nếu provider đã Paid thì reconcile và không ghi tiền tay thêm. Pending batch chặn ghi riêng/sửa/cọc/trả phòng liên quan.
 - Manual VietQR chỉ tạo yêu cầu; chỉ owner xác nhận tiền thực nhận. Confirm kiểm toàn bộ allocation/balance và commit nguyên tử; stale request không được ghi một phần. Confirm replay không sinh receipts mới.
-- Pending manual panel chỉ liệt kê `ConfirmedAt == null`; xác nhận xong bỏ khỏi panel nhưng giữ request/receipts trong DB. Hạn 24 giờ là tái sử dụng QR/request, không phải bảo đảm ngân hàng ngừng nhận tiền.
+- Panel yêu cầu VietQR chỉ liệt kê `ConfirmedAt == null && DismissedAt == null`; đánh giá lại dư nợ, occupancy, Issued lifecycle và reservation của toàn bộ allocation trên mỗi lần đọc/xác nhận. Yêu cầu cũ đã thu đủ/thay đổi/không còn khả dụng chỉ cho đối chiếu rồi bỏ khỏi danh sách qua `POST /api/manual-payments/{id}/dismiss`, không ghi receipt hay đánh dấu confirmed. Hạn 24 giờ là tái sử dụng QR/request, không phải hạn xác nhận tiền thực nhận hoặc bảo đảm ngân hàng ngừng nhận tiền.
 - Ảnh VietQR ở `img.vietqr.io` là dịch vụ ảnh bên ngoài, không dùng để xác minh tiền; không gửi tenant token trong URL ảnh, giữ `referrerPolicy=no-referrer` và CSP allowlist cụ thể.
 - Cọc và phần giữ/hoàn/khấu trừ là ledger riêng; Refund chỉ ghi nhận giao dịch bên ngoài, không tự chuyển tiền. Không tính cọc/credit cọc thành doanh thu thuê trọ.
 - Trả phòng yêu cầu xử lý nợ Issued, Draft và pending payment; lưu completion chống replay, thu hồi token, ngày kết thúc Việt Nam, nâng meter baseline. Không tự tạo hóa đơn cuối hoặc chuyển khoản hoàn cọc.
@@ -265,3 +265,11 @@ Không kiểm tra trạng thái live, không chạy migration vào DB vận hàn
 - Chưa kiểm thử PostgreSQL runtime trong đợt này; không chạy migration DB vận hành, không gửi SMTP thật, chưa commit/push/deploy. Các thay đổi dọn tài liệu trước đó vẫn giữ trong working tree.
 
 Đường triển khai recipient không cần SSH quản trị: repository variable `MONITORING_ALERT_TO` → CI main Docker build argument → image env cùng tên. Chỉ recipient được đóng gói, SMTP credentials vẫn chỉ ở runtime. Notifier ưu tiên recipient runtime không rỗng, rồi fallback env image. Đổi variable cần build/deploy lại; giữ tên/email cụ thể ngoài Git.
+
+## 12. Sửa luồng VietQR thủ công — 21/10/2026
+
+- Yêu cầu QR không phải bằng chứng chuyển tiền. `ManualPaymentAssessment` đánh giá snapshot theo dữ liệu hiện tại, chặn thu trùng/ghi một phần khi hóa đơn trong batch thay đổi. Dismiss lưu thời điểm/lý do, giữ lịch sử và không sửa tiền; chỉ owner của request có quyền thực hiện, chỉ cho yêu cầu stale. Hai concurrency tokens `ConfirmedAt`/`DismissedAt` cùng serializable transaction bảo vệ xác nhận/bỏ yêu cầu.
+- `GET /api/tenant/{token}/manual-payments/{id}` scope theo token lượt thuê đang hiệu lực; khách poll trạng thái bằng GET, ẩn QR stale/lỗi, chỉ tạo QR mới khi mở/chủ động cập nhật. Overview manual cũng poll khi còn nợ, dừng khi thanh toán xong.
+- Chủ trọ thấy trạng thái đã thu đủ/hóa đơn thay đổi thay vì nút xác nhận sai; refresh list và dữ liệu hóa đơn sau mutation lẫn conflict. Ghi thu/correction/reconcile/cọc/trả phòng invalidate panel. Error i18n chỉ nhận đúng lỗi lượt thuê, không đổi mọi thông báo “đã thay đổi” thành lỗi lượt thuê.
+- Schema thêm hai cột nullable `DismissedAt`/`DismissalReason`, migrations cả SQLite/PostgreSQL. Production tenant-payment limiter vẫn 12/phút; Development 120/phút cho HTTP fixture dùng chung loopback.
+- Kiểm chứng local: build frontend, i18n 1366 keys × 4, architecture, API/HTTP client đạt; C# suite 864 PASS; Playwright toàn bộ 69/69; HTTP SQLite 87/87 không skip; PostgreSQL 62 đạt/8 skip vì các fixture sửa DB chỉ hỗ trợ SQLite. Cả hai migration snapshots khớp model. Không xác nhận/bỏ yêu cầu thật hoặc ghi tiền trên production để thử nghiệm.

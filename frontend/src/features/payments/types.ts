@@ -34,6 +34,8 @@ export interface ManualPayment {
   roomName?: string | null; tenantName?: string | null;
   id: string; occupancyId: string; amount: number; bankBin: string; accountNumber: string; accountName: string;
   description: string; qrUrl: string; createdAt: string; expiresAt: string; confirmedAt: string | null;
+  status?: 'Ready' | 'AlreadyPaid' | 'InvoiceChanged' | 'Unavailable' | 'PaymentPending' | 'Confirmed' | 'Dismissed';
+  canConfirm?: boolean; canDismiss?: boolean; currentOutstanding?: number; statusMessage?: string | null; dismissedAt?: string | null;
   invoices: { invoiceId: string; amount: number }[];
 }
 export interface PaymentBank { bin: string; name: string; shortName: string; }

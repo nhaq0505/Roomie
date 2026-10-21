@@ -119,7 +119,7 @@ builder.Services.AddRateLimiter(options =>
     }));
     options.AddPolicy("tenant-payment", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
     {
-        PermitLimit = 12,
+        PermitLimit = builder.Environment.IsDevelopment() ? 120 : 12,
         Window = TimeSpan.FromMinutes(1),
         QueueLimit = 0,
         AutoReplenishment = true

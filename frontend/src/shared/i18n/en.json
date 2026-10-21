@@ -1352,5 +1352,17 @@
   "Bỏ qua mã OTP": "OTP bypassed",
   "Lượt đăng ký chưa rõ nguồn": "Registrations with unknown source",
   "Chi phí nhân công quy đổi (VND)": "Imputed labor cost (VND)",
-  "Dữ liệu thực tế: {0} đến {1}": "Effective data range: {0} to {1}"
+  "Dữ liệu thực tế: {0} đến {1}": "Effective data range: {0} to {1}",
+  "Yêu cầu chuyển khoản": "Transfer requests",
+  "Danh sách mã QR đã tạo, không phải bằng chứng chuyển tiền. Đối chiếu tài khoản và số tiền thực nhận trước khi xác nhận.": "Generated QR codes are not proof of payment. Check the receiving account and funds received before confirming.",
+  "Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu.": "Request removed from the list. No additional receipt was recorded.",
+  "Bỏ yêu cầu này khỏi danh sách?": "Remove this request from the list?",
+  "Chỉ bỏ yêu cầu đã đối chiếu; không ghi thêm khoản thu.": "Remove only after reconciliation; no additional receipt will be recorded.",
+  "Bỏ khỏi danh sách": "Remove from list",
+  "Yêu cầu này đã được bỏ khỏi danh sách. Không ghi thêm khoản thu.": "This request was removed from the list. No additional receipt was recorded.",
+  "Hóa đơn của yêu cầu này không còn khả dụng. Vui lòng đối chiếu trước khi bỏ khỏi danh sách.": "The invoices for this request are unavailable. Reconcile before removing it from the list.",
+  "Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.": "These invoices are already fully paid. Do not record another receipt.",
+  "Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.": "The invoices changed. Check the funds actually received before recording a receipt.",
+  "Vui lòng đối soát giao dịch payOS đang chờ trước khi ghi thu.": "Reconcile the pending payOS payment before recording a receipt.",
+  "Yêu cầu vẫn còn hiệu lực. Vui lòng kiểm tra hóa đơn trước khi bỏ khỏi danh sách.": "This request is still valid. Check the invoices before removing it from the list."
 }

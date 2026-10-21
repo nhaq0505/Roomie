@@ -24,7 +24,7 @@ export default function DepositLedger({ invoice }: { invoice: Invoice }) {
     },
     onSuccess: async () => {
       form.resetFields(); keys.current.clear();
-      await Promise.all(['invoice', 'invoices', 'rooms', 'dashboard', 'moveout'].map(key => client.invalidateQueries({ queryKey: [key] })));
+      await Promise.all(['invoice', 'invoices', 'rooms', 'dashboard', 'moveout', 'manual-payments', 'reports'].map(key => client.invalidateQueries({ queryKey: [key] })));
       message.success(t("Đã ghi nhận quyết toán cọc."));
     },
     onError: (error: Error) => message.error(error.message),

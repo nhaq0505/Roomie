@@ -1352,5 +1352,17 @@
   "Bỏ qua mã OTP": "인증번호 건너뜀",
   "Lượt đăng ký chưa rõ nguồn": "출처 불명 등록 건수",
   "Chi phí nhân công quy đổi (VND)": "환산 인건비 (VND)",
-  "Dữ liệu thực tế: {0} đến {1}": "실제 데이터 범위: {0} ~ {1}"
+  "Dữ liệu thực tế: {0} đến {1}": "실제 데이터 범위: {0} ~ {1}",
+  "Yêu cầu chuyển khoản": "이체 요청",
+  "Danh sách mã QR đã tạo, không phải bằng chứng chuyển tiền. Đối chiếu tài khoản và số tiền thực nhận trước khi xác nhận.": "생성된 QR 코드는 입금 증빙이 아닙니다. 확인 전에 수취 계좌와 실제 입금액을 확인하세요.",
+  "Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu.": "목록에서 요청을 제거했습니다. 추가 수납은 기록되지 않았습니다.",
+  "Bỏ yêu cầu này khỏi danh sách?": "목록에서 이 요청을 제거할까요?",
+  "Chỉ bỏ yêu cầu đã đối chiếu; không ghi thêm khoản thu.": "대조한 요청만 제거하세요. 추가 수납은 기록되지 않습니다.",
+  "Bỏ khỏi danh sách": "목록에서 제거",
+  "Yêu cầu này đã được bỏ khỏi danh sách. Không ghi thêm khoản thu.": "이 요청은 목록에서 제거되었습니다. 추가 수납은 기록되지 않았습니다.",
+  "Hóa đơn của yêu cầu này không còn khả dụng. Vui lòng đối chiếu trước khi bỏ khỏi danh sách.": "이 요청의 청구서를 사용할 수 없습니다. 대조 후 목록에서 제거하세요.",
+  "Các hóa đơn của yêu cầu này đã được thu đủ. Không ghi thêm khoản thu.": "이 요청의 청구서는 모두 납부되었습니다. 수납을 다시 기록하지 마세요.",
+  "Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.": "청구서가 변경되었습니다. 수납을 기록하기 전에 실제 입금액을 확인하세요.",
+  "Vui lòng đối soát giao dịch payOS đang chờ trước khi ghi thu.": "수납을 기록하기 전에 대기 중인 payOS 결제를 대조하세요.",
+  "Yêu cầu vẫn còn hiệu lực. Vui lòng kiểm tra hóa đơn trước khi bỏ khỏi danh sách.": "이 요청은 아직 유효합니다. 목록에서 제거하기 전에 청구서를 확인하세요."
 }

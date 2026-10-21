@@ -49,7 +49,11 @@ export function useTenantCheckout(token: string, invoiceId: string) {
     enabled: !!token,
     retry: false,
     refetchOnMount: 'always',
-    refetchInterval: checkout && tabVisible && checkout.status === 'pending' && !overviewPollingPaused ? overviewDelayMs : false,
+    refetchInterval: (current) => {
+      const overview = current.state.data;
+      const manualPending = overview?.confirmationMode === 'Manual' && (invoiceId === 'all' ? overview.totals.outstanding > 0 : overview.invoices.some(item => item.id === invoiceId && item.outstanding > 0));
+      return tabVisible && !overviewPollingPaused && (manualPending || checkout?.status === 'pending') ? overviewDelayMs : false;
+    },
     refetchIntervalInBackground: false,
   });
   const first = query.data?.invoices[0];
@@ -93,11 +97,11 @@ export function useTenantCheckout(token: string, invoiceId: string) {
       setTenantAccessError({ status, message: query.error.message });
       return;
     }
-    if (!checkout) return;
+    if (!checkout && query.data?.confirmationMode !== 'Manual') return;
     overviewFailures.current += 1;
     setOverviewDelayMs(status === 429 ? 60_000 : Math.min(60_000, 5000 * (2 ** Math.min(overviewFailures.current, 4))));
     if (overviewFailures.current >= 4) setOverviewPollingPaused(true);
-  }, [query.error, query.errorUpdatedAt, query.isError, checkout?.generation]);
+  }, [query.error, query.errorUpdatedAt, query.isError, checkout?.generation, query.data?.confirmationMode]);
   useEffect(() => {
     if (!query.isSuccess) return;
     overviewFailures.current = 0;
