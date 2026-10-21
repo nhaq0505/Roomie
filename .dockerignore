@@ -54,3 +54,6 @@ playwright-report
 # Zalo encrypted session and delivery state.
 **/*.enc
 **/*.enc.tmp
+
+# Local deliverables, recovery archives and generated previews.
+output/

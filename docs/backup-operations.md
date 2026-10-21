@@ -10,4 +10,10 @@ Khôi phục: tải xuống/giải mã vào thư mục riêng có quyền hạn 
 
 Production dùng role DML `roomie_app`, migration owner `room_rental`, DBA `roomie_dba` tách riêng. SSH quản trị dùng tài khoản sudo/key, không dùng root/password. Khóa giải mã phải lưu trong password manager/offline riêng, cùng cả password và salt; không lưu cạnh snapshot Drive.
 
-Đã có bằng chứng upload/download/giải mã/restore thử trên database tạm và refresh OAuth thực tế; lịch sử nội bộ chứa định danh tài khoản/folder và vị trí recovery được giữ riêng. Không coi backup là HA, PITR hoặc lưu trữ bất biến. Chi tiết thay đổi: [nhật ký xử lý tech debt](tech-debt-remediation-2026-10-16.md).
+Đã có bằng chứng upload/download/giải mã/restore thử trên database tạm và refresh OAuth thực tế; lịch sử nội bộ chứa định danh tài khoản/folder và vị trí recovery được giữ riêng. Không coi backup là HA, PITR hoặc lưu trữ bất biến. Mã nguồn triển khai: `deploy/rehouse-backup.sh`, `rehouse-drive-sync.py`, `rehouse-backup-alert.py`, `rehouse-restore.sh`; xem [runbook triển khai](deployment.md).
+
+## Kiểm tra vận hành
+
+Xem `rehouse-backup.timer`, `rehouse-backup-watchdog.timer`, service status/journal và marker `/var/lib/rehouse/backup-last-success`; không coi unit đã cài là backup đã thành công. Restore drill trên database tạm trước khi chọn recovery point. Helper restore `sudo /usr/local/sbin/rehouse-restore /var/backups/rehouse/<snapshot> --replace-current-data` thay dữ liệu hiện tại; chỉ dùng cho recovery đã được xác định và cho phép. Không tự chạy trong QA hay dọn repository.
+
+Backup DB/DataProtection không tự chứng minh đã bảo vệ session Zalo. Khi có gateway, kiểm riêng session volume, key mã hóa và ledger theo [hướng dẫn Zalo](zalo-setup.md); đối chiếu các tin đã gửi sau recovery point trước khi cho gửi lại. Không lưu khóa giải mã cạnh snapshot.

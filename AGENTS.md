@@ -1,0 +1,265 @@
+# Roomie — hướng dẫn tiếp quản
+
+Đọc file này trước khi sửa dự án. Đây là tài liệu bàn giao kỹ thuật chính; README chỉ hướng dẫn vào dự án, runbook trong `docs/` chỉ dành cho thao tác vận hành. Khi code đổi, sửa mục tương ứng ở đây thay vì tạo thêm báo cáo bàn giao theo ngày.
+
+Baseline rà soát: `7be139d`, ngày 21/10/2026. Mô tả dưới đây dựa trên repository, không phải kết luận về phiên bản hay dữ liệu đang chạy trên VPS. Kiểm tra `git status`, `git log` và CI trước khi tiếp tục; không ghi đè thay đổi đang có của người dùng.
+
+## 1. Sản phẩm và các quyết định đang áp dụng
+
+Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ và dashboard growth/revenue/operations. Camera/OCR/AI chưa triển khai.
+
+- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free. Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
+- Free tối đa 5 phòng đang sử dụng; Pro có thời hạn hoặc vô thời hạn. Kiểm tra `AppUser.IsPro/MaxRooms` và endpoint subscription trước khi sửa quota.
+- Đăng nhập chỉ dùng mật khẩu. Các cột MFA cũ vẫn tồn tại để tương thích schema, không phải tính năng cần bật lại.
+- Mật khẩu mới 9–256 ký tự, không toàn khoảng trắng, không ép ký tự đặc biệt.
+- Tiền thuê tính **đủ tháng**, không chia theo ngày vào/ra. Ngày và kỳ nghiệp vụ theo Việt Nam (UTC+7).
+- Khoản thu thủ công mới phải bằng **toàn bộ dư nợ**; dữ liệu thanh toán một phần cũ vẫn hợp lệ. Không phục hồi UI nhập khoản thu một phần từ test/doc lịch sử.
+- Tin Zalo dẫn về **`/t/{token}`**, để khách xem hóa đơn rồi tự chọn thanh toán. Không gửi thẳng checkout, số tài khoản hay ảnh QR trong tin.
+- `frontend/public/robots.txt` cố ý chặn mọi bot (`User-agent: *`, `Disallow: /`) theo yêu cầu người dùng. Không tự mở crawl, gửi sitemap hay yêu cầu index.
+- Backlog SEO chưa xuất bản: bốn bài quản lý phòng, tính điện, quản lý công nợ và thu tiền qua QR trong kế hoạch 8 tuần cũ. Chỉ triển khai khi có yêu cầu tiếp tục, nghiên cứu nguồn trước khi viết; route `/huong-dan/` chưa phải tính năng đã có. Đo bằng Search Console, không tự thêm GA4 hay hứa traffic/thứ hạng.
+- Logo đang dùng trong app: `frontend/src/shared/ui/RoomieMark.tsx`, `frontend/public/roomie-logo.svg`, `favicon.svg`; ảnh social `roomie-social.png/.svg`; email `backend/RoomRental.Api/Assets/roomie-email-logo.png`. Bản logo/cover Facebook mới nằm trong `output/facebook/`, chưa tự thay vào app.
+
+## 2. Bản đồ repository
+
+| Đường dẫn | Vai trò / điểm bắt đầu |
+| --- | --- |
+| `backend/RoomRental.Api/Program.cs` | DI, provider DB, workers, cookie, limiter, middleware, đăng ký routes, SPA fallback |
+| `backend/RoomRental.Api/Domain/` | Entities và DTO; monitoring, Zalo, manual payments, recovery có file riêng |
+| `backend/RoomRental.Api/Data/AppDbContext.cs` | Toàn bộ mapping, indexes, concurrency tokens, DbSets |
+| `backend/RoomRental.Api/Data/ProviderDbContexts.cs` | Hai context/factory SQLite và PostgreSQL |
+| `backend/RoomRental.Api/Data/Migrations/{Sqlite,Postgres}/` | Migration, designer và snapshot riêng cho mỗi provider |
+| `backend/RoomRental.Api/Features/` | Endpoint/service chia theo Auth, Admin, Properties, Billing, Payments, Reports, Zalo, Monitoring |
+| `backend/RoomRental.Api/Shared/` | Security, SEO, calendar, lookup owner/property, pagination, fingerprint, cleanup |
+| `backend/RoomRental.DbMigrator/` | Công cụ **import dữ liệu SQLite cũ sang PostgreSQL**, không phải runner EF migrations |
+| `frontend/src/app/` | Entry React, routing, layout, CSS assembly, metadata và prerender entry |
+| `frontend/src/features/` | API, types, page, hook và CSS theo nghiệp vụ |
+| `frontend/src/shared/` | HTTP, i18n, analytics, format, theme, UI dùng chung |
+| `frontend/scripts/` | Build/check i18n, architecture, prerender và các test Node |
+| `frontend/e2e/` | Playwright với API giả lập; không phụ thuộc API vận hành |
+| `zalo-gateway/` | Node 24 + zca-js, đăng nhập Zalo QR, lưu phiên và ledger mã hóa |
+| `tests/` | Console C# suites, HTTP Python harness, SMTP sink, tests backup/host collector |
+| `.github/workflows/ci-cd.yml` | Các cổng CI, image đã kiểm thử, GHCR và deploy theo digest |
+| `deploy/` | Production Compose, migration overlay, backup/restore, role DB, Caddy, firewall, host collector |
+| `scripts/` | Tiện ích webhook tunnel và import SQLite→PostgreSQL cũ |
+| `rehouse-video/` | Dự án Remotion độc lập, mock quảng cáo dùng tên ReHouse cũ; không nằm trong runtime/build app |
+| `.agents/skills/ui-ux/` | Skill thiết kế của dự án; không phải output build |
+| `output/`, `artifacts/`, `out/` | Deliverables, bằng chứng QA hoặc bản sao công việc; không tự coi mọi file trong đây là rác |
+
+Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/rehouse`, path host `/opt/rehouse` vẫn giữ tên cũ. Đổi tên thương hiệu không có nghĩa được đổi những định danh này đồng loạt.
+
+## 3. Đọc code theo việc cần làm
+
+| Việc | Backend | Frontend / test chính |
+| --- | --- | --- |
+| Đăng ký, login, đổi/reset mật khẩu | `Features/Auth/`, `Shared/RequestSecurityMiddleware.cs` | `features/auth/`, `AuthSecurityHttpTests`, `RegistrationVerificationTests`, `PasswordRecoveryTests` |
+| Dãy, phòng, lượt thuê, cấp link | `Features/Properties/OwnerManagementEndpoints.*`, `TenantTokenService.cs` | `features/buildings`, `features/rooms`, `RoomTenantLifecycleHttpTests`, `TenantLinkHttpTests` |
+| Chốt điện, tạo/phát hành/sửa hóa đơn | `Features/Billing/BillingEndpoints.*`, `InvoiceService.cs` | `features/readings`, `features/invoices`, `AccountingBillingHttpTests` |
+| Ghi thu, cọc, trả phòng | `ManualReceiptService.cs`, `DepositEndpoints.cs`, `Properties/MoveoutEndpoints.cs` | `DepositLedger.tsx`, `MoveoutDrawer.tsx`, `ManualReceiptTests` |
+| payOS, checkout gộp, webhook | `Features/Payments/PayOsService.*`, `PaymentEndpoints.cs`, `PaymentReservations.cs` | `features/tenant`, `PayOsPaymentTests`, `BatchPaymentTests`, `PayOsOperationsHttpTests` |
+| VietQR, xác nhận chuyển khoản | `ManualPaymentEndpoints.cs`, `PaymentPreferencesEndpoints.cs`, `Domain/ManualPayments.cs` | `ManualPaymentRequests.tsx`, `PaymentModeSettings.tsx`, `ManualPaymentPanel.tsx`, `test_payment_modes.py` |
+| Nâng cấp Pro | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs` | `features/subscription`, `test_billing_upgrade.py` |
+| Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
+| Nhắc Zalo | `Features/Zalo/`, `Domain/Zalo.cs` | `features/zalo`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test` |
+| Theo dõi growth/revenue | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests` |
+| Host/API/worker monitoring | `Features/Monitoring/Operations/`, `deploy/monitoring/` | `OperationsTab.tsx`, `OperationsMonitoringTests`, `test_host_collector.py` |
+| Landing/SEO | `Shared/SeoMiddleware.cs` | `features/marketing`, `app/seo`, `scripts/prerender.mjs`, `test_seo_http.py` |
+
+API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoint trên; DTO ở `Domain/ApiDtos.cs`, `MonitoringDtos.cs`, `ReportDtos.cs`, `ManualPayments.cs`, `PasswordRecovery.cs`. Đối chiếu handler và DTO trước khi sửa consumer; không duy trì một bản liệt kê API thủ công tách rời code.
+
+## 4. Kiến trúc và quy ước sửa code
+
+### Frontend
+
+- React 19, TypeScript 5.8, Vite 6, React Router 7, TanStack Query 5, Ant Design 5; CSS thuần. Không tự đưa Tailwind/bộ UI khác vào chỉ để sửa một màn.
+- `app → features → shared`. Shared không import app/features. Feature không import app hoặc `src/api.ts`; giữa các feature dùng public `index.ts`, ngoại lệ phiên auth là `auth/session.ts`. `check:architecture` kiểm imports và vòng phụ thuộc runtime.
+- `frontend/src/api.ts` là facade tương thích cho consumer/test cũ, không phải nơi thêm logic nghiệp vụ. Không xóa vì thấy app không import trực tiếp.
+- Trang phức tạp dùng hook `use*Page` và component nhận dữ liệu/handler; giữ vòng đời idempotency key, query key và invalidation khi refactor.
+- HTTP qua `shared/http/client.ts`: same-origin cookie, Accept-Language, timeout, unwrap envelope, `ApiError`; mutation không retry tự động. Excel dùng `requestBlob`.
+- `app/styles.css` ghép CSS theo thứ tự có chủ đích. Giữ cascade khi di chuyển rule. Nền/brand nằm ở `shared/styles/foundation.css`, Ant token ở `shared/design/antdTheme.ts`; font hiện có DM Sans/Manrope.
+- Tiếng Việt là nguồn; `shared/i18n/source.json` và `translations.tsv` cùng các catalog en/zh/ko/hi. Dùng `t()`; sau đổi copy chạy `i18n:build`, `i18n:check`; đọc script trước khi sửa trực tiếp catalog sinh ra.
+- Routes private phải đồng bộ `app/App.tsx`, `app/seo/site.ts`, `Shared/SeoMiddleware.cs`. Router React không đủ để hard-refresh chạy trên server.
+- Prerender sinh `dist/index.html` cho trang chủ, `app.html` cho SPA và sitemap. Không xuất renderer build-only vào production. Trang lạ/API lạ phải trả 404 thật.
+- Landing motion dùng IntersectionObserver/Web Animations; giữ nội dung nhìn được khi thiếu JS, Reduce Motion hoặc thiếu API; focus bàn phím phải hủy reveal đang che link.
+- Dashboard monitoring có Growth/Revenue/Operations, filter ngày Việt Nam, campaign costs và UTM link builder. `null`/Unknown phải hiển thị chưa có dữ liệu cùng lý do, không biến thành 0 hoặc 100%.
+
+### Backend
+
+- ASP.NET Core .NET 10 Minimal APIs, EF Core 10 + SQLite/Npgsql, ClosedXML cho Excel, MailKit cho SMTP. Chỉ một API project; namespaces cũ `RoomRental.Api.Endpoints`/`Services` vẫn được dùng trong nhiều thư mục Features.
+- Middleware: trusted forwarded headers → latency → exception/security headers → SEO/static → routing/limiter → authentication → request security → authorization. Thứ tự ảnh hưởng đo lỗi, HTTPS, cookie và same-origin.
+- Mỗi query nghiệp vụ phải scope owner và occupancy đúng; `PropertyLookup` giữ kiểm tra owner/archive, `PaymentReservations.Pending` nhận diện cả thành viên batch và attempt đơn cũ.
+- Ngày/kỳ dùng `VietnamCalendar`/`ApiSupport.VietnamDate`, không dùng ngày UTC của máy để chốt tháng Việt Nam. Fingerprint qua `RequestFingerprint`; đổi serializer/chuẩn hóa có thể phá replay đã lưu.
+- Model change: tạo migration **cả hai provider**, commit Up/Down/designer/snapshot. Không chỉnh migration đã phát hành hoặc xóa lịch sử migration để “dọn code”.
+- Startup Development có thể migrate; Production chỉ kiểm tra pending migrations. Runner schema hiện tại là **API image với `Database__MigrateOnly=true`**, dùng `deploy/migrate.yaml` và role riêng trước khi thay app.
+
+## 5. Những bất biến không được làm mất
+
+### Auth và dữ liệu riêng tư
+
+- Cookie HttpOnly/SameSite=Lax, 12 giờ, không sliding; Production Secure. Session `sid` phải còn hiệu lực trong DB ở mỗi request. Rejected/Suspended bị chặn; Owner Pending chỉ đi auth/account flow.
+- Request ghi của phiên đã đăng nhập phải qua same-origin guard; webhook payOS có ngoại lệ riêng và xác minh chữ ký. Không bỏ guard để chữa test thiếu Origin.
+- Đổi mật khẩu giữ phiên hiện tại và thu hồi thiết bị khác; reset hoàn tất thu hồi tất cả. OTP không phải MFA login.
+- Đăng ký OTP: code 6 số/10 phút, challenge 30 phút, tối đa 5 lần sai, resend 60 giây, 5 email/giờ. Xác minh tạo user và consume bằng chứng nguyên tử. Đừng tạo user login được trước xác minh.
+- Recovery: forgot → verify OTP → grant reset dùng một lần/10 phút → complete; phản hồi email tồn tại/không tồn tại cùng dạng. Worker nhận mail trước SMTP; lỗi/dừng lúc gửi không tự retry, người dùng xin mã mới. SMTP accepted không chứng minh đã vào inbox.
+- DataProtection keys giải mã tenant tokens, payOS credentials và recovery code đang chờ. Mất keys có thể làm mất khả năng dùng dữ liệu dù DB vẫn còn; backup DB và key ring cùng recovery point.
+- Tenant token là bearer secret theo **lượt thuê**, hash để lookup, bản mã để chủ trọ chia sẻ lại. Rotate/thu hồi/trả phòng vô hiệu token cũ; không đổi sang token theo RoomId.
+- Cấp/hiện link mới yêu cầu Automatic có webhook Verified hoặc Manual có bank details hợp lệ; xem `TenantTokenService.CanShareAsync`. Bypass chỉ dùng fixture Development, không Production.
+- payOS cấu hình riêng từng owner: Client ID/API Key/Checksum Key lưu mã hóa, không trả secret về UI. Lưu và xác minh gọi `confirm-webhook` với origin HTTPS từ config server; đổi origin/khóa làm verification cũ hết hiệu lực. Manual lưu ngân hàng/tài khoản riêng, không xóa khóa payOS; pending attempt chặn đổi chế độ/thông tin nhận tiền.
+
+### Hóa đơn, tiền và trả phòng
+
+- Snapshot đơn giá, số người, meter, tên dãy/phòng/khách thuộc lịch sử hóa đơn. Sửa phòng/lượt thuê không được tính lại Issued invoice cũ bằng giá hiện tại.
+- Chỉ số điện không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes.
+- Revision/version/request fingerprint/idempotency là hợp đồng chống stale write/replay, không phải trường dư. Giữ transaction bao toàn bộ ghi tiền và cập nhật trạng thái.
+- payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
+- Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
+- Manual receipt bằng toàn bộ dư nợ. Với pending payOS đơn: phải xác minh hủy an toàn; nếu provider đã Paid thì reconcile và không ghi tiền tay thêm. Pending batch chặn ghi riêng/sửa/cọc/trả phòng liên quan.
+- Manual VietQR chỉ tạo yêu cầu; chỉ owner xác nhận tiền thực nhận. Confirm kiểm toàn bộ allocation/balance và commit nguyên tử; stale request không được ghi một phần. Confirm replay không sinh receipts mới.
+- Pending manual panel chỉ liệt kê `ConfirmedAt == null`; xác nhận xong bỏ khỏi panel nhưng giữ request/receipts trong DB. Hạn 24 giờ là tái sử dụng QR/request, không phải bảo đảm ngân hàng ngừng nhận tiền.
+- Ảnh VietQR ở `img.vietqr.io` là dịch vụ ảnh bên ngoài, không dùng để xác minh tiền; không gửi tenant token trong URL ảnh, giữ `referrerPolicy=no-referrer` và CSP allowlist cụ thể.
+- Cọc và phần giữ/hoàn/khấu trừ là ledger riêng; Refund chỉ ghi nhận giao dịch bên ngoài, không tự chuyển tiền. Không tính cọc/credit cọc thành doanh thu thuê trọ.
+- Trả phòng yêu cầu xử lý nợ Issued, Draft và pending payment; lưu completion chống replay, thu hồi token, ngày kết thúc Việt Nam, nâng meter baseline. Không tự tạo hóa đơn cuối hoặc chuyển khoản hoàn cọc.
+- Báo cáo Excel giữ ô tiền kiểu số và chống formula injection từ tên/note người dùng.
+
+### Zalo
+
+- Invoice mới/phát hành Draft stage reminder **cùng transaction** với hóa đơn; không gọi Zalo trong request lưu hóa đơn và không sweep lịch sử để tự nhắc hóa đơn cũ khi nâng cấp.
+- Một slot DB/InvoiceId, lease dispatch theo owner, attempt id và ledger gateway chống gửi lặp qua restart. Có thể queue khi mất kết nối, nhưng dispatch phải kiểm lại tenant/payment/phone/owner/invoice.
+- Giờ gửi 07:00 đến trước 21:00 Việt Nam; cách ít nhất 5 giây/owner; cooldown 20 giờ kể cả kết quả Unknown. Không tự retry Unknown vì tin có thể đã gửi.
+- Gateway session + ledger AES-256-GCM, ghi nguyên tử/fsync. Một process gateway/một volume; không chia volume cho nhiều process. Khôi phục backup cũ có thể mất receipt mới: đối chiếu Zalo trước khi bật gửi lại.
+- Gateway là Zalo cá nhân qua zca-js, không phải ZNS/OA chính thức; không coi test fake là nghiệm thu gửi Zalo thật.
+
+### Monitoring
+
+- Browser events best effort, loại bỏ PII/token/query nhạy cảm, allowlist và giới hạn payload/rate. Client không có quyền tự khai milestones server.
+- Activation là phát hành **Monthly** đầu tiên, không phải Deposit/Supplemental. Revenue sản phẩm chỉ là order **Subscription Paid** đã xác minh, không phải tiền thuê/cọc hoặc Pro do admin tặng.
+- Actor Owner/System/Admin ảnh hưởng active-owner metrics. Lưu đúng actor/thời điểm publish/paid trong transaction + milestone outbox; telemetry lỗi không rollback sản phẩm.
+- Chỉ acknowledge outbox khi milestone đã tồn tại bền vững trong DB. Giữ Pending/Failed để đối chiếu; chỉ prune Completed theo retention.
+- Growth/CAC/retention có cohort, attribution, maturity và null reasons. Không thay dữ liệu thiếu bằng số ước đoán hoặc áp filter bằng cách materialize toàn bộ owner IDs trước query.
+- Host collector chạy ngoài app, chỉ mount thư mục JSON public `:ro`; tuyệt đối không mount Docker socket/private collector state vào app. Backup-watchdog có authority ở host, không tạo alert trùng trong app.
+
+## 6. Chạy local có kiểm soát
+
+Yêu cầu .NET SDK 10, Node 24, npm, Python 3; Docker chỉ cần cho QA PostgreSQL/deployment. Từ root:
+
+```sh
+npm --prefix frontend ci
+npm --prefix zalo-gateway ci
+dotnet tool restore
+```
+
+Development còn nạp `appsettings.Development.local.json`, `appsettings.Email.local.json` đã ignore. Env/command line override chúng. Kiểm tra cấu hình riêng tại máy trước khi chạy; không in secrets. Nếu chỉ cần thử app, chủ động dùng DB riêng bằng đường dẫn tuyệt đối:
+
+```sh
+# Terminal API: thư mục này dành riêng cho thao tác local của bạn.
+ROOMIE_DEV_DIR=$(mktemp -d /tmp/roomie-dev.XXXXXX)
+ASPNETCORE_ENVIRONMENT=Development DatabaseProvider=SQLite \
+ConnectionStrings__DefaultConnection="Data Source=$ROOMIE_DEV_DIR/dev.db" \
+DataProtection__KeysPath="$ROOMIE_DEV_DIR/keys" SeedDemo=true \
+Zalo__Enabled=false EnableInvoiceSweep=false EnablePaymentReconciliation=false \
+EmailVerification__Enabled=false RequireVerifiedPaymentForTenantLink=false \
+HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9 NO_PROXY=localhost,127.0.0.1 \
+dotnet run --no-launch-profile --project backend/RoomRental.Api --urls http://localhost:5080
+
+# Terminal frontend:
+npm --prefix frontend run dev
+```
+
+Mở `http://localhost:5173` (Vite proxy `/api` → `localhost:5080`). Fixture demo: `admin@phongtro.local` / `Admin123!`, `owner@phongtro.local` / `Owner123!`. Đây chỉ là credentials seed dùng thử. Để thử OTP dùng harness SMTP bên dưới, không gỡ guard rồi gọi SMTP thật.
+
+Cấu hình quan trọng: `DatabaseProvider`, `ConnectionStrings__DefaultConnection`, `DataProtection__KeysPath`, `PublicBaseUrl`, `WebhookBaseUrl`, `TrustedProxies`, `Email__*`, `Zalo__*`, `Monitoring__*`. Xem `.env.example` và runbooks; không thêm giá trị thật vào Git.
+
+## 7. Kiểm tra trước bàn giao thay đổi
+
+Chọn nhóm test theo phần sửa. Các test console C# là **executable**, dùng `dotnet run`, không thay bằng `dotnet test` rồi kết luận suite đã chạy.
+
+```sh
+dotnet build backend/RoomRental.Api
+dotnet build backend/RoomRental.DbMigrator
+dotnet run --project tests/RoomRental.WebhookTests
+dotnet run --project tests/RoomRental.ZaloTests
+npm --prefix zalo-gateway test
+npm --prefix frontend run build
+npm --prefix frontend run i18n:check
+npm --prefix frontend run check:architecture
+npm --prefix frontend run test:api
+npm --prefix frontend run test:http
+npm --prefix frontend run test:analytics
+npm --prefix frontend run test:dates
+npm --prefix frontend run test:e2e -- --workers=4
+dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context SqliteAppDbContext
+dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context PostgresAppDbContext
+git diff --check
+```
+
+Frontend build phải xong trước Playwright. Browser config tự chạy preview `127.0.0.1:4178`, API trong tests được giả lập. Không trỏ suite vào production hoặc dùng login thật để né fixture lỗi.
+
+HTTP regression dùng **API publish có đầy đủ `wwwroot`**, database tạm và SMTP sink do harness quản lý:
+
+```sh
+npm --prefix frontend run build
+ROOMIE_QA_APP=$(mktemp -d /tmp/roomie-qa-app.XXXXXX)
+dotnet publish backend/RoomRental.Api -c Release -o "$ROOMIE_QA_APP"
+cp -R frontend/dist "$ROOMIE_QA_APP/wwwroot"
+python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider sqlite
+python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp
+```
+
+Harness tạo DB/keys trong `/tmp/roomie-ci-*`, chặn outbound bằng proxy loopback, callback HTTP localhost; không dùng payOS/SMTP/Zalo thật. macOS: nếu Python Homebrew lỗi `pyexpat`, dùng `/usr/bin/python3` như lần QA này. Thiếu webroot gây SEO 404, không chữa bằng bỏ test.
+
+PostgreSQL/otp-postgres: xem [tests/README.md](tests/README.md); phải cấp container QA riêng, connection loopback có database `roomie_qa_*`. Harness tự tạo/drop DB ngẫu nhiên, không dùng DB/container app. Các fixture service PostgreSQL khác có guard riêng (`TEST_ALLOW_DISPOSABLE_PAYMENT_POSTGRES`, port 15496; `ZALO_TEST_POSTGRES`); đọc test trước khi cấp biến.
+
+Backup/collector thuần local:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_backup_*.py' -v
+python3 -m unittest discover -s tests -p 'test_host_collector.py' -v
+```
+
+Không chạy `unittest discover -s tests` tùy tiện: các module HTTP có thể trỏ tới API mặc định đang dùng. Test chống gọi provider phải giữ proxy + localhost callback; HTTP callback riêng không đủ để chặn subscription checkout.
+
+## 8. Những giới hạn đã thấy trong code, cần kiểm tra lại khi làm tiếp
+
+1. **Monitoring scheduler:** `MonitoringBackgroundWorker` gọi incident checks mỗi phút và maintenance mỗi giờ, hai vòng độc lập, scope riêng, không overlap trong process. Cấu hình `Monitoring:Schedule` được validate startup; xem monitoring runbook. DB outage gửi SMTP không phụ thuộc DB sau 3 probe cách ≥1 phút, cooldown 1 giờ; trạng thái outage trong RAM đến reconnect nên restart có thể gửi lại. Host collector/systemd gửi cảnh báo host/backup riêng. Chưa xác minh delivery/live VPS.
+2. **Monitoring maintenance:** scheduler tính lại 7 ngày đã kết thúc theo Việt Nam trước khi prune raw 90 ngày/activity và aggregate 13 tháng/Completed outbox 30 ngày. Rollup lỗi thì không prune, thử lại chu kỳ sau. Ngày thiếu/chỉnh sửa cũ hơn lookback phải gọi admin rollup trước khi raw hết retention; chưa có backfill toàn lịch sử tự động. Scheduler chưa có distributed lease; không scale nhiều replica hoặc thêm external scheduler trùng mà chưa thiết kế khóa. `DataMaintenanceService` vẫn chỉ dọn auth records.
+3. **Legacy import không theo kịp schema:** `RoomRental.DbMigrator` hardcode danh sách bảng cũ, thiếu payment modes/recovery/Zalo/monitoring mới. Không dùng nó cho data hiện tại hoặc để áp EF migration. Cần cập nhật/test đầy đủ trước một đợt import thực sự. Các script import/reset cũ là công cụ chuyên biệt, không đưa vào startup.
+4. **Mở rộng nhiều replica cần thiết kế thêm:** IP rate limiter/latency aggregator/worker telemetry ở process; invoice sweep và payment reconciliation chạy theo app instance. Zalo có DB lease nhưng gateway volume vẫn chỉ cho một process. Không tự scale Compose rồi suy ra đã HA.
+5. **Restore/SMTP/provider thật:** fake tests không chứng minh bank settlement, mailbox delivery, phiên Zalo thực hay production recovery point. Không lấy số test/throughput lịch sử làm capacity hoặc SLA hiện tại.
+6. **Source không đại diện toàn bộ host:** Compose repo chưa chứa mọi override Zalo/runtime hiện có trên VPS. Push code không tự cập nhật mọi helper/Compose/env trên host; đọc runbook và đối chiếu trước thay đổi hạ tầng.
+7. Frontend build hiện có cảnh báo chunk >500 KB; build vẫn đạt. Nếu tối ưu bundle, đo dependency/chunk thay vì tăng ngưỡng cảnh báo để che vấn đề.
+
+## 9. Triển khai, dữ liệu cần giữ và tài liệu còn lại
+
+Push `main` kích hoạt CI/CD, publish và deploy nếu các cổng thành công; chỉ push khi người dùng yêu cầu. Repo GitHub là `nhaq0505/Roomie`, image vẫn `ghcr.io/nhaq0505/rehouse`.
+
+- [Triển khai / rollback](docs/deployment.md): identity, digest, host paths, migration overlay, Caddy, SMTP.
+- [Backup / restore](docs/backup-operations.md): DB + keys, Drive crypt, retention, restore drill.
+- [EF migrations](docs/ef-core-migrations.md): scaffold cả hai provider và áp schema đúng runner.
+- [Zalo setup](docs/zalo-setup.md): gateway keys/session, Docker override, cooldown/Unknown.
+- [Monitoring runbook](docs/monitoring/runbook-and-metric-dictionary.md): metrics, nguồn dữ liệu, cấu hình và các giới hạn wiring.
+- [Test harness](tests/README.md): môi trường cô lập và PostgreSQL.
+
+Không xóa `.local-data`, private config, backup, DataProtection keys, Zalo session volume, `output/worktree-cleanup-*`, file `*.bundle`/archive, tài sản marketing/ảnh người dùng hoặc dự án video chỉ vì chúng không có import. `docs/marketing/` là nghiên cứu kinh doanh riêng, không phải tài liệu kỹ thuật dư.
+
+Các báo cáo triển khai/review theo ngày, handoff cũ, API/architecture mô tả lặp và DOCX thiết kế cũ đã được bỏ khỏi working tree khi hợp nhất ngày 21/10/2026; bản tracked có thể lấy lại bằng `git show 7be139d:<path>`. Không tạo lại chuỗi handoff/report chồng nhau. Khi bàn giao, ghi thay đổi và kiểm chứng thực tế vào mục liên quan, dùng Git lưu lịch sử.
+
+## 10. Kiểm chứng trong đợt hợp nhất tài liệu
+
+Ngày 21/10/2026 trên baseline ở đầu file:
+
+- API publish/build và DbMigrator build đạt; snapshots SQLite/PostgreSQL khớp model.
+- Frontend build, i18n (1354 keys × 4 catalogs), architecture (108 source modules), API paging, HTTP client, analytics và dates đạt. Build có cảnh báo chunk lớn đã nêu ở mục 8.
+- C# webhook/monitoring suite đạt (816 dòng PASS); Zalo SQLite suite 53 assertions đạt; gateway 12/12 đạt sau `npm ci` (lần đầu máy chưa cài zca-js).
+- HTTP harness SQLite 83/83 và OTP 15/15 đạt, không skip; backup 7/7 và host collector 34/34 đạt.
+- Playwright toàn bộ: 64 passed, 1 timeout ở `landlord.spec.ts` L3b khi `page.goto('/rooms')`, 2 test sau đó không chạy do serial group. Chạy lại nguyên `landlord.spec.ts` với 1 worker: 6/6 đạt, gồm ca lỗi và hai ca chưa chạy. Chưa xác định nguyên nhân timeout; không gọi lần toàn bộ đầu tiên là xanh.
+- Liên kết Markdown local và `git diff --check` đạt. Không chạy lại PostgreSQL runtime/role-container test trong đợt tài liệu này; snapshot check không thay thế chúng.
+
+Không kiểm tra trạng thái live, không chạy migration vào DB vận hành, không gửi tin/thư/chuyển tiền thật. Thay đổi lần này là tài liệu, ignore output và một comment tham chiếu; không sửa hành vi sản phẩm. Chưa commit/push trong đợt này.
+
+
+## 11. Cập nhật scheduler monitoring — 21/10/2026
+
+- `MonitoringBackgroundWorker` và `MonitoringScheduleOptions`: incident check mỗi phút, rollup 7 ngày hoàn tất + prune mỗi giờ; hai vòng độc lập, retry sau lỗi, scope mới mỗi chu kỳ, heartbeat và cancellation. Xem mục 8/runbook về lookback, giới hạn một replica và DB outage trong RAM.
+- `IncidentMonitoringService`: không truy cập DB sau probe thất bại; gửi cảnh báo outage độc lập sau ba probe cách ít nhất một phút, cooldown một giờ. Reconnect lưu lịch sử và dùng recovery/retry hiện có; shutdown cancellation không bị tính thành lỗi SMTP.
+- Cả hai Compose map cấu hình bật/tắt scheduler và app alerts, recipient `MONITORING_ALERT_TO`; SMTP tái dùng `SMTP_*`. Phải cấu hình recipient/SMTP trên môi trường triển khai; không suy ra host đã được cập nhật.
+- Kiểm chứng: API build đạt, 0 warning/error; console webhook/monitoring suite đạt 839 PASS (gồm scheduler dùng đồng hồ/timer điều khiển, SQLite maintenance thực, outage với connection đã dispose, SMTP failure/retry/cooldown/recovery, disable/config validation/cancellation). Cả hai Compose `config --quiet` đạt với env fixture; model SQLite/PostgreSQL không có pending changes; `git diff --check` đạt.
+- Chưa kiểm thử PostgreSQL runtime trong đợt này; không chạy migration DB vận hành, không gửi SMTP thật, chưa commit/push/deploy. Các thay đổi dọn tài liệu trước đó vẫn giữ trong working tree.

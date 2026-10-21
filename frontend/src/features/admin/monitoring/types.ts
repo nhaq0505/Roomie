@@ -1,5 +1,5 @@
 // Exact contract-aligned types for Roomie Monitoring Subsystem
-// Matches docs/monitoring/contracts.md and backend/RoomRental.Api/Domain/MonitoringDtos.cs
+// Matches backend/RoomRental.Api/Domain/MonitoringDtos.cs; see AGENTS.md for subsystem guidance
 
 export type DateRangePreset = '7d' | '30d' | '90d' | 'custom';
 export type OpsWindowPreset = '1h' | '24h' | '7d';

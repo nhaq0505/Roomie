@@ -880,6 +880,12 @@ public static class OperationsMonitoringTests
         builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
         builder.Services.AddMonitoringCore(builder.Configuration);
         builder.Services.AddMonitoringOperations(builder.Configuration);
+        // Endpoint fixture controls incident state explicitly; scheduler has its own integration tests.
+        builder.Services.Configure<MonitoringScheduleOptions>(o =>
+        {
+            o.IncidentChecksEnabled = false;
+            o.MaintenanceEnabled = false;
+        });
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAuthentication("fixture-ops").AddScheme<AuthenticationSchemeOptions, OpsTestFixtureAuth>("fixture-ops", _ => { });
         builder.Services.AddAuthorization();
@@ -922,8 +928,8 @@ public static class OperationsMonitoringTests
         Assert(opsData!.Overview.OverallStatus == "Healthy", "Default overview status is Healthy");
         Assert(opsData.Overview.Window == "1h", "Default window is 1h");
         Assert(opsData.Workers.Any(w => w.WorkerName == "backup-watchdog"), "backup-watchdog surfaced as WorkerStatusDto");
-        Assert(opsData.Workers.Count(w => w.WorkerName != "backup-watchdog") == 6, "All 6 application workers tracked");
-        Assert(opsData.Workers.Where(w => w.WorkerName != "backup-watchdog").All(w => w.Status == "Healthy"), "All 6 application workers healthy");
+        Assert(opsData.Workers.Count(w => w.WorkerName != "backup-watchdog") == 8, "All 8 application workers tracked, including disabled schedules");
+        Assert(opsData.Workers.Where(w => w.WorkerName != "backup-watchdog" && w.IsEnabled).All(w => w.Status == "Healthy"), "All enabled application workers healthy");
         Assert(opsData.Workers.Single(w => w.WorkerName == "backup-watchdog").Status == "Unknown", "Missing collector surfaces backup-watchdog as Unknown");
         Assert(opsData.Queues != null, "Operational queues stats present");
 

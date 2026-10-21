@@ -29,6 +29,10 @@ public static class MonitoringServiceCollectionExtensions
     {
         services.Configure<HostMetricsOptions>(configuration.GetSection(HostMetricsOptions.SectionName));
         services.Configure<IncidentNotificationOptions>(configuration.GetSection(IncidentNotificationOptions.SectionName));
+        services.AddOptions<MonitoringScheduleOptions>()
+            .Bind(configuration.GetSection(MonitoringScheduleOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.RemoveAll<IRouteLatencyAggregator>();
         services.AddSingleton<IRouteLatencyAggregator, RouteLatencyAggregator>();
@@ -58,6 +62,7 @@ public static class MonitoringServiceCollectionExtensions
         services.AddScoped<IIncidentNotifier, SmtpIncidentNotifier>();
 
         services.AddHostedService<OpsMinuteFlushWorker>();
+        services.AddHostedService<MonitoringBackgroundWorker>();
 
         return services;
     }

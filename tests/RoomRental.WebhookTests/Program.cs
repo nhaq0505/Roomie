@@ -91,6 +91,7 @@ await MonitoringBusinessTests.RunAsync();
 await MonitoringAccuracyAndOutboxRegressionTests.RunAsync();
 
 await RoomRental.WebhookTests.OperationsMonitoringTests.RunAsync();
+await RoomRental.WebhookTests.MonitoringSchedulerTests.RunAsync();
 
 sealed class FakeHandler : HttpMessageHandler, IHttpClientFactory
 {

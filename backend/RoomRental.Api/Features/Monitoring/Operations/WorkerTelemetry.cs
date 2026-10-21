@@ -44,6 +44,8 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
         "reconcile" => TimeSpan.FromMinutes(10),
         "cleanup" => TimeSpan.FromMinutes(20),
         "ops-aggregation" => TimeSpan.FromHours(2),
+        "incident-check" => TimeSpan.FromMinutes(10),
+        "monitoring-maintenance" => TimeSpan.FromHours(2),
         "invoice-sweep" => TimeSpan.FromHours(26),
         _ => TimeSpan.FromMinutes(15)
     };

@@ -64,6 +64,10 @@ services:
       Email__Smtp__Security: ${SMTP_SECURITY:-StartTls}
       Email__Smtp__Username: ${SMTP_USERNAME:-}
       Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Monitoring__Schedule__IncidentChecksEnabled: ${MONITORING_INCIDENT_CHECKS_ENABLED:-true}
+      Monitoring__Schedule__MaintenanceEnabled: ${MONITORING_MAINTENANCE_ENABLED:-true}
+      Monitoring__Alerts__Enabled: ${MONITORING_ALERTS_ENABLED:-true}
+      Monitoring__Alerts__AlertEmailTo: ${MONITORING_ALERT_TO:-}
       SeedDemo: "false"
     volumes:
       - app_keys:/app/data

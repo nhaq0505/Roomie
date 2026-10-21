@@ -1,203 +1,89 @@
-# Monitoring Runbook and Metric Dictionary
+# Monitoring — nguồn dữ liệu và vận hành
 
-## 1. Overview and Core Invariants
-The Roomie monitoring subsystem provides an internal, privacy-first, first-party analytics and operations tracking system (`/admin/monitoring`). It operates without third-party tracking scripts, external analytics clouds, or cookies.
+Đối chiếu source ngày 21/10/2026, baseline `7be139d`; không xác nhận host live. Kiến trúc chung và các điểm còn thiếu: [AGENTS.md](../../AGENTS.md). Các báo cáo review theo task đã được thay bằng runbook này.
 
-### Core Architectural Invariants:
-1. **Privacy & Anonymity**: No PII, email, phone number, OTP, JWT token, bank account number, IP address, or raw query parameters are ever persisted in analytics tables.
-2. **Server-Authoritative Milestones**: Registration, invoice issuance, and subscription payment milestones are recorded server-side inside transactional boundaries. Client telemetry cannot forge or manipulate milestones.
-3. **Additive Schema & DML Runtime**: All schema changes are strictly additive. Database migrations are verified for both SQLite and PostgreSQL. Runtime application code executes DML queries only.
-4. **No Invented Truth**: Missing, stale, or indeterminate data is explicitly reported as `null` or `Unknown` with an explanatory reason. Synthetic "healthy zeros" or fake backfills are strictly prohibited.
-5. **Durable Outbox & Idempotent Repair**: Telemetry and milestone updates use a transactional outbox (`MilestoneOutboxEvent`) and authoritative repair mechanisms (`EnsureSubscriptionPaidMilestoneAsync`, `EnsureInvoiceIssuedMilestoneAsync`). Product transaction rollback cancels uncommitted outbox events, while webhook replays and background workers safely restore dropped milestones without duplicating financial mutations.
+## Nguồn đúng theo phần việc
 
----
+| Phần | Source |
+| --- | --- |
+| API/DTO/entity | `Features/Monitoring/MonitoringEndpoints.cs`, `Domain/MonitoringDtos.cs`, `MonitoringEntities.cs` |
+| Intake, attribution, milestones, growth/revenue, maintenance | `Features/Monitoring/MonitoringServices.cs` |
+| Đăng ký service | `Features/Monitoring/MonitoringServiceCollectionExtensions.cs` |
+| Latency/host/worker/incident/SMTP | `Features/Monitoring/Operations/` |
+| Browser tracker | `frontend/src/shared/analytics/browserTracker.ts` |
+| Admin UI và query keys | `frontend/src/features/admin/monitoring/` |
+| Host collector | `deploy/monitoring/rehouse-host-collector.py`, installer và units cùng thư mục |
 
-## 2. Metric Dictionary
+`AddMonitoringCore` đăng ký tracking/query/maintenance; `AddMonitoringOperations` thay các đăng ký Ops bằng implementation thật và đăng ký hai hosted workers: minute flush và monitoring scheduler.
 
-### 2.1 Growth & Usage Metrics
-- **Time Window**: Default 30-day business window (`startUtc` to `endUtc` in Vietnam Timezone `Asia/Ho_Chi_Minh` UTC+7).
-- **Sessions (`TotalSessions`)**: Bounded 30-minute idle session model derived from client analytics events within the 90-day raw retention window. Queries use database-level `Distinct().CountAsync()`. When the 90-day window is exceeded or data is absent, returns `null`.
-- **Unique Visitors (`UniqueVisitors`)**: Distinct first-party `BrowserId` count within the active window (maximum 90 days). Returns `null` when filtered outside the raw event retention window.
-- **Registration Funnel**:
-  - `StartedCount`: Unique registration attempts initiated (`RegistrationLifecycleFact` with `Stage == 'Started'`).
-  - `CodeResentCount`: Registration attempts with OTP resend requested (`Stage == 'CodeResent'`).
-  - `VerifiedCount`: Successful OTP verification (`Stage == 'Verified'`).
-  - `BypassedCount`: Direct verification via auto-approved bypass (`Stage == 'Bypassed'`).
-  - `UnknownAttemptCount`: Unattributed registration facts present without matching started context.
-  - *Honest Funnel Fallback*: If `TotalSessions` is `null` (e.g. historical range >90d), the funnel displays authentic stage counts without inventing a synthetic session base.
-- **Active User Metrics**:
-  - **WAU7**: Distinct owners with meaningful owner actions (`OwnerDailyActivity.OwnerActionCount > 0`) in the trailing 7 Vietnam calendar days. Actions performed by `Admin` or `System` background workers are explicitly segregated and do not count toward owner WAU.
-  - **MAU30**: Distinct owners with meaningful owner actions in the trailing 30 Vietnam calendar days.
-- **Cohort Retention Matrix**:
-  - Owners grouped by registration/activation calendar month.
-  - Retention percentages for subsequent calendar months (Month 0 to Month 5) computed via SQL grouping.
-  - Inactive or unobserved months render explicit `null` ("—"), never defaulting to 100%.
+## Metrics và ranh giới
 
-### 2.2 Revenue Metrics
-- **Total Subscription Revenue (`TotalSubscriptionRevenueVnd`)**: Sum of confirmed `Paid` subscription order amounts (`PayOsAttempt.Amount` where `Kind == "Subscription" && Status == Paid`). Excludes tenant rent, deposits, and admin-granted complimentary Pro subscriptions.
-- **Paid Subscription Count (`PaidSubscriptionCount`)**: Count of confirmed paid subscription orders.
-- **Monthly Recurring Pro Revenue (`MonthlyRecurringProRevenueVnd`)**: Active paying Pro subscriptions annualized/normalized to monthly recurring rate.
-- **CAC30 (Customer Acquisition Cost within 30 Days)**:
-  - Calculation: $\frac{\text{Total Marketing Spend in Signup Cohort Period}}{\text{New First-Paid Owners Converted within 30 Days of Registration}}$
-  - Spend includes Cash (`CashVnd`) plus Imputed Labor (`PersonHours * HourlyRate`).
-  - **Explicit Null Reasons (`CacNullReason`)**:
-    - `MissingCostData`: No marketing cost records entered for the cohort window.
-    - `MissingValuation`: Non-zero `PersonHours` entered but `HourlyRate` omitted.
-    - `ZeroDenominator`: Cohort period has matured (>30 days elapsed) but 0 owners converted to Paid.
-    - `CohortImmature`: Cohort period ended less than 30 days ago; conversion window has not closed.
-    - `NoRegistrations`: Zero owner registrations occurred during the period.
+- `/api/analytics/events`: intake public có limiter; event server timestamp là căn cứ. Browser/session IDs và attribution không phải user identity. Không lưu email/phone/OTP/tenant token/bank details/IP thô hay raw query nhạy cảm vào telemetry.
+- `/api/admin/monitoring/growth`: funnel đăng ký, activation, active owners, retention và nguồn attribution. Activation dùng phát hành Monthly đầu tiên; Deposit/Supplemental không tính. Owner action khác System/Admin/tenant viewing. Raw telemetry hết retention phải trả null/reason thích hợp.
+- `/api/admin/monitoring/revenue`: order `Subscription Paid` đã xác minh. Không cộng tiền thuê, cọc hoặc Pro admin tặng. Milestones được server kiểm từ nghiệp vụ, không tin client khai đã paid.
+- CAC30 dùng chi phí cash + giờ công đã định giá và cohort đăng ký chuyển paid trong 30 ngày. Giữ lý do null `MissingCostData`, `MissingValuation`, `NoRegistrations`, `CohortImmature`, `ZeroDenominator`.
+- Campaign metadata `/campaigns/metadata`, costs `/campaigns/costs`, tracking URL `/campaigns/generate-url`; có aliases tương thích ở handler. Kiểm DTO trước đổi field/filter.
+- `/operations?window=1h|24h`: route/status counts và p95 ước lượng từ histogram, DB health, worker states và host JSON. Không lấy trung bình các p95 để gộp. Bộ đếm process không phải tổng toàn hệ thống nhiều replica.
+- `/incidents`: đọc các incident đang lưu; PATCH state ghi acknowledged/resolved và note. Unknown/thiếu mẫu không được tự coi là Healthy hay recovery.
 
-### 2.3 Operations & Telemetry Metrics
-- **Route Latency P95 (`LatencyP95Ms`)**: Interpolated 95th percentile latency computed from route minute bucket histograms (`RouteMinuteBuckets`).
-- **API 5xx Rate (`Api5xxRatePercent`)**: Proportion of requests resulting in HTTP 5xx status codes over the selected window. 4xx client errors (400, 401, 403, 404, 422) are strictly distinguished and do not trigger 5xx alerts.
-- **Worker Health Status**:
-  - States: `Healthy`, `Running`, `Degraded`, `Failed`, `Disabled`, `Unknown`.
-  - Startup Grace Period: 10 minutes from process start before worker staleness triggers.
-  - Per-Worker Heartbeat SLAs:
-    - `recovery-email`: 5 minutes
-    - `zalo`: 5 minutes
-    - `reconcile`: 10 minutes
-    - `cleanup`: 20 minutes
-    - `ops-aggregation`: 2 hours
-    - `invoice-sweep`: 26 hours
-- **Backup Watchdog Authority**:
-  - The 27-hour filesystem backup marker (`backup-watchdog`) managed by Ubuntu host collector is the sole authoritative backup monitor.
-  - Mapped into the operations API for unified display, but strictly excluded from application alert rules to prevent duplicate alarms.
-  - Absent or stale host collector telemetry surfaces `backup-watchdog` as `Unknown`.
+Outbox `MilestoneOutboxEvents` lưu cùng transaction product; sau commit thử tracker trong context riêng. Chỉ chuyển Completed khi milestone đã ghi bền vững. Pending replay tối đa theo logic service, Failed cần đối chiếu; không xóa để làm sạch dashboard. Invoice sweep chạy repair khi được bật, không phải queue daemon riêng liên tục.
 
----
+## Lịch chạy trong ứng dụng
 
-## 3. Data Retention Policy
+| Tác vụ | Hiện trạng trong source |
+| --- | --- |
+| Latency minute flush và prune route buckets >30 ngày | `OpsMinuteFlushWorker`, mỗi phút |
+| Auth cleanup | `DataMaintenanceService`, mỗi 10 phút; không dọn analytics |
+| Raw analytics >90 ngày; activity/daily aggregate >13 tháng; Completed outbox >30 ngày | `MonitoringBackgroundWorker`, sau rollup thành công mỗi giờ; vẫn có admin POST `/maintenance/prune` |
+| Daily rollup | `MonitoringBackgroundWorker`, mỗi giờ tính lại 7 ngày đã kết thúc theo giờ Việt Nam; vẫn có admin POST `/maintenance/rollup` |
+| App incident engine/SMTP notifier | `MonitoringBackgroundWorker` gọi `TriggerIncidentCheckAsync` mỗi phút |
+| Host collector/host SMTP | systemd timer riêng, mỗi phút sau khi installer/config được áp dụng |
 
-| Table / Entity | Retention Window | Purge Mechanism | Authority / Invariant |
-|---|---|---|---|
-| `ClientAnalyticsEvents` | 90 days | Scheduled background sweep (`DataMaintenanceService`) | Raw client telemetry pruned; queries past 90d return `null`. |
-| `OperationalRouteMinuteBuckets` | 30 days | Scheduled background sweep (`OpsMinuteFlushWorker`) | Aggregated route latencies kept for 30d operational analysis. |
-| `OwnerDailyActivities` | 13 months | Scheduled background sweep (`DataMaintenanceService`) | Preserves 13 months of daily owner activity for trailing WAU/MAU. |
-| `DailyMonitoringAggregates` | 13 months | Scheduled background sweep (`DataMaintenanceService`) | Daily growth and revenue snapshots preserved for trend reporting. |
-| `MonitoringIncidents` | Indefinite (or 13 mo) | Manual audit archive | Preserves historical incident records and resolution audit notes. |
-| `OwnerMilestones` | **Permanent** | **Never pruned** | Milestones (`RegisteredAt`, `ActivatedAt`, `FirstPaidAt`) persist as long as owner user exists. |
-| `MilestoneOutboxEvents` | 30 days after `Completed` | Scheduled sweep | Processed outbox events retained for 30 days for replay audit. |
+Hai vòng lịch chạy ngay khi API khởi động, dùng scope riêng mỗi chu kỳ và không chạy chồng chính nó. Maintenance chậm/lỗi không chặn incident probes; lỗi được ghi telemetry/log và thử lại ở chu kỳ sau. Dừng host hủy cả tác vụ đang chạy và lịch chờ. `incident-check` có SLA heartbeat 10 phút, `monitoring-maintenance` 2 giờ.
 
----
+Cấu hình section `Monitoring:Schedule` (env thay `:` bằng `__`):
 
-## 4. Operational Runbook
+| Key | Mặc định | Giới hạn |
+| --- | --- | --- |
+| `IncidentChecksEnabled` | `true` | Tắt vẫn hiển thị worker Disabled |
+| `MaintenanceEnabled` | `true` | Tắt vẫn hiển thị worker Disabled |
+| `IncidentIntervalSeconds` | `60` | 60–300 giây |
+| `MaintenanceIntervalSeconds` | `3600` | 300–3600 giây |
+| `RollupDays` | `7` | 1–89 ngày, trong raw retention 90 ngày |
 
-### 4.1 Required Configuration & Environment Variables
+Cấu hình ngoài giới hạn làm startup thất bại, tránh busy loop hoặc tổng hợp từ raw đã hết hạn. Recompute chỉ gồm ngày hoàn tất; các chỉnh sửa/ngày thiếu cũ hơn `RollupDays` cần admin rollup riêng trước khi raw hết retention. Khi một rollup lỗi, chu kỳ đó không prune. Lịch và chống overlap ở một process, **chưa có distributed lease cho nhiều replica**. Xóa lịch external trùng nếu host đã cấu hình riêng; chưa kiểm tra host live.
 
-```bash
-# Monitoring Alert Recipient (Dedicated Monitoring Mailbox)
-MONITORING_ALERT_TO="monitoring-alerts@rehouse.vn"
+Mất DB: xác nhận sau 3 probe thất bại cách nhau ít nhất một phút; gửi SMTP trực tiếp không truy vấn/ghi DB. Incident/cooldown nằm trong RAM đến khi kết nối lại, sau đó ghi lịch sử vào DB và gửi recovery qua luồng retry hiện có. Restart trong lúc DB mất sẽ mất trạng thái RAM và có thể gửi lại cảnh báo sau khi đủ probe. Các rule cần DB chờ kết nối hồi phục. App reminders giữ cooldown 1 giờ; SMTP lỗi không tính là gửi thành công. Collector vẫn chịu trách nhiệm gửi cảnh báo CPU/RAM/disk/container và backup watchdog; app không gửi lại các cảnh báo collector này.
 
-# Host Collector Bind Mount Path (Read-Only)
-MONITORING_HOST_METRICS_PATH="/app/monitoring-host/host-metrics.json"
+Source có scheduler không chứng minh VPS đang chạy bản này hoặc đã nhận thư: cần deploy, cấu hình recipient/SMTP và kiểm tra runtime riêng.
 
-# Webhook Base URL (Public Callback URL for payOS)
-WebhookBaseUrl="https://app.rehouse.vn"
+## Host collector: cài và cấu hình
 
-# Rate Limiting Policies
-RateLimiting__AnalyticsPermitLimit=120
-RateLimiting__AnalyticsWindowSeconds=60
+Review rồi chạy `sudo bash deploy/monitoring/install-monitoring.sh` trên đúng host. Installer cài `/usr/local/sbin/rehouse-host-collector`, units `rehouse-host-collector.service/.timer`, tạo `/etc/rehouse/monitoring.env` nếu chưa có; không chép unit mẫu tự chế thay installer.
+
+- Public JSON: `/var/lib/rehouse/monitoring/public/host-metrics.json`, quyền 0644; app mount đúng thư mục public read-only `/app/monitoring-host`.
+- Private state/SMTP queue: `/var/lib/rehouse/monitoring/collector-state.json`, quyền 0600; không mount thư mục cha vào app.
+- Backup marker: `/var/lib/rehouse/backup-last-success`, watchdog quá 27 giờ. Backup không được app incident engine gửi cảnh báo trùng.
+- Collector đọc cấu hình private từ host; `MONITORING_ALERT_TO` có fallback `BACKUP_ALERT_TO`/`ALERT_TO`. SMTP dùng cấu hình đã cấp, không log địa chỉ/credentials. Kiểm `load_config` khi cần thêm biến.
+- API host reader: `Monitoring__HostMetricsPath` mặc định `/app/monitoring-host/host-metrics.json`, hoặc `MONITORING_HOST_METRICS_PATH` override; `Monitoring__StalenessThresholdSeconds` mặc định 180.
+- App notifier: section `Monitoring:Alerts` với `AlertEmailTo`, `AlertEmailFrom`, `AlertEmailFromName`, `Enabled`; recipient fallback `MONITORING_ALERT_TO`. Cả hai Compose đã map `MONITORING_ALERT_TO`, `MONITORING_ALERTS_ENABLED`, `MONITORING_INCIDENT_CHECKS_ENABLED`, `MONITORING_MAINTENANCE_ENABLED` vào container. SMTP tái dùng biến `SMTP_*` hiện có; host collector đọc env riêng nên phải cấu hình riêng.
+- Analytics limiter hiện được khai báo cố định trong `Program.cs` (120/phút Production, 600 Development), không có cấu hình `RateLimiting__AnalyticsPermitLimit` như tài liệu cũ.
+
+Host JSON dùng `generated_at`, host metrics, containers/services, incidents/history và backup-watchdog; schema thực tế ở collector writer và `LinuxHostCollectorMetricsReader`. Reader chặn file quá 2 MB/JSON depth quá sâu, timestamp tương lai và dữ liệu stale. Thiếu file/thiếu số không biến thành CPU=0 hay host healthy.
+
+Chỉ collector host truy cập Docker; không mount `/var/run/docker.sock` vào API. Collector chạy trên cùng VPS không thể gửi mail khi toàn máy/mạng chết; phát hiện whole-host outage cần probe ngoài VPS.
+
+## Kiểm tra/diễn tập
+
+```sh
+python3 -m unittest discover -s tests -p 'test_host_collector.py' -v
+dotnet run --project tests/RoomRental.WebhookTests
+npm --prefix frontend run test:analytics
+npm --prefix frontend run test:dates
+npm --prefix frontend run build
+npm --prefix frontend run test:e2e -- monitoring --workers=2
 ```
 
-### 4.2 Host Collector Installation & Systemd Configuration
+Trên host chỉ kiểm đọc: status/timer/journal của collector, generated_at và quyền/mount public JSON, admin operations UI. Không in private state hoặc full runtime.env.
 
-1. **Directories & Permissions**:
-   ```bash
-   sudo mkdir -p /var/lib/rehouse/monitoring/public
-   sudo chown -R rehouse:rehouse /var/lib/rehouse/monitoring
-   sudo chmod 0755 /var/lib/rehouse/monitoring/public
-   ```
-
-2. **Systemd Collector Service** (`/etc/systemd/system/rehouse-host-collector.service`):
-   ```ini
-   [Unit]
-   Description=Rehouse Host Metrics Collector
-   After=network.target docker.service
-
-   [Service]
-   Type=oneshot
-   User=rehouse
-   ExecStart=/usr/bin/python3 /opt/rehouse/scripts/host-collector.py
-   StandardOutput=journal
-   StandardError=journal
-   ```
-
-3. **Systemd Collector Timer** (`/etc/systemd/system/rehouse-host-collector.timer`):
-   ```ini
-   [Unit]
-   Description=Trigger Rehouse Host Metrics Collector Every Minute
-
-   [Timer]
-   OnBootSec=1min
-   OnUnitActiveSec=1min
-   AccuracySec=5s
-
-   [Install]
-   WantedBy=timers.target
-   ```
-
-4. **Docker Container Bind Mount**:
-   Mount `/var/lib/rehouse/monitoring/public` into the application container strictly as read-only:
-   ```yaml
-   volumes:
-     - /var/lib/rehouse/monitoring/public:/app/monitoring-host:ro
-   ```
-   > [!CAUTION]
-   > Never mount the Docker daemon socket (`/var/run/docker.sock`) into the application container. The host collector runs autonomously on the host.
-
-### 4.3 Incident Engine & Alert Thresholds
-
-| Rule Key | Condition | Severity | Reminder Cooldown | Recovery Notice |
-|---|---|---|---|---|
-| `high_5xx_rate` | API 5xx rate > 5.0% sustained 5m (min 100 req) | Critical (>=10%) / Warning (>=5%) | 1 hour | Automatic upon <5% with >=100 req |
-| `high_p95_latency` | Route P95 latency > 2000ms sustained 10m (min 100 req) | Critical | 1 hour | Automatic upon <=2000ms with >=100 req |
-| `database_disconnected` | 3 consecutive DB health probe failures 1m apart | Critical | 1 hour | Automatic upon successful DB ping |
-| `host_collector_stale` | Collector timestamp > 180s old or file missing | Warning | 1 hour | Automatic upon fresh valid JSON |
-| `host_cpu_high` | Host CPU utilization >= 85% sustained 10m | Critical (>=90%) / Warning (>=85%) | 1 hour (collector) | Handled by host collector |
-| `host_disk_high` | Host disk utilization >= 85% sustained 5m | Critical (>=90%) / Warning (>=85%) | 1 hour (collector) | Handled by host collector |
-| `worker_stalled_{name}` | Enabled worker heartbeat older than SLA | Warning | 1 hour | Automatic upon worker healthy tick |
-
-> [!WARNING]
-> **No Whole-VPS Outage Detection**:
-> The internal host collector and application alerting mechanisms run on the local Ubuntu host. If the entire VPS experiences a total power outage, hypervisor panic, or complete network disconnection, the local processes cannot dispatch SMTP alerts. External synthetic uptime monitoring (HTTP probe outside the VPS targeting `/api/health`) is required for whole-host disaster alerting.
-
----
-
-## 5. Cutover and Migration Guide
-
-### 5.1 Offline Development vs. Live PostgreSQL Cutover
-1. **Offline / Development Database (SQLite)**:
-   - Disposable databases automatically apply pending migrations on container startup:
-     ```bash
-     dotnet ef database update --context SqliteAppDbContext
-     ```
-2. **Live Production Database (PostgreSQL)**:
-   - Migrations are strictly additive and backward-compatible.
-   - Run migration prior to deploying the updated application container:
-     ```bash
-     dotnet ef database update --context PostgresAppDbContext --connection "$PROD_POSTGRES_CONNECTION"
-     ```
-   - Schema additions (`MilestoneOutboxEvents`, `MonitoringIncidents`, `CampaignCosts`, etc.) do not lock existing product tables (`Users`, `Invoices`, `PayOsAttempts`).
-   - The application executes DML queries only.
-
-### 5.2 Rollback Procedure
-If a rollback of the application container is required:
-1. Revert container image to the prior stable release tag.
-2. The database schema is additive and non-breaking: newly added tables and columns remain dormant without conflicting with older code versions.
-3. No destructive migration down-scripts should be run against live PostgreSQL during an active incident.
-
-### 5.3 Alert Drill & Verification Procedure
-Operators can verify the full alert pipeline end-to-end without impacting production users:
-1. **Host-to-App Health Probe Drill**:
-   - Inspect `/app/monitoring-host/host-metrics.json` inside the application container:
-     ```bash
-     cat /app/monitoring-host/host-metrics.json | jq .
-     ```
-   - Verify `status` is `"ok"` and `timestamp` is within 60 seconds of host time.
-2. **Alert Dispatch Drill**:
-   - To drill SMTP alerting, configure `MONITORING_ALERT_TO` to a test mailbox.
-   - Inject a synthetic transient incident or temporarily pause a non-critical worker (e.g. `recovery-email`) past its 5m SLA in staging.
-   - Verify an alert email arrives with subject `[CRITICAL]` or `[WARNING]` and formatted HTML incident details.
-   - Verify an incident record is created in `MonitoringIncidents` with `State == 'Active'`.
-   - Resume the worker; verify a follow-up email arrives with subject `[RESOLVED]` and incident state transitions to `Resolved` with `ResolvedAt` recorded.
+Alert drill dùng environment/disposable fixture và người nhận thử được chỉ định. Kiểm trigger, cooldown, Unknown/thiếu mẫu không tự resolve, recovery và retry SMTP queue; fake SMTP hoặc accepted response không chứng minh mailbox Delivered. Không cố ý làm DB/VPS production lỗi để chứng minh cảnh báo. Kiểm hai worker mới trong Operations, sau đó diễn tập trên fixture cô lập; không suy ra delivery từ số lần gửi trong DB.

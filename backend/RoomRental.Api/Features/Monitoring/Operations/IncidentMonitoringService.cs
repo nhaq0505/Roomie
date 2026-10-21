@@ -18,7 +18,7 @@ public sealed class IncidentMonitoringService : IIncidentService
     private readonly ILogger<IncidentMonitoringService> _logger;
 
     private static readonly List<DateTimeOffset> DbFailedProbes = new();
-    private static bool DbIncidentTriggeredInMemory = false;
+    private static MonitoringIncident? DbIncidentInMemory;
     private static readonly object DbProbeLock = new();
 
     public Func<CancellationToken, Task<bool>>? DbProbeOverride { get; set; }
@@ -46,7 +46,7 @@ public sealed class IncidentMonitoringService : IIncidentService
         lock (DbProbeLock)
         {
             DbFailedProbes.Clear();
-            DbIncidentTriggeredInMemory = false;
+            DbIncidentInMemory = null;
         }
     }
 
@@ -59,6 +59,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                 .OrderByDescending(x => x.StartedAt)
                 .ToListAsync(ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to query incidents from database (database may be unreachable)");
@@ -67,20 +68,8 @@ public sealed class IncidentMonitoringService : IIncidentService
 
         lock (DbProbeLock)
         {
-            if (DbIncidentTriggeredInMemory && !list.Any(x => x.IncidentKey == "database_disconnected" && x.State != "Resolved"))
-            {
-                list.Insert(0, new MonitoringIncident
-                {
-                    IncidentKey = "database_disconnected",
-                    RuleName = "Database Connectivity Failure",
-                    Severity = "Critical",
-                    State = "Active",
-                    Summary = "Database probe failed 3 consecutive times",
-                    Details = "Application cannot connect to PostgreSQL database",
-                    StartedAt = DbFailedProbes.FirstOrDefault(),
-                    NotificationCount = 1
-                });
-            }
+            if (DbIncidentInMemory is { } outage && !list.Any(x => x.Id == outage.Id))
+                list.Insert(0, outage);
         }
 
         var activeCount = list.Count(x => x.State != "Resolved");
@@ -180,6 +169,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                 canConnect = await _db.Database.CanConnectAsync(ct);
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch
         {
             canConnect = false;
@@ -187,56 +177,71 @@ public sealed class IncidentMonitoringService : IIncidentService
 
         if (!canConnect)
         {
+            MonitoringIncident? outage;
             lock (DbProbeLock)
             {
-                DbFailedProbes.Add(now);
-                DbFailedProbes.RemoveAll(t => (now - t).TotalMinutes > 15);
+                // Ignore extra checks inside a minute; confirmation needs spaced probes.
+                if (DbFailedProbes.Count == 0 || now - DbFailedProbes[^1] >= TimeSpan.FromMinutes(1))
+                    DbFailedProbes.Add(now);
+                DbFailedProbes.RemoveAll(t => now - t > TimeSpan.FromMinutes(15));
+                if (DbFailedProbes.Count >= 3)
+                    DbIncidentInMemory ??= new MonitoringIncident
+                    {
+                        IncidentKey = "database_disconnected",
+                        RuleName = "Database Connectivity Failure",
+                        Severity = "Critical",
+                        State = "Active",
+                        Summary = "Database probe failed 3 consecutive times at least one minute apart",
+                        Details = "Application cannot connect to its database. Outage held in process memory until reconnect.",
+                        StartedAt = DbFailedProbes[0],
+                        UpdatedAt = now
+                    };
+                outage = DbIncidentInMemory;
+            }
 
-                var count = DbFailedProbes.Count;
-                var durationMinutes = count >= 3 ? (now - DbFailedProbes[0]).TotalMinutes : 0;
-
-                if (count >= 3 && durationMinutes >= 2.0)
+            // No queries/writes on an unavailable database, including telemetry persistence.
+            if (outage != null && (outage.LastNotifiedAt == null || now - outage.LastNotifiedAt >= TimeSpan.FromHours(1)))
+            {
+                try
                 {
-                    evaluations.Add(new RuleEvaluation(
-                        IncidentKey: "database_disconnected",
-                        RuleName: "Database Connectivity Failure",
-                        Severity: "Critical",
-                        Summary: $"Database probe failed {count} consecutive times over {durationMinutes:F1} minutes",
-                        Details: "Application cannot connect to PostgreSQL database",
-                        Status: RuleStatus.Triggered,
-                        AlternateKey: "app_db_unreachable"
-                    ));
+                    await _notifier.SendIncidentAlertAsync(outage, isRecovery: false, ct);
+                    outage.LastNotifiedAt = now;
+                    outage.NotificationCount++;
                 }
-                else
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception ex)
                 {
-                    evaluations.Add(new RuleEvaluation(
-                        IncidentKey: "database_disconnected",
-                        RuleName: "Database Connectivity Failure",
-                        Severity: "Critical",
-                        Summary: $"Database probe failed ({count}/3 consecutive probes needed)",
-                        Details: "Awaiting probe confirmation before alerting",
-                        Status: RuleStatus.Unknown,
-                        AlternateKey: "app_db_unreachable"
-                    ));
+                    _logger.LogWarning("Database outage alert failed ({ErrorType}); retrying next cycle.", ex.GetType().Name);
                 }
             }
+            return;
         }
-        else
+
+        MonitoringIncident? recoveredOutage;
+        lock (DbProbeLock)
         {
-            lock (DbProbeLock)
-            {
-                DbFailedProbes.Clear();
-            }
-            evaluations.Add(new RuleEvaluation(
-                IncidentKey: "database_disconnected",
-                RuleName: "Database Connectivity Failure",
-                Severity: "Critical",
-                Summary: "Database probe succeeded",
-                Details: "Database connection verified healthy",
-                Status: RuleStatus.ExplicitlyHealthy,
-                AlternateKey: "app_db_unreachable"
-            ));
+            DbFailedProbes.Clear();
+            recoveredOutage = DbIncidentInMemory;
         }
+        if (recoveredOutage != null)
+        {
+            // Persist before recovery delivery; the existing retry path then survives restarts.
+            if (!await _db.MonitoringIncidents.AnyAsync(x => x.Id == recoveredOutage.Id, ct))
+            {
+                _db.MonitoringIncidents.Add(recoveredOutage);
+                await _db.SaveChangesAsync(ct);
+            }
+            lock (DbProbeLock) { DbIncidentInMemory = null; }
+        }
+        evaluations.Add(new RuleEvaluation(
+            IncidentKey: "database_disconnected",
+            RuleName: "Database Connectivity Failure",
+            Severity: "Critical",
+            Summary: "Database probe succeeded",
+            Details: "Database connection verified healthy",
+            Status: RuleStatus.ExplicitlyHealthy,
+            AlternateKey: "app_db_unreachable"
+        ));
 
         // 2. API 5xx Rate: Sustained 5min, Min 100 requests, > 5.0% threshold
         var summary5m = _routeAggregator.GetWindowSummary(TimeSpan.FromMinutes(5));
@@ -650,6 +655,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                     incident.UpdatedAt = now;
                     await _db.SaveChangesAsync(ct);
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
                     _logger.LogWarning("Failed to send initial incident alert for {Key} ({ErrorType}). Will retry next cycle.", eval.IncidentKey, ex.GetType().Name);
@@ -676,6 +682,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                     existing.NotificationCount++;
                     existing.UpdatedAt = now;
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
                     _logger.LogWarning("Failed to send reminder incident alert for {Key} ({ErrorType}). Will retry next cycle.", eval.IncidentKey, ex.GetType().Name);
@@ -707,6 +714,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                     await _notifier.SendIncidentAlertAsync(existing, isRecovery: true, ct);
                     existing.LastNotifiedAt = now;
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
                     _logger.LogWarning("Failed to send recovery alert for {Key} ({ErrorType}). Marking pending retry.", eval.IncidentKey, ex.GetType().Name);
@@ -740,6 +748,7 @@ public sealed class IncidentMonitoringService : IIncidentService
                 incident.LastNotifiedAt = _clock.GetUtcNow();
                 _logger.LogInformation("Successfully delivered pending recovery notice for {Key}", incident.IncidentKey);
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 _logger.LogWarning("Pending recovery notice retry failed for {Key} ({ErrorType})", incident.IncidentKey, ex.GetType().Name);
