@@ -188,12 +188,19 @@ jobs:
         env:
           CI_POSTGRES_PASSWORD: ci-only-db-password
           TEST_HTTP_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          MONITORING_ALERT_TO: ${{ github.ref == 'refs/heads/main' && vars.MONITORING_ALERT_TO || '' }}
         run: |
           set -euo pipefail
           image="rehouse-ci:${GITHUB_SHA}"
           docker build --platform linux/amd64 \
+            --build-arg MONITORING_ALERT_TO \
             --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" --tag "$image" .
+          docker image inspect "$image" --format '{{json .Config.Env}}' | python3 -c '
+          import json, os, sys
+          expected = "MONITORING_ALERT_TO=" + os.environ.get("MONITORING_ALERT_TO", "")
+          assert expected in json.load(sys.stdin), "Image alert recipient differs from deployment setting"
+          print("Deployment alert recipient embedded successfully")'
           python3 tests/run_disposable.py --image "$image" --provider sqlite
           TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=5432;Database=roomie_qa_ci;Username=room_rental;Password=${CI_POSTGRES_PASSWORD}" \
             python3 tests/run_disposable.py --image "$image" --provider postgres

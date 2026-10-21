@@ -18,6 +18,9 @@ COPY --from=backend /out/ ./
 COPY --from=frontend /src/frontend/dist/ ./wwwroot/
 RUN mkdir -p /app/data/keys && chown -R app:app /app/data
 USER app
+ARG MONITORING_ALERT_TO=""
+# Recipient only; SMTP credentials must remain runtime configuration.
+ENV MONITORING_ALERT_TO=${MONITORING_ALERT_TO}
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "RoomRental.Api.dll"]

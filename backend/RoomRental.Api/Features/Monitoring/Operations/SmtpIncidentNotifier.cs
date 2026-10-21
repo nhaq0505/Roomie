@@ -38,7 +38,10 @@ public sealed class SmtpIncidentNotifier : IIncidentNotifier
             throw new InvalidOperationException("Incident alerting disabled via configuration options.");
         }
 
-        var recipient = opt.AlertEmailTo ?? Environment.GetEnvironmentVariable("MONITORING_ALERT_TO");
+        // An unset Compose variable may arrive as an empty section value.
+        var recipient = string.IsNullOrWhiteSpace(opt.AlertEmailTo)
+            ? Environment.GetEnvironmentVariable("MONITORING_ALERT_TO")
+            : opt.AlertEmailTo;
         if (string.IsNullOrWhiteSpace(recipient))
         {
             _logger.LogWarning("No alert recipient configured for incident {Key}", incident.IncidentKey);

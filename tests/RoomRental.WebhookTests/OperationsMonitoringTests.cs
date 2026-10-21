@@ -559,6 +559,23 @@ public static class OperationsMonitoringTests
         catch (InvalidOperationException) { threwDisabled = true; }
         Assert(threwDisabled, "Disabled alerting throws InvalidOperationException (does not silently succeed)");
 
+        // Deployment image recipient works when an empty Compose value overrides the section.
+        var previousRecipient = Environment.GetEnvironmentVariable("MONITORING_ALERT_TO");
+        try
+        {
+            Environment.SetEnvironmentVariable("MONITORING_ALERT_TO", "build-fixture@example.invalid");
+            var fallbackNotifier = new SmtpIncidentNotifier(
+                Options.Create(new IncidentNotificationOptions { AlertEmailTo = " ", Enabled = true }),
+                fakeEmailSender, NullLogger<SmtpIncidentNotifier>.Instance);
+            await fallbackNotifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default);
+            Assert(fakeEmailSender.SentEmails.Last().To == "build-fixture@example.invalid",
+                "Empty Compose recipient falls back to deployment image recipient");
+            await notifier.SendIncidentAlertAsync(sampleIncident, isRecovery: false, default);
+            Assert(fakeEmailSender.SentEmails.Last().To == "ops-team@rehouse.vn",
+                "Explicit runtime recipient overrides deployment image recipient");
+        }
+        finally { Environment.SetEnvironmentVariable("MONITORING_ALERT_TO", previousRecipient); }
+
         // Test transport failure propagates out (never silently succeeds)
         fakeEmailSender.ShouldThrow = true;
         bool threwTransport = false;

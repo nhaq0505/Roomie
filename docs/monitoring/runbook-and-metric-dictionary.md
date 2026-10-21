@@ -73,6 +73,12 @@ Host JSON dùng `generated_at`, host metrics, containers/services, incidents/his
 
 Chỉ collector host truy cập Docker; không mount `/var/run/docker.sock` vào API. Collector chạy trên cùng VPS không thể gửi mail khi toàn máy/mạng chết; phát hiện whole-host outage cần probe ngoài VPS.
 
+## Recipient qua CI/CD khi không có SSH quản trị
+
+Repository variable `MONITORING_ALERT_TO` được workflow main truyền vào build argument cùng tên. Docker image đã kiểm thử mang email nhận mặc định qua env `MONITORING_ALERT_TO`; không ghi email cụ thể vào Git. Đây chỉ là recipient, không phải SMTP credential. SMTP host/tài khoản/mật khẩu vẫn do runtime hiện có cấp, không đưa vào build argument/image.
+
+`Monitoring:Alerts:AlertEmailTo` runtime có giá trị sẽ được ưu tiên; null/rỗng/whitespace mới fallback env `MONITORING_ALERT_TO`. Vì vậy host Compose cũ không map biến mới vẫn dùng recipient trong image; Compose mới map giá trị rỗng cũng không làm mất fallback. Đổi repository variable cần chạy lại workflow để tạo/deploy image mới. Không dùng cơ chế này để thay SMTP hoặc thay cấu hình host collector.
+
 ## Kiểm tra/diễn tập
 
 ```sh
