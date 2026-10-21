@@ -139,7 +139,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 
 ## 6. Chạy local có kiểm soát
 
-Yêu cầu .NET SDK 10, Node 24, npm, Python 3; Docker chỉ cần cho QA PostgreSQL/deployment. Từ root:
+Yêu cầu .NET SDK 10, Node 24, npm, Python 3; Docker cần cho local PostgreSQL dev container (`compose.postgres-dev.yaml`), QA PostgreSQL và deployment. Từ root:
 
 ```sh
 npm --prefix frontend ci
@@ -194,18 +194,41 @@ git diff --check
 
 Frontend build phải xong trước Playwright. Browser config tự chạy preview `127.0.0.1:4178`, API trong tests được giả lập. Không trỏ suite vào production hoặc dùng login thật để né fixture lỗi.
 
-HTTP regression dùng **API publish có đầy đủ `wwwroot`**, database PostgreSQL disposable và SMTP sink do harness quản lý:
+HTTP regression và các suite C# yêu cầu container PostgreSQL QA chuyên dụng (tách biệt hoàn toàn với dev container `rehouse-pg-migration-db` cổng 15432). Chạy container QA tạm thời và cấp biến môi trường dùng chung:
 
 ```sh
+# 1. Khởi chạy container PostgreSQL QA riêng biệt trên cổng loopback (ví dụ 55432):
+QA_CONTAINER="roomie-qa-pg-local-$(date +%s)"
+QA_PORT=55432
+docker run -d --name "$QA_CONTAINER" \
+  -e POSTGRES_DB=roomie_qa_bootstrap \
+  -e POSTGRES_USER=room_rental \
+  -e POSTGRES_PASSWORD=qa_test_password \
+  -p "127.0.0.1:$QA_PORT:5432" \
+  postgres:17-alpine
+
+until docker exec "$QA_CONTAINER" pg_isready -U room_rental -d roomie_qa_bootstrap; do sleep 1; done
+
+# 2. Cấp biến môi trường dùng chung cho C# suites và Python harness:
+export TEST_HTTP_POSTGRES_CONTAINER="$QA_CONTAINER"
+export TEST_HTTP_POSTGRES_CONNECTION="Host=127.0.0.1;Port=$QA_PORT;Database=roomie_qa_bootstrap;Username=room_rental;Password=qa_test_password"
+
+# 3. Chạy console C# suites (nếu kiểm tra C#):
+dotnet run --project tests/RoomRental.WebhookTests
+dotnet run --project tests/RoomRental.ZaloTests
+
+# 4. Chạy HTTP regression với API publish có đầy đủ wwwroot:
 npm --prefix frontend run build
 ROOMIE_QA_APP=$(mktemp -d /tmp/roomie-qa-app.XXXXXX)
 dotnet publish backend/RoomRental.Api -c Release -o "$ROOMIE_QA_APP"
 cp -R frontend/dist "$ROOMIE_QA_APP/wwwroot"
 
-export TEST_HTTP_POSTGRES_CONTAINER=rehouse-pg-migration-db
-export TEST_HTTP_POSTGRES_CONNECTION='Host=127.0.0.1;Port=15432;Database=roomie_qa_local;Username=room_rental;Password=<password>'
 python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider postgres
 python3 tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp-postgres
+
+# 5. Dọn dẹp container QA và thư mục publish:
+docker rm -f "$QA_CONTAINER"
+rm -rf "$ROOMIE_QA_APP"
 ```
 
 Harness tạo database ngẫu nhiên `roomie_qa_*` trong container chỉ định, keys trong `/tmp/roomie-ci-*`, chặn outbound bằng proxy loopback, callback HTTP localhost; không dùng payOS/SMTP/Zalo thật. Cả hai provider kỳ vọng 0 skip. macOS: nếu Python Homebrew lỗi `pyexpat`, dùng `/usr/bin/python3` như lần QA này. Thiếu webroot gây SEO 404, không chữa bằng bỏ test.
@@ -235,7 +258,7 @@ Push `main` kích hoạt CI/CD, publish và deploy nếu các cổng thành côn
 
 - [Triển khai / rollback](docs/deployment.md): identity, digest, host paths, migration overlay, Caddy, SMTP.
 - [Backup / restore](docs/backup-operations.md): DB + keys, Drive crypt, retention, restore drill.
-- [EF migrations](docs/ef-core-migrations.md): scaffold cả hai provider và áp schema đúng runner.
+- [EF migrations](docs/ef-core-migrations.md): scaffold PostgreSQL và áp schema đúng runner.
 - [Zalo setup](docs/zalo-setup.md): gateway keys/session, Docker override, cooldown/Unknown.
 - [Monitoring runbook](docs/monitoring/runbook-and-metric-dictionary.md): metrics, nguồn dữ liệu, cấu hình và các giới hạn wiring.
 - [Test harness](tests/README.md): môi trường cô lập và PostgreSQL.
