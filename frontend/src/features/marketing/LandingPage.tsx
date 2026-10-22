@@ -1,9 +1,9 @@
 import {
 ArrowRightOutlined, BarChartOutlined, CheckCircleFilled, CreditCardOutlined,
-DashboardOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LockOutlined,
+DashboardOutlined, FileTextOutlined, HomeOutlined, LockOutlined,
 QrcodeOutlined, SafetyCertificateOutlined, TeamOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { recordAttribution, trackEvent } from '../../shared/analytics';
 import { formatVnd } from '../../shared/format';
@@ -94,18 +94,6 @@ export function LandingContent({ user = null }: { user?: User | null }) {
   const workspace = user?.role === 'Admin' ? '/admin/owners' : '/dashboard';
   const destination = user ? workspace : '/register';
   const actionLabel = user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ");
-  const [promo, setPromo] = useState<{ isEnabled: boolean; rewardMonths: number }>({ isEnabled: true, rewardMonths: 3 });
-
-  useEffect(() => {
-    fetch('/api/promotions/welcome')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && typeof data.isEnabled === 'boolean') {
-          setPromo(data);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     try {
@@ -125,20 +113,6 @@ export function LandingContent({ user = null }: { user?: User | null }) {
   };
 
   return <div className="landing-page" ref={rootRef}>
-    {promo.isEnabled && (
-      <aside className="landing-promo-banner" aria-label={t("ƯU ĐÃI ĐẶC BIỆT")}>
-        <div className="landing-promo-inner">
-          <span className="promo-badge"><GiftOutlined /> {t("ƯU ĐÃI ĐẶC BIỆT")}</span>
-          <span className="promo-message">
-            {t("Tặng ngay {0} tháng Pro không giới hạn phòng khi đăng ký mới!", [promo.rewardMonths])}
-          </span>
-          <Link to={destination} className="promo-cta" onClick={() => handleCta('cta_promo_banner', 'Promo Top Banner')}>
-            <span>{user ? t("Bảng điều khiển") : t("Nhận ưu đãi ngay")}</span>
-            <ArrowRightOutlined aria-hidden="true" />
-          </Link>
-        </div>
-      </aside>
-    )}
     <header className="landing-header">
       <div className="landing-header-inner">
         <Brand />
@@ -158,12 +132,6 @@ export function LandingContent({ user = null }: { user?: User | null }) {
           <h1><span>{t("Gọn gàng từng phòng.")}</span><span>{t("Rõ ràng từng khoản.")}</span></h1>
           <p>{t("Theo dõi người thuê, chốt chỉ số điện và gửi hóa đơn trong một nơi duy nhất.")}</p>
           <Link to={destination} className="landing-btn landing-btn-light landing-btn-lg" onClick={() => handleCta('btn_hero_signup', actionLabel)}><span>{actionLabel}</span><ArrowRightOutlined aria-hidden="true" /></Link>
-          {promo.isEnabled && (
-            <div className="hero-promo-badge">
-              <GiftOutlined />
-              <span>{t("Ưu đãi: Tặng {0} tháng Pro không giới hạn phòng khi đăng ký", [promo.rewardMonths])}</span>
-            </div>
-          )}
           <div className="hero-proof"><CheckCircleFilled /><span>{t("Người thuê xem hóa đơn, không cần cài app.")}</span></div>
         </div>
         <DashboardPreview />

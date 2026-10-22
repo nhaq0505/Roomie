@@ -192,21 +192,5 @@ public static class AdminPromotionsEndpoints
                 AddedMonths: promo.RewardMonths
             ));
         }).RequireAuthorization("ApprovedOwner");
-
-        app.MapGet("/api/promotions/welcome", async (AppDbContext db, IConfiguration config, CancellationToken ct) =>
-        {
-            var welcome = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", ct);
-            var now = DateTimeOffset.UtcNow;
-            if (welcome is not null)
-            {
-                var isActive = welcome.IsEnabled &&
-                    (!welcome.StartsAt.HasValue || now >= welcome.StartsAt.Value) &&
-                    (!welcome.EndsAt.HasValue || now <= welcome.EndsAt.Value);
-                return Results.Ok(new { isEnabled = isActive, rewardMonths = welcome.RewardMonths });
-            }
-
-            var defaultMonths = config.GetValue("Promotions:NewUserProMonths", 3);
-            return Results.Ok(new { isEnabled = defaultMonths > 0, rewardMonths = defaultMonths > 0 ? defaultMonths : 3 });
-        }).AllowAnonymous();
     }
 }
