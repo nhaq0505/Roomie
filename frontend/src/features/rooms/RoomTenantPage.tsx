@@ -422,7 +422,7 @@ function RoomTenantWorkspace() {
                 </Col>
                 <Col xs={24} md={10}>
                   <Form.Item label={t("Số điện thoại")} name="phone">
-                    <Input size="large" placeholder="09xx xxx xxx" maxLength={60} />
+                    <Input size="large" inputMode="tel" placeholder="09xx xxx xxx" maxLength={60} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -434,7 +434,7 @@ function RoomTenantWorkspace() {
                     name="tenantCitizenId"
                     rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
                   >
-                    <Input size="large" placeholder={t("Số CCCD")} maxLength={12} />
+                    <Input size="large" inputMode="numeric" placeholder={t("Số CCCD")} maxLength={12} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={7}>
@@ -781,6 +781,26 @@ function RoomTenantWorkspace() {
               </Space>
             </SectionCard>
           </div>
+        </div>
+        <div className="room-tenant-mobile-bar" role="region" aria-label={t("Thao tác nhanh")}>
+          <Button
+            icon={<QrcodeOutlined />}
+            disabled={isSaving}
+            onClick={() => setQrTarget({ kind: 'tenant' })}
+          >
+            {t("Quét / Tải ảnh CCCD")}
+          </Button>
+          <Button
+            type="primary"
+            loading={isSaving && !openContractAfterSaveRef.current}
+            disabled={isSaving}
+            onClick={() => {
+              openContractAfterSaveRef.current = false;
+              form.submit();
+            }}
+          >
+            {isEditing ? t("Lưu thay đổi") : t("Lưu người thuê")}
+          </Button>
         </div>
       </Form>
       <CccdQrScannerModal

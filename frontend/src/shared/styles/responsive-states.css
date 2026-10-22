@@ -22,11 +22,12 @@
   .moveout-invoice-row > .ant-btn { flex: 0 0 auto; }
 }
 @media (max-width: 767px) {
-  .invoice-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .invoice-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .invoice-filter-search { grid-column: 1 / -1; }
   .invoice-list-actions { width: 100%; justify-content: space-between; }
+  .ant-input, .ant-input-number-input, .ant-select-selection-item, .ant-picker-input > input { font-size: 16px; }
 }
-@media (max-width: 480px) {
+@media (max-width: 340px) {
   .invoice-filter-toolbar { grid-template-columns: minmax(0, 1fr); }
   .invoice-filter-search { grid-column: auto; }
 }

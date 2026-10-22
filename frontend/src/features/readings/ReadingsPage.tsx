@@ -27,6 +27,7 @@ export default function ReadingsPage() {
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [draftForm] = Form.useForm<DraftAmounts>();
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
   const [isBatchSaving, setIsBatchSaving] = useState(false);
   const publishKeys = useRef(new Map<string, string>());
   const roomsQuery = useQuery({ queryKey: ['rooms', period], queryFn: () => roomsApi.list(period) });
@@ -53,18 +54,24 @@ export default function ReadingsPage() {
     ];
   }, [rows]);
 
-  const filteredRows = useMemo(() => {
+  const buildingRows = useMemo(() => {
     if (selectedBuilding === 'all') return rows;
     return rows.filter((r) => r.room.buildingId === selectedBuilding);
   }, [rows, selectedBuilding]);
 
+  const filteredRows = useMemo(() => {
+    if (statusFilter === 'pending') return buildingRows.filter((r) => r.saved?.currentReading === undefined);
+    if (statusFilter === 'done') return buildingRows.filter((r) => r.saved?.currentReading !== undefined);
+    return buildingRows;
+  }, [buildingRows, statusFilter]);
+
   const validBatchRooms = useMemo(() => {
-    return filteredRows.filter((r) => {
+    return buildingRows.filter((r) => {
       const initialValue = r.room.previousReading ?? r.room.initialReading ?? 0;
       const draftVal = drafts[r.room.id];
       return draftVal !== undefined && draftVal !== null && draftVal >= initialValue && !r.saved?.invoiceId && r.saved?.currentReading === undefined && !r.draftInvoice;
     });
-  }, [filteredRows, drafts]);
+  }, [buildingRows, drafts]);
   const prevPeriodRef = useRef(period);
   useEffect(() => {
     if (prevPeriodRef.current !== period) {
@@ -134,7 +141,7 @@ export default function ReadingsPage() {
   const columns: TableProps<ReadingRow>['columns'] = [
     { title: t("PHÒNG / NGƯỜI THUÊ"), key: 'room', render: (_, row) => <div className="room-name-cell"><div className="room-avatar"><span>⚡</span></div><div><strong>{row.room.name}</strong><span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span></div></div> },
     { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
-    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={3} step={0.001} value={drafts[row.room.id] ?? undefined} onChange={(value) => setDrafts((current) => ({ ...current, [row.room.id]: value }))} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
+    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="decimal" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={3} step={0.001} value={drafts[row.room.id] ?? undefined} onChange={(value) => setDrafts((current) => ({ ...current, [row.room.id]: value }))} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
     { title: t("SỬ DỤNG"), key: 'consumption', render: (_, row) => {
       const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
       const current = row.saved?.currentReading ?? drafts[row.room.id];
@@ -173,6 +180,89 @@ export default function ReadingsPage() {
       );
     } },
   ];
+
+  const renderCompactReading = (row: ReadingRow) => {
+    const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
+    const current = row.saved?.currentReading ?? drafts[row.room.id];
+    const usage = current == null ? null : Math.round(Math.max(0, current - previous) * 1000) / 1000;
+    const rate = row.room.electricityRate ?? 0;
+    const estimatedCost = usage == null ? null : Math.round(usage * rate);
+    const currentReading = drafts[row.room.id];
+    const invalid = currentReading == null || currentReading < previous;
+
+    return (
+      <div className="reading-mobile-card">
+        <div className="reading-mobile-head">
+          <div className="room-name-cell">
+            <div className="room-avatar"><span>⚡</span></div>
+            <div>
+              <strong>{row.room.name}</strong>
+              <span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span>
+            </div>
+          </div>
+          {row.draftInvoice ? (
+            <Tag className="draft-state-tag" icon={<ClockCircleOutlined />}>{t("Bản nháp")}</Tag>
+          ) : row.saved ? (
+            <Tag icon={<CheckCircleFilled />} className="submitted-tag">{t("Đã phát hành")}</Tag>
+          ) : null}
+        </div>
+        <div className="reading-mobile-stats">
+          <div className="reading-mobile-stat">
+            <span>{t("CHỈ SỐ TRƯỚC")}</span>
+            <strong className="meter-value">{previous} <small>kWh</small></strong>
+          </div>
+          <div className="reading-mobile-stat">
+            <span>{t("SỬ DỤNG")}</span>
+            <div className="reading-mobile-usage">
+              <strong className="consumption-value">{usage === null ? '—' : `${usage} kWh`}</strong>
+              {estimatedCost != null && usage !== null && (
+                <small className="reading-mobile-cost">≈ {formatVnd(estimatedCost)}</small>
+              )}
+            </div>
+          </div>
+        </div>
+        {row.saved?.currentReading !== undefined ? (
+          <div className="reading-mobile-saved">
+            <div>
+              <span>{t("CHỈ SỐ MỚI")}</span>
+              <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div>
+            </div>
+            {row.draftInvoice ? (
+              <Button type="primary" onClick={() => openDraft(row)}>{t("Sửa bản nháp")}</Button>
+            ) : (
+              <span className="already-done">{t("Đã phát hành")}</span>
+            )}
+          </div>
+        ) : (
+          <div className="reading-mobile-entry">
+            <InputNumber
+              className="reading-mobile-input"
+              inputMode="decimal"
+              aria-label={t("Chỉ số mới {0}", [row.room.name])}
+              min={previous}
+              precision={3}
+              step={0.001}
+              value={drafts[row.room.id] ?? undefined}
+              onChange={(value) => setDrafts((curr) => ({ ...curr, [row.room.id]: value }))}
+              addonAfter="kWh"
+              placeholder={t("Nhập chỉ số")}
+            />
+            <Button
+              type="primary"
+              className="reading-mobile-submit"
+              loading={readingMutation.isPending && readingMutation.variables?.roomId === row.room.id}
+              disabled={invalid || readingMutation.isPending}
+              onClick={() => {
+                if (currentReading != null) confirmReading(row, currentReading);
+              }}
+            >
+              {t("Chốt & lập hóa đơn")}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
   const handleBatchSave = () => {
     if (validBatchRooms.length === 0) return;
     modal.confirm({
@@ -211,8 +301,9 @@ export default function ReadingsPage() {
   };
 
   const setMonth = (value: Dayjs | null) => { if (value) setPeriod(value.format('YYYY-MM')); };
-  const occupied = filteredRows.length;
-  const done = filteredRows.filter((row) => row.saved?.currentReading !== undefined).length;
+  const occupied = buildingRows.length;
+  const done = buildingRows.filter((row) => row.saved?.currentReading !== undefined).length;
+  const pendingCount = Math.max(0, occupied - done);
   const draftSessionAmounts = Form.useWatch([], draftForm) as DraftAmounts | undefined;
   const draftTotal = (draftSessionAmounts?.rent ?? draftSession?.invoice.rent ?? 0) +
     (draftSessionAmounts?.electricityAmount ?? draftSession?.invoice.electricityAmount ?? 0) +
@@ -256,10 +347,26 @@ export default function ReadingsPage() {
     />
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : readingsQuery.isError ? <LoadError error={readingsQuery.error} onRetry={() => void readingsQuery.refetch()} /> : invoicesQuery.isError ? <LoadError error={invoicesQuery.error} onRetry={() => void invoicesQuery.refetch()} /> : roomsQuery.isPending || readingsQuery.isPending || invoicesQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
       <div className="reading-progress-card"><div className="reading-progress-mark"><InfoCircleOutlined /></div><div className="reading-progress-copy"><strong>{periodLabel(period)} <span>·</span> {done}/{occupied} {t("phòng đã chốt")}</strong><span>{t("Chỉ số trước được lấy từ lần ghi gần nhất hoặc lúc tạo phòng.")}</span></div><div className="reading-progress-meter"><div style={{ width: `${occupied ? (done / occupied) * 100 : 0}%` }} /></div></div>
-      <SectionCard className="reading-section" title={t("Danh sách phòng đang thuê")} extra={<span className="section-caption">{periodLabel(period)}</span>}>
+      <SectionCard
+        className="reading-section"
+        title={t("Danh sách phòng đang thuê")}
+        extra={
+          <div className="reading-filter-pills" role="group" aria-label={t("Trạng thái phát hành")}>
+            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'all' ? 'true' : undefined} onClick={() => setStatusFilter('all')}>
+              {t("Tất cả ({0})", [occupied])}
+            </button>
+            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'pending' ? 'true' : undefined} onClick={() => setStatusFilter('pending')}>
+              {t("Nhập chỉ số")} ({pendingCount})
+            </button>
+            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'done' ? 'true' : undefined} onClick={() => setStatusFilter('done')}>
+              {t("Đã chốt")} ({done})
+            </button>
+          </div>
+        }
+      >
         <div className="reading-notice"><InfoCircleOutlined /><span><strong>{t("Tiền thuê tính đủ theo tháng")}</strong> {t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê.")}</span></div>
-        {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
-        {filteredRows.length > 0 && done === filteredRows.length && <div className="all-readings-done"><CheckCircleFilled /> {t("Tất cả phòng đang thuê đã có hóa đơn cho kỳ này.")}</div>}
+        {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} renderCompact={renderCompactReading} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
+        {buildingRows.length > 0 && done === buildingRows.length && <div className="all-readings-done"><CheckCircleFilled /> {t("Tất cả phòng đang thuê đã có hóa đơn cho kỳ này.")}</div>}
       </SectionCard>
     </>}
     <Modal className="legacy-draft-modal" title={t("Xem và phát hành bản nháp cũ")} open={!!draftSession} onCancel={() => { if (!publishMutation.isPending) setDraftSession(null); }} footer={null} confirmLoading={publishMutation.isPending} width={620} destroyOnClose>

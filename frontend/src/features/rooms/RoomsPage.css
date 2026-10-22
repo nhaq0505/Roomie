@@ -296,11 +296,53 @@
   text-align: right;
 }
 
+.room-tenant-mobile-bar {
+  display: none;
+}
+
 @media (max-width: 991px) {
   .room-tenant-workspace-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   .room-tenant-side-column {
     position: static;
+  }
+}
+
+@media (max-width: 767px) {
+  .room-tenant-card-header-flex > .ant-btn {
+    width: 100%;
+    min-height: 44px;
+    font-weight: 600;
+  }
+  .room-tenant-coresidents-header > .ant-space {
+    width: 100%;
+  }
+  .room-tenant-coresidents-header > .ant-space > .ant-space-item {
+    flex: 1 1 100%;
+  }
+  .room-tenant-coresidents-header > .ant-space .ant-btn {
+    width: 100%;
+    min-height: 42px;
+  }
+  .room-tenant-mobile-bar {
+    position: sticky;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    z-index: 25;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--room-line);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -4px 18px rgba(19, 48, 55, 0.08);
+  }
+  .room-tenant-mobile-bar > .ant-btn {
+    min-height: 44px;
+    font-weight: 600;
+    padding-inline: 10px;
   }
 }

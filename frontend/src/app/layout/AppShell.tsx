@@ -52,6 +52,7 @@ const adminItems = [
   const isAdmin = user?.role === 'Admin';
   const items = isAdmin ? adminItems : ownerItems;
   const activeMenuKey = location.pathname.startsWith('/rooms/') ? '/rooms' : location.pathname;
+  const primaryMobileKeys = new Set(['/dashboard', '/rooms', '/readings', '/invoices', 'settings']);
   const title = settingsItems.find((item) => item.key === activeMenuKey)?.label ?? items.find((item) => item.key === activeMenuKey)?.label ?? 'Roomie';
 
   const userMenu: MenuProps['items'] = [
@@ -81,11 +82,29 @@ const adminItems = [
     </Drawer>
     <Layout className="main-layout">
       <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}>{t("Menu")}</Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : t("Chủ trọ")}</small></span><Typography.Text type="secondary">⌄</Typography.Text></Button></Dropdown></Space></Header>
-      <nav className="compact-navigation" aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => item.key === 'settings'
-        ? <Dropdown key={item.key} trigger={['click']} menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
-          <button type="button" aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span>{item.label} <DownOutlined /></span></button>
-        </Dropdown>
-        : <Link key={item.key} to={item.key!} aria-current={location.pathname === item.key ? 'page' : undefined}>{item.icon}<span>{item.label}</span></Link>)}</nav>
+      <nav className="compact-navigation" data-role={isAdmin ? 'admin' : 'owner'} aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => {
+        const isSecondary = !isAdmin && !primaryMobileKeys.has(String(item.key));
+        if (item.key === 'settings') {
+          return (
+            <Dropdown key={item.key} trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
+              <button type="button" data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span>{item.label} <DownOutlined /></span></button>
+            </Dropdown>
+          );
+        }
+        return (
+          <Link key={item.key} to={item.key!} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={activeMenuKey === item.key ? 'page' : undefined}>
+            {item.icon}
+            {item.key === '/rooms' ? (
+              <>
+                <span className="compact-nav-label-full">{item.label}</span>
+                <span className="compact-nav-label-short">{t("Phòng")}</span>
+              </>
+            ) : (
+              <span>{item.label}</span>
+            )}
+          </Link>
+        );
+      })}</nav>
       <Content className="page-content"><div className="page-content-inner">{children}</div></Content>
     </Layout>
   </Layout>;
