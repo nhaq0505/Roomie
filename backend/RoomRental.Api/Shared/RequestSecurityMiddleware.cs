@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 
@@ -65,5 +67,15 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
         }
 
         await next(context);
+
+        if (context.User.Identity?.IsAuthenticated == true &&
+            MutatingMethods.Contains(context.Request.Method))
+        {
+            var userIdText = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userIdText, out var userId))
+            {
+                context.RequestServices.GetService<IMemoryCache>()?.Remove($"dashboard:{userId}");
+            }
+        }
     }
 }

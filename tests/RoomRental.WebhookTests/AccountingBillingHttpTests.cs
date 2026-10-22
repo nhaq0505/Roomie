@@ -268,7 +268,7 @@ internal static class AccountingBillingHttpTests
             rent: 2_000_000, elecRate: 3_000, waterFee: 50_000, waterPerPerson: false, serviceFee: 0, initialReading: 0);
 
         var requestId = Guid.NewGuid();
-        var dueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7));
+        var dueDate = VietnamCalendar.TodayVietnam().AddDays(7);
         const string desc = "Thay bóng đèn và sửa khóa cửa";
         const decimal amount = 175_000;
 
@@ -484,7 +484,7 @@ internal static class AccountingBillingHttpTests
 
         // A separate unpaid charge remains in the debt report after the original invoice is settled.
         var debtCharge = await client.PostAsJsonAsync($"/api/rooms/{roomId}/supplemental-invoices",
-            new SupplementalInvoiceRequest(Guid.NewGuid(), occupancyId, "Export debt fixture", 500_000, DateOnly.FromDateTime(DateTime.UtcNow)));
+            new SupplementalInvoiceRequest(Guid.NewGuid(), occupancyId, "Export debt fixture", 500_000, VietnamCalendar.TodayVietnam()));
         Assert(debtCharge.StatusCode == HttpStatusCode.Created, "unpaid debt export fixture created");
 
         // 2. Debt export: GET /api/reports/debt/export.xlsx

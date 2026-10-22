@@ -1410,5 +1410,22 @@
   "Chiến dịch Tết 2026, tặng đối tác...": "신년 프로모션, 파트너 선물...",
   "Giới hạn lượt dùng": "사용 한도",
   "Không giới hạn": "무제한",
-  "Ngày hết hạn": "만료 날짜"
+  "Ngày hết hạn": "만료 날짜",
+  "Kích hoạt thành công! Bạn nhận được {0} tháng sử dụng gói Pro.": "성공적으로 활성화되었습니다! Pro 요금제 {0}개월이 지급되었습니다.",
+  "Vô thời hạn (Gói Pro)": "무기한 (Pro 요금제)",
+  "Đã sao chép dãy trọ và các mức phí. Chỉnh tên phòng trước khi tạo. Phòng mới chưa có người thuê, tiền cọc hoặc hóa đơn.": "건물과 요금이 복사되었습니다. 생성 전에 방 이름을 수정하세요. 새 방에는 세입자, 보증금 또는 청구서가 없습니다.",
+  "Sao chép mã {0}": "코드 {0} 복사",
+  "Sửa mã {0}": "코드 {0} 수정",
+  "Xóa mã {0}": "코드 {0} 삭제",
+  "Mã khuyến mãi không tồn tại.": "프로모션 코드가 존재하지 않습니다.",
+  "Mã khuyến mãi này hiện đang bị khóa hoặc ngừng áp dụng.": "이 프로모션 코드는 현재 잠겨 있거나 중단되었습니다.",
+  "Mã khuyến mãi này đã hết hạn sử dụng.": "이 프로모션 코드는 유효기간이 만료되었습니다.",
+  "Mã khuyến mãi này đã đạt giới hạn lượt sử dụng.": "이 프로모션 코드는 사용 한도에 도달했습니다.",
+  "Bạn đã sử dụng mã khuyến mãi này rồi.": "이미 사용한 프로모션 코드입니다.",
+  "Không tìm thấy mã khuyến mãi.": "프로모션 코드를 찾을 수 없습니다.",
+  "Mã khuyến mãi này đã tồn tại.": "이미 존재하는 프로모션 코드입니다.",
+  "Số lượt sử dụng tối đa phải lớn hơn 0.": "최대 사용 횟수는 0보다 커야 합니다.",
+  "Thời gian bắt đầu không được lớn hơn thời gian kết thúc.": "시작 날짜는 종료 날짜 이후일 수 없습니다.",
+  "Số tháng tặng thưởng phải từ 1 đến 120 tháng.": "지급 개월 수는 1개월에서 120개월 사이여야 합니다.",
+  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "프로모션 코드는 3~32자여야 합니다."
 }

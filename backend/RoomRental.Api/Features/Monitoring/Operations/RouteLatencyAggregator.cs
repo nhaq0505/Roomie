@@ -39,6 +39,7 @@ public interface IRouteLatencyAggregator
     OperationsOverviewSnapshot GetOverviewSnapshot(TimeSpan window, bool? dbConnected = null, string? dbStatus = null);
     WindowLatencySummary GetWindowSummary(TimeSpan window);
     IReadOnlyList<OperationalRouteMinuteBucket> DrainCompletedMinuteBuckets(long beforeMinuteEpoch);
+    void UnmarkFlushedMinutes(IEnumerable<long> minuteEpochs);
     void Reset();
 }
 
@@ -192,6 +193,14 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
             }
         }
         return drained;
+    }
+
+    public void UnmarkFlushedMinutes(IEnumerable<long> minuteEpochs)
+    {
+        foreach (var minute in minuteEpochs)
+        {
+            _flushedMinutes.TryRemove(minute, out _);
+        }
     }
 
     public void Reset()

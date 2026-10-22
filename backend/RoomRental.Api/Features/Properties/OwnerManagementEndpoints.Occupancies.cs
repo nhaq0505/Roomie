@@ -75,11 +75,13 @@ public static partial class OwnerManagementEndpoints
             {
                 if (initialReading < 0 || initialReading > 1_000_000_000)
                     throw new ApiException(400, "Chỉ số điện phải là số không âm trong giới hạn cho phép.");
+                if (decimal.Round(initialReading, 3) != initialReading)
+                    throw new ApiException(400, "Chỉ số điện tối đa 3 chữ số thập phân.");
                 var maxReading = await QueryAggregates.MaxReadingAsync(db,
                     db.Readings.AsNoTracking().Where(x => x.RoomId == id).Select(x => x.CurrentReading), cancellationToken);
                 var maxFinal = await QueryAggregates.MaxReadingAsync(db,
                     db.Invoices.AsNoTracking().Where(x => x.RoomId == id && x.IsFinalMeterReading).Select(x => x.CurrentReading), cancellationToken);
-                var priorPhysical = Math.Max(maxReading, maxFinal);
+                var priorPhysical = Math.Max(room.InitialReading, Math.Max(maxReading, maxFinal));
                 if (priorPhysical > 0 && initialReading < priorPhysical)
                     throw new ApiException(400, $"Chỉ số điện không thể thấp hơn chỉ số trước đó ({priorPhysical} kWh).");
                 room.InitialReading = initialReading;

@@ -1,15 +1,15 @@
 import {
-CheckCircleFilled,
-CrownOutlined,
-GiftOutlined,
-SafetyCertificateOutlined
+  CheckCircleFilled,
+  CrownOutlined,
+  GiftOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { Alert, Button, Card, Col, Input, Progress, Radio, Row, Space, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { formatVnd } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
-import { PageTitle, SectionCard } from '../../shared/ui/Ui';
+import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { type SubscriptionPackage } from './index';
 import SubscriptionCheckoutModal from './SubscriptionCheckoutModal';
 import { useSubscriptionDashboard } from './useSubscriptionDashboard';
@@ -17,7 +17,12 @@ import { useSubscriptionDashboard } from './useSubscriptionDashboard';
 export default function ApprovedSubscriptionDashboard() {
   const state = useSubscriptionDashboard();
   const [promoCode, setPromoCode] = useState('');
-  const { selectedPackageId, setSelectedPackageId, upgradeMutation, status, isPro, currentRooms, maxRooms, isLimitReached } = state;
+  const { selectedPackageId, setSelectedPackageId, upgradeMutation, status, isPro, currentRooms, maxRooms, isLimitReached, subQuery } = state;
+
+  if (subQuery.isError) {
+    return <LoadError error={subQuery.error} onRetry={() => void subQuery.refetch()} />;
+  }
+
   return <>
     <PageTitle
       eyebrow={t("GÓI CƯỚC & TÀI KHOẢN")}
@@ -55,8 +60,8 @@ export default function ApprovedSubscriptionDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography.Text type="secondary">{t("Thời hạn sử dụng:")}</Typography.Text>
               <Typography.Text strong>
-                {isPro && status?.expiresAt
-                  ? dayjs(status.expiresAt).format('HH:mm DD/MM/YYYY')
+                {isPro
+                  ? (status?.expiresAt ? dayjs(status.expiresAt).format('HH:mm DD/MM/YYYY') : t("Vô thời hạn (Gói Pro)"))
                   : t("Không giới hạn thời gian (Gói Miễn phí)")}
               </Typography.Text>
             </div>
@@ -186,7 +191,7 @@ export default function ApprovedSubscriptionDashboard() {
                     </div>
                     <div style={{ margin: '14px 0 10px' }}>
                       <Typography.Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-                        {formatVnd(pkg.priceVnd)}
+                        {formatVnd(pkg.price ?? pkg.priceVnd ?? 0)}
                       </Typography.Title>
                       <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                         {t("Sử dụng trong {0} ngày", [pkg.days])}

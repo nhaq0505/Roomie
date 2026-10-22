@@ -16,7 +16,7 @@ public static class AuthEndpoints
     {
         var routes = app.MapGroup("/api/auth");
 
-        routes.MapPost("/register", async (RegisterRequest request, AppDbContext db, IPasswordHasher<AppUser> hasher, RegistrationVerificationService verification, IConfiguration configuration, CancellationToken cancellationToken, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null) =>
+        routes.MapPost("/register", async (RegisterRequest request, AppDbContext db, IPasswordHasher<AppUser> hasher, RegistrationVerificationService verification, IConfiguration configuration, TimeProvider clock, CancellationToken cancellationToken, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null) =>
         {
             var name = request.Name?.Trim();
             var email = request.Email?.Trim().ToLowerInvariant();
@@ -29,7 +29,7 @@ public static class AuthEndpoints
             if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
                 throw new ApiException(StatusCodes.Status409Conflict, "Email này đã được đăng ký.");
 
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             var welcomePromo = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", cancellationToken);
             int promoMonths;
             if (welcomePromo is not null)

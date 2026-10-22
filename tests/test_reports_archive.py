@@ -362,6 +362,59 @@ class ReportsArchiveIntegrationTests(unittest.TestCase):
         self.assertNotEqual(report["items"][0]["roomName"], renamed_room)
         self.assertEqual(report["items"][0]["amount"], monthly["total"])
 
+    def test_excel_export_sanitizes_formula_prefixes_and_keeps_numeric_cells(self) -> None:
+        building = self.create_building("report-sanitize")
+        room = self.create_room(building["id"], rent=1000)
+        occupancy = self.owner.ok("POST", f"/api/rooms/{room['id']}/occupancy", {
+            "tenantName": "@AttackerTenant",
+            "people": 1,
+            "startDate": first_day(period_offset(0)),
+            "depositAmount": 500,
+        })["occupancy"]
+        self.issue_monthly_invoice(room["id"])
+
+        self.owner.ok("POST", f"/api/invoices/{occupancy['depositInvoiceId']}/receipts", {
+            "amount": 500, "note": "=2+2", "idempotencyKey": str(uuid.uuid4()),
+        })
+
+        for amount, note in [
+            (100, "+cmd|' /C calc'!A0"),
+            (150, "-1+2"),
+            (200, "@SUM(1,2)"),
+        ]:
+            charge = self.owner.ok("POST", f"/api/rooms/{room['id']}/supplemental-invoices", {
+                "requestId": str(uuid.uuid4()), "occupancyId": occupancy["id"],
+                "description": f"Charge {note}", "amount": amount, "dueDate": today_vietnam().isoformat(),
+            })
+            self.owner.ok("POST", f"/api/invoices/{charge['id']}/receipts", {
+                "amount": amount, "note": note, "idempotencyKey": str(uuid.uuid4()),
+            })
+
+        today = today_vietnam().isoformat()
+        filters = f"dateFrom={today}&dateTo={today}&buildingId={building['id']}&roomId={room['id']}"
+        status, body, _ = self.owner.request("GET", f"/api/reports/receipts/export.xlsx?{filters}")
+        self.assertEqual(status, 200)
+
+        with ZipFile(BytesIO(body)) as workbook:
+            namespace = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            details = ET.fromstring(workbook.read("xl/worksheets/sheet2.xml"))
+
+            formulas = details.findall(".//s:f", namespace)
+            self.assertEqual(len(formulas), 0, "Excel output contained formula elements <s:f>")
+
+            amount_cells = details.findall(".//s:c[@r]", namespace)
+            detail_amounts: list[Decimal] = []
+            for cell in amount_cells:
+                coord = cell.get("r", "")
+                if coord.startswith("B") and coord != "B1":
+                    self.assertNotIn(cell.get("t"), ("s", "str", "inlineStr"), f"Money cell {coord} is stored as string")
+                    val = cell.find("s:v", namespace)
+                    self.assertIsNotNone(val, f"Money cell {coord} missing value")
+                    detail_amounts.append(Decimal(val.text))
+
+            self.assertEqual(len(detail_amounts), 4)
+            self.assertEqual(sum(detail_amounts), Decimal("950"))
+
 
 if __name__ == "__main__":
     unittest.main()

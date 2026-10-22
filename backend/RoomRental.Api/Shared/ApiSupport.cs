@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace RoomRental.Api.Services;
@@ -84,6 +86,16 @@ public static class ApiSupport
         var originPort = origin.IsDefaultPort ? (origin.Scheme == "https" ? 443 : 80) : origin.Port;
         return string.Equals(origin.Scheme, request.IsHttps ? "https" : "http", StringComparison.OrdinalIgnoreCase) &&
                string.Equals(origin.Host, requestHost.Host, StringComparison.OrdinalIgnoreCase) && requestPort == originPort;
+    }
+
+    public static void InvalidateDashboardCache(IMemoryCache? cache, Guid ownerId)
+    {
+        cache?.Remove($"dashboard:{ownerId}");
+    }
+
+    public static void InvalidateDashboardCache(HttpContext context, Guid ownerId)
+    {
+        InvalidateDashboardCache(context.RequestServices.GetService<IMemoryCache>(), ownerId);
     }
 }
 

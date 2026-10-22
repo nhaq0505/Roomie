@@ -203,10 +203,15 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       tier: 'Free',
       expiresAt: null,
       isPro: false,
+      roomCount: 0,
       currentRooms: 0,
       maxRooms: 5,
-      availablePackages: [],
+      availablePackages: [
+        { id: 'pro_1m', name: '1 tháng', days: 30, price: 99000, priceVnd: 99000, description: 'Gói 1 tháng' },
+      ],
     };
+    let delayPost = false;
+    let finishPost: () => void = () => {};
 
     await page.route('**/api/**', async (route) => {
       const url = new URL(route.request().url());
@@ -221,6 +226,9 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       if (path === '/api/rooms') {
         if (method === 'GET') return route.fulfill({ json: rooms });
         if (method === 'POST') {
+          if (delayPost) {
+            await new Promise<void>((resolve) => { finishPost = resolve; });
+          }
           const body = route.request().postDataJSON() as {
             buildingId: string;
             name: string;
@@ -229,7 +237,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
             waterFee: number;
             waterPerPerson: boolean;
             serviceFee: number;
-            initialReading: number;
+            initialReading?: number;
           };
           const newRoom: Room = {
             id: `room-${Date.now()}`,
@@ -241,8 +249,8 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
             waterFee: body.waterFee,
             waterPerPerson: body.waterPerPerson,
             serviceFee: body.serviceFee,
-            initialReading: body.initialReading,
-            previousReading: body.initialReading,
+            initialReading: body.initialReading ?? 0,
+            previousReading: body.initialReading ?? 0,
             occupancy: null,
             isArchived: false,
           };
@@ -257,10 +265,11 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await page.goto('/rooms');
     await expect(page.getByRole('heading', { level: 2, name: 'Phòng & người thuê' })).toBeVisible();
 
-    // 1. Create Room via modal
+    // 1. Create Room via modal (verifying absence of initial electricity meter reading field)
     await page.getByRole('button', { name: 'Tạo phòng trọ' }).first().click();
     const roomModal = page.locator('.ant-modal').filter({ hasText: 'Thêm phòng mới' });
     await expect(roomModal).toBeVisible();
+    await expect(roomModal.getByLabel('Chỉ số điện ban đầu')).toHaveCount(0);
 
     await roomModal.getByLabel('Tên phòng').fill('Phòng 101');
     await roomModal.getByLabel('Giá thuê / tháng').fill('3000000');
@@ -274,6 +283,28 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(page.getByText('Phòng 101', { exact: true })).toBeVisible();
     await expect(page.locator('.room-state-vacant')).toHaveText('Còn trống');
 
+    // 2b. Duplicate Room ("Nhân bản phòng") & verify isBusy / confirmLoading disabled state
+    await page.locator('.room-more').first().click();
+    await expect(page.getByRole('menuitem', { name: 'Nhân bản phòng' })).toBeVisible();
+    await page.getByRole('menuitem', { name: 'Nhân bản phòng' }).click();
+
+    const dupModal = page.locator('.ant-modal').filter({ hasText: 'Nhân bản Phòng 101' });
+    await expect(dupModal).toBeVisible();
+    await expect(dupModal.getByLabel('Tên phòng')).toHaveValue('Phòng 101 (bản sao)');
+    await expect(dupModal.getByLabel('Chỉ số điện ban đầu')).toHaveCount(0);
+
+    // Simulate in-flight request to verify confirmLoading state on submit button
+    delayPost = true;
+    const submitBtn = dupModal.getByRole('button', { name: 'Tạo phòng' });
+    await submitBtn.click();
+    await expect(submitBtn).toHaveClass(/ant-btn-loading/);
+
+    // Complete request and verify modal closes and duplicated room is visible
+    finishPost();
+    delayPost = false;
+    await expect(dupModal).toBeHidden();
+    await expect(page.getByText('Phòng 101 (bản sao)', { exact: true })).toBeVisible();
+
     // 3. Quota enforcement: Free plan with 5/5 active rooms
     rooms = [
       { id: 'r1', buildingId: 'bld-01', buildingName: building.name, name: 'Phòng 101', rent: 3000000, electricityRate: 3500, waterFee: 100000, serviceFee: 50000, occupancy: null, isArchived: false },
@@ -282,7 +313,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       { id: 'r4', buildingId: 'bld-01', buildingName: building.name, name: 'Phòng 104', rent: 3000000, electricityRate: 3500, waterFee: 100000, serviceFee: 50000, occupancy: null, isArchived: false },
       { id: 'r5', buildingId: 'bld-01', buildingName: building.name, name: 'Phòng 105', rent: 3000000, electricityRate: 3500, waterFee: 100000, serviceFee: 50000, occupancy: null, isArchived: false },
     ];
-    subStatus = { ...subStatus, currentRooms: 5, maxRooms: 5, isPro: false };
+    subStatus = { ...subStatus, roomCount: 5, currentRooms: 5, maxRooms: 5, isPro: false };
 
     await page.reload();
     await expect(page.getByRole('heading', { level: 2, name: 'Phòng & người thuê' })).toBeVisible();
@@ -331,7 +362,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
       if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
       if (path === '/api/buildings') return route.fulfill({ json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', isArchived: false }] });
-      if (path === '/api/subscription') return route.fulfill({ json: { tier: 'Pro', isPro: true, currentRooms: 1, maxRooms: null, availablePackages: [] } });
+      if (path === '/api/subscription') return route.fulfill({ json: { tier: 'Pro', isPro: true, roomCount: 1, currentRooms: 1, maxRooms: null, availablePackages: [{ id: 'pro_1m', name: '1 tháng', days: 30, price: 99000, priceVnd: 99000, description: 'Gói 1 tháng' }] } });
       if (path === '/api/settings/payment') return route.fulfill({ json: paymentSettings });
 
       if (path === '/api/rooms') {
@@ -344,9 +375,12 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
           people: number;
           startDate: string;
           depositAmount: number;
+          initialReading?: number;
         };
         room = {
           ...room,
+          initialReading: body.initialReading ?? room.initialReading,
+          previousReading: body.initialReading ?? room.previousReading,
           occupancy: {
             id: 'occ-01',
             tenantName: body.tenantName,
@@ -455,7 +489,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
       if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
       if (path === '/api/buildings') return route.fulfill({ json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', isArchived: false }] });
-      if (path === '/api/subscription') return route.fulfill({ json: { tier: 'Pro', isPro: true, currentRooms: 1, maxRooms: null, availablePackages: [] } });
+      if (path === '/api/subscription') return route.fulfill({ json: { tier: 'Pro', isPro: true, roomCount: 1, currentRooms: 1, maxRooms: null, availablePackages: [{ id: 'pro_1m', name: '1 tháng', days: 30, price: 99000, priceVnd: 99000, description: 'Gói 1 tháng' }] } });
       if (path === '/api/rooms') {
         return route.fulfill({ json: [room] });
       }

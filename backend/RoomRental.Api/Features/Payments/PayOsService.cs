@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Npgsql;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -18,15 +19,17 @@ public sealed partial class PayOsService
     private readonly ILogger<PayOsService> logger;
     private readonly IDataProtector _protector;
     private readonly PaymentWebhookService _webhookService;
+    private readonly IMemoryCache? _cache;
     private static readonly ConcurrentDictionary<long, DateTimeOffset> LastReconcileAttemptByOrder = new();
     private const string ApiBaseUrl = "https://api-merchant.payos.vn";
     private const int CheckoutExpirySeconds = 600;
     public PayOsService(AppDbContext db, IDataProtectionProvider protectionProvider, IHttpClientFactory httpClientFactory,
-        IConfiguration configuration, ILogger<PayOsService> logger, PaymentWebhookService? webhookService = null)
+        IConfiguration configuration, ILogger<PayOsService> logger, PaymentWebhookService? webhookService = null, IMemoryCache? cache = null)
     {
         this.db=db; this.httpClientFactory=httpClientFactory; this.configuration=configuration; this.logger=logger;
         _protector=protectionProvider.CreateProtector("RoomRental.OwnerPayOsCredentials.v1");
-        _webhookService=webhookService ?? new PaymentWebhookService(db,protectionProvider,httpClientFactory,configuration);
+        _cache = cache;
+        _webhookService=webhookService ?? new PaymentWebhookService(db,protectionProvider,httpClientFactory,configuration, null, cache);
     }
 
     public static readonly IReadOnlyList<SubscriptionPackageDto> DefaultPackages =

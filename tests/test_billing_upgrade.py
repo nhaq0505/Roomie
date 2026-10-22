@@ -559,9 +559,9 @@ class BillingUpgradeIntegrationTests(unittest.TestCase):
         self.assertIn("pro_3m", package_ids)
         self.assertIn("pro_1y", package_ids)
 
-        # Calling upgrade endpoint returns either checkout or 502 gateway error if payos is unconfigured
+        # Calling upgrade endpoint returns either checkout, 400 if unconfigured, or 502 gateway error
         status, body, _ = self.owner.request("POST", "/api/subscription/upgrade", {"packageId": "pro_1m"})
-        self.assertIn(status, (200, 502))
+        self.assertIn(status, (200, 400, 502))
 
     def test_older_tenant_invoice_lookup_is_not_limited_to_first_page(self):
         room=self.create_room()

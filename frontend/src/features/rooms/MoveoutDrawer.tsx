@@ -76,6 +76,7 @@ export default function MoveoutDrawer({ room, onClose }: { room: Room; onClose: 
     client.invalidateQueries({ queryKey: ['dashboard'] }),
     client.invalidateQueries({ queryKey: ['reports'] }),
     client.invalidateQueries({ queryKey: ['manual-payments'] }),
+    client.invalidateQueries({ queryKey: ['readings'] }),
   ]);
   const completeMutation = useMutation({
     mutationFn: (body: { occupancyId: string; requestId: string; refundAmount: number; expectedHeld: number; expectedDepositVersion: number | null }) => roomsApi.completeMoveout(room.id, body),

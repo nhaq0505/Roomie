@@ -203,7 +203,7 @@ class AccountOccupancyDashboardTests(unittest.TestCase):
         self.start_occupancy(empty['id'])
         draft = self.save_reading(empty['id'], period_offset(0), 110)['invoice']
         db = self.fixture_db(); db.execute('UPDATE "Invoices" SET "LifecycleState"=? WHERE "Id"=?', ('Draft', draft['id'].upper())); db.commit()
-        self.assertEqual(self.owner.ok('GET', '/api/dashboard')['monthlyBilled'], summary['monthlyBilled'])
+        self.assertEqual(self.owner.ok('GET', '/api/dashboard', headers={'Cache-Control': 'no-cache'})['monthlyBilled'], summary['monthlyBilled'])
 
     def test_empty_dashboard_has_zero_collection_rate(self):
         summary = self.owner.ok('GET', '/api/dashboard')

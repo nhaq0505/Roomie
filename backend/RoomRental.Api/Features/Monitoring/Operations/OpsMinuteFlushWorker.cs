@@ -28,8 +28,17 @@ public sealed class OpsMinuteFlushWorker(
 
                 if (completedBuckets.Count > 0)
                 {
-                    db.RouteMinuteBuckets.AddRange(completedBuckets);
-                    await db.SaveChangesAsync(stoppingToken);
+                    try
+                    {
+                        db.RouteMinuteBuckets.AddRange(completedBuckets);
+                        await db.SaveChangesAsync(stoppingToken);
+                    }
+                    catch
+                    {
+                        var epochs = completedBuckets.Select(b => b.MinuteTimestamp.ToUnixTimeSeconds() / 60).Distinct();
+                        routeAggregator.UnmarkFlushedMinutes(epochs);
+                        throw;
+                    }
                 }
 
                 // Ops 30-day retention on RouteMinuteBuckets

@@ -184,6 +184,7 @@ public sealed partial class PayOsService
         trackedAttempt.PaidAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        ApiSupport.InvalidateDashboardCache(_cache, ownerId);
     }
 
 

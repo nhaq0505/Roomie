@@ -1410,5 +1410,22 @@
   "Chiến dịch Tết 2026, tặng đối tác...": "新年促销，合作伙伴礼品...",
   "Giới hạn lượt dùng": "使用次数限制",
   "Không giới hạn": "不限制",
-  "Ngày hết hạn": "到期日"
+  "Ngày hết hạn": "到期日",
+  "Kích hoạt thành công! Bạn nhận được {0} tháng sử dụng gói Pro.": "激活成功！您已获得 {0} 个月的 Pro 套餐。",
+  "Vô thời hạn (Gói Pro)": "永久有效（Pro 套餐）",
+  "Đã sao chép dãy trọ và các mức phí. Chỉnh tên phòng trước khi tạo. Phòng mới chưa có người thuê, tiền cọc hoặc hóa đơn.": "已复制楼栋与费率。创建前请修改房间名称。新房间无租客、押金或账单。",
+  "Sao chép mã {0}": "复制优惠码 {0}",
+  "Sửa mã {0}": "编辑优惠码 {0}",
+  "Xóa mã {0}": "删除优惠码 {0}",
+  "Mã khuyến mãi không tồn tại.": "促销优惠码不存在。",
+  "Mã khuyến mãi này hiện đang bị khóa hoặc ngừng áp dụng.": "此促销优惠码已被锁定或已停用。",
+  "Mã khuyến mãi này đã hết hạn sử dụng.": "此促销优惠码已过期。",
+  "Mã khuyến mãi này đã đạt giới hạn lượt sử dụng.": "此促销优惠码已达到使用次数上限。",
+  "Bạn đã sử dụng mã khuyến mãi này rồi.": "您已经使用过该促销优惠码。",
+  "Không tìm thấy mã khuyến mãi.": "未找到促销优惠码。",
+  "Mã khuyến mãi này đã tồn tại.": "此促销优惠码已存在。",
+  "Số lượt sử dụng tối đa phải lớn hơn 0.": "最大使用次数必须大于 0。",
+  "Thời gian bắt đầu không được lớn hơn thời gian kết thúc.": "开始时间不能晚于结束时间。",
+  "Số tháng tặng thưởng phải từ 1 đến 120 tháng.": "奖励月数必须在 1 至 120 个月之间。",
+  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "优惠码必须为 3 至 32 个字符。"
 }

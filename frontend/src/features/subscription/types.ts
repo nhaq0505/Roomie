@@ -1,22 +1,29 @@
-
 export type SubscriptionTier = 'Free' | 'Pro';
 
 export interface SubscriptionPackage {
   id: string;
   name: string;
   days: number;
-  priceVnd: number;
+  price: number;
+  priceVnd?: number;
   description: string;
-  maxRooms: number;
+  maxRooms?: number;
 }
 
 export interface SubscriptionStatus {
   tier: SubscriptionTier;
   expiresAt: string | null;
   isPro: boolean;
-  currentRooms: number;
+  roomCount: number;
+  currentRooms?: number;
   maxRooms: number | null;
   availablePackages: SubscriptionPackage[];
+}
+
+export interface ReconcileSubscriptionResult {
+  status: string;
+  checkoutUrl?: string | null;
+  isPro?: boolean;
 }
 
 export interface RedeemResult {

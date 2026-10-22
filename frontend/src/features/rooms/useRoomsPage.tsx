@@ -46,7 +46,7 @@ export function useRoomsPage() {
   const roomsQuery = useQuery({ queryKey: ['rooms', 'archive-view'], queryFn: () => roomsApi.list(undefined, true) });
   const subQuery = useQuery({ queryKey: ['subscription'], queryFn: subscriptionApi.getStatus });
 
-  const refreshData = async () => { await Promise.all([client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['buildings'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['subscription'] })]); };
+  const refreshData = async () => { await Promise.all([client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['buildings'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['subscription'] }), client.invalidateQueries({ queryKey: ['readings'] })]); };
   const createMutation = useMutation({ mutationFn: roomsApi.create, onSuccess: async () => { await refreshData(); message.success(t("Đã thêm phòng.")); setMode(null); roomForm.resetFields(); }, onError: (e: Error) => message.error(e.message) });
   const supplementalMutation = useMutation({ mutationFn: ({ roomId, body }: { roomId: string; body: Parameters<typeof invoicesApi.createSupplemental>[1] }) => invoicesApi.createSupplemental(roomId, body), onSuccess: async () => { await refreshData(); message.success(t("Đã tạo hóa đơn bổ sung trên link khách.")); setSupplemental(null); supplementalForm.resetFields(); }, onError: (e: Error) => message.error(e.message) });
   const updateMutation = useMutation({ mutationFn: ({ id, values }: { id: string; values: Parameters<typeof roomsApi.update>[1] }) => roomsApi.update(id, values), onSuccess: async () => { await refreshData(); message.success(t("Đã cập nhật thông tin phòng.")); setMode(null); }, onError: (e: Error) => message.error(e.message) });
@@ -79,7 +79,7 @@ export function useRoomsPage() {
       });
       return;
     }
-    setSelectedRoom(null); roomForm.resetFields(); roomForm.setFieldsValue({ rent: 0, electricityRate: 3500, waterFee: 0, waterPerPerson: false, serviceFee: 0, initialReading: 0, buildingId: activeBuildings.some((building) => building.id === buildingFilter) ? buildingFilter : (activeBuildings.length === 1 ? activeBuildings[0].id : undefined) }); setMode('create');
+    setSelectedRoom(null); roomForm.resetFields(); roomForm.setFieldsValue({ rent: 0, electricityRate: 3500, waterFee: 0, waterPerPerson: false, serviceFee: 0, buildingId: activeBuildings.some((building) => building.id === buildingFilter) ? buildingFilter : (activeBuildings.length === 1 ? activeBuildings[0].id : undefined) }); setMode('create');
   };
   const openDuplicate = (room: Room) => {
     if (isQuotaReached) {
@@ -99,7 +99,7 @@ export function useRoomsPage() {
     while (existingNames.has(name.toLocaleLowerCase())) name = t("{0} (bản sao {1})", [baseName, suffix++]);
     setSelectedRoom(room);
     roomForm.resetFields();
-    roomForm.setFieldsValue({ buildingId: room.buildingId, name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee, initialReading: 0 });
+    roomForm.setFieldsValue({ buildingId: room.buildingId, name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee });
     setMode('duplicate');
   };
   const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee }); setMode('settings'); };

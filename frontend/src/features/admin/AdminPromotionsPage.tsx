@@ -56,8 +56,8 @@ export default function AdminPromotionsPage() {
       promotionsApi.updateWelcome({
         isEnabled: values.isEnabled,
         rewardMonths: values.rewardMonths,
-        startsAt: values.dateRange?.[0] ? values.dateRange[0].toISOString() : null,
-        endsAt: values.dateRange?.[1] ? values.dateRange[1].toISOString() : null,
+        startsAt: values.dateRange?.[0] ? values.dateRange[0].startOf('day').toISOString() : null,
+        endsAt: values.dateRange?.[1] ? values.dateRange[1].endOf('day').toISOString() : null,
       }),
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ['admin-promotions'] });
@@ -108,7 +108,7 @@ export default function AdminPromotionsPage() {
         description: values.description?.trim(),
         rewardMonths: values.rewardMonths,
         maxRedemptions: values.maxRedemptions ?? null,
-        expiresAt: values.expiresAt ? values.expiresAt.toISOString() : null,
+        expiresAt: values.expiresAt ? values.expiresAt.endOf('day').toISOString() : null,
         isActive: values.isActive ?? true,
       };
       if (editingCode) {
@@ -171,9 +171,14 @@ export default function AdminPromotionsPage() {
             type="text"
             size="small"
             icon={<CopyOutlined />}
-            onClick={() => {
-              void navigator.clipboard.writeText(code);
-              message.success(t("Đã sao chép mã {0}", [code]));
+            aria-label={t("Sao chép mã {0}", [code])}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(code);
+                message.success(t("Đã sao chép mã {0}", [code]));
+              } catch {
+                message.info(code);
+              }
             }}
           />
         </Space>
@@ -218,7 +223,7 @@ export default function AdminPromotionsPage() {
       render: (active: boolean, record: PromotionCode) => (
         <Switch
           checked={active}
-          loading={toggleStatusMutation.isPending}
+          loading={toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === record.id}
           onChange={() => toggleStatusMutation.mutate(record)}
         />
       ),
@@ -231,6 +236,7 @@ export default function AdminPromotionsPage() {
           <Button
             type="text"
             icon={<EditOutlined />}
+            aria-label={t("Sửa mã {0}", [record.code])}
             onClick={() => openEditModal(record)}
           />
           <Popconfirm
@@ -245,7 +251,8 @@ export default function AdminPromotionsPage() {
               type="text"
               danger
               icon={<DeleteOutlined />}
-              loading={deleteCodeMutation.isPending}
+              aria-label={t("Xóa mã {0}", [record.code])}
+              loading={deleteCodeMutation.isPending && deleteCodeMutation.variables === record.id}
             />
           </Popconfirm>
         </Space>
@@ -379,7 +386,7 @@ export default function AdminPromotionsPage() {
           </Form.Item>
 
           <Form.Item label={t("Ghi chú")} name="description">
-            <Input.TextArea rows={2} placeholder={t("Chiến dịch Tết 2026, tặng đối tác...")} />
+            <Input.TextArea maxLength={255} rows={2} placeholder={t("Chiến dịch Tết 2026, tặng đối tác...")} />
           </Form.Item>
 
           <Row gutter={16}>

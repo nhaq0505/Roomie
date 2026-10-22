@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -8,6 +9,15 @@ namespace RoomRental.Api.Endpoints;
 
 public static class AdminPromotionsEndpoints
 {
+    private static PostgresException? GetPostgresException(Exception ex)
+    {
+        for (var cur = ex; cur != null; cur = cur.InnerException)
+        {
+            if (cur is PostgresException pg) return pg;
+        }
+        return null;
+    }
+
     public static void MapPromotionsRoutes(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin/promotions")
@@ -16,7 +26,7 @@ public static class AdminPromotionsEndpoints
         admin.MapGet("", async (AppDbContext db, IConfiguration config, CancellationToken ct) =>
         {
             var welcome = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", ct);
-            var defaultMonths = config.GetValue("Promotions:NewUserProMonths", 3);
+            var defaultMonths = config.GetValue("Promotions:NewUserProMonths", 0);
             var welcomeDto = welcome is not null
                 ? new WelcomePromotionDto(welcome.Id, welcome.Name, welcome.IsEnabled, welcome.RewardMonths, welcome.StartsAt, welcome.EndsAt)
                 : new WelcomePromotionDto("welcome", "Tặng Pro người đăng ký mới", defaultMonths > 0, defaultMonths > 0 ? defaultMonths : 3, null, null);
@@ -63,7 +73,15 @@ public static class AdminPromotionsEndpoints
                 promo.UpdatedAt = clock.GetUtcNow();
             }
 
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            {
+                throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
+            }
+
             return Results.Ok(new WelcomePromotionDto(promo.Id, promo.Name, promo.IsEnabled, promo.RewardMonths, promo.StartsAt, promo.EndsAt));
         });
 
@@ -72,6 +90,9 @@ public static class AdminPromotionsEndpoints
             var code = request.Code?.Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(code) || code.Length < 3 || code.Length > 32)
                 throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi phải từ 3 đến 32 ký tự.");
+
+            if (request.Description?.Trim().Length > 255)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Mô tả mã khuyến mãi tối đa 255 ký tự.");
 
             if (request.RewardMonths < 1 || request.RewardMonths > 120)
                 throw new ApiException(StatusCodes.Status400BadRequest, "Số tháng tặng thưởng phải từ 1 đến 120 tháng.");
@@ -94,7 +115,17 @@ public static class AdminPromotionsEndpoints
             };
 
             db.PromotionCodes.Add(promoCode);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            {
+                var pg = GetPostgresException(ex);
+                if (pg?.SqlState == "23505")
+                    throw new ApiException(StatusCodes.Status409Conflict, "Mã khuyến mãi này đã tồn tại.");
+                throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
+            }
 
             return Results.Created($"/api/admin/promotions/codes/{promoCode.Id}", new PromotionCodeDto(
                 promoCode.Id, promoCode.Code, promoCode.Description, promoCode.RewardMonths, promoCode.MaxRedemptions,
@@ -107,8 +138,14 @@ public static class AdminPromotionsEndpoints
             var promo = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Id == id, ct)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy mã khuyến mãi.");
 
+            if (request.Description?.Trim().Length > 255)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Mô tả mã khuyến mãi tối đa 255 ký tự.");
+
             if (request.RewardMonths < 1 || request.RewardMonths > 120)
                 throw new ApiException(StatusCodes.Status400BadRequest, "Số tháng tặng thưởng phải từ 1 đến 120 tháng.");
+
+            if (request.MaxRedemptions.HasValue && request.MaxRedemptions.Value < 1)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Số lượt sử dụng tối đa phải lớn hơn 0.");
 
             if (request.MaxRedemptions.HasValue && request.MaxRedemptions.Value < promo.RedeemedCount)
                 throw new ApiException(StatusCodes.Status400BadRequest, $"Số lượt tối đa không được nhỏ hơn số lượt đã dùng ({promo.RedeemedCount}).");
@@ -119,7 +156,15 @@ public static class AdminPromotionsEndpoints
             promo.ExpiresAt = request.ExpiresAt;
             promo.IsActive = request.IsActive;
 
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            {
+                throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
+            }
+
             return Results.Ok(new PromotionCodeDto(
                 promo.Id, promo.Code, promo.Description, promo.RewardMonths, promo.MaxRedemptions,
                 promo.RedeemedCount, promo.IsActive, promo.ExpiresAt, promo.CreatedAt
@@ -134,7 +179,15 @@ public static class AdminPromotionsEndpoints
             var redemptions = db.PromotionRedemptions.Where(x => x.PromotionCodeId == id);
             db.PromotionRedemptions.RemoveRange(redemptions);
             db.PromotionCodes.Remove(promo);
-            await db.SaveChangesAsync(ct);
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            {
+                throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
+            }
 
             return Results.NoContent();
         });
@@ -166,6 +219,9 @@ public static class AdminPromotionsEndpoints
                 throw new ApiException(StatusCodes.Status400BadRequest, "Bạn đã sử dụng mã khuyến mãi này rồi.");
 
             var owner = await db.Users.SingleAsync(x => x.Id == ownerId, ct);
+            if (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt == null)
+                throw new ApiException(StatusCodes.Status409Conflict, "Tài khoản của bạn đang ở gói Pro vĩnh viễn, không cần sử dụng thêm mã khuyến mãi.");
+
             var baseExpiry = (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt.HasValue && owner.SubscriptionExpiresAt.Value > now)
                 ? owner.SubscriptionExpiresAt.Value
                 : now;
@@ -181,8 +237,18 @@ public static class AdminPromotionsEndpoints
                 RedeemedAt = now
             });
 
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+            }
+            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            {
+                var pg = GetPostgresException(ex);
+                if (pg?.SqlState == "23505")
+                    throw new ApiException(StatusCodes.Status409Conflict, "Bạn đã sử dụng mã khuyến mãi này rồi.");
+                throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
+            }
 
             return Results.Ok(new RedeemPromotionResultDto(
                 Success: true,
@@ -191,6 +257,6 @@ public static class AdminPromotionsEndpoints
                 SubscriptionExpiresAt: owner.SubscriptionExpiresAt,
                 AddedMonths: promo.RewardMonths
             ));
-        }).RequireAuthorization(policy => policy.RequireRole("Owner"));
+        }).RequireAuthorization(policy => policy.RequireRole("Owner")).RequireRateLimiting("tenant-payment");
     }
 }

@@ -4,13 +4,14 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
 public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvider protectionProvider,
-    IHttpClientFactory httpClientFactory, IConfiguration configuration, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
+    IHttpClientFactory httpClientFactory, IConfiguration configuration, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, IMemoryCache? cache = null)
 {
     public RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? MilestoneTracker => milestoneTracker;
     private string? WebhookUrl(Guid ownerId)
@@ -139,12 +140,20 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
         }
 
         var owner = await db.Users.SingleAsync(row => row.Id == attempt.OwnerId, cancellationToken);
-        var days = attempt.SubscriptionDays ?? 30;
-        var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > DateTimeOffset.UtcNow)
-            ? owner.SubscriptionExpiresAt.Value
-            : DateTimeOffset.UtcNow;
+        var isLifetimePro = owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt is null;
         owner.SubscriptionTier = SubscriptionTier.Pro;
-        owner.SubscriptionExpiresAt = baseDate.AddDays(days);
+        if (!isLifetimePro)
+        {
+            var days = attempt.SubscriptionDays ?? 30;
+            var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > DateTimeOffset.UtcNow)
+                ? owner.SubscriptionExpiresAt.Value
+                : DateTimeOffset.UtcNow;
+            owner.SubscriptionExpiresAt = baseDate.AddDays(days);
+        }
+        else
+        {
+            owner.SubscriptionExpiresAt = null;
+        }
 
         trackedAttempt.Status = PaymentAttemptStatus.Paid;
         trackedAttempt.ProviderReference = reference;
@@ -164,6 +173,7 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        ApiSupport.InvalidateDashboardCache(cache, attempt.OwnerId);
 
         if (milestoneTracker is not null)
         {

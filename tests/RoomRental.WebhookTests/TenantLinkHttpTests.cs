@@ -82,7 +82,7 @@ internal static class TenantLinkHttpTests
         var roomId = room.GetProperty("id").GetGuid();
         var occupancy = await JsonAsync(await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new
         {
-            tenantName = "Fixture Tenant", people = 1, startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), depositAmount = 100_000
+            tenantName = "Fixture Tenant", people = 1, startDate = VietnamCalendar.TodayVietnam().AddDays(-1), depositAmount = 100_000
         }));
         var occupancyId = occupancy.GetProperty("occupancy").GetProperty("id").GetGuid();
         Guid invoiceId;
@@ -130,7 +130,7 @@ internal static class TenantLinkHttpTests
         }), HttpStatusCode.Created);
         var verifiedOccupancy = await JsonAsync(await client.PostAsJsonAsync($"/api/rooms/{secondRoom.GetProperty("id").GetGuid()}/occupancy", new
         {
-            tenantName = "Verified Fixture Tenant", people = 1, startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), depositAmount = 0
+            tenantName = "Verified Fixture Tenant", people = 1, startDate = VietnamCalendar.TodayVietnam().AddDays(-1), depositAmount = 0
         }));
         Assert(!string.IsNullOrEmpty(verifiedOccupancy.GetProperty("occupancy").GetProperty("token").GetString()),
             "occupancy creation exposes a link after payOS verification");

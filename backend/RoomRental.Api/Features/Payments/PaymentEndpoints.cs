@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -134,13 +135,14 @@ public static class PaymentEndpoints
             return Results.Ok(new { status, invoice = InvoiceService.ToDto(refreshed) });
         }).RequireRateLimiting("tenant-payment");
 
-        app.MapPost("/api/payments/webhook/{ownerId:guid}", async (Guid ownerId, HttpRequest request, PayOsService payOsService, CancellationToken cancellationToken) =>
+        app.MapPost("/api/payments/webhook/{ownerId:guid}", async (Guid ownerId, HttpRequest request, PayOsService payOsService, [FromServices] IMemoryCache? cache, CancellationToken cancellationToken) =>
         {
             JsonDocument body;
             try { body = await JsonDocument.ParseAsync(request.Body, cancellationToken: cancellationToken); }
             catch (JsonException) { throw new ApiException(StatusCodes.Status400BadRequest, "Malformed payOS callback payload."); }
             using (body)
                 await payOsService.ProcessWebhookAsync(ownerId, body.RootElement, cancellationToken);
+            ApiSupport.InvalidateDashboardCache(cache, ownerId);
             return Results.Ok(new { code = "00", desc = "success" });
         });
     }

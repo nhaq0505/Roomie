@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using RoomRental.Api.Data;
@@ -116,6 +118,94 @@ internal static class PromotionsTests
         // Third user tries to redeem when max is reached
         Check(reloadedCode.MaxRedemptions.HasValue && reloadedCode.RedeemedCount >= reloadedCode.MaxRedemptions.Value,
             "max redemptions limit reached check works correctly");
+
+        // 3. Lifetime Pro user (SubscriptionTier.Pro, SubscriptionExpiresAt = null) is rejected when redeeming voucher
+        var lifetimeUser = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Name = "Lifetime Owner",
+            Email = "lifetime@example.invalid",
+            PasswordHash = "x",
+            Status = OwnerStatus.Approved,
+            SubscriptionTier = SubscriptionTier.Pro,
+            SubscriptionExpiresAt = null
+        };
+        db.Users.Add(lifetimeUser);
+
+        var lifetimeVoucher = new PromotionCode
+        {
+            Code = "PRO_LIFETIME_TEST",
+            Description = "Test Voucher",
+            RewardMonths = 1,
+            MaxRedemptions = 5,
+            RedeemedCount = 0,
+            IsActive = true,
+            CreatedAt = clock.GetUtcNow()
+        };
+        db.PromotionCodes.Add(lifetimeVoucher);
+        await db.SaveChangesAsync();
+
+        var lifetimeRedeemRejected = false;
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            var promo = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Code == "PRO_LIFETIME_TEST")
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Mã khuyến mãi không tồn tại.");
+
+            var owner = await db.Users.SingleAsync(x => x.Id == lifetimeUser.Id);
+            if (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt == null)
+                throw new ApiException(StatusCodes.Status409Conflict, "Tài khoản của bạn đang ở gói Pro vĩnh viễn, không cần sử dụng thêm mã khuyến mãi.");
+
+            owner.SubscriptionTier = SubscriptionTier.Pro;
+            owner.SubscriptionExpiresAt = clock.GetUtcNow().AddMonths(promo.RewardMonths);
+            promo.RedeemedCount++;
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status409Conflict)
+        {
+            lifetimeRedeemRejected = true;
+        }
+
+        Check(lifetimeRedeemRejected, "lifetime pro user is rejected with 409 Conflict when redeeming voucher");
+
+        var reloadedLifetimeUser = await db.Users.AsNoTracking().SingleAsync(x => x.Id == lifetimeUser.Id);
+        Check(reloadedLifetimeUser.SubscriptionTier == SubscriptionTier.Pro && reloadedLifetimeUser.SubscriptionExpiresAt == null,
+            "lifetime pro user retains SubscriptionTier.Pro and SubscriptionExpiresAt == null");
+
+        var reloadedLifetimeVoucher = await db.PromotionCodes.AsNoTracking().SingleAsync(x => x.Code == "PRO_LIFETIME_TEST");
+        Check(reloadedLifetimeVoucher.RedeemedCount == 0, "voucher RedeemedCount was not incremented when lifetime user was rejected");
+
+        // 4. Payment webhook for lifetime Pro user retains SubscriptionExpiresAt == null
+        var dummyProtection = new EphemeralDataProtectionProvider();
+        var dummyHttpFactory = new FakeHttpClientFactory();
+        var webhookService = new PaymentWebhookService(db, dummyProtection, dummyHttpFactory, config);
+
+        var subAttempt = new PayOsAttempt
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = lifetimeUser.Id,
+            OrderCode = 77665544,
+            Amount = 99000,
+            Kind = "Subscription",
+            SubscriptionDays = 30,
+            Status = PaymentAttemptStatus.Pending,
+            CreatedAt = clock.GetUtcNow()
+        };
+        db.PayOsAttempts.Add(subAttempt);
+        await db.SaveChangesAsync();
+
+        var paymentHandled = await webhookService.HandleSubscriptionPaymentSuccessAsync(subAttempt, 99000, "ref-lifetime-sub-pay", default);
+        Check(paymentHandled, "HandleSubscriptionPaymentSuccessAsync succeeds for lifetime user");
+
+        var reloadedAfterSubPayment = await db.Users.AsNoTracking().SingleAsync(x => x.Id == lifetimeUser.Id);
+        Check(reloadedAfterSubPayment.SubscriptionTier == SubscriptionTier.Pro && reloadedAfterSubPayment.SubscriptionExpiresAt == null,
+            "lifetime pro user retains SubscriptionTier.Pro and SubscriptionExpiresAt == null after payment webhook");
+    }
+
+    private sealed class FakeHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new();
     }
 
     private sealed class FakeOtpSender : IRegistrationEmailSender

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 
@@ -6,7 +7,7 @@ namespace RoomRental.Api.Services;
 
 public sealed record ManualReceiptResult(Guid Id, Guid InvoiceId, decimal Amount, decimal Paid, decimal Outstanding, string Status, long Version);
 
-public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
+public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, IMemoryCache? cache = null)
 {
     public async Task<ManualReceiptResult> RecordAsync(Guid ownerId, Guid invoiceId, ReceiptRequest request,
         string? headerKey, CancellationToken ct)
@@ -59,6 +60,7 @@ public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs, Ro
                 InvoiceService.RecalculateStatus(invoice);
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
+                ApiSupport.InvalidateDashboardCache(cache, ownerId);
                 if (milestoneTracker != null)
                 {
                     try { await milestoneTracker.RecordOwnerActivityAsync(ownerId, ActorType.Owner, "ManualReceipt", ct); }
@@ -71,6 +73,7 @@ public sealed class ManualReceiptService(AppDbContext db, PayOsService payOs, Ro
         // Reconcile only the signed, exact-amount provider payment. Never add manual cash as well.
         db.ChangeTracker.Clear();
         await payOs.RecordVerifiedPaymentAfterCancellationCheckAsync(ownerId, paidOnline, ct);
+        ApiSupport.InvalidateDashboardCache(cache, ownerId);
         throw new ApiException(409, "payOS đã xác nhận thanh toán. Hóa đơn đã được cập nhật; không ghi thêm khoản thu tiền mặt.");
     }
 

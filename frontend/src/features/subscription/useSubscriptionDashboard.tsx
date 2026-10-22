@@ -33,13 +33,14 @@ export function useSubscriptionDashboard() {
   const reconcileMutation = useMutation({
     mutationFn: (orderCode: number) => subscriptionApi.reconcile(orderCode),
     onSuccess: async (data) => {
-      if (data.isPro) {
+      if (data.status === 'Paid' || data.isPro) {
         setPaymentSuccess(true);
         message.success(t("Nâng cấp gói Pro thành công!"));
         await Promise.all([
           subQuery.refetch(),
           refreshUser(),
           client.invalidateQueries({ queryKey: ['rooms'] }),
+          client.invalidateQueries({ queryKey: ['dashboard'] }),
         ]);
         if (pollingRef.current) {
           window.clearInterval(pollingRef.current);
@@ -52,11 +53,12 @@ export function useSubscriptionDashboard() {
   const redeemMutation = useMutation({
     mutationFn: (code: string) => subscriptionApi.redeemCode(code),
     onSuccess: async (data) => {
-      message.success(data.message);
+      message.success(t("Kích hoạt thành công! Bạn nhận được {0} tháng sử dụng gói Pro.", [data.addedMonths]));
       await Promise.all([
         subQuery.refetch(),
         refreshUser(),
         client.invalidateQueries({ queryKey: ['rooms'] }),
+        client.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
     },
     onError: (err: Error) => message.error(err.message),
@@ -88,9 +90,9 @@ export function useSubscriptionDashboard() {
 
   const status = subQuery.data;
   const isPro = status?.isPro ?? false;
-  const currentRooms = status?.currentRooms ?? 0;
+  const currentRooms = status?.roomCount ?? status?.currentRooms ?? 0;
   const maxRooms = status?.maxRooms ?? 5;
   const isLimitReached = !isPro && currentRooms >= maxRooms;
 
-  return { message, selectedPackageId, setSelectedPackageId, checkout, setCheckout, paymentSuccess, setPaymentSuccess, upgradeMutation, reconcileMutation, redeemMutation, copyToClipboard, status, isPro, currentRooms, maxRooms, isLimitReached };
+  return { message, selectedPackageId, setSelectedPackageId, checkout, setCheckout, paymentSuccess, setPaymentSuccess, upgradeMutation, reconcileMutation, redeemMutation, copyToClipboard, status, isPro, currentRooms, maxRooms, isLimitReached, subQuery };
 }

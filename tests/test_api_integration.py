@@ -65,15 +65,18 @@ class ApiSession:
         payload: Any | None = None,
         *,
         origin: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> tuple[int, Any, dict[str, str]]:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
-        headers = {"Accept": "application/json"}
+        req_headers = {"Accept": "application/json"}
         if data is not None:
-            headers["Content-Type"] = "application/json"
+            req_headers["Content-Type"] = "application/json"
         if method.upper() not in {"GET", "HEAD", "OPTIONS"}:
-            headers["Origin"] = origin or ORIGIN
+            req_headers["Origin"] = origin or ORIGIN
+        if headers:
+            req_headers.update(headers)
         request = urllib.request.Request(
-            f"{BASE_URL}{path}", data=data, headers=headers, method=method.upper()
+            f"{BASE_URL}{path}", data=data, headers=req_headers, method=method.upper()
         )
         try:
             response = self.opener.open(request, timeout=10)
@@ -99,8 +102,15 @@ class ApiSession:
             body = raw.decode("utf-8", errors="replace")
         return status, body, response_headers
 
-    def ok(self, method: str, path: str, payload: Any | None = None) -> Any:
-        status, body, _ = self.request(method, path, payload)
+    def ok(
+        self,
+        method: str,
+        path: str,
+        payload: Any | None = None,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        status, body, _ = self.request(method, path, payload, headers=headers)
         if not 200 <= status < 300:
             raise AssertionError(f"{method} {path} returned {status}: {body!r}")
         return unwrap(body)

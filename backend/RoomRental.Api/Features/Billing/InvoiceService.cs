@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
+public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, IMemoryCache? cache = null)
 {
     public Task StageZaloReminderAsync(Invoice invoice, CancellationToken ct) => zalo?.StageIssuedAsync(invoice, ct) ?? Task.CompletedTask;
 
@@ -93,6 +94,11 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
                     // Telemetry failure must not break invoice generation; outbox remains Pending
                 }
             }
+        }
+
+        if (created > 0)
+        {
+            ApiSupport.InvalidateDashboardCache(cache, ownerId);
         }
 
         return (created, eligible.Count - created);

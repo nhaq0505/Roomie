@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Col, Form, Input, Modal, Row, Select, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { t } from '../../shared/i18n/runtime';
+import { getLocale, t } from '../../shared/i18n/runtime';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { roomsApi } from '../rooms/index';
 import { buildingsApi, type Building } from './index';
@@ -75,7 +75,7 @@ export default function BuildingsPage() {
         return <Col key={building.id} xs={24} md={12} xl={8}><Card className={`building-card ${building.isArchived ? 'building-card-archived' : ''}`} bordered={false}>
           <div className="building-card-header"><div className="building-card-icon" aria-hidden="true"><BankOutlined /></div>{building.isArchived && <Tag className="building-archived-tag">{t("Đã lưu trữ")}</Tag>}<div className="building-room-count"><strong>{roomCount ?? building.roomCount ?? 0}</strong><small>{t("phòng")}</small></div></div>
           <div className="building-card-body"><div className="building-card-title"><div><Typography.Title level={4}>{building.name}</Typography.Title><span><EnvironmentOutlined /> {building.address || t("Chưa có địa chỉ")}</span></div></div>
-            <div className="building-card-footer">{building.isArchived && <span>{t("Đã lưu trữ {0}", [building.archivedAt ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(building.archivedAt)) : ''])}</span>}{building.isArchived ? <Button icon={<RollbackOutlined />} loading={restoreMutation.isPending && restoreMutation.variables === building.id} onClick={() => restoreMutation.mutate(building.id)}>{t("Khôi phục")}</Button> : <><Link className="building-view-rooms" to={`/rooms?building=${encodeURIComponent(building.id)}`}>{t("Xem phòng")} <ArrowRightOutlined /></Link><Space size={0} wrap><Button type="text" icon={<EditOutlined />} onClick={() => openEditBuilding(building)} aria-label={t("Sửa dãy trọ")}>{t("Sửa")}</Button><Button danger type="text" loading={archiveMutation.isPending && archiveMutation.variables === building.id} onClick={() => confirmArchive(building)}>{t("Lưu trữ")}</Button></Space></>}</div>
+            <div className="building-card-footer">{building.isArchived && <span>{t("Đã lưu trữ {0}", [building.archivedAt ? new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(building.archivedAt)) : ''])}</span>}{building.isArchived ? <Button icon={<RollbackOutlined />} loading={restoreMutation.isPending && restoreMutation.variables === building.id} onClick={() => restoreMutation.mutate(building.id)}>{t("Khôi phục")}</Button> : <><Link className="building-view-rooms" to={`/rooms?building=${encodeURIComponent(building.id)}`}>{t("Xem phòng")} <ArrowRightOutlined /></Link><Space size={0} wrap><Button type="text" icon={<EditOutlined />} onClick={() => openEditBuilding(building)} aria-label={t("Sửa dãy trọ")}>{t("Sửa")}</Button><Button danger type="text" loading={archiveMutation.isPending && archiveMutation.variables === building.id} onClick={() => confirmArchive(building)}>{t("Lưu trữ")}</Button></Space></>}</div>
           </div>
         </Card></Col>;
       })}</Row>

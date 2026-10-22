@@ -3,7 +3,7 @@ import concurrent.futures
 import unittest
 import uuid
 from urllib.parse import urlsplit, parse_qs
-from test_api_integration import ApiSession, OWNER_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD, as_list, today_vietnam
+from test_api_integration import ApiSession, BASE_URL, OWNER_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD, as_list, today_vietnam
 
 class PaymentModesHttpTests(unittest.TestCase):
     def setUp(self):
@@ -121,3 +121,57 @@ class PaymentModesHttpTests(unittest.TestCase):
         self.assertEqual(self.owner.request('POST',f"/api/manual-payments/{single['id']}/confirm",{'amount':single['amount']})[0],409)
         invoice=self.owner.ok('GET',f"/api/invoices/{charge['id']}")
         self.assertEqual(invoice['paid'],charge['total']); self.assertEqual(invoice['outstanding'],0)
+
+    def test_switch_payment_mode_and_pending_attempt_blocks_mutation(self):
+        updated = self.owner.ok('PUT', '/api/settings/payment/preferences', {'confirmationMode': 'Automatic'})
+        self.assertEqual(updated.get('confirmationMode'), 'Automatic')
+
+        manual = self.owner.ok('PUT', '/api/settings/payment/preferences', {
+            'confirmationMode': 'Manual',
+            'bankBin': '970436',
+            'accountNumber': '987654321',
+            'accountName': 'MANUAL SWITCH TEST'
+        })
+        self.assertEqual(manual.get('confirmationMode'), 'Manual')
+
+        from pg_fixture import get_pg_fixture
+        db = get_pg_fixture(BASE_URL)
+        owner_id = db.query_val('SELECT "Id" FROM "Users" WHERE "Email" = ?', (self.email,))
+        self.assertIsNotNone(owner_id)
+        order_code = (uuid.uuid4().int % 800_000_000) + 100_000_000
+        charge = self.supplement(200)
+        attempt_id = str(uuid.uuid4()).upper()
+        self.addCleanup(lambda: db.execute('DELETE FROM "PayOsAttempts" WHERE "Id" = ?', (attempt_id,)))
+        db.execute("""INSERT INTO "PayOsAttempts"
+            ("Id", "OwnerId", "InvoiceId", "OrderCode", "Amount", "PaymentLinkId", "CheckoutUrl",
+             "Status", "ProviderReference", "CreatedAt", "PaidAt", "Kind")
+            VALUES (?, ?, ?, ?, ?, NULL, NULL, 'Pending', NULL, NOW(), NULL, 'Invoice')""",
+            (attempt_id, owner_id, charge["id"].upper(), order_code, 200))
+
+        status, body, _ = self.owner.request('PUT', '/api/settings/payment/preferences', {
+            'confirmationMode': 'Automatic'
+        })
+        self.assertEqual(status, 409)
+        self.assertIn('Vui lòng đối soát các giao dịch payOS đang chờ', body.get('message', ''))
+
+        status2, body2, _ = self.owner.request('PUT', '/api/settings/payment/preferences', {
+            'confirmationMode': 'Manual',
+            'bankBin': '970436',
+            'accountNumber': '11112222',
+            'accountName': 'NEW NAME'
+        })
+        self.assertEqual(status2, 409)
+
+        db.execute('UPDATE "PayOsAttempts" SET "Status" = \'Cancelled\' WHERE "OrderCode" = ?', (order_code,))
+
+        restored = self.owner.ok('PUT', '/api/settings/payment/preferences', {
+            'confirmationMode': 'Manual',
+            'bankBin': '970436',
+            'accountNumber': '12345678',
+            'accountName': 'SYNTHETIC TEST ONLY'
+        })
+        self.assertEqual(restored.get('confirmationMode'), 'Manual')
+
+
+if __name__ == '__main__':
+    unittest.main()

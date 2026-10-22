@@ -96,7 +96,7 @@ internal static class RoomTenantLifecycleHttpTests
 
         // 5. Block archive if a room has an active tenant
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{r1Id}/occupancy", new OccupancyRequest(
-            "Le Van C", "0901112233", 2, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-5)), 0));
+            "Le Van C", "0901112233", 2, VietnamCalendar.TodayVietnam().AddDays(-5), 0));
         Assert(occResp.StatusCode == HttpStatusCode.OK, "active occupancy added to room 101");
 
         var blockedArchive = await client.DeleteAsync($"/api/buildings/{bldgId}");
@@ -223,7 +223,7 @@ internal static class RoomTenantLifecycleHttpTests
 
         // Create occupancy with initial headcount = 1
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Tran Thi B", "0912345678", 1, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)), 0));
+            "Tran Thi B", "0912345678", 1, VietnamCalendar.TodayVietnam().AddDays(-10), 0));
         var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
         var occupancyId = occJson.GetProperty("occupancy").GetProperty("id").GetGuid();
 
@@ -242,7 +242,7 @@ internal static class RoomTenantLifecycleHttpTests
                 RoomName = "Headcount Room 1",
                 BuildingName = "Headcount Tower",
                 TenantName = "Tran Thi B",
-                Period = ApiSupport.VietnamDate(DateTimeOffset.UtcNow).ToString("yyyy-MM"),
+                Period = VietnamCalendar.CurrentVietnamPeriod(),
                 Kind = "Monthly",
                 LifecycleState = InvoiceLifecycleState.Draft,
                 Rent = 3_000_000,
@@ -256,7 +256,7 @@ internal static class RoomTenantLifecycleHttpTests
                 Total = 3_080_000, // 3M + 0 + 60k + 20k
                 Paid = 0,
                 Version = 1,
-                DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5))
+                DueDate = VietnamCalendar.TodayVietnam().AddDays(5)
             };
             db.Invoices.Add(draftInvoice);
             await db.SaveChangesAsync();
@@ -299,7 +299,7 @@ internal static class RoomTenantLifecycleHttpTests
 
         // Create occupancy with deposit of 500,000
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Deposit Tenant", "0988776655", 1, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)), 500_000));
+            "Deposit Tenant", "0988776655", 1, VietnamCalendar.TodayVietnam().AddDays(-30), 500_000));
         var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
         var occupancyId = occJson.GetProperty("occupancy").GetProperty("id").GetGuid();
 
@@ -332,7 +332,7 @@ internal static class RoomTenantLifecycleHttpTests
                 Paid = 0,
                 Status = InvoiceStatus.Unpaid,
                 Version = 1,
-                DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5))
+                DueDate = VietnamCalendar.TodayVietnam().AddDays(5)
             });
             await db.SaveChangesAsync();
         }
@@ -395,7 +395,7 @@ internal static class RoomTenantLifecycleHttpTests
         var roomId = roomJson.GetProperty("id").GetGuid();
 
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Moveout Tenant", "0933445566", 1, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-60)), 300_000));
+            "Moveout Tenant", "0933445566", 1, VietnamCalendar.TodayVietnam().AddDays(-60), 300_000));
         var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
         var occupancyId = occJson.GetProperty("occupancy").GetProperty("id").GetGuid();
 
@@ -434,7 +434,7 @@ internal static class RoomTenantLifecycleHttpTests
                 RoomName = "Moveout Room 1", BuildingName = "Moveout Plaza", TenantName = "Moveout Tenant",
                 Period = "2026-09", Kind = "Monthly", LifecycleState = InvoiceLifecycleState.Issued,
                 Total = 100_000, Paid = 0, Status = InvoiceStatus.Unpaid, Version = 1,
-                DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1))
+                DueDate = VietnamCalendar.TodayVietnam().AddDays(1)
             });
             await db.SaveChangesAsync();
         }
@@ -517,6 +517,22 @@ internal static class RoomTenantLifecycleHttpTests
         var bldgResp = await client.PostAsJsonAsync("/api/buildings", new BuildingRequest("Meter Building", "Danang"));
         var bldg = await bldgResp.Content.ReadFromJsonAsync<BuildingDto>();
 
+        // Regression: Room created with initial reading 120 rejects check-in with 100 even before any monthly reading
+        var preconfiguredRoomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg!.Id, "Room Preconfigured-120", 2_000_000, 3_500, 50_000, false, 0, 120));
+        var preconfiguredRoomJson = await preconfiguredRoomResp.Content.ReadFromJsonAsync<JsonElement>();
+        var preconfiguredRoomId = preconfiguredRoomJson.GetProperty("id").GetGuid();
+
+        var rollbackBeforeMonthlyResp = await client.PostAsJsonAsync($"/api/rooms/{preconfiguredRoomId}/occupancy", new OccupancyRequest(
+            "Rollback Tenant", "0901234567", 1, VietnamCalendar.TodayVietnam(), 0, 100));
+        Assert(rollbackBeforeMonthlyResp.StatusCode == HttpStatusCode.BadRequest,
+            "check-in with 100 on room having InitialReading 120 without monthly readings is rejected with 400");
+
+        var invalidScaleResp = await client.PostAsJsonAsync($"/api/rooms/{preconfiguredRoomId}/occupancy", new OccupancyRequest(
+            "Scale Tenant", "0901234567", 1, VietnamCalendar.TodayVietnam(), 0, 125.1234m));
+        Assert(invalidScaleResp.StatusCode == HttpStatusCode.BadRequest,
+            "check-in with meter reading having > 3 decimal places is rejected with 400");
+
         // Room created without tenant: initial reading defaults to 0
         var roomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
             bldg!.Id, "Room Meter-1", 2_000_000, 3_500, 50_000, false, 0));
@@ -525,7 +541,7 @@ internal static class RoomTenantLifecycleHttpTests
 
         // 1. First tenant check-in sets initial electric reading to 120
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Tenant One", "0901112233", 1, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)), 0, 120));
+            "Tenant One", "0901112233", 1, VietnamCalendar.TodayVietnam().AddDays(-30), 0, 120));
         Assert(occResp.StatusCode == HttpStatusCode.OK, "first tenant check-in accepted with initial reading 120");
         var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
         Assert(occJson.GetProperty("initialReading").GetDecimal() == 120m, "room initialReading updated to 120");
@@ -552,12 +568,12 @@ internal static class RoomTenantLifecycleHttpTests
 
         // 2. Second tenant check-in: rollback below 180 rejected
         var invalidOccResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Tenant Two", "0904445566", 1, DateOnly.FromDateTime(DateTime.UtcNow), 0, 150));
+            "Tenant Two", "0904445566", 1, VietnamCalendar.TodayVietnam(), 0, 150));
         Assert(invalidOccResp.StatusCode == HttpStatusCode.BadRequest, "check-in with meter rollback below baseline is rejected with 400");
 
         // 3. Second tenant check-in: advance to 185 accepted
         var validOccResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
-            "Tenant Two", "0904445566", 1, DateOnly.FromDateTime(DateTime.UtcNow), 0, 185));
+            "Tenant Two", "0904445566", 1, VietnamCalendar.TodayVietnam(), 0, 185));
         Assert(validOccResp.StatusCode == HttpStatusCode.OK, "check-in with valid meter advance is accepted");
         var validOccJson = await validOccResp.Content.ReadFromJsonAsync<JsonElement>();
         Assert(validOccJson.GetProperty("initialReading").GetDecimal() == 185m, "room initialReading updated to 185");
