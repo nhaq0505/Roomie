@@ -19,9 +19,9 @@ public sealed record OccupancyUpdateRequest(Guid OccupancyId, string TenantName,
 public sealed record OwnerStatusRequest(string Status, string? Reason);
 public sealed record BuildingRequest(string Name, string? Address);
 public sealed record BuildingDto(Guid Id, string Name, string? Address);
-public sealed record RoomCreateRequest(Guid BuildingId, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading);
+public sealed record RoomCreateRequest(Guid BuildingId, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading = 0);
 public sealed record RoomUpdateRequest(string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee);
-public sealed record OccupancyRequest(string TenantName, string? Phone, int People, DateOnly StartDate, decimal DepositAmount = 0);
+public sealed record OccupancyRequest(string TenantName, string? Phone, int People, DateOnly StartDate, decimal DepositAmount = 0, decimal? InitialReading = null);
 public sealed record OccupancyDto(Guid Id, string TenantName, string? Phone, int People, DateOnly StartDate, string? Token, string? Url, Guid? DepositInvoiceId, decimal DepositRequired, decimal DepositPaid, decimal DepositHeld);
 public sealed record RoomDto(Guid Id, Guid BuildingId, string BuildingName, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading, decimal PreviousReading, OccupancyDto? Occupancy);
 public sealed record RotateLinkDto(string Token, string Url);

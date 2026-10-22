@@ -267,7 +267,6 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await roomModal.getByLabel('Giá điện / kWh').fill('3500');
     await roomModal.locator('#waterFee').fill('100000');
     await roomModal.getByLabel('Phí dịch vụ / tháng').fill('50000');
-    await roomModal.getByLabel('Chỉ số điện ban đầu').fill('100');
 
     await roomModal.getByRole('button', { name: 'Tạo phòng' }).click();
 
@@ -385,6 +384,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await occupancyModal.getByLabel('Tên người thuê').fill('Nguyễn Văn A');
     await occupancyModal.getByLabel('Số điện thoại').fill('0901234567');
     await occupancyModal.getByLabel('Số người ở').fill('2');
+    await occupancyModal.getByLabel('Chỉ số điện ban đầu').fill('100');
     await occupancyModal.getByLabel('Tiền cọc yêu cầu').fill('3000000');
 
     await occupancyModal.getByRole('button', { name: 'Lưu người thuê' }).click();

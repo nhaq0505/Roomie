@@ -31,6 +31,15 @@ export interface Room {
   archiveBatchId?: string | null;
 }
 
+export interface OccupancyRequest {
+  tenantName: string;
+  phone?: string;
+  people: number;
+  startDate: string;
+  depositAmount: number;
+  initialReading?: number;
+}
+
 export interface MoveoutDepositSummary { invoiceId: string; required: number; paid: number; settled: number; held: number; outstanding: number; version: number | null; }
 
 export interface MoveoutSummary { occupancyId: string; tenantName: string; roomName: string; startDate: string; endDate: string; invoices: Invoice[]; pendingInvoiceIds: string[]; deposit: MoveoutDepositSummary | null; heldDeposit: number; canComplete: boolean; blockedReason?: string | null; }

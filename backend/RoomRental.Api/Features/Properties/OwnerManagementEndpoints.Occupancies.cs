@@ -70,6 +70,21 @@ public static partial class OwnerManagementEndpoints
 
             if (request.DepositAmount < 0 || request.DepositAmount > int.MaxValue || request.DepositAmount != decimal.Truncate(request.DepositAmount))
                 throw new ApiException(400, "Tiền cọc phải là số nguyên VND từ 0 đến 2.147.483.647.");
+
+            if (request.InitialReading is decimal initialReading)
+            {
+                if (initialReading < 0 || initialReading > 1_000_000_000)
+                    throw new ApiException(400, "Chỉ số điện phải là số không âm trong giới hạn cho phép.");
+                var maxReading = await QueryAggregates.MaxReadingAsync(db,
+                    db.Readings.AsNoTracking().Where(x => x.RoomId == id).Select(x => x.CurrentReading), cancellationToken);
+                var maxFinal = await QueryAggregates.MaxReadingAsync(db,
+                    db.Invoices.AsNoTracking().Where(x => x.RoomId == id && x.IsFinalMeterReading).Select(x => x.CurrentReading), cancellationToken);
+                var priorPhysical = Math.Max(maxReading, maxFinal);
+                if (priorPhysical > 0 && initialReading < priorPhysical)
+                    throw new ApiException(400, $"Chỉ số điện không thể thấp hơn chỉ số trước đó ({priorPhysical} kWh).");
+                room.InitialReading = initialReading;
+            }
+
             var token = tokenService.Create();
             var occupancy = new Occupancy
             {

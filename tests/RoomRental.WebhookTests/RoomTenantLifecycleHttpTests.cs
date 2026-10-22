@@ -35,6 +35,7 @@ internal static class RoomTenantLifecycleHttpTests
         await OccupancyHeadcountInvoiceRecalculationAsync();
         await DepositLedgerDeductionAndRefundAsync();
         await MoveoutSettlementAndMeterBaselineAdvancementAsync();
+        await OccupancyInitialMeterReadingAdvancementAsync();
     }
 
     private static async Task BuildingArchiveCascadeAndRestoreAsync()
@@ -503,6 +504,64 @@ internal static class RoomTenantLifecycleHttpTests
             new DepositSettlementRequest(10_000, "Refund", "Late refund", Guid.NewGuid().ToString(), null));
         Assert(postMoveoutSettle.StatusCode == HttpStatusCode.Conflict,
             "deposit settlement after completed move-out is rejected with 409 Conflict");
+    }
+
+    private static async Task OccupancyInitialMeterReadingAdvancementAsync()
+    {
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
+
+        var bldgResp = await client.PostAsJsonAsync("/api/buildings", new BuildingRequest("Meter Building", "Danang"));
+        var bldg = await bldgResp.Content.ReadFromJsonAsync<BuildingDto>();
+
+        // Room created without tenant: initial reading defaults to 0
+        var roomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg!.Id, "Room Meter-1", 2_000_000, 3_500, 50_000, false, 0));
+        var roomJson = await roomResp.Content.ReadFromJsonAsync<JsonElement>();
+        var roomId = roomJson.GetProperty("id").GetGuid();
+
+        // 1. First tenant check-in sets initial electric reading to 120
+        var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Tenant One", "0901112233", 1, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)), 0, 120));
+        Assert(occResp.StatusCode == HttpStatusCode.OK, "first tenant check-in accepted with initial reading 120");
+        var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(occJson.GetProperty("initialReading").GetDecimal() == 120m, "room initialReading updated to 120");
+        Assert(occJson.GetProperty("previousReading").GetDecimal() == 120m, "room previousReading starts at 120");
+
+        var occId = occJson.GetProperty("occupancy").GetProperty("id").GetGuid();
+
+        // Add monthly reading 180 (consumption 60) and move out
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Readings.Add(new MonthlyReading
+            {
+                RoomId = roomId, OccupancyId = occId, Period = "2026-09",
+                PreviousReading = 120, CurrentReading = 180, Consumption = 60,
+                RecordedAt = DateTimeOffset.UtcNow.AddDays(-1)
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var moveoutResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/end-occupancy",
+            new CompleteMoveoutRequest(occId, Guid.NewGuid(), 0, 0, null));
+        Assert(moveoutResp.StatusCode == HttpStatusCode.OK, "moveout completed, baseline is now 180");
+
+        // 2. Second tenant check-in: rollback below 180 rejected
+        var invalidOccResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Tenant Two", "0904445566", 1, DateOnly.FromDateTime(DateTime.UtcNow), 0, 150));
+        Assert(invalidOccResp.StatusCode == HttpStatusCode.BadRequest, "check-in with meter rollback below baseline is rejected with 400");
+
+        // 3. Second tenant check-in: advance to 185 accepted
+        var validOccResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Tenant Two", "0904445566", 1, DateOnly.FromDateTime(DateTime.UtcNow), 0, 185));
+        Assert(validOccResp.StatusCode == HttpStatusCode.OK, "check-in with valid meter advance is accepted");
+        var validOccJson = await validOccResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(validOccJson.GetProperty("initialReading").GetDecimal() == 185m, "room initialReading updated to 185");
+        Assert(validOccJson.GetProperty("previousReading").GetDecimal() == 185m, "room previousReading starts at 185");
     }
 
     private static WebApplication CreateTestApp(string connectionString)
