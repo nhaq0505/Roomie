@@ -1,18 +1,26 @@
-import { ArrowLeftOutlined, DeleteOutlined, FileTextOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DeleteOutlined, FileTextOutlined, PlusOutlined, QrcodeOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Col, ConfigProvider, DatePicker, Form, Grid, Input, InputNumber, Row, Select, Space, Spin, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
 import { legalCt01Template } from '../../shared/i18n/legalTemplates';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import MoneyInput from '../../shared/ui/MoneyInput';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
+import CccdQrScannerModal from './CccdQrScannerModal';
+import type { ParsedCccdQr } from './cccdQr';
 import './RoomsPage.css';
 import { roomsApi } from './api';
 import { roomTheme } from './theme';
 import type { CoResident, Room } from './types';
+
+type QrScanTarget =
+  | { kind: 'tenant' }
+  | { kind: 'coResident-add' }
+  | { kind: 'coResident-row'; index: number }
+  | null;
 
 interface CoResidentFormItem {
   fullName?: string;
@@ -82,10 +90,15 @@ function RoomTenantWorkspace() {
   const totalPeople = 1 + (watchedCoResidents?.length ?? 0);
   const openContractAfterSaveRef = useRef(false);
   const initializedOccupancyKeyRef = useRef<string | null>(null);
+  const serverOccupancySignatureRef = useRef<string | null>(null);
+  const [qrTarget, setQrTarget] = useState<QrScanTarget>(null);
 
   const roomsQuery = useQuery({
     queryKey: ['rooms', 'archive-view'],
     queryFn: () => roomsApi.list(undefined, true),
+    refetchOnWindowFocus: true,
+    refetchInterval: 4000,
+    refetchIntervalInBackground: false,
   });
 
   const room: Room | undefined = (roomsQuery.data ?? []).find((item) => item.id === id);
@@ -95,8 +108,14 @@ function RoomTenantWorkspace() {
   useEffect(() => {
     if (!room) return;
     const currentKey = `${room.id}:${room.occupancy?.id ?? 'new'}`;
-    if (initializedOccupancyKeyRef.current === currentKey) return;
+    const nextSignature = JSON.stringify(room.occupancy ?? null);
+    const isInitialForRoom = initializedOccupancyKeyRef.current !== currentKey;
+    const isServerUpdated = serverOccupancySignatureRef.current !== null && serverOccupancySignatureRef.current !== nextSignature;
+
+    if (!isInitialForRoom && !isServerUpdated) return;
+    const hadPreviousInit = initializedOccupancyKeyRef.current !== null;
     initializedOccupancyKeyRef.current = currentKey;
+    serverOccupancySignatureRef.current = nextSignature;
 
     if (room.occupancy) {
       form.setFieldsValue({
@@ -124,6 +143,9 @@ function RoomTenantWorkspace() {
           relation: member.relation ?? '',
         })),
       });
+      if (hadPreviousInit && isServerUpdated) {
+        message.info(t("Đã tự động đồng bộ thông tin người thuê mới nhất."));
+      }
     } else {
       form.setFieldsValue({
         tenantName: '',
@@ -148,7 +170,63 @@ function RoomTenantWorkspace() {
         coResidents: [],
       });
     }
-  }, [room, minReading, form]);
+  }, [room, minReading, form, message]);
+
+  const handleQrDetected = (parsed: ParsedCccdQr) => {
+    if (!qrTarget) return;
+    if (qrTarget.kind === 'tenant') {
+      form.setFieldsValue({
+        tenantName: parsed.fullName,
+        tenantCitizenId: parsed.citizenId,
+        tenantDateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : form.getFieldValue('tenantDateOfBirth'),
+        tenantGender: parsed.gender ?? form.getFieldValue('tenantGender'),
+        tenantPermanentAddress: parsed.permanentAddress || form.getFieldValue('tenantPermanentAddress'),
+        tenantCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('tenantCitizenIdIssuedDate'),
+        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || t("Cục Cảnh sát QLHC về TTXH"),
+      });
+      message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      return;
+    }
+
+    const currentList: CoResidentFormItem[] = [...(form.getFieldValue('coResidents') ?? [])];
+    const newItem: CoResidentFormItem = {
+      fullName: parsed.fullName,
+      citizenId: parsed.citizenId,
+      gender: parsed.gender ?? legalCt01Template.genderMale,
+      dateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : null,
+      relation: t("Người thuê trọ"),
+    };
+
+    if (qrTarget.kind === 'coResident-row') {
+      const idx = qrTarget.index;
+      if (idx >= 0 && idx < currentList.length) {
+        currentList[idx] = {
+          ...currentList[idx],
+          ...newItem,
+          relation: currentList[idx]?.relation || t("Người thuê trọ"),
+        };
+        form.setFieldValue('coResidents', currentList);
+        message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      }
+      return;
+    }
+
+    const existingIdx = currentList.findIndex(
+      (item) => (item?.citizenId && item.citizenId.trim() === parsed.citizenId) || (!item?.fullName?.trim() && !item?.citizenId?.trim()),
+    );
+    if (existingIdx >= 0) {
+      currentList[existingIdx] = {
+        ...currentList[existingIdx],
+        ...newItem,
+        relation: currentList[existingIdx]?.relation || t("Người thuê trọ"),
+      };
+    } else if (currentList.length < 29) {
+      currentList.push(newItem);
+    }
+    form.setFieldValue('coResidents', currentList);
+    form.setFieldValue('people', Math.min(30, 1 + currentList.length));
+    message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+  };
 
   const refreshData = async () => {
     await Promise.all([
@@ -319,10 +397,18 @@ function RoomTenantWorkspace() {
         <div className="room-tenant-workspace-grid">
           <div className="room-tenant-main-column">
             <SectionCard className="room-tenant-card">
-              <div className="room-tenant-card-header">
+              <div className="room-tenant-card-header room-tenant-card-header-flex">
                 <Typography.Title level={5} style={{ margin: 0 }}>
                   {t("1. Bên thuê phòng / Người kê khai CT01 (Bên B)")}
                 </Typography.Title>
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<QrcodeOutlined />}
+                  onClick={() => setQrTarget({ kind: 'tenant' })}
+                >
+                  {t("Quét / Tải ảnh CCCD")}
+                </Button>
               </div>
               <Row gutter={16}>
                 <Col xs={24} md={14}>
@@ -416,27 +502,19 @@ function RoomTenantWorkspace() {
                           {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
                         </Typography.Title>
                       </div>
-                      <Button
-                        type="primary"
-                        ghost
-                        icon={<PlusOutlined />}
-                        disabled={fields.length >= 29}
-                        onClick={() => {
-                          const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
-                          add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
-                          form.setFieldValue('people', nextCount);
-                        }}
-                      >
-                        {t("Thêm thành viên ở cùng")}
-                      </Button>
-                    </div>
-
-                    {fields.length === 0 ? (
-                      <div className="room-tenant-coresidents-empty">
-                        <UserAddOutlined className="room-tenant-coresidents-empty-icon" />
+                      <Space wrap>
                         <Button
-                          type="dashed"
+                          icon={<QrcodeOutlined />}
+                          disabled={fields.length >= 29}
+                          onClick={() => setQrTarget({ kind: 'coResident-add' })}
+                        >
+                          {t("Quét CCCD thêm thành viên")}
+                        </Button>
+                        <Button
+                          type="primary"
+                          ghost
                           icon={<PlusOutlined />}
+                          disabled={fields.length >= 29}
                           onClick={() => {
                             const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
                             add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
@@ -445,6 +523,31 @@ function RoomTenantWorkspace() {
                         >
                           {t("Thêm thành viên ở cùng")}
                         </Button>
+                      </Space>
+                    </div>
+
+                    {fields.length === 0 ? (
+                      <div className="room-tenant-coresidents-empty">
+                        <UserAddOutlined className="room-tenant-coresidents-empty-icon" />
+                        <Space wrap>
+                          <Button
+                            icon={<QrcodeOutlined />}
+                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
+                          >
+                            {t("Quét CCCD thêm thành viên")}
+                          </Button>
+                          <Button
+                            type="dashed"
+                            icon={<PlusOutlined />}
+                            onClick={() => {
+                              const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
+                              add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
+                              form.setFieldValue('people', nextCount);
+                            }}
+                          >
+                            {t("Thêm thành viên ở cùng")}
+                          </Button>
+                        </Space>
                       </div>
                     ) : (
                       <div className="room-tenant-coresidents-list">
@@ -452,20 +555,30 @@ function RoomTenantWorkspace() {
                           <div key={field.key} className="room-tenant-coresident-row">
                             <div className="room-tenant-coresident-row-head">
                               <Tag color="cyan">#{index + 1}</Tag>
-                              <Button
-                                danger
-                                type="text"
-                                size="small"
-                                icon={<DeleteOutlined />}
-                                onClick={() => {
-                                  const nextCount = Math.max(1, 1 + fields.length - 1);
-                                  remove(field.name);
-                                  form.setFieldValue('people', nextCount);
-                                }}
-                                aria-label={t("Xóa thành viên")}
-                              >
-                                {t("Xóa thành viên")}
-                              </Button>
+                              <Space size={4}>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<QrcodeOutlined />}
+                                  onClick={() => setQrTarget({ kind: 'coResident-row', index })}
+                                >
+                                  {t("Quét / Tải ảnh CCCD")}
+                                </Button>
+                                <Button
+                                  danger
+                                  type="text"
+                                  size="small"
+                                  icon={<DeleteOutlined />}
+                                  onClick={() => {
+                                    const nextCount = Math.max(1, 1 + fields.length - 1);
+                                    remove(field.name);
+                                    form.setFieldValue('people', nextCount);
+                                  }}
+                                  aria-label={t("Xóa thành viên")}
+                                >
+                                  {t("Xóa thành viên")}
+                                </Button>
+                              </Space>
                             </div>
                             <Row gutter={12}>
                               <Col xs={24} md={7}>
@@ -670,6 +783,16 @@ function RoomTenantWorkspace() {
           </div>
         </div>
       </Form>
+      <CccdQrScannerModal
+        open={qrTarget !== null}
+        title={
+          qrTarget?.kind === 'tenant'
+            ? t("Quét mã QR CCCD người thuê")
+            : t("Quét mã QR CCCD thành viên ở cùng")
+        }
+        onClose={() => setQrTarget(null)}
+        onDetected={handleQrDetected}
+      />
     </div>
   );
 }

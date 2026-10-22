@@ -132,6 +132,94 @@
   border-bottom: 1px solid var(--room-line);
 }
 
+.room-tenant-card-header-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cccd-qr-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 156px;
+  padding: 24px 18px;
+  border: 2px dashed var(--room-control-line);
+  border-radius: 16px;
+  background: #fbfdfc;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.cccd-qr-dropzone:hover,
+.cccd-qr-dropzone.is-dragging {
+  border-color: var(--room-accent);
+  background: #f1f8f6;
+}
+
+.cccd-qr-dropzone:focus-visible {
+  outline: 2px solid var(--room-accent);
+  outline-offset: 2px;
+}
+
+.cccd-qr-dropzone-icon {
+  font-size: 32px;
+  color: var(--room-accent);
+}
+
+.cccd-qr-raw-box {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--room-line);
+}
+
+.cccd-qr-raw-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--room-muted);
+}
+
+.cccd-qr-video-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 320px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d1b1e;
+}
+
+.cccd-qr-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cccd-qr-viewfinder {
+  position: absolute;
+  inset: 18%;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+.cccd-qr-video-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 27, 30, 0.55);
+}
+
 .room-tenant-coresidents-header {
   display: flex;
   align-items: center;

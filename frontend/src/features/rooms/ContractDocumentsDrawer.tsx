@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SaveOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, QrcodeOutlined, SaveOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -7,10 +7,19 @@ import { formatVnd } from '../../shared/format';
 import { legalContractTemplate, legalCt01Template } from '../../shared/i18n/legalTemplates';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import { LoadError, PageTitle } from '../../shared/ui/Ui';
+import CccdQrScannerModal from './CccdQrScannerModal';
+import type { ParsedCccdQr } from './cccdQr';
 import { roomsApi } from './api';
 import type { OccupancyDocumentData, Room, UpdateOccupancyDocumentRequest } from './types';
 
 type DocumentTab = 'contract' | 'ct01';
+
+type DocQrTarget =
+  | { kind: 'tenant' }
+  | { kind: 'owner' }
+  | { kind: 'coResident-add' }
+  | { kind: 'coResident-row'; index: number }
+  | null;
 
 interface CoResidentFormItem {
   fullName: string;
@@ -85,20 +94,32 @@ export default function ContractDocumentsDrawer({
   const watchedValues = Form.useWatch([], form);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const initializedOccupancyId = useRef<string | null>(null);
+  const serverDocSignatureRef = useRef<string | null>(null);
   const [isDownloadingDocx, setIsDownloadingDocx] = useState(false);
+  const [qrTarget, setQrTarget] = useState<DocQrTarget>(null);
 
   const query = useQuery({
     queryKey: ['room-documents', targetRoomId],
     queryFn: () => roomsApi.getDocuments(targetRoomId),
     enabled: !!targetRoomId,
+    refetchOnWindowFocus: true,
+    refetchInterval: 4000,
+    refetchIntervalInBackground: false,
   });
 
   const data = query.data;
   const displayRoomName = data?.roomName ?? room?.name ?? '';
 
   useEffect(() => {
-    if (!data || initializedOccupancyId.current === data.occupancyId) return;
+    if (!data) return;
+    const nextSignature = JSON.stringify(data);
+    const isInitialForOccupancy = initializedOccupancyId.current !== data.occupancyId;
+    const isServerUpdated = serverDocSignatureRef.current !== null && serverDocSignatureRef.current !== nextSignature;
+    if (!isInitialForOccupancy && !isServerUpdated) return;
+
+    const hadPreviousInit = initializedOccupancyId.current !== null;
     initializedOccupancyId.current = data.occupancyId;
+    serverDocSignatureRef.current = nextSignature;
     form.setFieldsValue({
       ownerPhone: data.ownerPhone ?? '',
       ownerCitizenId: data.ownerCitizenId ?? '',
@@ -131,7 +152,77 @@ export default function ContractDocumentsDrawer({
         relation: item.relation ?? '',
       })),
     });
-  }, [data, form]);
+    if (hadPreviousInit && isServerUpdated) {
+      message.info(t("Đã tự động đồng bộ thông tin người thuê mới nhất."));
+    }
+  }, [data, form, message]);
+
+  const handleQrDetected = (parsed: ParsedCccdQr) => {
+    if (!qrTarget) return;
+    if (qrTarget.kind === 'tenant') {
+      form.setFieldsValue({
+        tenantName: parsed.fullName,
+        tenantCitizenId: parsed.citizenId,
+        tenantDateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : form.getFieldValue('tenantDateOfBirth'),
+        tenantGender: parsed.gender ?? form.getFieldValue('tenantGender'),
+        tenantPermanentAddress: parsed.permanentAddress || form.getFieldValue('tenantPermanentAddress'),
+        tenantCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('tenantCitizenIdIssuedDate'),
+        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || t("Cục Cảnh sát QLHC về TTXH"),
+      });
+      message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      return;
+    }
+
+    if (qrTarget.kind === 'owner') {
+      form.setFieldsValue({
+        ownerCitizenId: parsed.citizenId,
+        ownerDateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : form.getFieldValue('ownerDateOfBirth'),
+        ownerPermanentAddress: parsed.permanentAddress || form.getFieldValue('ownerPermanentAddress'),
+        ownerCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('ownerCitizenIdIssuedDate'),
+        ownerCitizenIdIssuedPlace: form.getFieldValue('ownerCitizenIdIssuedPlace') || t("Cục Cảnh sát QLHC về TTXH"),
+      });
+      message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      return;
+    }
+
+    const currentList: CoResidentFormItem[] = [...(form.getFieldValue('coResidents') ?? [])];
+    const newItem: CoResidentFormItem = {
+      fullName: parsed.fullName,
+      citizenId: parsed.citizenId,
+      gender: parsed.gender ?? legalCt01Template.genderMale,
+      dateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : null,
+      relation: legalCt01Template.defaultRelation,
+    };
+
+    if (qrTarget.kind === 'coResident-row') {
+      const idx = qrTarget.index;
+      if (idx >= 0 && idx < currentList.length) {
+        currentList[idx] = {
+          ...currentList[idx],
+          ...newItem,
+          relation: currentList[idx]?.relation || legalCt01Template.defaultRelation,
+        };
+        form.setFieldValue('coResidents', currentList);
+        message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      }
+      return;
+    }
+
+    const existingIdx = currentList.findIndex(
+      (item) => (item?.citizenId && item.citizenId.trim() === parsed.citizenId) || (!item?.fullName?.trim() && !item?.citizenId?.trim()),
+    );
+    if (existingIdx >= 0) {
+      currentList[existingIdx] = {
+        ...currentList[existingIdx],
+        ...newItem,
+        relation: currentList[existingIdx]?.relation || legalCt01Template.defaultRelation,
+      };
+    } else if (currentList.length < 29) {
+      currentList.push(newItem);
+    }
+    form.setFieldValue('coResidents', currentList);
+    message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+  };
 
   const buildPayload = (values: DocumentFormValues): UpdateOccupancyDocumentRequest => ({
     occupancyId: data!.occupancyId,
@@ -172,6 +263,7 @@ export default function ContractDocumentsDrawer({
   const saveMutation = useMutation({
     mutationFn: (payload: UpdateOccupancyDocumentRequest) => roomsApi.saveDocuments(targetRoomId, payload),
     onSuccess: async (updated) => {
+      serverDocSignatureRef.current = JSON.stringify(updated);
       queryClient.setQueryData(['room-documents', targetRoomId], updated);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['rooms'] }),
@@ -396,6 +488,17 @@ export default function ContractDocumentsDrawer({
                     label: <strong>{t("1. Bên thuê phòng / Người kê khai CT01 (Bên B)")}</strong>,
                     children: (
                       <>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            icon={<QrcodeOutlined />}
+                            onClick={() => setQrTarget({ kind: 'tenant' })}
+                          >
+                            {t("Quét / Tải ảnh CCCD")}
+                          </Button>
+                        </div>
                         <Row gutter={12}>
                           <Col xs={24} sm={14}>
                             <Form.Item
@@ -466,6 +569,17 @@ export default function ContractDocumentsDrawer({
                     label: <strong>{t("2. Bên cho thuê / Chủ hộ (Bên A — Lưu dùng chung mọi phòng)")}</strong>,
                     children: (
                       <>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            icon={<QrcodeOutlined />}
+                            onClick={() => setQrTarget({ kind: 'owner' })}
+                          >
+                            {t("Quét / Tải ảnh CCCD")}
+                          </Button>
+                        </div>
                         <Row gutter={12}>
                           <Col xs={24} sm={12}>
                             <Form.Item label={t("Họ và tên chủ trọ")}>
@@ -564,13 +678,24 @@ export default function ContractDocumentsDrawer({
                         <Form.Item name="householdHeadRelation" label={t("Mối quan hệ với chủ hộ")}>
                           <Input maxLength={100} placeholder={t("Người thuê trọ")} />
                         </Form.Item>
-                        <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
-                          {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
-                        </Typography.Text>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                          <Typography.Text strong style={{ display: 'block' }}>
+                            {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
+                          </Typography.Text>
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            icon={<QrcodeOutlined />}
+                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
+                          >
+                            {t("Quét CCCD thêm thành viên")}
+                          </Button>
+                        </div>
                         <Form.List name="coResidents">
                           {(fields, { add, remove }) => (
                             <div className="co-residents-list">
-                              {fields.map(({ key, name, ...restField }) => (
+                              {fields.map(({ key, name, ...restField }, index) => (
                                 <div key={key} className="co-resident-item">
                                   <Row gutter={8} align="middle">
                                     <Col xs={24} sm={9}>
@@ -609,14 +734,22 @@ export default function ContractDocumentsDrawer({
                                         <Input maxLength={100} placeholder={t("Người thuê trọ")} />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={2} sm={6} style={{ textAlign: 'right' }}>
-                                      <Button
-                                        danger
-                                        type="text"
-                                        icon={<DeleteOutlined />}
-                                        onClick={() => remove(name)}
-                                        aria-label={t("Xóa thành viên")}
-                                      />
+                                    <Col xs={14} sm={6} style={{ textAlign: 'right' }}>
+                                      <Space size={4}>
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          icon={<QrcodeOutlined />}
+                                          onClick={() => setQrTarget({ kind: 'coResident-row', index })}
+                                        />
+                                        <Button
+                                          danger
+                                          type="text"
+                                          icon={<DeleteOutlined />}
+                                          onClick={() => remove(name)}
+                                          aria-label={t("Xóa thành viên")}
+                                        />
+                                      </Space>
                                     </Col>
                                   </Row>
                                 </div>
@@ -688,6 +821,18 @@ export default function ContractDocumentsDrawer({
               </div>
             </div>
           </div>
+          <CccdQrScannerModal
+            open={qrTarget !== null}
+            title={
+              qrTarget?.kind === 'owner'
+                ? t("Quét mã QR CCCD chủ trọ")
+                : qrTarget?.kind === 'tenant'
+                  ? t("Quét mã QR CCCD người thuê")
+                  : t("Quét mã QR CCCD thành viên ở cùng")
+            }
+            onClose={() => setQrTarget(null)}
+            onDetected={handleQrDetected}
+          />
         </div>
       );
 

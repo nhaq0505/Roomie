@@ -907,4 +907,191 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     expect(savedPayload).toBeTruthy();
     expect(savedPayload?.tenantCitizenId).toBe('079099887766');
   });
+
+  test('Scenario L9: CCCD QR scan auto-fill (tenant, co-resident, owner) and live cross-device sync without reload', async ({ page }) => {
+    let room: Room = {
+      id: 'room-202',
+      buildingId: 'bld-01',
+      buildingName: 'Nhà trọ Bình An',
+      name: 'Phòng 202',
+      rent: 4000000,
+      electricityRate: 3500,
+      waterFee: 100000,
+      waterPerPerson: true,
+      serviceFee: 50000,
+      initialReading: 50,
+      previousReading: 50,
+      occupancy: null,
+      isArchived: false,
+    };
+
+    let documentData = {
+      roomId: 'room-202',
+      buildingId: 'bld-01',
+      occupancyId: 'occ-202',
+      ownerName: 'Chủ Trọ Bình An',
+      ownerPhone: '0911222333',
+      ownerEmail: 'landlord@example.com',
+      ownerCitizenId: '',
+      ownerDateOfBirth: null as string | null,
+      ownerCitizenIdIssuedDate: null as string | null,
+      ownerCitizenIdIssuedPlace: 'Cục Cảnh sát QLHC về TTXH',
+      ownerPermanentAddress: '',
+      bankBin: '970436',
+      bankName: 'Ngân hàng TMCP Ngoại thương Việt Nam',
+      bankShortName: 'Vietcombank',
+      bankAccountNumber: '0123456789',
+      bankAccountName: 'CHU TRO BINH AN',
+      buildingName: 'Nhà trọ Bình An',
+      buildingAddress: '123 Đường Số 1, Quận 7, TP.HCM',
+      policeStationName: 'Công an Phường Tân Phong, Quận 7, TP.HCM',
+      roomName: 'Phòng 202',
+      roomAreaSqm: 25,
+      rent: 4000000,
+      rentInWords: 'Bốn triệu đồng chẵn',
+      electricityRate: 3500,
+      waterFee: 100000,
+      waterPerPerson: true,
+      serviceFee: 50000,
+      initialReading: 50,
+      tenantName: 'Lê Thị Mai Anh',
+      tenantPhone: '0909888777',
+      tenantEmail: '',
+      people: 2,
+      tenantCitizenId: '079098001234',
+      tenantDateOfBirth: '1998-12-24',
+      tenantGender: 'Nữ',
+      tenantCitizenIdIssuedDate: '2022-09-10',
+      tenantCitizenIdIssuedPlace: 'Cục Cảnh sát QLHC về TTXH',
+      tenantPermanentAddress: '88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh',
+      startDate: '2026-10-01',
+      contractEndDate: '2027-10-01',
+      paymentDueDay: 5,
+      depositRequired: 4000000,
+      depositInWords: 'Bốn triệu đồng chẵn',
+      depositPaid: 4000000,
+      handoverAssets: '01 máy lạnh',
+      additionalTerms: '',
+      householdHeadRelation: 'Người thuê trọ',
+      coResidents: [
+        {
+          fullName: 'Trần Minh Quân',
+          citizenId: '079200005678',
+          gender: 'Nam',
+          dateOfBirth: '2000-05-05',
+          relation: 'Người thuê trọ',
+        },
+      ],
+    };
+
+    let submittedTenantBody: Record<string, unknown> | null = null;
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
+      if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
+      if (path === '/api/buildings') {
+        return route.fulfill({
+          json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', isArchived: false }],
+        });
+      }
+      if (path === '/api/rooms') return route.fulfill({ json: [room] });
+      if (path === '/api/subscription/status' || path === '/api/subscription') {
+        return route.fulfill({
+          json: { tier: 'Pro', isPro: true, expiresAt: null, roomCount: 1, maxRooms: 999, availablePackages: [] },
+        });
+      }
+      if (path === '/api/rooms/room-202/occupancy' && method === 'POST') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        submittedTenantBody = body;
+        room = {
+          ...room,
+          occupancy: {
+            id: 'occ-202',
+            tenantName: String(body.tenantName ?? ''),
+            phone: String(body.phone ?? ''),
+            people: Number(body.people ?? 1),
+            startDate: String(body.startDate ?? '2026-10-01'),
+            tenantCitizenId: String(body.tenantCitizenId ?? ''),
+            tenantDateOfBirth: String(body.tenantDateOfBirth ?? ''),
+            tenantGender: String(body.tenantGender ?? ''),
+            tenantPermanentAddress: String(body.tenantPermanentAddress ?? ''),
+            depositRequired: 0,
+            depositPaid: 0,
+            depositHeld: 0,
+          },
+        };
+        return route.fulfill({ json: room });
+      }
+      if (path === '/api/rooms/room-202/documents' && method === 'GET') {
+        return route.fulfill({ json: documentData });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    await page.goto('/rooms/room-202/tenant');
+    const tenantWorkspace = page.locator('.room-tenant-page');
+    await expect(tenantWorkspace).toBeVisible();
+
+    // 1. Open QR modal and test invalid QR string validation first
+    await tenantWorkspace.getByRole('button', { name: 'Quét / Tải ảnh CCCD' }).first().click();
+    const qrModal = page.locator('.cccd-qr-modal');
+    await expect(qrModal).toBeVisible();
+
+    const qrInput = qrModal.locator('#cccd-qr-raw-input');
+    await qrInput.fill('chuoi-khong-hop-le');
+    await qrModal.getByRole('button', { name: 'Điền thông tin từ chuỗi QR' }).click();
+    await expect(qrModal.getByText('Chuỗi QR không đúng định dạng CCCD Việt Nam.')).toBeVisible();
+
+    // 2. Paste valid 7-field primary tenant CCCD QR
+    await qrInput.fill('079098001234|025123456|Lê Thị Mai Anh|24121998|Nữ|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|10092022');
+    await expect(qrModal).toBeHidden();
+
+    // Verify primary tenant fields are auto-filled
+    await expect(tenantWorkspace.getByLabel('Tên người thuê')).toHaveValue('Lê Thị Mai Anh');
+    await expect(tenantWorkspace.getByLabel('Số CCCD / Định danh cá nhân (12 số)')).toHaveValue('079098001234');
+    await expect(tenantWorkspace.getByLabel('Địa chỉ thường trú')).toHaveValue('88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh');
+
+    // 3. Scan / Paste co-resident CCCD QR (and verify duplicate CCCD updates existing row instead of duplicating)
+    await tenantWorkspace.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
+    await expect(qrModal).toBeVisible();
+    await qrModal.locator('#cccd-qr-raw-input').fill('079200005678||Trần Minh Quân|05052000|Nam|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|12102022');
+    await expect(qrModal).toBeHidden();
+
+    await expect(tenantWorkspace.locator('.room-tenant-coresident-row')).toHaveCount(1);
+    await expect(tenantWorkspace.getByText('2 người')).toBeVisible();
+
+    // Re-scan the same co-resident Citizen ID with updated name -> should still be 1 row (no duplicate)
+    await tenantWorkspace.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
+    await qrModal.locator('#cccd-qr-raw-input').fill('079200005678|Trần Minh Quân|05052000|Nam|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|12102022');
+    await expect(qrModal).toBeHidden();
+    await expect(tenantWorkspace.locator('.room-tenant-coresident-row')).toHaveCount(1);
+
+    // Save tenant and open Contract & CT01 page directly
+    await tenantWorkspace.getByRole('button', { name: 'Xuất hợp đồng & CT01' }).first().click();
+    await expect(page).toHaveURL(/\/rooms\/room-202\/documents$/);
+    expect(submittedTenantBody).toBeTruthy();
+    expect(submittedTenantBody?.tenantName).toBe('Lê Thị Mai Anh');
+    expect(submittedTenantBody?.tenantCitizenId).toBe('079098001234');
+    expect(submittedTenantBody?.people).toBe(2);
+
+    // 4. Verify live cross-device sync on Contract page without F5 reload:
+    // Simulate landlord scanning a new tenant CCCD on their phone and saving to the server while PC has Contract page open
+    const preview = page.getByTestId('document-a4-preview');
+    await expect(preview).toContainText('Lê Thị Mai Anh');
+
+    documentData = {
+      ...documentData,
+      tenantName: 'Phạm Hoàng Gia Bảo',
+      tenantCitizenId: '079095009999',
+      tenantPermanentAddress: '100 Điện Biên Phủ, Quận Bình Thạnh, TP. Hồ Chí Minh',
+    };
+
+    // Wait for background sync (or window focus) without calling page.reload()
+    await expect(preview).toContainText('Phạm Hoàng Gia Bảo', { timeout: 8000 });
+    await expect(preview).toContainText('079095009999');
+  });
 });

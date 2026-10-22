@@ -1638,3 +1638,26 @@
 1637|Preview: Form CT01 (Circular 66/2023/TT-BCA)|预览：CT01 表（第 66/2023/TT-BCA 号通知）|미리보기: CT01 양식 (시행규칙 66/2023/TT-BCA)|पूर्वावलोकन: प्रपत्र CT01 (परिपत्र 66/2023/TT-BCA)
 1638|Also download CT01 (.docx)|顺便下载 CT01 (.docx)|CT01 함께 다운로드 (.docx)|CT01 भी डाउनलोड करें (.docx)
 1639|Also download Contract (.docx)|顺便下载合同 (.docx)|계약서 함께 다운로드 (.docx)|अनुबंध भी डाउनलोड करें (.docx)
+1640|No valid Citizen ID QR code found in the image. Please select a clear photo of the top-right corner of the front of the ID card.|图像中未找到有效的公民身份证二维码。请选择身份证正面右上角清晰的照片。|이미지에서 유효한 시민 신분증 QR 코드를 찾을 수 없습니다. 신분증 앞면 우측 상단이 선명하게 나온 사진을 선택해 주세요.|छवि में कोई मान्य नागरिक आईडी क्यूआर कोड नहीं मिला। कृपया आईडी कार्ड के सामने के ऊपरी-दाएँ कोने की स्पष्ट फ़ोटो चुनें।
+1641|Could not read the selected image file. Please try another image.|无法读取所选图像文件。请尝试其他图像。|선택한 이미지 파일을 읽을 수 없습니다. 다른 이미지를 시도해 주세요.|चयनित छवि फ़ाइल को पढ़ा नहीं जा सका। कृपया कोई अन्य छवि आज़माएँ।
+1642|This browser does not support direct camera access. Please switch to the Select Photo / Paste from Zalo tab.|当前浏览器不支持直接打开摄像头。请切换到“选择照片 / 从 Zalo 粘贴”标签页。|브라우저에서 직접 카메라 열기를 지원하지 않습니다. 사진 선택 / Zalo에서 붙여넣기 탭으로 전환해 주세요.|यह ब्राउज़र सीधे कैमरा खोलने का समर्थन नहीं करता है। कृपया फ़ोटो चुनें / Zalo से पेस्ट करें टैब पर जाएँ।
+1643|Could not access the camera. Please grant camera permission or use the Select Photo / Paste from Zalo tab.|无法访问摄像头。请授予摄像头权限或使用“选择照片 / 从 Zalo 粘贴”标签页。|카메라에 접근할 수 없습니다. 카메라 권한을 허용하거나 사진 선택 / Zalo에서 붙여넣기 탭을 사용해 주세요.|कैमरा एक्सेस नहीं किया जा सका। कृपया कैमरा अनुमति दें या फ़ोटो चुनें / Zalo से पेस्ट करें टैब का उपयोग करें।
+1644|The QR string is not in a valid Vietnamese Citizen ID format.|二维码字符串不符合越南公民身份证格式。|QR 문자열이 베트남 시민 신분증 형식에 맞지 않습니다.|क्यूआर स्ट्रिंग मान्य वियतनामी नागरिक आईडी प्रारूप में नहीं है।
+1645|Scan Citizen ID QR code|扫描公民身份证二维码|시민 신분증 QR 코드 스캔|नागरिक आईडी क्यूआर कोड स्कैन करें
+1646|Select Photo / Paste Zalo (PC)|选择照片 / 粘贴 Zalo (电脑)|사진 선택 / Zalo 붙여넣기 (PC)|फ़ोटो चुनें / Zalo पेस्ट करें (PC)
+1647|Open Camera Scanner|打开摄像头扫描|카메라 스캔 열기|कैमरा स्कैनर खोलें
+1648|Select Citizen ID photo from device|从设备选择身份证照片|기기에서 신분증 사진 선택|डिवाइस से नागरिक आईडी फ़ोटो चुनें
+1649|Decoding QR code from Citizen ID photo…|正在从身份证照片解析二维码…|신분증 사진에서 QR 코드를 해독하는 중…|नागरिक आईडी फ़ोटो से क्यूआर कोड डिकोड किया जा रहा है…
+1650|Click to select the front photo of the Citizen ID or drag and drop here|点击选择身份证正面照片或拖拽到此处|클릭하여 신분증 앞면 사진을 선택하거나 여기에 드래그 앤 드롭하세요|नागरिक आईडी के सामने की फ़ोटो चुनने के लिए क्लिक करें या यहाँ खींचें और छोड़ें
+1651|PC tip: Copy the Citizen ID photo from Zalo and press Ctrl + V right in this window.|电脑端提示：从 Zalo 复制身份证照片后，直接在此窗口按 Ctrl + V 粘贴。|PC 팁: Zalo에서 신분증 사진을 복사한 후 이 창에서 바로 Ctrl + V를 누르세요.|पीसी टिप: Zalo से नागरिक आईडी फ़ोटो कॉपी करें और इसी विंडो में Ctrl + V दबाएँ।
+1652|Or paste the QR text string (if scanned with phone Zalo):|或粘贴二维码文本字符串（如果使用手机 Zalo 扫描）：|또는 QR 텍스트 문자열 붙여넣기 (휴대폰 Zalo로 스캔한 경우):|या क्यूआर टेक्स्ट स्ट्रिंग पेस्ट करें (यदि फ़ोन Zalo से स्कैन किया गया हो):
+1653|Fill info from QR string|从二维码字符串填充信息|QR 문자열에서 정보 채우기|क्यूआर स्ट्रिंग से जानकारी भरें
+1654|Position the top-right corner of the front of the Citizen ID card into the frame for automatic detection.|将公民身份证正面右上角对准取景框以自动识别。|자동 인식을 위해 시민 신분증 앞면 우측 상단을 프레임 안에 맞춰 주세요.|स्वचालित पहचान के लिए नागरिक आईडी कार्ड के सामने के ऊपरी-दाएँ कोने को फ़्रेम में रखें।
+1655|Switch camera|切换摄像头|카메라 전환|कैमरा बदलें
+1656|Automatically synced the latest tenant information.|已自动同步最新租客信息。|최신 세입자 정보가 자동으로 동기화되었습니다.|नवीनतम किरायेदार जानकारी स्वचालित रूप से सिंक की गई।
+1657|Filled Citizen ID information for {0}.|已填充 {0} 的公民身份证信息。|{0}의 시민 신분증 정보를 입력했습니다.|{0} की नागरिक आईडी जानकारी भर दी गई है।
+1658|Scan / Upload ID QR|扫描 / 上传身份证二维码|신분증 QR 스캔 / 업로드|आईडी क्यूआर स्कैन / अपलोड करें
+1659|Scan ID to add member|扫描身份证添加同住成员|신분증 스캔으로 동거인 추가|सदस्य जोड़ने के लिए आईडी स्कैन करें
+1660|Scan Landlord Citizen ID QR|扫描房东公民身份证二维码|집주인 시민 신분증 QR 스캔|मकान मालिक नागरिक आईडी क्यूआर स्कैन करें
+1661|Scan Tenant Citizen ID QR|扫描租客公民身份证二维码|세입자 시민 신분증 QR 스캔|किरायेदार नागरिक आईडी क्यूआर स्कैन करें
+1662|Scan Co-resident Citizen ID QR|扫描同住成员公民身份证二维码|동거인 시민 신분증 QR 스캔|सह-निवासी नागरिक आईडी क्यूआर स्कैन करें
