@@ -298,4 +298,37 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await drawer.locator('.ant-drawer-close').click();
     await expect(drawer).toBeHidden();
   });
+
+  test('Mobile bottom tab bar stays anchored at the bottom of 375x812 viewport and switches tabs', async ({ page }) => {
+    await page.goto('/dashboard');
+    const bottomNav = page.locator('.compact-navigation');
+    await expect(bottomNav).toBeVisible();
+
+    const navBox = await bottomNav.boundingBox();
+    expect(navBox).not.toBeNull();
+    // Anchored at the bottom of the 812px viewport
+    expect(navBox!.y).toBeGreaterThan(700);
+    expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(375);
+
+    // Navigate via bottom tab bar to Readings and verify status filter pills
+    await bottomNav.getByRole('link', { name: 'Lập hóa đơn' }).click();
+    await expect(page).toHaveURL(/\/readings$/);
+    await expect(page.locator('.reading-filter-pills')).toBeVisible();
+    await expect(page.locator('.reading-mobile-card').first()).toBeVisible();
+
+    // Open Settings dropdown from bottom tab bar "Cấu hình" button
+    await bottomNav.getByRole('button', { name: /Cấu hình/ }).click();
+    await expect(page.locator('.ant-dropdown:visible')).toBeVisible();
+  });
+
+  test('Mobile RoomTenantPage displays sticky bottom action bar for quick QR scan and save', async ({ page }) => {
+    await page.goto('/rooms/room-01/tenant');
+    const stickyBar = page.locator('.room-tenant-mobile-bar');
+    await expect(stickyBar).toBeVisible();
+    await expect(stickyBar.getByRole('button', { name: 'Quét / Tải ảnh CCCD' })).toBeVisible();
+    await expect(stickyBar.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow).toBe(false);
+  });
 });
