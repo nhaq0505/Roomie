@@ -18,16 +18,22 @@ public static partial class OwnerManagementEndpoints
                         select room.Id;
             var activeOccupancies = db.Occupancies.AsNoTracking().Where(row => row.IsActive && rooms.Contains(row.RoomId));
             var occupiedRooms = await activeOccupancies.CountAsync(cancellationToken);
+            var period = ApiSupport.VietnamDate(clock.GetUtcNow()).ToString("yyyy-MM");
             var invoices = db.Invoices.AsNoTracking().Where(row => row.OwnerId == ownerId &&
                 row.LifecycleState == InvoiceLifecycleState.Issued && row.Kind != "Deposit");
-            var billed = await QueryAggregates.SumMoneyAsync(db, invoices.Select(row => row.Total), cancellationToken);
-            var paid = await QueryAggregates.SumMoneyAsync(db, invoices.Select(row => row.Paid), cancellationToken);
-            var period = ApiSupport.VietnamDate(clock.GetUtcNow()).ToString("yyyy-MM");
-            var monthly = invoices.Where(row => row.Period == period);
-            var monthlyBilled = await QueryAggregates.SumMoneyAsync(db, monthly.Select(row => row.Total), cancellationToken);
-            var monthlyPaid = await QueryAggregates.SumMoneyAsync(db, monthly.Select(row => row.Paid), cancellationToken);
-            var monthlyOutstanding = await QueryAggregates.SumMoneyAsync(db,
-                monthly.Select(row => row.Total > row.Paid ? row.Total - row.Paid : 0m), cancellationToken);
+            var summary = await invoices.GroupBy(_ => 1).Select(group => new
+            {
+                billed = group.Sum(x => x.Total),
+                paid = group.Sum(x => x.Paid),
+                monthlyBilled = group.Sum(x => x.Period == period ? x.Total : 0m),
+                monthlyPaid = group.Sum(x => x.Period == period ? x.Paid : 0m),
+                monthlyOutstanding = group.Sum(x => x.Period == period && x.Total > x.Paid ? x.Total - x.Paid : 0m)
+            }).SingleOrDefaultAsync(cancellationToken);
+            var billed = summary?.billed ?? 0m;
+            var paid = summary?.paid ?? 0m;
+            var monthlyBilled = summary?.monthlyBilled ?? 0m;
+            var monthlyPaid = summary?.monthlyPaid ?? 0m;
+            var monthlyOutstanding = summary?.monthlyOutstanding ?? 0m;
             var roomCount = await rooms.CountAsync(cancellationToken);
             var pendingReadings = await activeOccupancies.CountAsync(occupancy =>
                 !db.Readings.Any(reading => reading.OccupancyId == occupancy.Id && reading.Period == period), cancellationToken);

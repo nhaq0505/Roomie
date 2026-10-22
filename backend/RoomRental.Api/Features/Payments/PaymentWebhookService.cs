@@ -30,7 +30,16 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
     public async Task<PaymentSettingsDto> GetAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var settings = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == ownerId, cancellationToken);
-        var owner = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == ownerId, cancellationToken);
+        var owner = await db.Users.AsNoTracking()
+            .Where(x => x.Id == ownerId)
+            .Select(x => new
+            {
+                x.PaymentConfirmationMode,
+                x.ManualBankBin,
+                x.ManualAccountNumber,
+                x.ManualAccountName
+            })
+            .SingleOrDefaultAsync(cancellationToken);
         PaymentSettingsDto Dto(bool configured, string? clientId, string? webhookUrl, string status, string? verifiedAt, string? error) =>
             new(configured, clientId, webhookUrl, status, verifiedAt, error) {
                 ConfirmationMode = owner?.PaymentConfirmationMode.ToString() ?? "Automatic",

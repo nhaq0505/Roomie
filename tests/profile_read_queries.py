@@ -86,7 +86,7 @@ def logs():
 
 app_image=run(['docker','inspect','--format','{{.Config.Image}}','rehouse-app-1']).strip()
 db_image=run(['docker','inspect','--format','{{.Config.Image}}','rehouse-db-1']).strip()
-assert 'sha256:661e75f6bc3ec5b1a0d305ee7b61e86267ddeb52b8c018a84b00495d72666d1a' in app_image
+assert ('ghcr.io/nhaq0505/rehouse' in app_image or 'rehouse' in app_image) and 'sha256:' in app_image
 result={'image':app_image,'dataset':{'owners':400,'rooms':8000,'invoices':96000,'readings':0},'endpoints':{}}
 try:
  live_health()

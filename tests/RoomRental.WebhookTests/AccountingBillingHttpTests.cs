@@ -94,6 +94,18 @@ internal static class AccountingBillingHttpTests
         var legacy = await client.GetFromJsonAsync<JsonElement>("/api/invoices");
         Assert(legacy.ValueKind == JsonValueKind.Array && legacy.GetArrayLength() == 4,
             "invoice list without page retains legacy array response");
+
+        commands.Clear();
+        var dashboardRes = await client.GetAsync("/api/dashboard");
+        Assert(dashboardRes.StatusCode == HttpStatusCode.OK, "dashboard returns 200");
+        var dashboard = await dashboardRes.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(dashboard.GetProperty("totalBilled").GetDecimal() == 300 &&
+               dashboard.GetProperty("totalPaid").GetDecimal() == 290 &&
+               dashboard.GetProperty("totalOutstanding").GetDecimal() == 10,
+               "dashboard aggregates issued non-deposit invoices correctly");
+        Assert(commands.Count(x => x.Contains("\"Invoices\"", StringComparison.Ordinal)) == 1 &&
+               commands.Count(x => x.Contains("GROUP BY", StringComparison.Ordinal)) == 1,
+               "dashboard uses exactly one aggregate query on invoices table");
     }
 
     private static async Task AutomaticZaloQueueAsync()
