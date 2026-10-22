@@ -44,7 +44,13 @@ export function useRoomsPage() {
   const buildingFilter = searchParams.get('building') || undefined;
   const [statusFilter, setStatusFilter] = useState<'all' | 'occupied' | 'vacant'>('all');
   const buildingsQuery = useQuery({ queryKey: ['buildings', 'room-options'], queryFn: () => buildingsApi.list(true) });
-  const roomsQuery = useQuery({ queryKey: ['rooms', 'archive-view'], queryFn: () => roomsApi.list(undefined, true) });
+  const roomsQuery = useQuery({
+    queryKey: ['rooms', 'archive-view'],
+    queryFn: () => roomsApi.list(undefined, true),
+    refetchOnWindowFocus: true,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
+  });
   const subQuery = useQuery({ queryKey: ['subscription'], queryFn: subscriptionApi.getStatus });
 
   const refreshData = async () => { await Promise.all([client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['buildings'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['subscription'] }), client.invalidateQueries({ queryKey: ['readings'] })]); };
