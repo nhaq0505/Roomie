@@ -5,6 +5,14 @@ namespace RoomRental.Api.Services;
 /// <summary>HTTP index controls also apply before static files and authentication errors.</summary>
 public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration configuration, IWebHostEnvironment environment)
 {
+    private static readonly Dictionary<string, string> PublicHtmlFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["/"] = "index.html",
+        ["/features"] = Path.Combine("features", "index.html"),
+        ["/pricing"] = Path.Combine("pricing", "index.html"),
+        ["/huong-dan"] = Path.Combine("huong-dan", "index.html"),
+    };
+
     private static readonly HashSet<string> AppPaths = new(StringComparer.OrdinalIgnoreCase)
     {
         "/login", "/register", "/reset-password", "/change-password", "/account-status",
@@ -15,12 +23,23 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     [GeneratedRegex(@"^/(t|tenant)/[^/]+(?:/invoices/[^/]+/checkout)?$", RegexOptions.IgnoreCase)]
     private static partial Regex GuestPath();
 
+    private static string NormalizePath(string path)
+    {
+        var trimmed = path.TrimEnd('/');
+        return string.IsNullOrEmpty(trimmed) ? "/" : trimmed;
+    }
+
+    public static bool TryGetPublicHtmlFile(string path, out string relativeFile) =>
+        PublicHtmlFiles.TryGetValue(NormalizePath(path), out relativeFile!);
+
+    public static bool IsPublicPath(string path) => PublicHtmlFiles.ContainsKey(NormalizePath(path));
+
     public static bool IsAppPath(string path) => AppPaths.Contains(path.TrimEnd('/')) || GuestPath().IsMatch(path.TrimEnd('/'));
 
     public async Task InvokeAsync(HttpContext context)
     {
         var path = context.Request.Path.Value ?? "/";
-        var publicDocument = path == "/";
+        var publicDocument = IsPublicPath(path);
         var canonicalHost = context.Request.Host.Host.Equals("roomie.io.vn", StringComparison.OrdinalIgnoreCase);
         var allowIndexing = configuration.GetValue("Seo:AllowIndexing", !environment.IsDevelopment());
         var language = context.Request.Query["lang"];

@@ -79,6 +79,9 @@ export default function App() {
     <Route path="/tenant/:token" element={<TenantPage />} />
     <Route path="/tenant/:token/invoices/:invoiceId/checkout" element={<TenantCheckoutPage />} />
     <Route path="/" element={<HomeRedirect />} />
+    <Route path="/features" element={<LandingPage page="features" />} />
+    <Route path="/pricing" element={<LandingPage page="pricing" />} />
+    <Route path="/huong-dan" element={<LandingPage page="guides" />} />
     <Route path="/dashboard" element={<Gate><AppShell><DashboardPage /></AppShell></Gate>} />
     <Route path="/buildings" element={<Gate><AppShell><BuildingsPage /></AppShell></Gate>} />
     <Route path="/rooms" element={<Gate><AppShell><RoomsPage /></AppShell></Gate>} />

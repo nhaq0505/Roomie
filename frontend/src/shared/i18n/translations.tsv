@@ -1461,3 +1461,126 @@
 1460|Send hour (7h - 20h)|发送小时 (7h - 20h)|발송 시간 (7시 - 20시)|भेजने का समय (7h - 20h)
 1461|Minute (0 - 59)|分钟 (0 - 59)|분 (0 - 59)|मिनट (0 - 59)
 1462|Save reminder schedule|保存提醒计划|알림 일정 저장|अनुस्मारक शेड्यूल सहेजें
+1463|FAQ|常见问题|자주 묻는 질문|सामान्य प्रश्न
+1464|Strict move-out settlement that automatically revokes former tenant links.|严格的退房结算，自动收回旧租客链接。|철저한 퇴실 정산 및 이전 세입자 링크 자동 회수.|सख्त चेक-आउट निपटान और पुराने किरायेदार लिंक को स्वतः रद्द करना।
+1465|Locks historical unit rates so past invoices never change when room prices update.|锁定历史单价，更改房价时历史账单不会变动。|과거 단가를 고정하여 방 요금 변경 시에도 이전 청구서 금액이 바뀌지 않습니다.|ऐतिहासिक दरों को स्थिर रखता है ताकि किराया बदलने पर पुराने बिल न बदलें।
+1466|Timely reminders. Accurate accounting reports.|准时提醒，报表数据精准。|정시 알림. 정확한 정산 보고서.|समय पर अनुस्मारक। सटीक डेटा रिपोर्ट।
+1467|Automatically send Zalo invoice reminders and compile month-end books in just a few clicks.|自动通过 Zalo 发送账单通知，只需几步即可汇总月末账目。|Zalo를 통해 청구서 알림을 자동 발송하고 몇 번의 클릭으로 월말 장부를 집계하세요.|Zalo के माध्यम से स्वचालित रूप से बिल अनुस्मारक भेजें और कुछ ही क्लिक में मासिक खाते तैयार करें।
+1468|Automatically sends private invoice links during polite hours (07:00 – 21:00).|在 07:00 – 21:00 礼貌时段内自动发送私密账单链接。|예의 바른 시간대(07:00 – 21:00)에 전용 청구서 링크를 자동 발송합니다.|सभ्य समय (07:00 – 21:00) के दौरान निजी चालान लिंक स्वचालित रूप से भेजता है।
+1469|Duplicate-send protection that automatically stops reminders once an invoice is paid in full.|防重复发送保护，账单结清后自动停止提醒。|중복 발송 방지 잠금 및 완납 시 알림 자동 중단.|डुप्लिकेट संदेश सुरक्षा और बिल का पूरा भुगतान होने पर अनुस्मारक स्वतः बंद।
+1470|Export accounting-ready Excel reports that separate rental revenue from security deposits.|导出符合财务规范的 Excel 报表，清晰区分租金收入与押金。|임대 수익과 보증금을 분리하여 회계 표준 Excel 보고서로 내보냅니다.|किराये की आय और सुरक्षा जमा को अलग करते हुए लेखा-मानक Excel रिपोर्ट निर्यात करें।
+1471|Collect payments flexibly via manual VietQR transfer or automatic reconciliation with payOS.|通过手动 VietQR 转账或 payOS 自动销账灵活收款。|수동 VietQR 이체 또는 payOS 자동 정산으로 유연하게 수금하세요.|मैनुअल VietQR ट्रांसफर या payOS स्वचालित मिलान के माध्यम से लचीले ढंग से भुगतान प्राप्त करें।
+1472|Separated from revenue|与收入分离|수익과 분리 관리|राजस्व से अलग
+1473|Delivery window 07:00 – 21:00|发送时段 07:00 – 21:00|발송 시간대 07:00 – 21:00|भेजने का समय 07:00 – 21:00
+1474|Hello, invoice P101 for period 10/2026 has been issued. Total due:|您好，P101 房 2026年10月账单已出。应付总额：|안녕하세요, P101호 2026년 10월 청구서가 발행되었습니다. 총 결제 금액:|नमस्ते, अवधि 10/2026 के लिए P101 का बिल जारी कर दिया गया है। कुल देय राशि:
+1475|Reports & balance reconciliation|报表与欠款对账|보고서 및 미수금 대사|रिपोर्ट और बकाया मिलान
+1476|Summarize rent, utilities, and deposits by billing period|按账期汇总房租、水电费及押金|청구 기간별 임대료, 공과금, 보증금 종합|अवधि के अनुसार किराया, बिजली-पानी और जमा राशि का सारांश
+1477|Automated payOS|payOS 自动确认|자동 payOS|स्वचालित payOS
+1478|Free up to 5 rooms|最多 5 间房免费|최대 5개 호실 무료|5 कमरों तक मुफ़्त
+1479|Quick setup with no time limit|快速创建，无使用期限限制|시간 제한 없는 빠른 시작|बिना किसी समय सीमा के त्वरित सेटअप
+1480|No app install for tenants|租客无需安装应用|세입자 앱 설치 불필요|किरायेदारों के लिए ऐप इंस्टॉल जरूरी नहीं
+1481|Open invoices directly via private link|通过私密链接直接打开账单|전용 링크로 청구서 바로 확인|निजी लिंक के माध्यम से सीधे बिल खोलें
+1482|Flexible VietQR & payOS|灵活支持 VietQR 与 payOS|유연한 VietQR 및 payOS 결제|लचीला VietQR और payOS
+1483|Manual confirmation or auto-reconciliation|手动确认或自动销账|수동 확인 또는 자동 정산|मैनुअल पुष्टि या स्वचालित मिलान
+1484|Polite Zalo reminders|礼貌时段 Zalo 提醒|예의 바른 Zalo 알림|सभ्य Zalo अनुस्मारक
+1485|Automatically sent between 07:00 – 21:00|在 07:00 – 21:00 自动发送|07:00 – 21:00 시간대 자동 발송|07:00 – 21:00 के बीच स्वचालित रूप से भेजा गया
+1486|EFFICIENCY COMPARISON|效率对比|효율성 비교|दक्षता तुलना
+1487|Leave behind paper notebooks, scattered spreadsheets, and lost messages.|告别纸质账本、零散表格和遗漏的消息。|수기 장부, 흩어진 엑셀 파일, 누락된 메시지와 작별하세요.|कागजी डायरियों, बिखरी हुई स्प्रेडशीट और खोए हुए संदेशों को अलविदा कहें।
+1488|Move from error-prone manual bookkeeping to a closed-loop workflow on a single platform.|从容易出错的手工记录转向单一平台上的闭环流程。|오류가 잦은 수기 기록에서 단일 플랫폼의 통합 워크플로우로 전환하세요.|त्रुटि-प्रवण मैनुअल रिकॉर्डिंग से एक ही मंच पर एकीकृत कार्यप्रणाली में बदलें।
+1489|Traditional way|传统管理方式|기존 관리 방식|पुराना तरीका
+1490|Paper notebooks, Excel files & scattered Zalo chats|纸质账本、Excel 表格与零散 Zalo 消息|수기 장부, 엑셀 파일 및 흩어진 Zalo 메시지|डायरी, Excel फ़ाइलें और बिखरे हुए Zalo संदेश
+1491|Easy to mix up previous and current meter readings while manually calculating rent and fees.|容易混淆上期与本期电表读数，需手动计算每间房租与杂费。|이전·현재 전기 계량기 수치를 혼동하기 쉽고 호실별 요금을 일일이 계산해야 합니다.|पिछली और वर्तमान मीटर रीडिंग में भ्रम होना आसान है, हर कमरे का हिसाब हाथ से करना पड़ता है।
+1492|Taking photos of paper slips for each tenant on Zalo wastes hours reconciling every month.|在 Zalo 上逐个拍照发送收据，每月初耗费数小时对账。|청구서를 일일이 사진 찍어 Zalo로 보내며 매달 초 대사에 많은 시간을 소모합니다.|Zalo पर हर किरायेदार को रसीद की फोटो भेजना और हर महीने मिलान में घंटों बर्बाद करना।
+1493|Security deposits get mixed into rental income, making it hard to track who paid and who owes.|保管中的押金与租金收入混在一起，难以追踪谁已付款、谁仍欠款。|보관 중인 보증금과 임대 수익이 섞여 누가 납부했고 미납했는지 파악하기 어렵습니다.|सुरक्षा जमा और किराये की आय आपस में मिल जाती है; किसने भुगतान किया और किसका बकाया है, यह ट्रैक करना कठिन होता है।
+1494|Former tenants who moved out still retain shared spreadsheet links or old billing screenshots.|退租租客仍保留着共享表格链接或旧账单截图。|퇴실한 이전 세입자가 공유 시트 링크나 기존 청구서 캡처를 그대로 가지고 있습니다.|कमरा छोड़ चुके पुराने किरायेदारों के पास अभी भी पुरानी स्प्रेडशीट के लिंक या स्क्रीनशॉट रहते हैं।
+1495|With Roomie|使用 Roomie 后|Roomie 도입 후|Roomie के साथ
+1496|Standardized from meter reading to full collection|从抄电表到收齐款项全流程标准化|전기 검침부터 수금 완료까지 표준화|मीटर रीडिंग से लेकर पूरा किराया वसूलने तक मानकीकृत
+1497|Automatically pulls previous readings, blocks backward meter inputs, and calculates totals instantly.|自动带出上期读数，拦截倒退读数并在输入时即时算清金额。|이전 검침값을 자동으로 불러오고 역방향 입력을 차단하며 입력 즉시 금액을 정확히 계산합니다.|पिछली रीडिंग स्वतः लाता है, कम रीडिंग दर्ज करने से रोकता है और टाइप करते ही सटीक राशि की गणना करता है।
+1498|Schedules Zalo invoice reminders with private links automatically between 07:00 and 21:00.|在 07:00 – 21:00 时段内自动安排带私密链接的 Zalo 账单提醒。|07:00 – 21:00 시간대에 전용 링크가 포함된 Zalo 청구서 알림을 자동 예약합니다.|07:00 – 21:00 के बीच निजी लिंक के साथ Zalo बिल अनुस्मारक स्वचालित रूप से शेड्यूल करता है।
+1499|Separates deposit ledger from rental revenue; supports both VietQR transfers and payOS auto-settlement.|将押金台账与租金收入彻底分离；同时支持 VietQR 转账与 payOS 自动销账。|보증금 원장을 임대 수익과 분리하고 VietQR 이체와 payOS 자동 정산을 모두 지원합니다.|सुरक्षा जमा बहीखाते को किराये की आय से अलग रखता है; VietQR ट्रांसफर और payOS दोनों का समर्थन करता है।
+1500|Streamlined move-out settlement that immediately invalidates the former tenancy link.|严谨的退房结算，立即自动作废旧租约的访问链接。|철저한 퇴실 정산과 함께 이전 임대 계약의 링크를 즉시 무효화합니다.|सटीक चेक-आउट निपटान जो पुराने किरायेदार के लिंक को तुरंत अमान्य कर देता है।
+1501|TRANSPARENT PRICING|透明定价|투명한 요금제|पारदर्शी मूल्य निर्धारण
+1502|Start for free. Upgrade as your property grows.|免费起步，随房源规模扩展再升级。|무료로 시작하고 호실이 늘어날 때 업그레이드하세요.|मुफ़्त में शुरू करें। जब आपके कमरे बढ़ें तब अपग्रेड करें।
+1503|Experience every core feature on the Free plan. Only upgrade when you manage more than 5 active rooms.|在免费版即可体验全部核心功能，仅在管理超过 5 间房时才需升级。|무료 플랜에서도 모든 핵심 기능을 이용하고, 운영 호실이 5개를 초과할 때만 업그레이드하세요.|मुफ़्त प्लान से ही सभी मुख्य सुविधाओं का अनुभव लें। केवल 5 से अधिक कमरे होने पर अपग्रेड करें।
+1504|Free Plan|免费版|무료 플랜|मुफ़्त प्लान
+1505|Up to 5 active rooms|最多 5 间在用房间|사용 중인 호실 최대 5개|अधिकतम 5 सक्रिय कमरे
+1506|Ideal for small landlords or owners evaluating the full real-world workflow.|适合小型房东或希望完整体验实际运营流程的用户。|소규모 임대인이나 전체 운영 흐름을 직접 체험해 보고 싶은 분께 적합합니다.|छोटे मकान मालिकों या पूरी कार्यप्रणाली का वास्तविक परीक्षण करने वालों के लिए उपयुक्त।
+1507|Manage buildings, rooms, tenants, and deposit ledger|管理楼栋、房间、租客及押金台账|건물, 호실, 세입자 및 보증금 원장 관리|इमारतों, कमरों, किरायेदारों और जमा बहीखाते का प्रबंधन
+1508|Record electricity readings, save drafts, and issue monthly invoices|抄录电表、保存草稿并发布月度账单|전기 검침 기록, 임시저장 및 월별 청구서 발행|बिजली रीडिंग दर्ज करें, ड्राफ्ट सहेजें और मासिक बिल जारी करें
+1509|Share private invoice links that tenants open without installing an app|生成私密账单链接，租客免装应用即可查看|앱 설치 없이 바로 여는 세입자 전용 청구서 링크 제공|निजी बिल लिंक साझा करें जिसे किरायेदार बिना ऐप इंस्टॉल किए देख सकें
+1510|Accept payments via manual VietQR or automated payOS gateway|通过手动 VietQR 或 payOS 自动网关收款|수동 VietQR 또는 자동 payOS 결제 연동 지원|मैनुअल VietQR या स्वचालित payOS गेटवे के माध्यम से भुगतान स्वीकार करें
+1511|Send Zalo invoice reminders and export Excel (.xlsx) reports|通过 Zalo 发送账单提醒并导出 Excel (.xlsx) 报表|Zalo 청구서 알림 발송 및 Excel(.xlsx) 보고서 내보내기|Zalo के माध्यम से बिल अनुस्मारक भेजें और Excel (.xlsx) रिपोर्ट निर्यात करें
+1512|Start with Free Plan|免费开始使用|무료 플랜으로 시작하기|मुफ़्त प्लान के साथ शुरू करें
+1513|Recommended for multi-room landlords|多房源房东推荐方案|다수 호실 운영 임대인 추천|अधिक कमरों वाले मकान मालिकों के लिए अनुशंसित
+1514|Pro Plan|专业版 Pro|Pro 플랜|Pro प्लान
+1515|Unlimited rooms and buildings|不限房间与楼栋数量|호실 및 건물 수 무제한|असीमित कमरे और इमारतें
+1516|Unlock room limits with flexible duration packages that reduce operating costs.|解锁房间数量限制，提供灵活周期套餐以节省运营成本。|호실 제한을 해제하고 유연한 기간별 패키지로 운영 비용을 절감하세요.|कमरों की सीमा समाप्त करें और लचीली अवधि के पैकेजों के साथ परिचालन लागत बचाएं।
+1517|Pro plan durations|Pro 套餐周期选项|Pro 플랜 기간 옵션|Pro प्लान की अवधियाँ
+1518|Pro 1-Month Plan|Pro 1 个月套餐|Pro 1개월 플랜|Pro 1-महीने का प्लान
+1519|30 days of access|30 天使用期|30일 이용|30 दिनों का उपयोग
+1520|Pro 3-Month Plan|Pro 3 个月套餐|Pro 3개월 플랜|Pro 3-महीने का प्लान
+1521|Save 10%|立省 10%|10% 할인|10% की बचत
+1522|Pro 1-Year Plan|Pro 1 年套餐|Pro 1년 플랜|Pro 1-वर्ष का प्लान
+1523|Save 25%|立省 25%|25% 할인|25% की बचत
+1524|Includes every feature in the Free plan|包含免费版的全部功能|무료 플랜의 모든 기능 포함|मुफ़्त प्लान की सभी सुविधाएँ शामिल हैं
+1525|Add unlimited buildings and occupied rooms|无限添加楼栋与在租房间|건물 및 임대 중인 호실 무제한 추가|असीमित इमारतें और किराये के कमरे जोड़ें
+1526|Allow tenants to pay multiple invoices in a single batch checkout|支持租客一次合并支付多张账单|세입자의 다건 청구서 일괄 결제 지원|किरायेदारों को एक साथ कई बिलों का भुगतान करने की सुविधा
+1527|Priority technical support throughout your subscription|订阅期间享受优先技术支持|구독 기간 내 우선 기술 지원 제공|सदस्यता अवधि के दौरान प्राथमिकता तकनीकी सहायता
+1528|Register & Upgrade to Pro|注册并升级 Pro|가입 및 Pro 업그레이드|पंजीकरण करें और Pro में अपग्रेड करें
+1529|Do tenants need to download an app or create an account?|租客需要下载应用或注册账号吗？|세입자가 앱을 다운로드하거나 계정을 만들어야 하나요?|क्या किरायेदारों को कोई ऐप डाउनलोड करने या खाता बनाने की आवश्यकता है?
+1530|No. Landlords simply share the private room link or enable Zalo reminders. Tenants open the link right in their mobile browser to inspect rent, meter readings, and scan the QR code to pay.|不需要。房东只需分享房间私密链接或开启 Zalo 账单提醒，租客在手机浏览器中即可直接查看房租、水电读数并扫码付款。|아니요. 임대인이 전용 링크를 공유하거나 Zalo 알림을 켜기만 하면 세입자는 휴대폰 브라우저에서 바로 임대료와 검침 내역을 확인하고 QR 코드로 결제할 수 있습니다.|नहीं। मकान मालिक बस निजी लिंक साझा करते हैं या Zalo अनुस्मारक चालू करते हैं। किरायेदार सीधे फोन ब्राउज़र में किराया, मीटर रीडिंग देख सकते हैं और QR स्कैन करके भुगतान कर सकते हैं।
+1531|Can I receive money directly into my personal bank account without using payOS?|我可以不通过 payOS，直接收款到个人银行账户吗？|payOS를 거치지 않고 개인 은행 계좌로 직접 입금받을 수 있나요?|क्या मैं payOS के बिना सीधे अपने व्यक्तिगत बैंक खाते में पैसे प्राप्त कर सकता हूँ?
+1532|Absolutely. Roomie supports two modes: Manual VietQR generates a bank transfer QR straight to your personal account for one-tap owner confirmation; or Automated payOS mode reconciles invoices automatically upon payment verification.|完全可以。Roomie 支持两种模式：手动 VietQR 模式生成直达您银行账户的收款码，核对后一键确认；或通过 payOS 自动模式在交易完成后自动销账。|네, 가능합니다. Roomie는 두 가지 모드를 지원합니다. 수동 VietQR 모드는 임대인 계좌로 직접 이체되는 QR을 생성하여 확인 후 원클릭으로 승인할 수 있고, 자동 payOS 모드는 결제 완료 즉시 자동으로 완납 처리합니다.|बिल्कुल। Roomie दो मोड का समर्थन करता है: मैनुअल VietQR आपके बैंक खाते में सीधा ट्रांसफर QR बनाता है जिसे आप एक क्लिक में सत्यापित कर सकते हैं; या स्वचालित payOS मोड भुगतान पूरा होने पर बिल को स्वतः अपडेट कर देता है।
+1533|What are the limits of the Free plan and when should I upgrade to Pro?|免费版有什么限制？什么时候需要升级到 Pro 版？|무료 플랜의 제한 사항은 무엇이며 언제 Pro 플랜으로 업그레이드해야 하나요?|मुफ़्त प्लान की सीमाएँ क्या हैं और मुझे Pro प्लान में कब अपग्रेड करना चाहिए?
+1534|Right after email OTP verification, your landlord account is activated on the Free plan with full features for up to 5 active rooms. Once you manage a 6th room or more, you can upgrade to Pro for 1 month, 3 months, or 1 year.|完成邮箱 OTP 验证后，房东账号即刻激活免费版，支持最多 5 间在用房间的完整功能。当您管理第 6 间及更多房间时，可按 1 个月、3 个月或 1 年升级 Pro 版。|이메일 OTP 인증 후 즉시 최대 5개 사용 호실까지 모든 기능을 쓸 수 있는 무료 플랜이 활성화됩니다. 6번째 호실부터는 1개월, 3개월 또는 1년 단위로 Pro 플랜으로 업그레이드할 수 있습니다.|ईमेल OTP सत्यापन के तुरंत बाद, आपका खाता अधिकतम 5 सक्रिय कमरों के लिए सभी सुविधाओं के साथ मुफ़्त प्लान पर सक्रिय हो जाता है। 6 या अधिक कमरों के प्रबंधन के लिए आप 1 महीने, 3 महीने या 1 साल के Pro प्लान में अपग्रेड कर सकते हैं।
+1535|How does Roomie handle security deposits and move-out settlement?|Roomie 如何管理押金与退房结算流程？|Roomie에서는 보증금과 퇴실 정산 절차를 어떻게 관리하나요?|Roomie सुरक्षा जमा और कमरा खाली करने (चेक-आउट) की प्रक्रिया को कैसे संभालता है?
+1536|Deposits are tracked in a dedicated ledger (collection, invoice deduction, or refund) and never mixed into rental revenue. At move-out, Roomie checks outstanding balances, records final meter readings, and revokes the old tenancy link.|押金在独立台账中跟踪（收取、抵扣账单或退还），不会混入租金收入。退房时系统会检查欠款、记录最终电表读数并自动收回旧租约链接。|보증금은 전용 원장(수납, 청구서 차감, 반환)에서 별도로 추적되어 임대 수익과 섞이지 않습니다. 퇴실 시 미수금 확인, 최종 전기 검침 기록 후 이전 계약 링크를 자동 회수합니다.|जमा राशि को एक अलग बहीखाते (संग्रह, बिल में कटौती, या धनवापसी) में ट्रैक किया जाता है और किराये की आय में नहीं मिलाया जाता। चेक-आउट पर सिस्टम बकाया की जाँच करता है, अंतिम मीटर रीडिंग लेता है और पुराने लिंक को रद्द कर देता है।
+1537|How do Zalo invoice reminders work without spamming tenants?|Zalo 账单提醒如何运作才能避免打扰租客？|Zalo 청구서 알림은 세입자에게 불편을 주지 않도록 어떻게 작동하나요?|किरायेदारों को परेशान किए बिना Zalo बिल अनुस्मारक कैसे काम करता है?
+1538|When an invoice is issued or on your monthly schedule, Roomie sends a Zalo message pointing to the tenant invoice link. Messages are strictly sent between 07:00 and 21:00 with built-in duplicate prevention and cooldowns.|发布账单或到达每月定时计划时，Roomie 会发送带有账单链接的 Zalo 消息。系统仅在 07:00 至 21:00 礼貌时段内发送，并内置防重发与冷却机制。|청구서 발행 시 또는 월별 예약 일정에 따라 세입자 전용 청구서 링크가 담긴 Zalo 메시지를 발송합니다. 07:00~21:00 시간대에만 발송되며 중복 발송 방지 잠금이 적용됩니다.|बिल जारी होने या मासिक शेड्यूल पर, Roomie किरायेदार के बिल लिंक के साथ Zalo संदेश भेजता है। संदेश केवल 07:00 से 21:00 के बीच भेजे जाते हैं और डुप्लिकेट भेजने से रोकने की सुरक्षा होती है।
+1539|If I change the room rent or utility rates, will previously issued invoices change?|修改房租或水电单价后，以前的旧账单金额会变动吗？|임대료나 전기·수도 단가를 변경하면 이전에 발행된 청구서 금액도 바뀌나요?|यदि मैं किराया या बिजली-पानी की दरें बदलता हूँ, तो क्या पुराने बिल बदल जाएंगे?
+1540|No. Every issued invoice stores an immutable snapshot of the room rent, utility rates, occupant count, and meter readings for that period. Updating room rates for future months never alters historical issued invoices.|不会。每张已发布账单都会固定保存当期的房租、水电单价、人数与电表读数快照。更新房间新单价绝不会改变历史已发账单。|아니요. 발행된 모든 청구서는 해당 기간의 임대료, 공과금 단가, 인원수, 계량기 수치 스냅샷을 고정 저장합니다. 이후 요금을 수정해도 과거 발행된 청구서 내역은 변하지 않습니다.|नहीं। जारी किया गया प्रत्येक बिल उस अवधि के किराये, दरों, लोगों की संख्या और मीटर रीडिंग का एक स्थायी स्नैपशॉट सहेजता है। नई दरें अपडेट करने से पुराने बिल कभी नहीं बदलते।
+1541|FREQUENTLY ASKED QUESTIONS|常见问题解答|자주 묻는 질문|अक्सर पूछे जाने वाले प्रश्न
+1542|Clear answers before you get started.|在开始使用前为您清晰解答。|시작하기 전에 궁금한 점을 명확히 확인하세요.|शुरू करने से पहले आपके सभी प्रश्नों के स्पष्ट उत्तर।
+1543|Every workflow in Roomie is designed around real-world rental property management in Vietnam.|Roomie 的每项运营规则都紧密贴合越南出租屋的实际管理场景。|Roomie의 모든 운영 규칙은 실제 임대 관리 현장에 맞춰 설계되었습니다.|Roomie का हर नियम वास्तविक किराये के आवास प्रबंधन को ध्यान में रखकर बनाया गया है।
+1544|Guides|使用指南|이용 가이드|मार्गदर्शिका
+1545|Quick page navigation|快速页面切换|빠른 페이지 이동|त्वरित पृष्ठ नेविगेशन
+1546|Explore details|了解详情|자세히 살펴보기|विस्तार से जानें
+1547|Features & Comparison|功能与对比|기능 및 비교|सुविधाएँ और तुलना
+1548|See Zalo reminders, Excel exports, and a side-by-side comparison with manual bookkeeping.|查看 Zalo 提醒、Excel 报表导出及与传统记账方式的详细对比。|Zalo 알림, Excel 보고서 내보내기 및 기존 수기 장부와의 비교를 확인하세요.|Zalo अनुस्मारक, Excel रिपोर्ट और पारंपरिक बहीखाते के साथ तुलना देखें।
+1549|View details|查看详情|자세히 보기|विवरण देखें
+1550|Pricing & FAQ|价格与常见问题|요금제 및 FAQ|मूल्य निर्धारण और सामान्य प्रश्न
+1551|Free plan up to 5 rooms, flexible Pro durations, and answers to common questions.|最多 5 间房的免费版、灵活 Pro 套餐周期及常见问题解答。|최대 5개 호실 무료 플랜, Pro 기간별 요금제 및 자주 묻는 질문.|5 कमरों तक मुफ़्त प्लान, Pro पैकेज और सामान्य प्रश्नों के उत्तर।
+1552|View pricing|查看价格|요금제 보기|मूल्य देखें
+1553|Operations Guidebook|运营操作指南|운영 가이드북|संचालन मार्गदर्शिका
+1554|4 standard workflows from room setup and meter readings to QR payment collection.|从添加房间、抄电表到二维码收款的 4 大标准运营流程。|호실 등록과 전기 검침부터 QR 수금까지 4가지 표준 운영 프로세스.|कमरा जोड़ने और मीटर रीडिंग से लेकर QR भुगतान तक 4 मानक प्रक्रियाएँ।
+1555|Read guides|查看指南|가이드 보기|मार्गदर्शिका देखें
+1556|Every rental workflow.|全部出租屋业务。|임대 관리의 모든 업무.|किराये के प्रबंधन का हर काम।
+1557|All in one place.|尽在一处。|한곳에서 완결.|एक ही स्थान पर।
+1558|From room management, deposit ledgers, and meter readings to Zalo reminders and VietQR/payOS reconciliation.|从房间管理、押金台账、电表抄录、Zalo 提醒到 VietQR 与 payOS 收款核销。|호실 관리, 보증금 원장, 전기 검침, Zalo 알림부터 VietQR 및 payOS 결제 대사까지.|कमरा प्रबंधन, जमा बहीखाता, मीटर रीडिंग और Zalo अनुस्मारक से लेकर VietQR और payOS मिलान तक।
+1559|Free up to 5 rooms.|最多 5 间房免费。|최대 5개 호실 무료.|5 कमरों तक मुफ़्त।
+1560|Scale without limits.|无限扩展规模。|제한 없는 확장.|बिना किसी सीमा के विस्तार करें।
+1561|LANDLORD GUIDEBOOK|房东操作指南|임대인 가이드북|मकान मालिक मार्गदर्शिका
+1562|Get started quickly.|快速上手。|빠르게 시작하세요.|तेजी से शुरू करें।
+1563|Run smoothly step by step.|按步骤规范运营。|단계별 표준 운영.|कदम-दर-कदम व्यवस्थित संचालन।
+1564|Step-by-step instructions from setting up your first room to meter readings, Zalo reminders, and month-end reconciliation.|从创建第一间房到抄电表、Zalo 催收及月末对账的分步详细指南。|첫 호실 설정부터 전기 검침, Zalo 알림 발송 및 월말 정산까지의 단계별 상세 안내.|पहला कमरा बनाने से लेकर मीटर रीडिंग, Zalo अनुस्मारक और मासिक मिलान तक का चरणबद्ध विवरण।
+1565|Room, deposit, and move-out workflow|房间、押金与退房管理流程|호실, 보증금 및 퇴실 관리 프로세스|कमरा, सुरक्षा जमा और चेक-आउट प्रक्रिया
+1566|How to organize buildings, check in tenants, maintain a separate deposit ledger, and settle move-outs safely.|如何组织楼栋、办理租客入住、维护独立押金台账并安全完成退房结算。|건물 구성, 신규 세입자 입실, 별도 보증금 원장 관리 및 안전한 퇴실 정산 방법.|इमारतों को व्यवस्थित करने, नए किरायेदार जोड़ने, अलग जमा बहीखाता रखने और सुरक्षित चेक-आउट का तरीका।
+1567|Create buildings and configure default rent, electricity, water, and service rates for each room.|创建楼栋并为每间房配置默认租金、电费、水费及服务费单价。|건물을 생성하고 호실별 기본 임대료, 전기·수도 및 서비스 단가를 설정합니다.|इमारत बनाएं और प्रत्येक कमरे के लिए किराया, बिजली, पानी और सेवा शुल्क निर्धारित करें।
+1568|At check-in: record the initial handover meter reading and required security deposit in the dedicated ledger.|办理入住时：录入交接电表初始读数，并在独立台账中登记应收押金。|입실 시: 인계 전기 계량기 초기 수치와 보증금을 전용 원장에 기록합니다.|चेक-इन के समय: प्रारंभिक बिजली मीटर रीडिंग और आवश्यक सुरक्षा जमा को अलग बहीखाते में दर्ज करें।
+1569|At move-out: review balances, deduct or refund deposits, record final meter readings, and revoke the old link.|办理退房时：核对欠款、抵扣或退还押金、记录最终电表读数并自动收回旧链接。|퇴실 시: 미수금 대사, 보증금 차감·반환, 최종 검침 기록 및 이전 링크 자동 회수.|चेक-आउट पर: बकाया जांचें, जमा राशि समायोजित या वापस करें, अंतिम मीटर रीडिंग लें और पुराना लिंक रद्द करें।
+1570|How to record electricity readings and issue monthly invoices|如何抄录电表并生成月度账单|전기 검침 기록 및 월별 청구서 발행 방법|मासिक बिजली रीडिंग और बिल जारी करने की विधि
+1571|Fast building-wide meter entry, kWh consumption validation, and transparent invoice issuance.|按楼栋快速录入电表读数，校验用电差额并透明发布账单。|건물별 빠른 계량기 입력, 사용량(kWh) 검증 및 투명한 청구서 발행 절차.|इमारत के अनुसार तेज़ मीटर प्रविष्टि, kWh की जाँच और पारदर्शी बिल जारी करना।
+1572|Select the billing period (month/year): the system pre-fills each occupied room’s previous meter reading.|选择账期（月/年）：系统自动带出每间在租房间的上期电表读数。|청구 기간(월/년) 선택: 임대 중인 각 호실의 이전 검침값이 자동으로 입력됩니다.|भुगतान अवधि (महीना/वर्ष) चुनें: सिस्टम प्रत्येक किराये के कमरे की पिछली रीडिंग स्वतः भर देता है।
+1573|Enter the new reading: validation blocks backward numbers and calculates kWh consumption immediately.|输入本期新读数：校验器自动拦截倒退读数并即时计算用电量 (kWh)。|새 검침값 입력: 역방향 입력을 자동 차단하고 즉시 사용량(kWh)을 계산합니다.|नई रीडिंग दर्ज करें: सिस्टम पिछली संख्या से कम प्रविष्टि को रोकता है और तुरंत खपत (kWh) की गणना करता है।
+1574|Save drafts for review or batch-issue: issued invoices lock the historical unit rates for that period.|保存草稿复核或批量发布：已发布账单将固定保存当期历史单价。|검토를 위해 임시저장하거나 일괄 발행: 발행된 청구서는 해당 기간의 단가를 고정 보존합니다.|समीक्षा के लिए ड्राफ्ट सहेजें या एक साथ जारी करें: जारी किए गए बिल उस अवधि की दरों को लॉक कर देते हैं।
+1575|Manage receivables, record receipts, and export Excel reports|欠款管理、收款登记与 Excel 报表导出|미수금 관리, 수납 기록 및 Excel 보고서 내보내기|बकाया प्रबंधन, रसीद प्रविष्टि और Excel रिपोर्ट निर्यात
+1576|Track unpaid invoices closely, verify tenant bank transfers, and export month-end accounting books.|紧密跟踪未收账单，核对租客转账并导出月末财务账册。|미납 청구서를 면밀히 추적하고 세입자 이체 내역을 대사하여 월말 장부를 내보냅니다.|अवैतनिक बिलों को ट्रैक करें, किरायेदार के ट्रांसफर का मिलान करें और मासिक लेखा रिपोर्ट निर्यात करें।
+1577|Filter invoices by building, billing period, or Unpaid / Paid status.|按楼栋、账期或未付/已付状态筛选账单列表。|건물, 청구 월 또는 미납/완납 상태별로 청구서 목록을 필터링합니다.|इमारत, महीने या अवैतनिक / भुगतान की स्थिति के अनुसार बिलों को फ़िल्टर करें।
+1578|Record full-balance manual receipts or confirm VietQR transfer requests submitted by tenants.|按全部欠款额登记手动收款，或确认租客提交的 VietQR 转账请求。|전액 수동 수납을 기록하거나 세입자의 VietQR 이체 확인 요청을 승인합니다.|पूर्ण बकाया राशि की मैनुअल रसीद दर्ज करें या किरायेदारों के VietQR ट्रांसफर अनुरोधों की पुष्टि करें।
+1579|Export Excel (.xlsx) reports with numeric currency formatting for archiving and revenue summaries.|导出保持数字金额格式的 Excel (.xlsx) 报表，便于归档与收入汇总。|숫자 통화 서식이 유지된 Excel(.xlsx) 보고서를 내보내 보관 및 수익을 집계합니다.|संग्रह और राजस्व सारांश के लिए संख्यात्मक मुद्रा प्रारूप में Excel (.xlsx) फ़ाइल निर्यात करें।
+1580|Collect rent via QR code & automated Zalo reminders|通过二维码收租与 Zalo 自动提醒|QR 코드 수금 및 Zalo 자동 알림|QR कोड से किराया वसूली और स्वचालित Zalo अनुस्मारक
+1581|Configure your VietQR or payOS receiving account, share tenant links, and enable timely Zalo reminders.|配置 VietQR 或 payOS 收款账户，向租客发放链接并开启准时 Zalo 提醒。|VietQR 또는 payOS 수취 계좌를 설정하고 세입자 링크 발급 및 정시 Zalo 알림을 활성화합니다.|VietQR या payOS खाता सेट करें, किरायेदार को लिंक दें और समय पर Zalo अनुस्मारक चालू करें।
+1582|In Payment Settings: choose manual VietQR (personal bank account) or connect automated payOS.|在支付设置中：选择手动 VietQR 模式（个人银行卡）或连接 payOS 自动网关。|결제 설정에서 수동 VietQR 모드(개인 계좌)를 선택하거나 자동 payOS를 연동합니다.|भुगतान सेटिंग्स में: मैनुअल VietQR (व्यक्तिगत बैंक खाता) चुनें या स्वचालित payOS कनेक्ट करें।
+1583|Share the private link (/t/token) with tenants or connect Zalo to send automated reminder messages.|向租客分享私密链接 (/t/token) 或连接 Zalo 发送自动提醒消息。|세입자에게 전용 링크(/t/token)를 공유하거나 Zalo를 연결해 자동 알림을 보냅니다.|किरायेदार के साथ निजी लिंक (/t/token) साझा करें या स्वचालित संदेश भेजने के लिए Zalo कनेक्ट करें।
+1584|Tenants open the link on their phone, inspect every line item, and scan the QR code to pay with no app needed.|租客在手机上打开链接，查看各项明细并直接扫码支付，无需安装应用。|세입자는 앱 설치 없이 휴대폰에서 링크를 열어 상세 내역을 확인하고 QR로 결제합니다.|किरायेदार बिना ऐप इंस्टॉल किए फोन पर लिंक खोलते हैं, विवरण देखते हैं और QR स्कैन कर भुगतान करते हैं।
+1585|4 core workflows for running your rental property on Roomie.|在 Roomie 上运营出租屋的 4 大核心流程。|Roomie에서 임대 시설을 운영하는 4가지 핵심 프로세스.|Roomie पर किराये के कमरे प्रबंधित करने की 4 मुख्य प्रक्रियाएँ।

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 // Prerendered content stays visible by default. Only supported clients prepare
 // offscreen targets, so an already-visible block never flashes back to opacity 0.
-export function useLandingMotion() {
+export function useLandingMotion(pageKey = 'home') {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,6 +24,8 @@ export function useLandingMotion() {
     register('.landing-dashboard', 650, 12);
     register('.landing-section-heading, .product-story .story-copy', 600, 12);
     register('.product-story .story-art', 600, 12, 0, 80);
+    register('.comparison-card, .pricing-card, .explore-card, .guide-card', 600, 12, 60);
+    register('.faq-item', 500, 10, 40);
     register('.landing-security, .cta-content', 550, 10);
     register('.setup-steps > li', 550, 10, 60);
 
@@ -91,7 +93,7 @@ export function useLandingMotion() {
       preference.removeEventListener('change', onPreferenceChange);
       root.removeEventListener('focusin', onFocus);
     };
-  }, []);
+  }, [pageKey]);
 
   return rootRef;
 }

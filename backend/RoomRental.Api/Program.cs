@@ -209,10 +209,10 @@ app.MapFallback("{*path:nonfile}", async context =>
         return;
     }
 
-    var isHome = path == "/";
+    var isPublic = SeoMiddleware.TryGetPublicHtmlFile(path, out var publicFile);
     var isApp = SeoMiddleware.IsAppPath(path);
-    if (!isHome && !isApp) context.Response.StatusCode = StatusCodes.Status404NotFound;
-    var index = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), isHome ? "index.html" : "app.html");
+    if (!isPublic && !isApp) context.Response.StatusCode = StatusCodes.Status404NotFound;
+    var index = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), isPublic ? publicFile : "app.html");
     if (!File.Exists(index))
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;

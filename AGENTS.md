@@ -78,8 +78,8 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - `app/styles.css` ghép CSS theo thứ tự có chủ đích. Giữ cascade khi di chuyển rule. Nền/brand nằm ở `shared/styles/foundation.css`, Ant token ở `shared/design/antdTheme.ts`; font toàn hệ thống Be Vietnam Pro (nội dung, tiêu đề, số liệu và Ant Design); giữ monospace cho mã/nội dung chuyển khoản.
 - Tiếng Việt là nguồn; `shared/i18n/source.json` và `translations.tsv` cùng các catalog en/zh/ko/hi. Dùng `t()`; sau đổi copy chạy `i18n:build`, `i18n:check`; đọc script trước khi sửa trực tiếp catalog sinh ra.
 - Routes private phải đồng bộ `app/App.tsx`, `app/seo/site.ts`, `Shared/SeoMiddleware.cs`. Router React không đủ để hard-refresh chạy trên server.
-- Prerender sinh `dist/index.html` cho trang chủ, `app.html` cho SPA và sitemap. Không xuất renderer build-only vào production. Trang lạ/API lạ phải trả 404 thật.
-- Landing motion dùng IntersectionObserver/Web Animations; giữ nội dung nhìn được khi thiếu JS, Reduce Motion hoặc thiếu API; focus bàn phím phải hủy reveal đang che link.
+- Prerender sinh HTML tĩnh cho bộ 4 trang công khai (`/` → `dist/index.html`, `/features` → `dist/features/index.html`, `/pricing` → `dist/pricing/index.html`, `/huong-dan` → `dist/huong-dan/index.html`), `app.html` cho SPA và `sitemap.xml`. Không xuất renderer build-only vào production. Trang lạ/API lạ phải trả 404 thật.
+- Bộ Landing page (`LandingPage.tsx`, `LandingVisuals.tsx`, `LandingSections.tsx`) chia thành 4 trang trên thanh điều hướng: Trang chủ (`/`) ngắn gọn + thẻ khám phá, Tính năng & So sánh (`/features`), Bảng giá Free/Pro & FAQ `<details>/<summary>` (`/pricing`), và Cẩm nang hướng dẫn (`/huong-dan`). Landing motion dùng IntersectionObserver/Web Animations; giữ nội dung nhìn được khi thiếu JS, Reduce Motion hoặc thiếu API; focus bàn phím phải hủy reveal đang che link.
 - Dashboard monitoring có Growth/Revenue/Operations, filter ngày Việt Nam, campaign costs và UTM link builder. `null`/Unknown phải hiển thị chưa có dữ liệu cùng lý do, không biến thành 0 hoặc 100%.
 
 ### Backend

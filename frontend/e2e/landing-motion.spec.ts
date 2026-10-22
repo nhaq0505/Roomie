@@ -100,6 +100,11 @@ test('prerendered landing remains readable without JavaScript', async ({ browser
   await expect(page.locator('.hero-content h1')).toBeVisible();
   await expect(page.locator('.rooms-art')).toHaveCSS('opacity', '1');
   await expect(page.locator('.landing-cta .landing-btn')).toHaveAttribute('href', '/register');
+
+  await page.goto('http://127.0.0.1:4178/pricing/');
+  await expect(page.locator('#pricing .pricing-card')).toHaveCount(2);
+  await expect(page.locator('#faq .faq-item')).toHaveCount(6);
+  await expect(page.locator('#faq .faq-item').first().locator('.faq-answer')).toBeVisible();
   await context.close();
 });
 
