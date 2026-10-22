@@ -24,6 +24,57 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-page a { transition: none; }
 }
+.landing-promo-banner {
+  background: linear-gradient(90deg, #072620 0%, #0a6155 50%, #072620 100%);
+  color: #fff;
+  border-bottom: 1px solid rgba(156, 232, 210, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px 16px;
+  position: relative;
+  z-index: 40;
+}
+.landing-promo-inner {
+  max-width: 1328px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 215, 0, 0.16);
+  border: 1px solid rgba(255, 215, 0, 0.45);
+  color: #ffd700;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.promo-message {
+  font-weight: 500;
+  color: #f1fff8;
+}
+.promo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--landing-mint);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+.promo-cta:hover {
+  color: #fff;
+}
 .landing-header { position: sticky; top: 0; z-index: 30; background: var(--landing-deep); border-bottom: 1px solid #2a444d; }
 .landing-header-inner { max-width: 1328px; padding: 16px 24px; min-height: 80px; margin: auto; display: flex; align-items: center; gap: 40px; }
 .landing-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; color: #fff; }
@@ -52,6 +103,23 @@
 .hero-content h1 > span { display: block; }
 .hero-content h1 > span:last-child { color: var(--landing-mint); }
 .hero-content > p { max-width: 570px; margin: 24px auto 28px; font-size: 17px; line-height: 1.7; color: #d4e4df; }
+.hero-promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 6px 14px;
+  background: rgba(156, 232, 210, 0.1);
+  border: 1px solid rgba(156, 232, 210, 0.28);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--landing-mint);
+}
+.hero-promo-badge .anticon {
+  color: #ffd700;
+  font-size: 14px;
+}
 .hero-proof { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; line-height: 1.6; color: #d4e4df; margin-top: 20px; }
 .hero-proof .anticon { color: var(--landing-mint); }
 /* The previews use static sample data and the app's own visual language. */
