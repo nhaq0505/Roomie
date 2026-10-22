@@ -21,11 +21,33 @@ public static partial class OwnerManagementEndpoints
             if (string.IsNullOrWhiteSpace(request.TenantName) || request.TenantName.Trim().Length > 160)
                 throw new ApiException(400, "Tên người thuê cần từ 1 đến 160 ký tự.");
             if (request.Phone?.Trim().Length > 60) throw new ApiException(400, "Số điện thoại tối đa 60 ký tự.");
-            if (request.People is < 1 or > 30) throw new ApiException(400, "Số người ở cần từ 1 đến 30.");
-            var peopleChanged = occupancy.People != request.People;
+            ApplyOccupancyContractFields(
+                occupancy,
+                request.TenantCitizenId,
+                request.TenantDateOfBirth,
+                request.TenantGender,
+                request.TenantCitizenIdIssuedDate,
+                request.TenantCitizenIdIssuedPlace,
+                request.TenantPermanentAddress,
+                request.TenantEmail,
+                request.ContractEndDate,
+                request.PaymentDueDay,
+                request.RoomAreaSqm,
+                request.HandoverAssets,
+                request.AdditionalTerms,
+                request.HouseholdHeadRelation,
+                preserveExistingWhenNull: request.TenantCitizenId is null);
+            var effectivePeople = request.People;
+            if (request.CoResidents is not null)
+            {
+                occupancy.CoResidentsJson = ValidateAndSerializeCoResidents(request.CoResidents, out var cleanedCoResidents);
+                effectivePeople = Math.Max(effectivePeople, 1 + cleanedCoResidents.Count);
+            }
+            if (request.People < 1 || effectivePeople is < 1 or > 30) throw new ApiException(400, "Số người ở cần từ 1 đến 30.");
+            var peopleChanged = occupancy.People != effectivePeople;
             occupancy.TenantName = request.TenantName.Trim();
             occupancy.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
-            occupancy.People = request.People;
+            occupancy.People = effectivePeople;
             if (peopleChanged)
             {
                 // Issued invoices (including unpaid ones) are finalized snapshots. Only unpaid drafts may change.
@@ -61,7 +83,15 @@ public static partial class OwnerManagementEndpoints
                 throw new ApiException(StatusCodes.Status409Conflict, "This room already has an active occupancy.");
             if (string.IsNullOrWhiteSpace(request.TenantName) || request.TenantName.Trim().Length > 160)
                 throw new ApiException(StatusCodes.Status400BadRequest, "Tenant name is required and must be 160 characters or fewer.");
-            if (request.People is < 1 or > 30)
+            var tenantCitizenId = ValidateAndCleanCitizenId(request.TenantCitizenId, "Số CCCD/Định danh của người thuê");
+            List<CoResidentDto> cleanedCoResidents = [];
+            string? coResidentsJson = null;
+            if (request.CoResidents is not null)
+            {
+                coResidentsJson = ValidateAndSerializeCoResidents(request.CoResidents, out cleanedCoResidents);
+            }
+            var effectivePeople = Math.Max(request.People, 1 + cleanedCoResidents.Count);
+            if (request.People < 1 || effectivePeople is < 1 or > 30)
                 throw new ApiException(StatusCodes.Status400BadRequest, "People must be between 1 and 30.");
             var today = VietnamCalendar.TodayVietnam();
             if (request.StartDate > today)
@@ -93,11 +123,29 @@ public static partial class OwnerManagementEndpoints
                 RoomId = id,
                 TenantName = request.TenantName.Trim(),
                 Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim()[..Math.Min(request.Phone.Trim().Length, 60)],
-                People = request.People,
+                People = effectivePeople,
                 StartDate = request.StartDate,
+                TenantCitizenId = tenantCitizenId,
+                CoResidentsJson = coResidentsJson,
                 TenantTokenHash = token.Hash,
                 ProtectedTenantToken = token.ProtectedToken
             };
+            ApplyOccupancyContractFields(
+                occupancy,
+                tenantCitizenId,
+                request.TenantDateOfBirth,
+                request.TenantGender,
+                request.TenantCitizenIdIssuedDate,
+                request.TenantCitizenIdIssuedPlace,
+                request.TenantPermanentAddress,
+                request.TenantEmail,
+                request.ContractEndDate,
+                request.PaymentDueDay,
+                request.RoomAreaSqm,
+                request.HandoverAssets,
+                request.AdditionalTerms,
+                request.HouseholdHeadRelation,
+                preserveExistingWhenNull: false);
             db.Occupancies.Add(occupancy);
             if (request.DepositAmount > 0)
             {

@@ -15,14 +15,77 @@ public sealed record LoginRequest(string Email, string Password, string? Code = 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string? ConfirmPassword = null);
 public sealed record ResetPasswordRequest(string Email, string Token, string NewPassword, string ConfirmPassword);
 public sealed record AdminResetPasswordRequest(string CurrentPassword);
-public sealed record OccupancyUpdateRequest(Guid OccupancyId, string TenantName, string? Phone, int People);
+public sealed record OccupancyUpdateRequest(
+    Guid OccupancyId,
+    string TenantName,
+    string? Phone,
+    int People,
+    string? TenantCitizenId = null,
+    IReadOnlyList<CoResidentDto>? CoResidents = null,
+    DateOnly? TenantDateOfBirth = null,
+    string? TenantGender = null,
+    DateOnly? TenantCitizenIdIssuedDate = null,
+    string? TenantCitizenIdIssuedPlace = null,
+    string? TenantPermanentAddress = null,
+    string? TenantEmail = null,
+    DateOnly? ContractEndDate = null,
+    int? PaymentDueDay = null,
+    decimal? RoomAreaSqm = null,
+    string? HandoverAssets = null,
+    string? AdditionalTerms = null,
+    string? HouseholdHeadRelation = null);
 public sealed record OwnerStatusRequest(string Status, string? Reason);
 public sealed record BuildingRequest(string Name, string? Address);
 public sealed record BuildingDto(Guid Id, string Name, string? Address);
 public sealed record RoomCreateRequest(Guid BuildingId, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading = 0);
 public sealed record RoomUpdateRequest(string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee);
-public sealed record OccupancyRequest(string TenantName, string? Phone, int People, DateOnly StartDate, decimal DepositAmount = 0, decimal? InitialReading = null);
-public sealed record OccupancyDto(Guid Id, string TenantName, string? Phone, int People, DateOnly StartDate, string? Token, string? Url, Guid? DepositInvoiceId, decimal DepositRequired, decimal DepositPaid, decimal DepositHeld);
+public sealed record OccupancyRequest(
+    string TenantName,
+    string? Phone,
+    int People,
+    DateOnly StartDate,
+    decimal DepositAmount = 0,
+    decimal? InitialReading = null,
+    string? TenantCitizenId = null,
+    IReadOnlyList<CoResidentDto>? CoResidents = null,
+    DateOnly? TenantDateOfBirth = null,
+    string? TenantGender = null,
+    DateOnly? TenantCitizenIdIssuedDate = null,
+    string? TenantCitizenIdIssuedPlace = null,
+    string? TenantPermanentAddress = null,
+    string? TenantEmail = null,
+    DateOnly? ContractEndDate = null,
+    int? PaymentDueDay = null,
+    decimal? RoomAreaSqm = null,
+    string? HandoverAssets = null,
+    string? AdditionalTerms = null,
+    string? HouseholdHeadRelation = null);
+public sealed record OccupancyDto(
+    Guid Id,
+    string TenantName,
+    string? Phone,
+    int People,
+    DateOnly StartDate,
+    string? Token,
+    string? Url,
+    Guid? DepositInvoiceId,
+    decimal DepositRequired,
+    decimal DepositPaid,
+    decimal DepositHeld,
+    string? TenantCitizenId = null,
+    IReadOnlyList<CoResidentDto>? CoResidents = null,
+    DateOnly? TenantDateOfBirth = null,
+    string? TenantGender = null,
+    DateOnly? TenantCitizenIdIssuedDate = null,
+    string? TenantCitizenIdIssuedPlace = null,
+    string? TenantPermanentAddress = null,
+    string? TenantEmail = null,
+    DateOnly? ContractEndDate = null,
+    int PaymentDueDay = 5,
+    decimal? RoomAreaSqm = null,
+    string? HandoverAssets = null,
+    string? AdditionalTerms = null,
+    string? HouseholdHeadRelation = null);
 public sealed record RoomDto(Guid Id, Guid BuildingId, string BuildingName, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading, decimal PreviousReading, OccupancyDto? Occupancy);
 public sealed record RotateLinkDto(string Token, string Url);
 public sealed record ReadingRequest(Guid RoomId, string Period, decimal CurrentReading);

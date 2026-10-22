@@ -1461,3 +1461,57 @@
 1460|Send hour (7h - 20h)|发送小时 (7h - 20h)|발송 시간 (7시 - 20시)|भेजने का समय (7h - 20h)
 1461|Minute (0 - 59)|分钟 (0 - 59)|분 (0 - 59)|मिनट (0 - 59)
 1462|Save reminder schedule|保存提醒计划|알림 일정 저장|अनुस्मारक शेड्यूल सहेजें
+1463|Export Contract & CT01|导出租房合同与 CT01|임대 계약서 및 CT01 출력|अनुबंध और CT01 निर्यात करें
+1464|Saved rental contract and CT01 declaration details.|已保存租房合同和 CT01 申报表信息。|임대 계약서 및 CT01 신고서 정보가 저장되었습니다.|किराया अनुबंध और CT01 घोषणा विवरण सहेजे गए।
+1465|Downloaded Rental Contract Word file.|已下载租房合同 Word 文件。|임대 계약서 Word 파일을 다운로드했습니다.|किराया अनुबंध Word फ़ाइल डाउनलोड की गई।
+1466|Downloaded CT01 Declaration Word file.|已下载 CT01 申报表 Word 文件。|CT01 거주지 변경 신고서 Word 파일을 다운로드했습니다.|CT01 घोषणा Word फ़ाइल डाउनलोड की गई।
+1467|Rental Contract & CT01 Form · {0}|租房合同与 CT01 申报表 · {0}|임대 계약서 및 CT01 신고서 · {0}|किराया अनुबंध और CT01 प्रपत्र · {0}
+1468|Save details|保存信息|정보 저장|जानकारी सहेजें
+1469|Print / Save PDF (A4)|打印 / 保存 PDF (A4)|인쇄 / PDF 저장 (A4)|प्रिंट / PDF सहेजें (A4)
+1470|Download Contract (.docx)|下载合同 Word (.docx)|계약서 Word 다운로드 (.docx)|अनुबंध Word डाउनलोड करें (.docx)
+1471|Download CT01 (.docx)|下载 CT01 Word (.docx)|CT01 Word 다운로드 (.docx)|CT01 Word डाउनलोड करें (.docx)
+1472|Preparing rental contract and CT01 declaration data…|正在准备租房合同与 CT01 申报表数据…|임대 계약서 및 CT01 신고서 데이터를 준비하는 중…|किराया अनुबंध और CT01 डेटा तैयार किया जा रहा है…
+1473|Room details, rent, utility rates, and deposit have been pre-filled automatically|房间信息、租金、水电单价及押金已自动填入|호실 정보, 임대료, 수도·전기 단가 및 보증금이 자동으로 입력되었습니다|कमरे का विवरण, किराया, बिजली-पानी दरें और अमानत राशि स्वतः भर दी गई हैं
+1474|Landlord ID details and the local Police Station name are saved and reused automatically across all other rooms.|房东身份证号及派出所名称将自动保存并复用于其他所有房间。|임대인 신분증 정보와 관할 경찰서 명칭은 저장되어 다른 모든 호실에 자동 적용됩니다.|मकान मालिक का पहचान पत्र और स्थानीय पुलिस स्टेशन का नाम सहेजा जाता है और अन्य सभी कमरों के लिए स्वतः उपयोग होता है।
+1475|1. Tenant / CT01 Declarant (Party B)|1. 承租人 / CT01 申报人（乙方）|1. 임차인 / CT01 신고인 (을)|1. किरायेदार / CT01 घोषणाकर्ता (पक्ष B)
+1476|Tenant full name|租客姓名|세입자 성명|किरायेदार का पूरा नाम
+1477|Citizen ID / Personal ID (12 digits)|公民身份证号 / 个人识别码（12位）|주민등록번호 / 개인식별번호 (12자리)|नागरिक पहचान संख्या (12 अंक)
+1478|Enter 9 to 12 digits.|请输入 9 至 12 位数字。|9~12자리 숫자를 입력하세요.|9 से 12 अंक दर्ज करें।
+1479|Date of birth|出生日期|생년월일|जन्म तिथि
+1480|Select date|选择日期|날짜 선택|तिथि चुनें
+1481|Gender|性别|성별|लिंग
+1482|Select|选择|선택|चुनें
+1483|Male|男|남|पुरुष
+1484|Female|女|여|महिला
+1485|ID issue date|身份证签发日期|신분증 발급일|पहचान पत्र जारी करने की तिथि
+1486|ID issue place|身份证签发机关|신분증 발급기관|पहचान पत्र जारी करने का स्थान
+1487|Police Department for Administrative Management of Social Order|治安行政管理警察局|사회질서행정관리경찰국|सामाजिक व्यवस्था प्रशासनिक प्रबंधन पुलिस विभाग
+1488|Permanent address|常住地址|상주 주소 (본적지)|स्थायी पता
+1489|House number, street, ward/commune, district, province/city|门牌号、街道、社区/乡镇、区/县、省/市|집번호, 도로명, 동/읍/면, 구/군, 시/도|मकान नंबर, गली, वार्ड/पंचायत, जिला, राज्य/शहर
+1490|Contact email (optional)|联系邮箱（如有）|연락처 이메일 (선택)|संपर्क ईमेल (यदि हो)
+1491|2. Landlord / Household Head (Party A — Saved for all rooms)|2. 出租人 / 户主（甲方 — 保存并用于所有房间）|2. 임대인 / 세대주 (갑 — 모든 호실 공통 저장)|2. मकान मालिक / परिवार प्रमुख (पक्ष A — सभी कमरों के लिए सहेजा गया)
+1492|Landlord full name|房东姓名|임대인 성명|मकान मालिक का पूरा नाम
+1493|Landlord phone number|房东电话|임대인 전화번호|मकान मालिक का फ़ोन नंबर
+1494|Landlord / Household Head Citizen ID (12 digits)|房东 / 户主身份证号（12位）|임대인 / 세대주 개인식별번호 (12자리)|मकान मालिक / मुखिया पहचान संख्या (12 अंक)
+1495|3. Contract Terms & Handover Assets|3. 合同条款与交接物品|3. 계약 조건 및 인도 비품|3. अनुबंध की शर्तें और सौंपे गए सामान
+1496|Property address / Temporary residence address|出租屋地址 / 暂住登记地址|건물 주소 / 임시거주 등록 주소|संपत्ति का पता / अस्थायी निवास का पता
+1497|Contract end date|合同到期日|계약 종료일|अनुबंध समाप्ति तिथि
+1498|Monthly payment due day|每月付款截止日|매월 납부 기한(일)|मासिक भुगतान देय दिन
+1499|Room area|房间面积|객실 면적|कमरे का क्षेत्रफल
+1500|Handover assets inventory|交接家具与设备清单|인도 비품 및 시설 목록|सौंपे गए सामानों की सूची
+1501|Example: 1 air conditioner, 1 water heater, 1 bed, 1 wardrobe, 2 room keys…|例如：1台空调、1台热水器、1张床、1个衣柜、2把房间钥匙…|예: 에어컨 1대, 온수기 1대, 침대 1개, 옷장 1개, 방 열쇠 2개…|उदाहरण: 1 एसी, 1 गीजर, 1 पलंग, 1 अलमारी, 2 कमरे की चाबियाँ…
+1502|Additional terms / house rules (optional)|补充协议 / 租房规定（如有）|추가 약정 / 생활 수칙 (선택)|अतिरिक्त शर्तें / नियम (यदि कोई हो)
+1503|Example: Flexible hours, no pets allowed, 30 days notice before move-out…|例如：出入时间自由、禁止养宠物、退房需提前 30 天通知…|예: 출입 시간 자유, 반려동물 금지, 퇴실 30일 전 통보…|उदाहरण: लचीला समय, पालतू जानवर मना हैं, कमरा छोड़ने से 30 दिन पहले सूचना…
+1504|4. CT01 Residence Form & Co-residents|4. CT01 居留申报表与同住人员|4. CT01 거주 신고서 및 동거인|4. CT01 निवास प्रपत्र और साथ रहने वाले सदस्य
+1505|Recipient Police Station (saved per building)|致公安机关名称（按楼栋保存）|수신 경찰서 명칭 (건물별 저장)|प्राप्तकर्ता पुलिस स्टेशन (इमारत के अनुसार सहेजा गया)
+1506|Example: Thanh My Loi Ward Police, Thu Duc City, Ho Chi Minh City|例如：胡志明市守德市盛美利坊公安派出所|예: 호찌민시 투득시 탄미러이동 공안|उदाहरण: थान मी लोई वार्ड पुलिस, थू डुक सिटी, हो ची मिन्ह सिटी
+1507|Relationship to household head|与户主关系|세대주와의 관계|परिवार के मुखिया से संबंध
+1508|Tenant|租客|임차인|किरायेदार
+1509|Family members / Co-residents changing residence together|随同变更居留的家庭成员 / 同住人|함께 거주지를 변경하는 세대원 / 동거인|साथ निवास बदलने वाले सदस्य / सह-निवासी
+1510|Citizen ID|身份证号|신분증 번호|पहचान संख्या
+1511|Remove member|删除成员|구성원 삭제|सदस्य हटाएँ
+1512|Add co-resident|添加同住人员|동거인 추가|सह-निवासी जोड़ें
+1513|Preview: Rental Contract|预览：租房合同|미리보기: 임대차 계약서|पूर्वावलोकन: किराया अनुबंध
+1514|Preview: Form CT01 (Circular 66/2023/TT-BCA)|预览：CT01 表（第 66/2023/TT-BCA 号通知）|미리보기: CT01 양식 (시행규칙 66/2023/TT-BCA)|पूर्वावलोकन: प्रपत्र CT01 (परिपत्र 66/2023/TT-BCA)
+1515|Also download CT01 (.docx)|顺便下载 CT01 (.docx)|CT01 함께 다운로드 (.docx)|CT01 भी डाउनलोड करें (.docx)
+1516|Also download Contract (.docx)|顺便下载合同 (.docx)|계약서 함께 다운로드 (.docx)|अनुबंध भी डाउनलोड करें (.docx)

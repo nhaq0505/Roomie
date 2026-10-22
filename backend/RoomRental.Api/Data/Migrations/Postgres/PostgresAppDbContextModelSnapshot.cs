@@ -28,8 +28,22 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CitizenId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateOnly?>("CitizenIdIssuedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("CitizenIdIssuedPlace")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -90,6 +104,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
 
                     b.Property<string>("PendingMfaSecret")
                         .HasColumnType("text");
+
+                    b.Property<string>("PermanentAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(60)
@@ -183,6 +201,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PoliceStationName")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
 
                     b.HasKey("Id");
 
@@ -1105,14 +1127,37 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AdditionalTerms")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CoResidentsJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("ContractEndDate")
+                        .HasColumnType("date");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("HandoverAssets")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("HouseholdHeadRelation")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("PaymentDueDay")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
 
                     b.Property<int>("People")
                         .HasColumnType("integer");
@@ -1125,16 +1170,46 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<decimal?>("RoomAreaSqm")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
                     b.Property<Guid>("RoomId")
                         .HasColumnType("uuid");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("TenantCitizenId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateOnly?>("TenantCitizenIdIssuedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("TenantCitizenIdIssuedPlace")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateOnly?>("TenantDateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("TenantEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("TenantGender")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("TenantName")
                         .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
+
+                    b.Property<string>("TenantPermanentAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("TenantTokenHash")
                         .HasMaxLength(64)

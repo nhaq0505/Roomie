@@ -15,7 +15,11 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     [GeneratedRegex(@"^/(t|tenant)/[^/]+(?:/invoices/[^/]+/checkout)?$", RegexOptions.IgnoreCase)]
     private static partial Regex GuestPath();
 
-    public static bool IsAppPath(string path) => AppPaths.Contains(path.TrimEnd('/')) || GuestPath().IsMatch(path.TrimEnd('/'));
+    [GeneratedRegex(@"^/rooms/[^/]+/(tenant|documents)$", RegexOptions.IgnoreCase)]
+    private static partial Regex RoomTenantPath();
+
+    public static bool IsAppPath(string path) =>
+        AppPaths.Contains(path.TrimEnd('/')) || GuestPath().IsMatch(path.TrimEnd('/')) || RoomTenantPath().IsMatch(path.TrimEnd('/'));
 
     public async Task InvokeAsync(HttpContext context)
     {

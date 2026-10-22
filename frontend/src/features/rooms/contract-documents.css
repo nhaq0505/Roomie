@@ -1,0 +1,260 @@
+.contract-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 320px;
+}
+
+.contract-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(380px, 480px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.contract-form-pane {
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.room-documents-page .contract-form-pane {
+  max-height: none;
+  overflow-y: visible;
+  padding-right: 0;
+}
+
+.room-documents-page .contract-preview-pane {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+}
+
+.contract-form-pane .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.co-residents-list {
+  display: grid;
+  gap: 10px;
+}
+
+.co-resident-item {
+  padding: 10px 12px 2px;
+  border: 1px solid #e3ece9;
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+
+.contract-preview-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #eef3f2;
+  border: 1px solid #dce6e4;
+  border-radius: 14px;
+  padding: 14px;
+  max-height: calc(100vh - 130px);
+}
+
+.contract-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.contract-a4-scroll {
+  overflow: auto;
+  padding: 8px 4px 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.contract-a4-sheet {
+  width: 100%;
+  max-width: 794px;
+  min-height: 1020px;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 8px 28px rgba(18, 38, 42, 0.12);
+  border: 1px solid #d9e2e0;
+  border-radius: 4px;
+  padding: 36px 44px;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 13pt;
+  line-height: 1.48;
+}
+
+.contract-a4-sheet .a4-header-note {
+  text-align: right;
+  font-style: italic;
+  font-size: 10.5pt;
+  margin-bottom: 6px;
+  color: #222;
+}
+
+.contract-a4-sheet .a4-republic {
+  text-align: center;
+  font-weight: 700;
+  font-size: 13pt;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.contract-a4-sheet .a4-motto {
+  text-align: center;
+  font-weight: 700;
+  font-size: 13pt;
+  text-decoration: underline;
+  margin: 2px 0 14px;
+}
+
+.contract-a4-sheet .a4-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 15pt;
+  text-transform: uppercase;
+  margin: 10px 0 8px;
+  color: #000;
+}
+
+.contract-a4-sheet .a4-subtitle {
+  text-align: center;
+  font-size: 12.5pt;
+  margin: 0 0 14px;
+}
+
+.contract-a4-sheet .a4-date-place {
+  font-style: italic;
+  margin: 6px 0 10px;
+}
+
+.contract-a4-sheet .a4-section-heading {
+  font-weight: 700;
+  margin: 12px 0 5px;
+  font-size: 13pt;
+}
+
+.contract-a4-sheet .a4-line {
+  margin: 4px 0;
+  text-align: justify;
+}
+
+.contract-a4-sheet .a4-inline-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 18px;
+  margin: 4px 0;
+}
+
+.contract-a4-sheet .ct01-id-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.contract-a4-sheet .ct01-id-boxes {
+  display: inline-grid;
+  grid-template-columns: repeat(12, 24px);
+  border: 1px solid #000;
+}
+
+.contract-a4-sheet .ct01-id-box {
+  width: 24px;
+  height: 26px;
+  border-right: 1px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12.5pt;
+}
+
+.contract-a4-sheet .ct01-id-box:last-child {
+  border-right: 0;
+}
+
+.contract-a4-sheet .ct01-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 14px;
+  font-size: 11.5pt;
+}
+
+.contract-a4-sheet .ct01-table th,
+.contract-a4-sheet .ct01-table td {
+  border: 1px solid #000;
+  padding: 5px 6px;
+  vertical-align: middle;
+}
+
+.contract-a4-sheet .ct01-table th {
+  font-weight: 700;
+  text-align: center;
+}
+
+.contract-a4-sheet .ct01-table td.center {
+  text-align: center;
+}
+
+.contract-a4-sheet .a4-sign-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 22px;
+  text-align: center;
+}
+
+.contract-a4-sheet .a4-sign-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+  text-align: center;
+  font-size: 11.5pt;
+}
+
+.contract-a4-sheet .a4-sign-box {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.contract-a4-sheet .a4-sign-note {
+  font-style: italic;
+  font-size: 10.5pt;
+  font-weight: 400;
+}
+
+.contract-a4-sheet .a4-sign-name {
+  font-weight: 700;
+  margin-top: 52px;
+}
+
+.contract-a4-sheet .ct01-footnote {
+  font-style: italic;
+  font-size: 10pt;
+  margin-top: 14px;
+}
+
+@media (max-width: 991px) {
+  .contract-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .contract-form-pane,
+  .contract-preview-pane {
+    max-height: none;
+  }
+  .contract-a4-sheet {
+    padding: 20px 18px;
+    font-size: 11.5pt;
+  }
+}

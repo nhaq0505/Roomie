@@ -101,3 +101,118 @@
   .rooms-workspace *, .room-editor * { scrollbar-width: thin; scrollbar-color: var(--room-scrollbar-thumb) transparent; }
 }
 .room-editor .ant-modal-body { overflow-x: hidden; }
+
+.room-tenant-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 24px;
+  align-items: start;
+}
+
+.room-tenant-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.room-tenant-side-column {
+  position: sticky;
+  top: 20px;
+}
+
+.room-tenant-card {
+  border-color: var(--room-line);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.room-tenant-card-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--room-line);
+}
+
+.room-tenant-coresidents-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--room-line);
+}
+
+.room-tenant-coresidents-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px 16px;
+  border: 1px dashed var(--room-control-line);
+  border-radius: 14px;
+  background: #fbfdfc;
+}
+
+.room-tenant-coresidents-empty-icon {
+  font-size: 28px;
+  color: var(--room-muted);
+}
+
+.room-tenant-coresidents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.room-tenant-coresident-row {
+  padding: 14px 16px 4px;
+  border: 1px solid var(--room-line);
+  border-radius: 14px;
+  background: #fbfdfc;
+}
+
+.room-tenant-coresident-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.room-tenant-fee-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--room-line);
+  border-radius: 14px;
+  background: #f8fbfa;
+}
+
+.room-tenant-fee-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.room-tenant-fee-item span {
+  color: var(--room-muted);
+}
+
+.room-tenant-fee-item strong {
+  color: var(--room-ink);
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (max-width: 991px) {
+  .room-tenant-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .room-tenant-side-column {
+    position: static;
+  }
+}

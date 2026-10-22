@@ -18,6 +18,8 @@ const AccountStatusPage = lazy(() => import('../features/subscription/AccountSta
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const BuildingsPage = lazy(() => import('../features/buildings/BuildingsPage'));
 const RoomsPage = lazy(() => import('../features/rooms/RoomsPage'));
+const RoomTenantPage = lazy(() => import('../features/rooms/RoomTenantPage'));
+const RoomDocumentsPage = lazy(() => import('../features/rooms/RoomDocumentsPage'));
 const ReadingsPage = lazy(() => import('../features/readings/ReadingsPage'));
 const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage'));
@@ -82,6 +84,8 @@ export default function App() {
     <Route path="/dashboard" element={<Gate><AppShell><DashboardPage /></AppShell></Gate>} />
     <Route path="/buildings" element={<Gate><AppShell><BuildingsPage /></AppShell></Gate>} />
     <Route path="/rooms" element={<Gate><AppShell><RoomsPage /></AppShell></Gate>} />
+    <Route path="/rooms/:id/tenant" element={<Gate><AppShell><RoomTenantPage /></AppShell></Gate>} />
+    <Route path="/rooms/:id/documents" element={<Gate><AppShell><RoomDocumentsPage /></AppShell></Gate>} />
     <Route path="/readings" element={<Gate><AppShell><ReadingsPage /></AppShell></Gate>} />
     <Route path="/invoices" element={<Gate><AppShell><InvoicesPage /></AppShell></Gate>} />
     <Route path="/reports" element={<Gate><AppShell><ReportsPage /></AppShell></Gate>} />

@@ -15,6 +15,7 @@ public static partial class OwnerManagementEndpoints
         MapBuildingsRoutes(routes);
         MapRoomsRoutes(routes);
         MapOccupanciesRoutes(routes);
+        MapDocumentRoutes(routes);
     }
 
     private static async Task<string?> RoomArchiveBlockReasonAsync(AppDbContext db, Guid ownerId, Guid roomId, CancellationToken ct)
@@ -90,8 +91,33 @@ public static partial class OwnerManagementEndpoints
         if (occupancy is not null)
         {
             var token = canShareTenantLink ? tokenService.Unprotect(occupancy) : null;
-            occupancyDto = new OccupancyDto(occupancy.Id, occupancy.TenantName, occupancy.Phone, occupancy.People, occupancy.StartDate,
-                token, token is null ? null : tokenService.Url(token), deposit?.Id, deposit?.Total ?? 0, deposit?.Paid ?? 0, deposit is null ? 0 : Math.Max(0, deposit.Paid - deposit.DepositSettlements.Sum(x => x.Amount)));
+            var coResidents = DeserializeCoResidents(occupancy.CoResidentsJson);
+            occupancyDto = new OccupancyDto(
+                occupancy.Id,
+                occupancy.TenantName,
+                occupancy.Phone,
+                occupancy.People,
+                occupancy.StartDate,
+                token,
+                token is null ? null : tokenService.Url(token),
+                deposit?.Id,
+                deposit?.Total ?? 0,
+                deposit?.Paid ?? 0,
+                deposit is null ? 0 : Math.Max(0, deposit.Paid - deposit.DepositSettlements.Sum(x => x.Amount)),
+                occupancy.TenantCitizenId,
+                coResidents,
+                occupancy.TenantDateOfBirth,
+                occupancy.TenantGender,
+                occupancy.TenantCitizenIdIssuedDate,
+                occupancy.TenantCitizenIdIssuedPlace,
+                occupancy.TenantPermanentAddress,
+                occupancy.TenantEmail,
+                occupancy.ContractEndDate,
+                occupancy.PaymentDueDay is >= 1 and <= 28 ? occupancy.PaymentDueDay : 5,
+                occupancy.RoomAreaSqm,
+                occupancy.HandoverAssets,
+                occupancy.AdditionalTerms,
+                occupancy.HouseholdHeadRelation);
         }
         return new RoomDto(room.Id, room.BuildingId, building.Name, room.Name, room.Rent, room.ElectricityRate, room.WaterFee,
             room.WaterPerPerson, room.ServiceFee, room.InitialReading, previousReading, occupancyDto);

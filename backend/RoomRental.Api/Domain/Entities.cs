@@ -17,6 +17,11 @@ public sealed class AppUser
     public required string Name { get; set; }
     public required string Email { get; set; }
     public string? Phone { get; set; }
+    public string? CitizenId { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    public DateOnly? CitizenIdIssuedDate { get; set; }
+    public string? CitizenIdIssuedPlace { get; set; }
+    public string? PermanentAddress { get; set; }
     public PaymentConfirmationMode PaymentConfirmationMode { get; set; } = PaymentConfirmationMode.Automatic;
     public string? ManualBankBin { get; set; }
     public string? ManualAccountNumber { get; set; }
@@ -76,6 +81,7 @@ public sealed class Building
     public Guid OwnerId { get; set; }
     public required string Name { get; set; }
     public string? Address { get; set; }
+    public string? PoliceStationName { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public Guid? ArchivedBy { get; set; }
     public Guid? ArchiveBatchId { get; set; }
@@ -108,6 +114,20 @@ public sealed class Occupancy
     public int People { get; set; } = 1;
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
+    public string? TenantCitizenId { get; set; }
+    public DateOnly? TenantDateOfBirth { get; set; }
+    public string? TenantGender { get; set; }
+    public DateOnly? TenantCitizenIdIssuedDate { get; set; }
+    public string? TenantCitizenIdIssuedPlace { get; set; }
+    public string? TenantPermanentAddress { get; set; }
+    public string? TenantEmail { get; set; }
+    public DateOnly? ContractEndDate { get; set; }
+    public int PaymentDueDay { get; set; } = 5;
+    public decimal? RoomAreaSqm { get; set; }
+    public string? HandoverAssets { get; set; }
+    public string? AdditionalTerms { get; set; }
+    public string? HouseholdHeadRelation { get; set; }
+    public string? CoResidentsJson { get; set; }
     public bool IsActive { get; set; } = true;
     public string? TenantTokenHash { get; set; }
     public string? ProtectedTenantToken { get; set; }

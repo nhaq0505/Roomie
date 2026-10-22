@@ -51,7 +51,8 @@ const adminItems = [
 ];
   const isAdmin = user?.role === 'Admin';
   const items = isAdmin ? adminItems : ownerItems;
-  const title = settingsItems.find((item) => item.key === location.pathname)?.label ?? items.find((item) => item.key === location.pathname)?.label ?? 'Roomie';
+  const activeMenuKey = location.pathname.startsWith('/rooms/') ? '/rooms' : location.pathname;
+  const title = settingsItems.find((item) => item.key === activeMenuKey)?.label ?? items.find((item) => item.key === activeMenuKey)?.label ?? 'Roomie';
 
   const userMenu: MenuProps['items'] = [
     { key: 'account', label: <div className="user-menu-info"><strong>{user?.name}</strong><span>{user?.email}</span></div>, disabled: true },
@@ -65,7 +66,7 @@ const adminItems = [
     if (key === 'password') setPasswordOpen(true);
     if (key === 'logout') void signOut().then(() => navigate('/login')).catch((error: Error) => message.error(error.message));
   };
-  const menu = <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
+  const menu = <Menu theme="dark" mode="inline" selectedKeys={[activeMenuKey]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
 
   return <Layout className="app-layout">
     <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />

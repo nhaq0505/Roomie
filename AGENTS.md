@@ -52,7 +52,8 @@ Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/reho
 | Việc | Backend | Frontend / test chính |
 | --- | --- | --- |
 | Đăng ký, login, đổi/reset mật khẩu | `Features/Auth/`, `Shared/RequestSecurityMiddleware.cs` | `features/auth/`, `AuthSecurityHttpTests`, `RegistrationVerificationTests`, `PasswordRecoveryTests` |
-| Dãy, phòng, lượt thuê, cấp link | `Features/Properties/OwnerManagementEndpoints.*`, `TenantTokenService.cs` | `features/buildings`, `features/rooms`, `RoomTenantLifecycleHttpTests`, `TenantLinkHttpTests` |
+| Dãy, phòng, lượt thuê, cấp link | `Features/Properties/OwnerManagementEndpoints.*`, `TenantTokenService.cs` | `features/buildings`, `features/rooms`, `RoomTenantPage.tsx`, `RoomTenantLifecycleHttpTests`, `TenantLinkHttpTests` |
+| Hợp đồng thuê trọ & tờ khai CT01 | `Features/Properties/OwnerManagementEndpoints.Documents.cs`, `ContractWordGenerator.cs`, `Domain/ContractDocuments.cs`, `Shared/VietnameseMoneyReader.cs` | `RoomDocumentsPage.tsx`, `ContractDocumentsDrawer.tsx`, `shared/i18n/legalTemplates.ts`, `RoomTenantLifecycleHttpTests`, `landlord.spec.ts` |
 | Chốt điện, tạo/phát hành/sửa hóa đơn | `Features/Billing/BillingEndpoints.*`, `InvoiceService.cs` | `features/readings`, `features/invoices`, `AccountingBillingHttpTests` |
 | Ghi thu, cọc, trả phòng | `ManualReceiptService.cs`, `DepositEndpoints.cs`, `Properties/MoveoutEndpoints.cs` | `DepositLedger.tsx`, `MoveoutDrawer.tsx`, `ManualReceiptTests` |
 | payOS, checkout gộp, webhook | `Features/Payments/PayOsService.*`, `PaymentEndpoints.cs`, `PaymentReservations.cs` | `features/tenant`, `PayOsPaymentTests`, `BatchPaymentTests`, `PayOsOperationsHttpTests` |

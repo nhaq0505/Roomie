@@ -64,8 +64,8 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   return unwrap<T>(payload);
 }
 
-export async function requestBlob(path: string): Promise<Blob> {
-  const headers = new Headers({ Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+export async function requestBlob(path: string, accept = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'): Promise<Blob> {
+  const headers = new Headers({ Accept: accept });
   headers.set('Accept-Language', getLocale());
   let response: Response;
   try { response = await fetch(path, { headers, signal: AbortSignal.timeout(90000), credentials: 'same-origin' }); }

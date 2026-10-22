@@ -36,6 +36,7 @@ internal static class RoomTenantLifecycleHttpTests
         await DepositLedgerDeductionAndRefundAsync();
         await MoveoutSettlementAndMeterBaselineAdvancementAsync();
         await OccupancyInitialMeterReadingAdvancementAsync();
+        await ContractAndCt01DocumentsExportAsync();
     }
 
     private static async Task BuildingArchiveCascadeAndRestoreAsync()
@@ -578,6 +579,86 @@ internal static class RoomTenantLifecycleHttpTests
         var validOccJson = await validOccResp.Content.ReadFromJsonAsync<JsonElement>();
         Assert(validOccJson.GetProperty("initialReading").GetDecimal() == 185m, "room initialReading updated to 185");
         Assert(validOccJson.GetProperty("previousReading").GetDecimal() == 185m, "room previousReading starts at 185");
+    }
+
+    private static async Task ContractAndCt01DocumentsExportAsync()
+    {
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
+
+        var bldgResp = await client.PostAsJsonAsync("/api/buildings", new BuildingRequest("Nha Tro Binh Minh", "123 Nguyen Trai, Quan 1"));
+        var bldg = await bldgResp.Content.ReadFromJsonAsync<BuildingDto>();
+
+        var roomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg!.Id, "Phong 201", 3_500_000, 3_800, 100_000, true, 50_000, 45));
+        var roomId = (await roomResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Nguyen Van Khach", "0909123456", 2, new DateOnly(2026, 10, 1), 3_500_000, 45));
+        Assert(occResp.StatusCode == HttpStatusCode.OK, "occupancy created for contract document test");
+        var occId = (await occResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("occupancy").GetProperty("id").GetGuid();
+
+        // 1. GET pre-filled document data
+        var getDocResp = await client.GetAsync($"/api/rooms/{roomId}/documents");
+        Assert(getDocResp.StatusCode == HttpStatusCode.OK, "GET /api/rooms/{id}/documents succeeds");
+        var docDto = await getDocResp.Content.ReadFromJsonAsync<OccupancyDocumentDto>();
+        Assert(docDto != null && docDto.TenantName == "Nguyen Van Khach", "document DTO pre-fills tenant name");
+        Assert(docDto!.Rent == 3_500_000 && docDto.RentInWords == "Ba triệu năm trăm nghìn đồng chẵn",
+            "document DTO pre-fills rent and Vietnamese words");
+        Assert(docDto.DepositRequired == 3_500_000 && docDto.InitialReading == 45m,
+            "document DTO pre-fills deposit amount and initial meter reading");
+
+        // 2. PUT legal & contract details (persisted across owner, building, and occupancy)
+        var updateReq = new UpdateOccupancyDocumentRequest(
+            OccupancyId: occId,
+            OwnerPhone: "0911222333",
+            OwnerCitizenId: "079088001122",
+            OwnerDateOfBirth: new DateOnly(1988, 5, 10),
+            OwnerCitizenIdIssuedDate: new DateOnly(2022, 1, 15),
+            OwnerCitizenIdIssuedPlace: "Cuc Canh sat QLHC ve TTXH",
+            OwnerPermanentAddress: "123 Nguyen Trai, Quan 1, TP.HCM",
+            BuildingAddress: "123 Nguyen Trai, Phuong Ben Thanh, Quan 1, TP.HCM",
+            PoliceStationName: "Cong an Phuong Ben Thanh, Quan 1, TP.HCM",
+            TenantName: "Nguyen Van Khach",
+            TenantPhone: "0909123456",
+            TenantEmail: "khach@example.com",
+            TenantCitizenId: "079099005566",
+            TenantDateOfBirth: new DateOnly(1999, 8, 20),
+            TenantGender: "Nam",
+            TenantCitizenIdIssuedDate: new DateOnly(2023, 6, 1),
+            TenantCitizenIdIssuedPlace: "Cuc Canh sat QLHC ve TTXH",
+            TenantPermanentAddress: "45 Le Duan, Da Nang",
+            ContractEndDate: new DateOnly(2027, 10, 1),
+            PaymentDueDay: 5,
+            RoomAreaSqm: 24.5m,
+            HandoverAssets: "01 dieu hoa, 01 tu lanh, 01 giuong",
+            AdditionalTerms: "Khong nuoi thu cung",
+            HouseholdHeadRelation: "Nguoi thue tro",
+            CoResidents: [new CoResidentDto("Tran Thi Vo", new DateOnly(2000, 2, 2), "Nu", "079200007788", "Vo")]);
+
+        var putResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents", updateReq);
+        Assert(putResp.StatusCode == HttpStatusCode.OK, "PUT /api/rooms/{id}/documents saves legal details");
+        var updatedDto = await putResp.Content.ReadFromJsonAsync<OccupancyDocumentDto>();
+        Assert(updatedDto!.OwnerCitizenId == "079088001122" && updatedDto.TenantCitizenId == "079099005566",
+            "saved Citizen IDs returned in updated DTO");
+        Assert(updatedDto.PoliceStationName == "Cong an Phuong Ben Thanh, Quan 1, TP.HCM" && updatedDto.CoResidents.Count == 1,
+            "saved PoliceStationName and CoResidents returned in updated DTO");
+
+        // 3. Download Contract .docx and CT01 .docx
+        var contractDocxResp = await client.GetAsync($"/api/rooms/{roomId}/documents/contract.docx");
+        Assert(contractDocxResp.StatusCode == HttpStatusCode.OK, "GET contract.docx returns 200 OK");
+        var contractBytes = await contractDocxResp.Content.ReadAsByteArrayAsync();
+        Assert(contractBytes.Length > 1000 && contractBytes[0] == 'P' && contractBytes[1] == 'K',
+            "contract.docx is a valid non-empty OpenXML zip archive");
+
+        var ct01DocxResp = await client.GetAsync($"/api/rooms/{roomId}/documents/ct01.docx");
+        Assert(ct01DocxResp.StatusCode == HttpStatusCode.OK, "GET ct01.docx returns 200 OK");
+        var ct01Bytes = await ct01DocxResp.Content.ReadAsByteArrayAsync();
+        Assert(ct01Bytes.Length > 1000 && ct01Bytes[0] == 'P' && ct01Bytes[1] == 'K',
+            "ct01.docx is a valid non-empty OpenXML zip archive");
     }
 
     private static WebApplication CreateTestApp(string connectionString)

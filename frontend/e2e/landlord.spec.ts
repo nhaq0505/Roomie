@@ -410,20 +410,21 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(page.getByText('Phòng 101', { exact: true })).toBeVisible();
     await expect(page.locator('.room-state-vacant')).toHaveText('Còn trống');
 
-    // 1. Check in tenant
+    // 1. Check in tenant on dedicated page (/rooms/room-101/tenant)
     await page.getByRole('button', { name: 'Thêm người thuê' }).click();
-    const occupancyModal = page.locator('.ant-modal').filter({ hasText: 'Thêm người thuê' });
-    await expect(occupancyModal).toBeVisible();
+    await expect(page).toHaveURL(/\/rooms\/room-101\/tenant/);
+    const tenantWorkspace = page.locator('.room-tenant-page');
+    await expect(tenantWorkspace).toBeVisible();
 
-    await occupancyModal.getByLabel('Tên người thuê').fill('Nguyễn Văn A');
-    await occupancyModal.getByLabel('Số điện thoại').fill('0901234567');
-    await occupancyModal.getByLabel('Số người ở').fill('2');
-    await occupancyModal.getByLabel('Chỉ số điện ban đầu').fill('100');
-    await occupancyModal.getByLabel('Tiền cọc yêu cầu').fill('3000000');
+    await tenantWorkspace.getByLabel('Tên người thuê').fill('Nguyễn Văn A');
+    await tenantWorkspace.getByLabel('Số điện thoại').fill('0901234567');
+    await tenantWorkspace.getByLabel('Chỉ số điện ban đầu').fill('100');
+    await tenantWorkspace.getByLabel('Tiền cọc yêu cầu').fill('3000000');
 
-    await occupancyModal.getByRole('button', { name: 'Lưu người thuê' }).click();
+    await tenantWorkspace.getByRole('button', { name: 'Lưu người thuê' }).first().click();
 
     // 2. Room transitions to "Đang thuê" with tenant info
+    await expect(page).toHaveURL(/\/rooms$/);
     await expect(page.locator('.room-state-occupied')).toHaveText('Đang thuê');
     await expect(page.getByText('Nguyễn Văn A', { exact: true })).toBeVisible();
     await expect(page.getByText('0901234567')).toBeVisible();
@@ -755,5 +756,155 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     // Verify status transitions to Paid
     await expect(drawer.locator('.status-paid')).toHaveText('Đã thanh toán');
     await expect(drawer.getByText('Hóa đơn đã được thanh toán đầy đủ.')).toBeVisible();
+  });
+
+  test('Scenario L8: Preview and export Rental Contract & CT01 Residence Form', async ({ page }) => {
+    const rooms: Room[] = [
+      {
+        id: 'room-101',
+        buildingId: 'bld-01',
+        buildingName: 'Nhà trọ Bình An',
+        name: 'Phòng 101',
+        rent: 3500000,
+        electricityRate: 3500,
+        waterFee: 100000,
+        waterPerPerson: true,
+        serviceFee: 50000,
+        initialReading: 120,
+        previousReading: 120,
+        occupancy: {
+          id: 'occ-101',
+          tenantName: 'Nguyễn Văn Khách',
+          phone: '0909123456',
+          people: 2,
+          startDate: '2026-10-01',
+          depositRequired: 3500000,
+          depositPaid: 3500000,
+          depositHeld: 3500000,
+        },
+        isArchived: false,
+      },
+    ];
+
+    let documentData = {
+      roomId: 'room-101',
+      buildingId: 'bld-01',
+      occupancyId: 'occ-101',
+      ownerName: 'Chủ Trọ Bình An',
+      ownerPhone: '0911222333',
+      ownerEmail: 'landlord@example.com',
+      ownerCitizenId: '079088001122',
+      ownerDateOfBirth: '1988-05-10',
+      ownerCitizenIdIssuedDate: '2022-01-15',
+      ownerCitizenIdIssuedPlace: 'Cục Cảnh sát QLHC về TTXH',
+      ownerPermanentAddress: '123 Đường Số 1, Quận 7, TP.HCM',
+      bankBin: '970436',
+      bankName: 'Ngân hàng TMCP Ngoại thương Việt Nam',
+      bankShortName: 'Vietcombank',
+      bankAccountNumber: '0123456789',
+      bankAccountName: 'CHU TRO BINH AN',
+      buildingName: 'Nhà trọ Bình An',
+      buildingAddress: '123 Đường Số 1, Phường Tân Phong, Quận 7, TP.HCM',
+      policeStationName: 'Công an Phường Tân Phong, Quận 7, TP.HCM',
+      roomName: 'Phòng 101',
+      roomAreaSqm: 25,
+      rent: 3500000,
+      rentInWords: 'Ba triệu năm trăm nghìn đồng chẵn',
+      electricityRate: 3500,
+      waterFee: 100000,
+      waterPerPerson: true,
+      serviceFee: 50000,
+      initialReading: 120,
+      tenantName: 'Nguyễn Văn Khách',
+      tenantPhone: '0909123456',
+      tenantEmail: 'khach@example.com',
+      people: 2,
+      tenantCitizenId: '079099001234',
+      tenantDateOfBirth: '1999-08-20',
+      tenantGender: 'Nam',
+      tenantCitizenIdIssuedDate: '2023-06-01',
+      tenantCitizenIdIssuedPlace: 'Cục Cảnh sát QLHC về TTXH',
+      tenantPermanentAddress: '45 Lê Duẩn, Đà Nẵng',
+      startDate: '2026-10-01',
+      contractEndDate: '2027-10-01',
+      paymentDueDay: 5,
+      depositRequired: 3500000,
+      depositInWords: 'Ba triệu năm trăm nghìn đồng chẵn',
+      depositPaid: 3500000,
+      handoverAssets: '01 máy lạnh, 01 tủ lạnh',
+      additionalTerms: 'Không nuôi thú cưng',
+      householdHeadRelation: 'Người thuê trọ',
+      coResidents: [],
+    };
+
+    let savedPayload: Record<string, unknown> | null = null;
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
+      if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
+      if (path === '/api/buildings') {
+        return route.fulfill({
+          json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', isArchived: false }],
+        });
+      }
+      if (path === '/api/rooms') return route.fulfill({ json: rooms });
+      if (path === '/api/subscription/status') {
+        return route.fulfill({
+          json: { tier: 'Pro', isPro: true, expiresAt: null, roomCount: 1, maxRooms: 999, availablePackages: [] },
+        });
+      }
+      if (path === '/api/rooms/room-101/documents' && method === 'GET') {
+        return route.fulfill({ json: documentData });
+      }
+      if (path === '/api/rooms/room-101/documents' && method === 'PUT') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        savedPayload = body;
+        documentData = { ...documentData, ...body } as typeof documentData;
+        return route.fulfill({ json: documentData });
+      }
+      if (path === '/api/rooms/room-101/documents/contract.docx' || path === '/api/rooms/room-101/documents/ct01.docx') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          body: Buffer.from('PK-mock-docx-content'),
+        });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    await page.goto('/rooms');
+    await expect(page.getByText('Nguyễn Văn Khách')).toBeVisible();
+
+    // Open room action menu -> Xuất hợp đồng & CT01
+    await page.getByRole('button', { name: 'Tác vụ Phòng 101' }).click();
+    await page.getByRole('menuitem', { name: 'Xuất hợp đồng & CT01' }).click();
+
+    const drawer = page.locator('.contract-documents-drawer');
+    await expect(drawer).toBeVisible();
+
+    // Verify Rental Contract A4 preview shows pre-filled values
+    const preview = drawer.getByTestId('document-a4-preview');
+    await expect(preview).toContainText('HỢP ĐỒNG THUÊ PHÒNG TRỌ');
+    await expect(preview).toContainText('Nguyễn Văn Khách');
+    await expect(preview).toContainText('Ba triệu năm trăm nghìn đồng chẵn');
+    await expect(preview).toContainText('0123456789');
+
+    // Switch to CT01 preview tab
+    await drawer.getByText('Bản xem trước: Mẫu CT01 (TT 66/2023/TT-BCA)').click();
+    await expect(preview).toContainText('TỜ KHAI THAY ĐỔI THÔNG TIN CƯ TRÚ');
+    await expect(preview).toContainText('NGUYỄN VĂN KHÁCH');
+    await expect(preview).toContainText('Công an Phường Tân Phong, Quận 7, TP.HCM');
+
+    // Update tenant Citizen ID in the form and verify live A4 preview updates
+    const tenantIdInput = drawer.getByLabel('Số CCCD / Định danh cá nhân (12 số)');
+    await tenantIdInput.fill('079099887766');
+    await drawer.getByRole('button', { name: 'Lưu thông tin' }).click();
+
+    expect(savedPayload).toBeTruthy();
+    expect(savedPayload?.tenantCitizenId).toBe('079099887766');
   });
 });

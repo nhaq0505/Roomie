@@ -77,6 +77,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Email).HasMaxLength(320);
             entity.Property(x => x.Name).HasMaxLength(160);
             entity.Property(x => x.Phone).HasMaxLength(60);
+            entity.Property(x => x.CitizenId).HasMaxLength(20);
+            entity.Property(x => x.CitizenIdIssuedPlace).HasMaxLength(200);
+            entity.Property(x => x.PermanentAddress).HasMaxLength(500);
             entity.Property(x => x.PasswordHash).HasMaxLength(1024).IsConcurrencyToken();
             entity.Property(x => x.PasswordResetHash).HasMaxLength(64).IsConcurrencyToken();
             entity.Property(x => x.Role).HasConversion<string>().HasMaxLength(24);
@@ -138,6 +141,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.ArchivedAt);
             entity.Property(x => x.Name).HasMaxLength(160);
             entity.Property(x => x.Address).HasMaxLength(500);
+            entity.Property(x => x.PoliceStationName).HasMaxLength(250);
         });
 
         modelBuilder.Entity<Room>(entity =>
@@ -160,6 +164,17 @@ public class AppDbContext : DbContext
             entity.HasIndex(x => x.TenantTokenHash).IsUnique();
             entity.Property(x => x.TenantName).HasMaxLength(160);
             entity.Property(x => x.Phone).HasMaxLength(60);
+            entity.Property(x => x.TenantCitizenId).HasMaxLength(20);
+            entity.Property(x => x.TenantGender).HasMaxLength(20);
+            entity.Property(x => x.TenantCitizenIdIssuedPlace).HasMaxLength(200);
+            entity.Property(x => x.TenantPermanentAddress).HasMaxLength(500);
+            entity.Property(x => x.TenantEmail).HasMaxLength(320);
+            entity.Property(x => x.PaymentDueDay).HasDefaultValue(5).HasSentinel(0);
+            entity.Property(x => x.RoomAreaSqm).HasPrecision(10, 2);
+            entity.Property(x => x.HandoverAssets).HasMaxLength(2000);
+            entity.Property(x => x.AdditionalTerms).HasMaxLength(2000);
+            entity.Property(x => x.HouseholdHeadRelation).HasMaxLength(100);
+            entity.Property(x => x.CoResidentsJson).HasColumnType("text");
             entity.Property(x => x.TenantTokenHash).HasMaxLength(64);
             entity.Property(x => x.ProtectedTenantToken).HasMaxLength(2048);
         });

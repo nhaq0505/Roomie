@@ -1,4 +1,4 @@
-import { CopyOutlined, EditOutlined, EllipsisOutlined, FileAddOutlined, InboxOutlined, LinkOutlined, RollbackOutlined, UserAddOutlined } from '@ant-design/icons';
+import { CopyOutlined, EditOutlined, EllipsisOutlined, FileAddOutlined, FileTextOutlined, InboxOutlined, LinkOutlined, RollbackOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MenuProps, TableProps } from 'antd';
 import { App, Button, Dropdown, Form, Tag } from 'antd';
@@ -24,6 +24,7 @@ export function useRoomsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [moveoutRoom, setMoveoutRoom] = useState<Room | null>(null);
+  const [documentRoom, setDocumentRoom] = useState<Room | null>(null);
   const [mode, setMode] = useState<RoomMode>(null);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [linkInfo, setLinkInfo] = useState<{ token: string; url: string; room?: Room; newlyIssued?: boolean } | null>(null);
@@ -117,9 +118,10 @@ export function useRoomsPage() {
     setMode('duplicate');
   };
   const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.resetFields(); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee }); setMode('settings'); };
-  const openOccupancy = (room: Room) => { setSelectedRoom(room); occupancyForm.resetFields(); occupancyForm.setFieldsValue({ people: 1, startDate: dayjs(), depositAmount: 0, initialReading: room.previousReading ?? room.initialReading ?? 0 }); setMode('occupancy'); };
+  const openOccupancy = (room: Room) => { navigate(`/rooms/${encodeURIComponent(room.id)}/tenant`); };
 
   const getActions = (room: Room): MenuProps['items'] => [
+    ...(room.occupancy ? [{ key: 'documents', icon: <FileTextOutlined />, label: t("Xuất hợp đồng & CT01") }] : []),
     { key: 'edit', icon: <EditOutlined />, label: t("Sửa thông tin phòng") },
     ...(room.occupancy ? [{ key: 'edit-occupancy', icon: <EditOutlined />, label: t("Sửa thông tin người thuê") }] : []),
     { key: 'duplicate', icon: <CopyOutlined />, label: t("Nhân bản phòng") },
@@ -131,8 +133,9 @@ export function useRoomsPage() {
 
   ];
   const onAction = (key: string, room: Room) => {
+    if (key === 'documents' && room.occupancy) navigate(`/rooms/${encodeURIComponent(room.id)}/documents`);
     if (key === 'edit') openSettings(room);
-    if (key === 'edit-occupancy' && room.occupancy) { setSelectedRoom(room); editOccupancyForm.resetFields(); editOccupancyForm.setFieldsValue(room.occupancy); setMode('edit-occupancy'); }
+    if (key === 'edit-occupancy' && room.occupancy) navigate(`/rooms/${encodeURIComponent(room.id)}/tenant`);
     if (key === 'duplicate') openDuplicate(room);
     if (key === 'supplemental' && room.occupancy) { supplementalForm.resetFields(); supplementalForm.setFieldsValue({ dueDate: dayjs() }); setSupplemental({ room, requestId: crypto.randomUUID() }); }
     if (key === 'occupancy') openOccupancy(room);
@@ -170,8 +173,15 @@ export function useRoomsPage() {
       const next = new URLSearchParams(searchParams);
       next.delete('links');
       setSearchParams(next, { replace: true });
+    } else if (searchParams.get('documents') && roomsQuery.isSuccess) {
+      const targetId = searchParams.get('documents');
+      const targetRoom = (roomsQuery.data ?? []).find((r) => r.id === targetId && r.occupancy);
+      if (targetRoom) setDocumentRoom(targetRoom);
+      const next = new URLSearchParams(searchParams);
+      next.delete('documents');
+      setSearchParams(next, { replace: true });
     }
-  }, [searchParams, buildingsQuery.isSuccess, buildingsQuery.data]);
+  }, [searchParams, buildingsQuery.isSuccess, buildingsQuery.data, roomsQuery.isSuccess, roomsQuery.data]);
 
   const roomStatus = (room: Room) => room.isArchived ? <Tag className="archived-state-tag">{t("Đã lưu trữ")}</Tag> : <Tag className={`room-state ${room.occupancy ? 'room-state-occupied' : 'room-state-vacant'}`}>{room.occupancy ? t("Đang thuê") : t("Còn trống")}</Tag>;
   const roomActions = (room: Room) => <div className="room-actions">
@@ -182,13 +192,13 @@ export function useRoomsPage() {
   </div>;
   const compactRoom = (room: Room) => <>
     <div className="room-card-head"><div><strong>{room.name}</strong><span>{room.buildingName || buildingsQuery.data?.find((building) => building.id === room.buildingId)?.name || t("Dãy trọ")}</span></div>{roomStatus(room)}</div>
-    <div className="room-card-tenant"><span className="room-field-label">{t("Người thuê")}</span>{room.occupancy ? <div><strong>{room.occupancy.tenantName}</strong><span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span><span>{t("Cọc yêu cầu")} {formatVnd(room.occupancy.depositRequired)}  {t("· Đang giữ")} {formatVnd(room.occupancy.depositHeld)}</span></div> : <span>{t("Chưa có người thuê")}</span>}</div>
+    <div className="room-card-tenant"><span className="room-field-label">{t("Người thuê")}</span>{room.occupancy ? <div><strong>{room.occupancy.tenantName}</strong>{room.occupancy.coResidents && room.occupancy.coResidents.length > 0 && <span>+ {room.occupancy.coResidents.map((m) => m.fullName).join(', ')}</span>}<span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span><span>{t("Cọc yêu cầu")} {formatVnd(room.occupancy.depositRequired)}  {t("· Đang giữ")} {formatVnd(room.occupancy.depositHeld)}</span></div> : <span>{t("Chưa có người thuê")}</span>}</div>
     <div className="room-card-rent"><span className="room-field-label">{t("Giá thuê / tháng")}</span><strong>{formatVnd(room.rent)}</strong></div>
     {roomActions(room)}
   </>;
   const columns: TableProps<Room>['columns'] = [
     { title: t("Phòng"), key: 'room', render: (_, room) => <div className="room-list-name"><strong>{room.name}</strong><span>{room.buildingName || buildingsQuery.data?.find((building) => building.id === room.buildingId)?.name || t("Dãy trọ")}</span></div> },
-    { title: t("Người thuê"), key: 'tenant', render: (_, room) => room.occupancy ? <div className="room-list-tenant"><strong>{room.occupancy.tenantName}</strong><span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span><span>{t("Cọc yêu cầu")} {formatVnd(room.occupancy.depositRequired)}  {t("· Đang giữ")} {formatVnd(room.occupancy.depositHeld)}</span></div> : <span className="room-field-label">{t("Chưa có người thuê")}</span> },
+    { title: t("Người thuê"), key: 'tenant', render: (_, room) => room.occupancy ? <div className="room-list-tenant"><strong>{room.occupancy.tenantName}</strong>{room.occupancy.coResidents && room.occupancy.coResidents.length > 0 && <span>+ {room.occupancy.coResidents.map((m) => m.fullName).join(', ')}</span>}<span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span><span>{t("Cọc yêu cầu")} {formatVnd(room.occupancy.depositRequired)}  {t("· Đang giữ")} {formatVnd(room.occupancy.depositHeld)}</span></div> : <span className="room-field-label">{t("Chưa có người thuê")}</span> },
     { title: t("Giá thuê / tháng"), dataIndex: 'rent', width: 160, align: 'right', render: (value: number) => <strong className="room-price">{formatVnd(value)}</strong> },
     { title: t("Trạng thái"), key: 'status', width: 118, render: (_, room) => roomStatus(room) },
     { title: '', key: 'actions', width: 240, align: 'right', render: (_, room) => roomActions(room) },
@@ -198,5 +208,5 @@ export function useRoomsPage() {
 
   const clearFilters = () => { setStatusFilter('all'); setArchiveFilter('Active'); setSearchParams({}); };
 
-  return { numberRule, message, modal, navigate, setSearchParams, moveoutRoom, setMoveoutRoom, mode, setMode, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, archiveFilter, setArchiveFilter, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, buildingFilter, statusFilter, setStatusFilter, buildingsQuery, roomsQuery, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, isPro, maxRooms, activeRoomCount, isQuotaReached, buildingRooms, rooms, occupiedCount, vacancyCount, activeBuildings, openCreate, renewLink, compactRoom, columns, isCreating, isBusy, clearFilters };
+  return { numberRule, message, modal, navigate, setSearchParams, moveoutRoom, setMoveoutRoom, documentRoom, setDocumentRoom, mode, setMode, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, archiveFilter, setArchiveFilter, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, buildingFilter, statusFilter, setStatusFilter, buildingsQuery, roomsQuery, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, isPro, maxRooms, activeRoomCount, isQuotaReached, buildingRooms, rooms, occupiedCount, vacancyCount, activeBuildings, openCreate, renewLink, compactRoom, columns, isCreating, isBusy, clearFilters };
 }
