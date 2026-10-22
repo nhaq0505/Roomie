@@ -119,7 +119,7 @@ public sealed class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExce
         }
         catch (Exception exception)
         {
-            logger.LogError("Unhandled request error {ErrorType} for {Path}", exception.GetType().Name, ApiSupport.SafePath(context.Request.Path));
+            logger.LogError(exception, "Unhandled request error {ErrorType} for {Path}", exception.GetType().Name, ApiSupport.SafePath(context.Request.Path));
             if (context.Response.HasStarted) throw;
             context.Response.Clear();
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;

@@ -11,7 +11,7 @@ public static class AdminPromotionsEndpoints
     public static void MapPromotionsRoutes(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin/promotions")
-            .RequireAuthorization("AdminOnly");
+            .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
         admin.MapGet("", async (AppDbContext db, IConfiguration config, CancellationToken ct) =>
         {
@@ -191,6 +191,6 @@ public static class AdminPromotionsEndpoints
                 SubscriptionExpiresAt: owner.SubscriptionExpiresAt,
                 AddedMonths: promo.RewardMonths
             ));
-        }).RequireAuthorization("ApprovedOwner");
+        }).RequireAuthorization(policy => policy.RequireRole("Owner"));
     }
 }
