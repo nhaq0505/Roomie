@@ -784,14 +784,16 @@ function RoomTenantWorkspace() {
         </div>
         <div className="room-tenant-mobile-bar" role="region" aria-label={t("Thao tác nhanh")}>
           <Button
+            className="room-tenant-mobile-qr-btn"
             icon={<QrcodeOutlined />}
+            aria-label={t("Quét / Tải ảnh CCCD")}
+            title={t("Quét / Tải ảnh CCCD")}
             disabled={isSaving}
             onClick={() => setQrTarget({ kind: 'tenant' })}
-          >
-            {t("Quét / Tải ảnh CCCD")}
-          </Button>
+          />
           <Button
             type="primary"
+            className="room-tenant-mobile-save-btn"
             loading={isSaving && !openContractAfterSaveRef.current}
             disabled={isSaving}
             onClick={() => {
