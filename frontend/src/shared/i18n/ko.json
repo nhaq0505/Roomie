@@ -1427,5 +1427,16 @@
   "Số lượt sử dụng tối đa phải lớn hơn 0.": "최대 사용 횟수는 0보다 커야 합니다.",
   "Thời gian bắt đầu không được lớn hơn thời gian kết thúc.": "시작 날짜는 종료 날짜 이후일 수 없습니다.",
   "Số tháng tặng thưởng phải từ 1 đến 120 tháng.": "지급 개월 수는 1개월에서 120개월 사이여야 합니다.",
-  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "프로모션 코드는 3~32자여야 합니다."
+  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "프로모션 코드는 3~32자여야 합니다.",
+  "Vui lòng nhập mật khẩu hiện tại.": "현재 비밀번호를 입력해 주세요.",
+  "Vui lòng xác nhận mật khẩu mới.": "새 비밀번호를 확인해 주세요.",
+  "Vui lòng nhập số tiền.": "금액을 입력해 주세요.",
+  "💰 Tổng cộng: {0} (Đã thanh toán: {1})": "💰 총액: {0} (결제 완료: {1})",
+  "👉 Còn phải thanh toán: {0}": "👉 잔여 결제 금액: {0}",
+  "Vui lòng chọn ngân hàng thụ hưởng.": "수취 은행을 선택해 주세요.",
+  "Vui lòng nhập số tài khoản.": "계좌번호를 입력해 주세요.",
+  "Vui lòng nhập tên chủ tài khoản.": "예금주명을 입력해 주세요.",
+  "Ghi chỉ số điện nhanh chóng & phát hành hóa đơn hàng loạt": "신속한 전기 검침 및 청구서 일괄 발행",
+  "Chưa ghi nhận thanh toán. Hệ thống vẫn đang tự động kiểm tra...": "아직 결제가 확인되지 않았습니다. 시스템에서 계속 자동 확인 중입니다...",
+  "Ngân hàng": "은행"
 }

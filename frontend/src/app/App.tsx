@@ -10,6 +10,7 @@ import ErrorBoundary from '../shared/ui/ErrorBoundary';
 import AppShell from './layout/AppShell';
 
 const PasswordPage = lazy(() => import('../features/auth/PasswordPage'));
+const ChangePasswordModal = lazy(() => import('../features/auth/ChangePasswordModal'));
 const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
@@ -53,15 +54,25 @@ function AppFallback() {
   return <div className="screen-center"><Spin size="large" /></div>;
 }
 
+function ChangePasswordRoute() {
+  const { user, ready } = useAuth();
+  if (!ready) return <div className="screen-center"><Spin size="large" /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'Owner' && user.status !== 'Approved') {
+    return <div style={{ maxWidth: 600, margin: '40px auto', padding: '0 16px' }}><PasswordPage /></div>;
+  }
+  return <PasswordPage layout={AppShell} />;
+}
+
 export default function App() {
   useLanguage();
   const location = useLocation();
   return <><SeoMetadata /><ErrorBoundary><Suspense fallback={<AppFallback />}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/reset-password" element={<ForgotPasswordPage />} />
-    <Route path="/change-password" element={<PasswordPage layout={AppShell} />} />
+    <Route path="/change-password" element={<ChangePasswordRoute />} />
     <Route path="/register" element={<RegisterPage />} />
-    <Route path="/account-status" element={<AccountStatusPage layout={AppShell} />} />
+    <Route path="/account-status" element={<AccountStatusPage layout={AppShell} passwordModal={ChangePasswordModal} />} />
     <Route path="/welcome" element={<Navigate to={`/${location.search}${location.hash}`} replace />} />
     <Route path="/t/:token" element={<TenantPage />} />
     <Route path="/t/:token/invoices/:invoiceId/checkout" element={<TenantCheckoutPage />} />

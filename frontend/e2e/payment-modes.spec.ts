@@ -191,7 +191,7 @@ test('tenant checks QR status with GET and hides an obsolete QR before offering 
   await expect(page.getByRole('img', { name: 'Mã VietQR chuyển khoản', exact: true })).toHaveCount(0, { timeout: 10000 });
   await expect(page.getByText('Hóa đơn đã thay đổi. Vui lòng kiểm tra khoản tiền thực nhận trước khi ghi thu.', { exact: true })).toBeVisible();
   expect(creates).toBe(1); expect(statusReads).toBeGreaterThan(1);
-  await page.getByRole('button', { name: 'Cập nhật mã QR', exact: true }).click();
+  await page.getByRole('button', { name: /Cập nhật mã QR/ }).click();
   await expect(page.getByRole('img', { name: 'Mã VietQR chuyển khoản', exact: true })).toBeVisible();
   expect(creates).toBe(2);
 });

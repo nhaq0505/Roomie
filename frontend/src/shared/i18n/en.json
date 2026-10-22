@@ -1427,5 +1427,16 @@
   "Số lượt sử dụng tối đa phải lớn hơn 0.": "Maximum redemptions must be greater than 0.",
   "Thời gian bắt đầu không được lớn hơn thời gian kết thúc.": "Start date cannot be after end date.",
   "Số tháng tặng thưởng phải từ 1 đến 120 tháng.": "Reward months must be between 1 and 120 months.",
-  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "Promo code must be 3 to 32 characters."
+  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "Promo code must be 3 to 32 characters.",
+  "Vui lòng nhập mật khẩu hiện tại.": "Please enter your current password.",
+  "Vui lòng xác nhận mật khẩu mới.": "Please confirm your new password.",
+  "Vui lòng nhập số tiền.": "Please enter the amount.",
+  "💰 Tổng cộng: {0} (Đã thanh toán: {1})": "💰 Total: {0} (Paid: {1})",
+  "👉 Còn phải thanh toán: {0}": "👉 Remaining balance: {0}",
+  "Vui lòng chọn ngân hàng thụ hưởng.": "Please select the beneficiary bank.",
+  "Vui lòng nhập số tài khoản.": "Please enter the account number.",
+  "Vui lòng nhập tên chủ tài khoản.": "Please enter the account holder name.",
+  "Ghi chỉ số điện nhanh chóng & phát hành hóa đơn hàng loạt": "Quick electricity meter logging & batch invoice issuance",
+  "Chưa ghi nhận thanh toán. Hệ thống vẫn đang tự động kiểm tra...": "Payment not yet recorded. The system is still checking automatically...",
+  "Ngân hàng": "Bank"
 }

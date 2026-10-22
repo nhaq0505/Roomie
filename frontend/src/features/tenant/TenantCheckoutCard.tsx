@@ -3,6 +3,7 @@ import { Alert, Button, Card, QRCode, Typography } from 'antd';
 import { formatVnd, periodLabel } from '../../shared/format';
 import { getLocale, t } from '../../shared/i18n/runtime';
 import { type Invoice } from '../invoices/index';
+import { formatBankLabel } from '../payments/index';
 import { checkoutExpiration, type CheckoutSession } from './checkout';
 
 
@@ -20,7 +21,7 @@ export default function TenantCheckoutCard({ checkout, invoice, error, checking,
   const details = [
     checkout.accountName ? [t("Tên người nhận"), checkout.accountName] : null,
     checkout.accountNumber ? [t("Số tài khoản"), checkout.accountNumber] : null,
-    checkout.bankBin ? [t("Mã ngân hàng (BIN)"), checkout.bankBin] : null,
+    checkout.bankBin ? [t("Ngân hàng"), formatBankLabel(checkout.bankBin)] : null,
   ].filter((entry): entry is [string, string] => !!entry);
   const hasQr = status === 'pending' && !expiredByClock && !checkout.verificationPending && !!checkout.qrCode;
   const invoicePaid = status === 'paid';

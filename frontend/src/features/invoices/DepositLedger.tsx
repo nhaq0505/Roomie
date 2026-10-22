@@ -44,13 +44,13 @@ export default function DepositLedger({ invoice }: { invoice: Invoice }) {
     {invoice.depositHeld > 0 && <Form name="depositSettlement" form={form} layout="vertical" initialValues={{ kind: 'Refund' }} onFinish={submit}>
       <Form.Item label={t("Cách quyết toán")} name="kind" rules={[{ required: true }]}><Select options={[
         { value: 'Refund', label: t("Ghi nhận đã hoàn cọc cho khách") }, { value: 'Deduction', label: t("Khấu trừ cọc") }]} /></Form.Item>
-      <Form.Item label={t("Số tiền")} name="amount" rules={[{ required: true, type: 'number', min: 1, max: invoice.depositHeld }]}>
+      <Form.Item label={t("Số tiền")} name="amount" rules={[{ required: true, type: 'number', min: 1, max: invoice.depositHeld, message: t("Vui lòng nhập số tiền.") }]}>
         <MoneyInput min={1} max={invoice.depositHeld} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} />
       </Form.Item>
       {kind === 'Deduction' && <Form.Item label={t("Trừ vào hóa đơn còn nợ (nếu có)")} name="targetInvoiceId" extra={t("Để trống nếu khấu trừ cho hư hỏng hoặc chi phí khác.")}>
         <Select allowClear loading={targetsQuery.isPending} options={targets.map(x => ({ value: x.id, label: t("{0} · Còn nợ {1}", [x.kind === 'Supplemental' ? t("Bổ sung") : periodLabel(x.period), formatVnd(x.outstanding)]) }))} />
       </Form.Item>}
-      <Form.Item label={t("Lý do / thông tin hoàn cọc")} name="reason" rules={[{ required: true, whitespace: true, max: 500 }]}>
+      <Form.Item label={t("Lý do / thông tin hoàn cọc")} name="reason" rules={[{ required: true, whitespace: true, max: 500, message: t("Vui lòng nhập lý do.") }]}>
         <Input.TextArea rows={2} maxLength={500} />
       </Form.Item>
       <Button type="primary" htmlType="submit" loading={mutation.isPending}>{t("Ghi nhận quyết toán cọc")}</Button>

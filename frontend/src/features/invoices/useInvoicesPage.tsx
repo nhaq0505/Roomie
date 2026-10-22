@@ -5,7 +5,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
-import { getLocale, t } from '../../shared/i18n/runtime';
+import { getLanguage, t } from '../../shared/i18n/runtime';
 import { invoicesApi, type Invoice } from './index';
 
 export function useInvoicesPage() {
@@ -113,7 +113,9 @@ export function useInvoicesPage() {
   const hasMonthlyOverlap = !!invoice && !!invoice.hasMonthlyOverlap;
   const getCheckoutUrl = (item: Invoice) => {
     if (!item.tenantToken) return '';
-    return `${window.location.origin}/t/${encodeURIComponent(item.tenantToken)}/invoices/${encodeURIComponent(item.id)}/checkout`;
+    const lang = getLanguage();
+    const query = lang && lang !== 'vi' ? `?lang=${encodeURIComponent(lang)}` : '';
+    return `${window.location.origin}/t/${encodeURIComponent(item.tenantToken)}${query}`;
   };
 
   const formatReminderMessage = (item: Invoice) => {
@@ -127,12 +129,17 @@ export function useInvoicesPage() {
       const [year, month] = item.period.split('-');
       periodText = month && year ? `${month}/${year}` : item.period;
     }
-    const amountText = `${new Intl.NumberFormat(getLocale()).format(item.total)} đ`;
-    return [
+    const lines = [
       t("🔔 Thông báo tiền phòng {0} - Kỳ {1}", [item.roomName, periodText]),
-      t("💰 Tổng cộng: {0}", [amountText]),
-      t("👉 Xem chi tiết chỉ số điện nước và quét mã QR thanh toán tự động tại: {0}", [url]),
-    ].join('\n');
+    ];
+    if (item.paid > 0) {
+      lines.push(t("💰 Tổng cộng: {0} (Đã thanh toán: {1})", [formatVnd(item.total), formatVnd(item.paid)]));
+      lines.push(t("👉 Còn phải thanh toán: {0}", [formatVnd(item.outstanding)]));
+    } else {
+      lines.push(t("💰 Tổng cộng: {0}", [formatVnd(item.outstanding)]));
+    }
+    lines.push(t("👉 Xem chi tiết chỉ số điện nước và quét mã QR thanh toán tự động tại: {0}", [url]));
+    return lines.join('\n');
   };
 
   const copyReminderMessage = async (item: Invoice) => {

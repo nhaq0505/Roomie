@@ -31,8 +31,12 @@ export function useSubscriptionDashboard() {
   });
 
   const reconcileMutation = useMutation({
-    mutationFn: (orderCode: number) => subscriptionApi.reconcile(orderCode),
-    onSuccess: async (data) => {
+    mutationFn: (vars: number | { orderCode: number; manual?: boolean }) => {
+      const orderCode = typeof vars === 'number' ? vars : vars.orderCode;
+      return subscriptionApi.reconcile(orderCode);
+    },
+    onSuccess: async (data, vars) => {
+      const isManual = typeof vars === 'object' && vars !== null && 'manual' in vars ? vars.manual : false;
       if (data.status === 'Paid' || data.isPro) {
         setPaymentSuccess(true);
         message.success(t("Nâng cấp gói Pro thành công!"));
@@ -46,7 +50,13 @@ export function useSubscriptionDashboard() {
           window.clearInterval(pollingRef.current);
           pollingRef.current = null;
         }
+      } else if (isManual) {
+        message.info(t("Chưa ghi nhận thanh toán. Hệ thống vẫn đang tự động kiểm tra..."));
       }
+    },
+    onError: (err: Error, vars) => {
+      const isManual = typeof vars === 'object' && vars !== null && 'manual' in vars ? vars.manual : true;
+      if (isManual) message.error(err.message);
     },
   });
 
@@ -68,7 +78,7 @@ export function useSubscriptionDashboard() {
   useEffect(() => {
     if (checkout && checkout.orderCode && !paymentSuccess) {
       pollingRef.current = window.setInterval(() => {
-        reconcileMutation.mutate(checkout.orderCode);
+        reconcileMutation.mutate({ orderCode: checkout.orderCode, manual: false });
       }, 5000);
     }
     return () => {

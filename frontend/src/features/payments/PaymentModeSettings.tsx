@@ -5,6 +5,7 @@ import type { FormInstance } from 'antd';
 import { t } from '../../shared/i18n/runtime';
 import { LoadError } from '../../shared/ui/Ui';
 import { paymentSettingsApi } from './api';
+import { VIETQR_BANKS } from './banks';
 import type { PaymentPreferences, PaymentSettings } from './types';
 
 export function PaymentModeSettings({ settings, form }: { settings: PaymentSettings; form: FormInstance<PaymentPreferences> }) {
@@ -27,9 +28,9 @@ export function PaymentModeSettings({ settings, form }: { settings: PaymentSetti
       <Alert showIcon type="info" message={mode === 'Manual' ? t("Người thuê chuyển khoản bằng VietQR. Bạn kiểm tra tiền thực nhận rồi xác nhận khoản thu.") : t("payOS xác minh giao dịch và tự cập nhật các hóa đơn đã thanh toán.")} />
       {mode === 'Manual' && <div className="payment-manual-fields">
         {banks.isError && <LoadError error={banks.error} onRetry={() => void banks.refetch()} />}
-        <Form.Item name="bankBin" label={t("Ngân hàng nhận tiền")} rules={[{ required: true }]}><Select showSearch loading={banks.isPending} optionFilterProp="label" options={(banks.data ?? []).map(bank => ({ value: bank.bin, label: `${bank.shortName} — ${bank.name}` }))} /></Form.Item>
-        <Form.Item name="accountNumber" label={t("Số tài khoản")} rules={[{ required: true, pattern: /^[A-Za-z0-9]{4,34}$/ }]}><Input autoComplete="off" maxLength={34} /></Form.Item>
-        <Form.Item name="accountName" label={t("Tên chủ tài khoản")} rules={[{ required: true, whitespace: true, max: 100 }]}><Input autoComplete="off" maxLength={100} /></Form.Item>
+        <Form.Item name="bankBin" label={t("Ngân hàng nhận tiền")} rules={[{ required: true, message: t("Vui lòng chọn ngân hàng thụ hưởng.") }]}><Select showSearch loading={banks.isPending} optionFilterProp="label" options={(banks.data ?? VIETQR_BANKS).map(bank => ({ value: bank.bin, label: `${bank.shortName} — ${bank.name}` }))} /></Form.Item>
+        <Form.Item name="accountNumber" label={t("Số tài khoản")} rules={[{ required: true, message: t("Vui lòng nhập số tài khoản.") }, { pattern: /^[A-Za-z0-9]{4,34}$/ }]}><Input autoComplete="off" maxLength={34} /></Form.Item>
+        <Form.Item name="accountName" label={t("Tên chủ tài khoản")} rules={[{ required: true, whitespace: true, max: 100, message: t("Vui lòng nhập tên chủ tài khoản.") }]}><Input autoComplete="off" maxLength={100} /></Form.Item>
         <Typography.Paragraph type="secondary">{t("Kiểm tra đúng tài khoản nhận tiền trước khi lưu. Tạo QR không đồng nghĩa với xác nhận đã thanh toán.")}</Typography.Paragraph>
       </div>}
       <Button type="primary" htmlType="submit" loading={save.isPending} style={{ marginTop: 16 }}>{t("Lưu chế độ thanh toán")}</Button>

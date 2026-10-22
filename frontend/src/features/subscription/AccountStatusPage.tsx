@@ -1,4 +1,4 @@
-import { Fragment, type ComponentType, type ReactNode } from 'react';
+import { Fragment, useState, type ComponentType, type ReactNode } from 'react';
 import {
 LogoutOutlined,
 ReloadOutlined
@@ -11,10 +11,17 @@ import RoomieMark from '../../shared/ui/RoomieMark';
 import { useAuth } from '../auth/session';
 import ApprovedSubscriptionDashboard from './ApprovedSubscriptionDashboard';
 
-export default function AccountStatusPage({ layout: Layout = Fragment }: { layout?: ComponentType<{ children: ReactNode }> }) {
+export default function AccountStatusPage({
+  layout: Layout = Fragment,
+  passwordModal: PasswordModal,
+}: {
+  layout?: ComponentType<{ children: ReactNode }>;
+  passwordModal?: ComponentType<{ open: boolean; onClose: () => void }>;
+}) {
   const { message } = App.useApp();
   const { user, ready, refresh, signOut } = useAuth();
   const navigate = useNavigate();
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   if (!ready) return <div className="screen-center"><Spin size="large" /></div>;
   if (!user) return <Navigate to="/login" replace />;
@@ -41,11 +48,12 @@ export default function AccountStatusPage({ layout: Layout = Fragment }: { layou
         subTitle={<>{config.subtitle}<br /><span className="status-email">{user.email}</span></>}
         extra={<div className="status-actions">
           <Button type="primary" icon={<ReloadOutlined />} onClick={() => void refresh()}>{t("Kiểm tra trạng thái")}</Button>
-          <Button onClick={() => navigate('/change-password')}>{t("Đổi mật khẩu")}</Button>
+          <Button onClick={() => (PasswordModal ? setPasswordOpen(true) : navigate('/change-password'))}>{t("Đổi mật khẩu")}</Button>
           <Button icon={<LogoutOutlined />} onClick={() => void signOut().then(() => navigate('/login')).catch((error: Error) => message.error(error.message))}>{t("Đăng xuất")}</Button>
         </div>}
       />
     </div>
     <div className="status-foot">{t("Bạn cần trợ giúp? Hãy liên hệ quản trị viên hệ thống.")}</div>
+    {PasswordModal && <PasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />}
   </div>;
 }

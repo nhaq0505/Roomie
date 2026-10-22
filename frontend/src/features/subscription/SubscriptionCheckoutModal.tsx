@@ -32,7 +32,7 @@ export default function SubscriptionCheckoutModal({ state }: { state: ReturnType
             type="primary"
             icon={<ReloadOutlined />}
             loading={reconcileMutation.isPending}
-            onClick={() => checkout?.orderCode && reconcileMutation.mutate(checkout.orderCode)}
+            onClick={() => checkout?.orderCode && reconcileMutation.mutate({ orderCode: checkout.orderCode, manual: true })}
           >
             {t("Kiểm tra thanh toán")}
           </Button>

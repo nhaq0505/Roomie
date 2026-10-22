@@ -1427,5 +1427,16 @@
   "Số lượt sử dụng tối đa phải lớn hơn 0.": "最大使用次数必须大于 0。",
   "Thời gian bắt đầu không được lớn hơn thời gian kết thúc.": "开始时间不能晚于结束时间。",
   "Số tháng tặng thưởng phải từ 1 đến 120 tháng.": "奖励月数必须在 1 至 120 个月之间。",
-  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "优惠码必须为 3 至 32 个字符。"
+  "Mã khuyến mãi phải từ 3 đến 32 ký tự.": "优惠码必须为 3 至 32 个字符。",
+  "Vui lòng nhập mật khẩu hiện tại.": "请输入当前密码。",
+  "Vui lòng xác nhận mật khẩu mới.": "请确认新密码。",
+  "Vui lòng nhập số tiền.": "请输入金额。",
+  "💰 Tổng cộng: {0} (Đã thanh toán: {1})": "💰 总计：{0}（已付：{1}）",
+  "👉 Còn phải thanh toán: {0}": "👉 待付金额：{0}",
+  "Vui lòng chọn ngân hàng thụ hưởng.": "请选择收款银行。",
+  "Vui lòng nhập số tài khoản.": "请输入银行账号。",
+  "Vui lòng nhập tên chủ tài khoản.": "请输入账户持有人姓名。",
+  "Ghi chỉ số điện nhanh chóng & phát hành hóa đơn hàng loạt": "快速记录电表读数并批量生成账单",
+  "Chưa ghi nhận thanh toán. Hệ thống vẫn đang tự động kiểm tra...": "尚未收到付款记录。系统仍在自动检查中...",
+  "Ngân hàng": "银行"
 }

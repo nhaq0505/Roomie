@@ -94,7 +94,7 @@ export default function ApprovedSubscriptionDashboard() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircleFilled style={{ color: '#52c41a' }} />
-              <Typography.Text>{t("Tự động chốt số điện nước & phát hành hóa đơn tự động")}</Typography.Text>
+              <Typography.Text>{t("Ghi chỉ số điện nhanh chóng & phát hành hóa đơn hàng loạt")}</Typography.Text>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircleFilled style={{ color: '#52c41a' }} />

@@ -37,7 +37,27 @@ export default function ReadingsPage() {
       saved: (readingsQuery.data ?? []).find((reading) => reading.roomId === room.id && reading.occupancyId === room.occupancy?.id),
       draftInvoice: (invoicesQuery.data ?? []).find((invoice) => invoice.kind === 'Monthly' && invoice.roomId === room.id && invoice.period === period && invoice.lifecycleState === 'Draft' && invoice.occupancyId === room.occupancy?.id),
     })), [roomsQuery.data, readingsQuery.data, invoicesQuery.data, period]);
-  useEffect(() => { setDrafts(Object.fromEntries(rows.map(({ room, saved }) => [room.id, saved?.currentReading ?? null]))); }, [rows]);
+  const prevPeriodRef = useRef(period);
+  useEffect(() => {
+    if (prevPeriodRef.current !== period) {
+      prevPeriodRef.current = period;
+      setDrafts(Object.fromEntries(rows.map(({ room, saved }) => [room.id, saved?.currentReading ?? null])));
+      return;
+    }
+    setDrafts((prev) => {
+      const next: Record<string, number | null> = {};
+      for (const { room, saved } of rows) {
+        if (saved?.currentReading !== undefined) {
+          next[room.id] = saved.currentReading;
+        } else if (prev[room.id] !== undefined) {
+          next[room.id] = prev[room.id];
+        } else {
+          next[room.id] = null;
+        }
+      }
+      return next;
+    });
+  }, [rows, period]);
 
   const refresh = async () => Promise.all([
     client.invalidateQueries({ queryKey: ['readings', period] }), client.invalidateQueries({ queryKey: ['invoices'] }),
