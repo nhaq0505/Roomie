@@ -67,6 +67,29 @@ test('landing keeps sign-in reachable in the header across mobile and desktop wi
   await expect(page).toHaveURL(/\/login$/);
 });
 
+test('landing pricing, comparison, and FAQ sections maintain readable contrast and complete package tiers', async ({ page }) => {
+  await fixture(page);
+  await page.goto('/pricing');
+  const pricingSection = page.locator('#pricing');
+  await expect(pricingSection).toBeVisible();
+  await expect(pricingSection.getByText('Tối đa 5 phòng đang sử dụng')).toBeVisible();
+  await expect(pricingSection.getByText('Gói Pro 1 tháng')).toBeVisible();
+  await expect(pricingSection.getByText('Gói Pro 3 tháng')).toBeVisible();
+  await expect(pricingSection.getByText('Gói Pro 1 năm')).toBeVisible();
+  expect(await contrast(pricingSection.locator('.pricing-cta').first())).toBeGreaterThanOrEqual(4.5);
+  expect(await contrast(pricingSection.locator('.pricing-cta').last())).toBeGreaterThanOrEqual(4.5);
+
+  const secondFaq = page.locator('#faq .faq-item').nth(1);
+  await secondFaq.locator('summary').click();
+  await expect(secondFaq.locator('.faq-answer')).toBeVisible();
+  expect(await contrast(secondFaq.locator('.faq-answer p'))).toBeGreaterThanOrEqual(4.5);
+
+  await page.goto('/features');
+  await expect(page.locator('#comparison')).toBeVisible();
+  await page.goto('/huong-dan');
+  await expect(page.locator('#guides-list .guide-card')).toHaveCount(4);
+});
+
 test('mobile drawer close button is visible on its dark header and supports keyboard dismissal', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await fixture(page, true);

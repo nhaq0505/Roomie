@@ -138,7 +138,12 @@ class SeoHttpTests(unittest.TestCase):
         self.assertIn("xml", headers["Content-Type"])
         root = ET.fromstring(body)
         urls = root.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
-        self.assertEqual([url.text for url in urls], ["https://roomie.io.vn/"])
+        self.assertEqual([url.text for url in urls], [
+            "https://roomie.io.vn/",
+            "https://roomie.io.vn/features",
+            "https://roomie.io.vn/pricing",
+            "https://roomie.io.vn/huong-dan",
+        ])
 
     def test_robots_blocks_all_crawlers(self):
         status, headers, body = self.fetch("/robots.txt")

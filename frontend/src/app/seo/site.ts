@@ -7,7 +7,24 @@ export const site = {
 };
 
 // Only published public pages belong here; weeks 3–6 will extend this registry.
-export const publicPages = [{ path: '/', title: site.title, description: site.description }];
+export const publicPages = [
+  { path: '/', title: site.title, description: site.description },
+  {
+    path: '/features',
+    title: 'Tính năng quản lý phòng trọ, hóa đơn & Zalo | Roomie',
+    description: 'Khám phá bộ tính năng quản lý dãy trọ, chốt chỉ số điện, lập hóa đơn, nhắc lịch Zalo tự động, thu tiền VietQR/payOS và xuất báo cáo Excel.',
+  },
+  {
+    path: '/pricing',
+    title: 'Bảng giá phần mềm quản lý phòng trọ & Hỏi đáp | Roomie',
+    description: 'Bảng giá minh bạch của Roomie: Gói Miễn phí tối đa 5 phòng đang sử dụng và Gói Pro không giới hạn số phòng theo kỳ hạn 1 tháng, 3 tháng, 1 năm.',
+  },
+  {
+    path: '/huong-dan',
+    title: 'Hướng dẫn quản lý nhà trọ, tính điện & thu tiền QR | Roomie',
+    description: 'Cẩm nang hướng dẫn chủ trọ thiết lập phòng, ghi chỉ số điện hàng tháng, quản lý tiền cọc, đối soát công nợ và thu tiền qua mã QR.',
+  },
+];
 
 export const privatePageTitles: Record<string, string> = {
   '/login': 'Đăng nhập', '/register': 'Đăng ký làm chủ trọ',

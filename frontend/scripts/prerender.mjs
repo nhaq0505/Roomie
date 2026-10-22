@@ -1,4 +1,5 @@
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -13,6 +14,13 @@ if (!manifest['index.html']?.css?.length) throw new Error('Entry CSS missing fro
 // The private SPA must never inherit the public page's content/canonical.
 await writeFile(new URL('app.html', dist), template.replace('</head>', '    <meta name="robots" content="noindex, follow" />\n  </head>'));
 
+const outputMap = {
+  '/': 'index.html',
+  '/features': 'features/index.html',
+  '/pricing': 'pricing/index.html',
+  '/huong-dan': 'huong-dan/index.html',
+};
+
 // Bundle the build-only renderer so Node never needs browser ESM package shims.
 await build({
   root, configFile: false, plugins: [react()], logLevel: 'warn',
@@ -23,8 +31,8 @@ try {
   const { renderPublicPage, publicPages, site, structuredData } = await import(new URL('.prerender/prerender.js', dist));
   template = template.replace('</head>', `${publicCss.map(file => `<link rel="stylesheet" href="/${file}" />`).join('\n')}\n</head>`);
   for (const page of publicPages) {
-    // Explicit mapping prevents accidentally replacing app.html with a public page.
-    if (page.path !== '/') throw new Error('Register output paths before adding public pages');
+    const outputFile = outputMap[page.path];
+    if (!outputFile) throw new Error(`Register output paths before adding public pages: ${page.path}`);
     const canonical = `${site.origin}${page.path}`;
     const { html: content, styles } = renderPublicPage(page.path);
     const head = [
@@ -42,8 +50,10 @@ try {
       .replace(/<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${escape(page.description)}" />`)
       .replace('</head>', `    <link rel="canonical" href="${canonical}" />\n    ${head}\n    <script id="site-structured-data" type="application/ld+json">${JSON.stringify(structuredData).replaceAll('<', '\\u003c')}</script>\n${styles}\n  </head>`)
       .replace('<div id="root"></div>', `<div id="root">${content}</div>`);
-    if (!html.includes('<h1>') || !html.includes('id="features"')) throw new Error('Public HTML is missing content');
-    await writeFile(new URL('index.html', dist), html);
+    if (!html.includes('<h1>')) throw new Error(`Public HTML is missing content for ${page.path}`);
+    const targetUrl = new URL(outputFile, dist);
+    await mkdir(dirname(fileURLToPath(targetUrl)), { recursive: true });
+    await writeFile(targetUrl, html);
   }
   // Vite copies public/robots.txt unchanged. Do not override the user's crawl block.
   const urls = publicPages.map(page => `  <url><loc>${site.origin}${page.path}</loc></url>`).join('\n');
