@@ -106,6 +106,11 @@ internal static class AccountingBillingHttpTests
         Assert(commands.Count(x => x.Contains("\"Invoices\"", StringComparison.Ordinal)) == 1 &&
                commands.Count(x => x.Contains("GROUP BY", StringComparison.Ordinal)) == 1,
                "dashboard uses exactly one aggregate query on invoices table");
+
+        commands.Clear();
+        var cachedDashboardRes = await client.GetAsync("/api/dashboard");
+        Assert(cachedDashboardRes.StatusCode == HttpStatusCode.OK, "cached dashboard returns 200");
+        Assert(commands.Count == 0, "subsequent dashboard call hits in-memory cache with 0 DB queries");
     }
 
     private static async Task AutomaticZaloQueueAsync()
@@ -564,6 +569,7 @@ internal static class AccountingBillingHttpTests
         builder.Services.AddScoped<PayOsService>();
         builder.Services.AddScoped<PaymentWebhookService>();
         builder.Services.AddHttpClient();
+        builder.Services.AddMemoryCache();
         builder.Services.AddSingleton(TimeProvider.System);
 
         builder.Services.AddAuthentication(FixtureAuthentication.SchemeName)

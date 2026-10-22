@@ -58,6 +58,7 @@ if (!builder.Configuration.GetValue("EmailVerification:Enabled", true) && !build
 if (!builder.Configuration.GetValue("RequireVerifiedPaymentForTenantLink", true) && !builder.Environment.IsDevelopment())
     throw new InvalidOperationException("RequireVerifiedPaymentForTenantLink cannot be disabled outside Development.");
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("Zalo", client => client.Timeout = TimeSpan.FromSeconds(40));
 builder.Services.AddScoped<IZaloGateway, ZaloGateway>();
 builder.Services.AddScoped<ZaloReminderService>();

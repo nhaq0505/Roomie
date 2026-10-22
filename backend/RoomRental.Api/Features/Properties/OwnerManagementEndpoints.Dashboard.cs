@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -9,9 +11,16 @@ public static partial class OwnerManagementEndpoints
 {
     private static void MapDashboardRoutes(RouteGroupBuilder routes)
     {
-        routes.MapGet("/dashboard", async (HttpContext context, AppDbContext db, TimeProvider clock, CancellationToken cancellationToken) =>
+        routes.MapGet("/dashboard", async (HttpContext context, AppDbContext db, TimeProvider clock, [FromServices] IMemoryCache? cache = null, CancellationToken cancellationToken = default) =>
         {
             var ownerId = ApiSupport.OwnerId(context);
+            var cacheKey = $"dashboard:{ownerId}";
+            var bypassCache = context.Request.Headers.CacheControl.ToString().Contains("no-cache", StringComparison.OrdinalIgnoreCase);
+            if (cache is not null && !bypassCache && cache.TryGetValue(cacheKey, out object? cached))
+            {
+                return Results.Ok(cached);
+            }
+
             var rooms = from room in db.Rooms.AsNoTracking()
                         join building in db.Buildings.AsNoTracking() on room.BuildingId equals building.Id
                         where building.OwnerId == ownerId && building.ArchivedAt == null && room.ArchivedAt == null
@@ -37,7 +46,7 @@ public static partial class OwnerManagementEndpoints
             var roomCount = await rooms.CountAsync(cancellationToken);
             var pendingReadings = await activeOccupancies.CountAsync(occupancy =>
                 !db.Readings.Any(reading => reading.OccupancyId == occupancy.Id && reading.Period == period), cancellationToken);
-            return Results.Ok(new
+            var response = new
             {
                 totalRooms = roomCount,
                 occupiedRooms,
@@ -50,7 +59,10 @@ public static partial class OwnerManagementEndpoints
                 monthlyPaid,
                 monthlyOutstanding,
                 collectionRate = monthlyBilled == 0 ? 0 : decimal.Round(monthlyPaid / monthlyBilled * 100, 2)
-            });
+            };
+            // ponytail: 10s per-process in-memory cache; upgrade to distributed cache or event bus if scaled across replicas.
+            cache?.Set(cacheKey, response, TimeSpan.FromSeconds(10));
+            return Results.Ok(response);
         });
 
     }
