@@ -20,7 +20,12 @@ export default function ResponsiveTable<T extends object>(props: TableProps<T> &
   const pageSize = typeof props.pagination === 'object' ? props.pagination.pageSize ?? 10 : 10;
   useEffect(() => { setPage(1); }, [props.dataSource]);
   const { renderCompact, disableCompactPagination, ...tableProps } = props;
-  if (!compact) return <div ref={container}><Table<T> {...tableProps} /></div>;
+  const desktopPagination = tableProps.pagination === false ? false : {
+    ...(typeof tableProps.pagination === 'object' ? tableProps.pagination : {}),
+    current: paging?.current ?? page,
+    onChange: paging?.onChange ?? ((nextPage: number, _pageSize: number) => setPage(nextPage)),
+  };
+  if (!compact) return <div ref={container}><Table<T> {...tableProps} pagination={desktopPagination} /></div>;
   const columns = (props.columns ?? []).filter((column) => !('children' in column));
   const cell = (column: typeof columns[number], record: T, index: number): ReactNode => {
     const field = 'dataIndex' in column ? column.dataIndex : undefined;

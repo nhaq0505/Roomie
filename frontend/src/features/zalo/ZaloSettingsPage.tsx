@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Modal, Popconfirm, Skeleton, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Form, InputNumber, Modal, Popconfirm, Skeleton, Space, Switch, Tag, Typography } from 'antd';
 import { MessageOutlined, QrcodeOutlined } from '@ant-design/icons';
 import { t } from '../../shared/i18n/runtime';
 import { getLocale } from '../../shared/i18n/runtime';
@@ -56,6 +56,45 @@ export default function ZaloSettingsPage() {
   const connect = useMutation({ mutationFn: zaloApi.connect, onError, onSuccess: refresh });
   const disconnect = useMutation({ mutationFn: zaloApi.disconnect, onError, onSuccess: () => { refresh(); void client.invalidateQueries({ queryKey: ['zalo-settings'] }); } });
   const queue = useMutation({ mutationFn: zaloApi.queue, onError, onSuccess: result => { void message.success(t("Đã thêm {0} hóa đơn vào hàng đợi.", [result.queued])); setPage(1); refresh(); } });
+
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [dayOfMonth, setDayOfMonth] = useState(25);
+  const [hour, setHour] = useState(8);
+  const [minute, setMinute] = useState(0);
+
+  useEffect(() => {
+    if (settings.data) {
+      setScheduleEnabled(settings.data.scheduleEnabled ?? false);
+      setDayOfMonth(settings.data.dayOfMonth || 25);
+      setHour(settings.data.hour ?? 8);
+      setMinute(settings.data.minute ?? 0);
+    }
+  }, [settings.data]);
+
+  const saveSettings = useMutation({
+    mutationFn: async (body: { scheduleEnabled: boolean; dayOfMonth: number; hour: number; minute: number }) => {
+      const fn = (zaloApi as { updateSettings?: (b: unknown) => Promise<unknown>; save: (b: unknown) => Promise<unknown> }).updateSettings ?? zaloApi.save;
+      const current = settings.data ?? {
+        scheduleEnabled: false,
+        dayOfMonth: 25,
+        hour: 8,
+        minute: 0,
+        bankBin: '',
+        bankAccount: '',
+        bankAccountName: '',
+        gatewayEnabled: false,
+      };
+      return fn({
+        ...current,
+        ...body,
+      });
+    },
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['zalo-settings'] });
+      message.success(t("Đã lưu lịch nhắc tự động"));
+    },
+    onError,
+  });
   const state = connection.data?.status ?? 'Unavailable';
   const connected = state === 'Connected';
   const connecting = ['QrReady', 'AwaitingConfirmation', 'Connecting', 'Restoring'].includes(state);
@@ -74,13 +113,37 @@ export default function ZaloSettingsPage() {
           <Alert showIcon type={connected ? 'success' : 'info'} message={connectionLabel(state)} />
           {connection.isError && <LoadError error={connection.error} onRetry={() => void connection.refetch()} />}
           {!settings.data.gatewayEnabled && <Alert type="warning" message={t("Máy chủ chưa bật dịch vụ Zalo. Liên hệ quản trị viên để cấu hình.")} />}
-          {connection.data?.qrImage && state === 'QrReady' && <div className="zalo-qr"><img width={256} height={256} src={connection.data.qrImage} alt={t("QR đăng nhập Zalo")} /></div>}
+          {connection.data?.qrImage && (state === 'QrReady' || state === 'AwaitingConfirmation') && <div className="zalo-qr"><img width={256} height={256} src={connection.data.qrImage} alt={t("QR đăng nhập Zalo")} /></div>}
           <Typography.Paragraph>{t("Kết nối xuất hiện như thiết bị “Zalo Web” trên điện thoại. Đăng xuất thiết bị đó sẽ làm Roomie ngừng gửi; hãy quét QR lại để kết nối.")}</Typography.Paragraph>
           <Space wrap>
             {!connected && !connecting && <Button type="primary" icon={<QrcodeOutlined />} disabled={!settings.data.gatewayEnabled || busy} loading={connect.isPending} onClick={() => connect.mutate()}>{t("Tạo QR kết nối")}</Button>}
             {(connected || connecting) && <Popconfirm title={t("Ngắt kết nối và dừng lịch tự động?")} onConfirm={() => disconnect.mutate()} okText={t("Ngắt kết nối")} cancelText={t("Hủy")}><Button danger loading={disconnect.isPending} disabled={busy}>{t("Ngắt kết nối")}</Button></Popconfirm>}
           </Space>
           <Typography.Text type="secondary">{t("Người thuê trả lời thì bạn đọc và trả lời trong Zalo bình thường.")}</Typography.Text>
+        </Space>
+      </SectionCard>
+      <SectionCard title={t("Lịch nhắc tự động hàng tháng")}>
+        <Space direction="vertical" size="middle" className="zalo-full-width">
+          <Typography.Paragraph type="secondary">{t("Tự động quét hóa đơn chưa thanh toán và gửi tin nhắn nhắc nhở qua Zalo theo lịch định kỳ.")}</Typography.Paragraph>
+          <Form layout="vertical">
+            <Form.Item label={t("Kích hoạt lịch nhắc tự động")}>
+              <Switch checked={scheduleEnabled} onChange={setScheduleEnabled} checkedChildren={t("Bật")} unCheckedChildren={t("Tắt")} />
+            </Form.Item>
+            <Form.Item label={t("Ngày trong tháng (1 - 28)")}>
+              <InputNumber min={1} max={28} value={dayOfMonth} onChange={(val) => val != null && setDayOfMonth(val)} style={{ width: 140 }} />
+            </Form.Item>
+            <Space wrap size="large">
+              <Form.Item label={t("Giờ gửi (7h - 20h)")}>
+                <InputNumber min={7} max={20} value={hour} onChange={(val) => val != null && setHour(val)} addonAfter="h" style={{ width: 120 }} />
+              </Form.Item>
+              <Form.Item label={t("Phút (0 - 59)")}>
+                <InputNumber min={0} max={59} value={minute} onChange={(val) => val != null && setMinute(val)} addonAfter={t("Phút")} style={{ width: 130 }} />
+              </Form.Item>
+            </Space>
+            <div>
+              <Button type="primary" loading={saveSettings.isPending} onClick={() => saveSettings.mutate({ scheduleEnabled, dayOfMonth, hour, minute })}>{t("Lưu lịch nhắc tự động")}</Button>
+            </div>
+          </Form>
         </Space>
       </SectionCard>
     </div>}

@@ -126,7 +126,7 @@ public static partial class OwnerManagementEndpoints
         {
             var ownerId = ApiSupport.OwnerId(context);
             if (!await tokenService.CanShareAsync(ownerId, webhookService, cancellationToken))
-                throw new ApiException(StatusCodes.Status400BadRequest, "Chưa lưu cấu hình payOS đã được xác minh. Vui lòng thiết lập thanh toán trước khi cấp link cho khách.");
+                throw new ApiException(StatusCodes.Status400BadRequest, "Chưa hoàn tất cấu hình nhận tiền (VietQR thủ công hoặc payOS tự động). Vui lòng thiết lập thanh toán trước khi cấp link cho khách.");
 
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
             _ = await PropertyLookup.FindRoomAsync(db, ownerId, id, cancellationToken);

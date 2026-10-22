@@ -122,19 +122,19 @@ export default function AdminOwnersPage() {
           <Space size={4}>
             {owner.status === 'Pending' ? (
               <>
-                <Button type="primary" size="small" icon={<CheckOutlined />} loading={updateMutation.isPending} onClick={() => approve(owner)}>
+                <Button type="primary" size="small" icon={<CheckOutlined />} loading={updateMutation.isPending && updateMutation.variables?.id === owner.id} onClick={() => approve(owner)}>
                   {t("Duyệt")}
                 </Button>
-                <Button danger size="small" icon={<CloseOutlined />} onClick={() => requestReason(owner, 'Rejected')}>
+                <Button danger size="small" icon={<CloseOutlined />} disabled={updateMutation.isPending && updateMutation.variables?.id === owner.id} onClick={() => requestReason(owner, 'Rejected')}>
                   {t("Từ chối")}
                 </Button>
               </>
             ) : owner.status === 'Approved' ? (
-              <Button size="small" onClick={() => requestReason(owner, 'Suspended')}>
+              <Button size="small" loading={updateMutation.isPending && updateMutation.variables?.id === owner.id} onClick={() => requestReason(owner, 'Suspended')}>
                 {t("Tạm khóa")}
               </Button>
             ) : (
-              <Button size="small" type={owner.status === 'Suspended' ? 'primary' : 'default'} onClick={() => approve(owner)}>
+              <Button size="small" type={owner.status === 'Suspended' ? 'primary' : 'default'} loading={updateMutation.isPending && updateMutation.variables?.id === owner.id} onClick={() => approve(owner)}>
                 {owner.status === 'Suspended' ? t("Mở khóa") : t("Duyệt lại")}
               </Button>
             )}
@@ -159,7 +159,7 @@ export default function AdminOwnersPage() {
     {/* Reset Password Modal */}
     <Modal title={t("Đặt lại mật khẩu")} open={!!resetOwner} maskClosable={false} onCancel={() => { if (!resetMutation.isPending) { setResetOwner(null); setResetResult(null); resetForm.resetFields(); } }} footer={resetResult ? <Button onClick={() => { setResetOwner(null); setResetResult(null); }}>{t("Đóng")}</Button> : undefined} onOk={() => resetForm.submit()} confirmLoading={resetMutation.isPending} okText={t("Tạo mã đặt lại")} cancelText={t("Hủy")} cancelButtonProps={{ disabled: resetMutation.isPending }} closable={!resetMutation.isPending} destroyOnClose>
       <Typography.Paragraph>{resetOwner?.email}</Typography.Paragraph>
-      {resetResult ? <><Typography.Paragraph>{t("Gửi mã này riêng cho chủ trọ sau khi xác minh danh tính. Mã chỉ hiển thị lần này.")}</Typography.Paragraph><Input.TextArea readOnly aria-label={t("Mã đặt lại mật khẩu")} value={resetResult.token} autoSize /><Typography.Paragraph>{t("Hết hạn: {0}", [dayjs(resetResult.expiresAt).format('HH:mm DD/MM/YYYY')])}</Typography.Paragraph><Typography.Paragraph>{t("Chủ trọ mở trang Đặt lại mật khẩu ở màn đăng nhập để nhập mã.")}</Typography.Paragraph></> : <><Typography.Paragraph>{t("Tạo mã sẽ kết thúc các phiên của chủ trọ và yêu cầu đặt mật khẩu mới trước khi đăng nhập.")}</Typography.Paragraph><Form form={resetForm} layout="vertical" onFinish={(values) => { if (!resetMutation.isPending) resetMutation.mutate(values.currentPassword); }}><Form.Item name="currentPassword" label={t("Mật khẩu hiện tại")} rules={[{ required: true }]}><Input.Password autoComplete="current-password" maxLength={256} /></Form.Item></Form></>}
+      {resetResult ? <><Typography.Paragraph>{t("Gửi mã này riêng cho chủ trọ sau khi xác minh danh tính. Mã chỉ hiển thị lần này.")}</Typography.Paragraph><Input.TextArea readOnly aria-label={t("Mã đặt lại mật khẩu")} value={resetResult.token} autoSize /><Typography.Paragraph>{t("Hết hạn: {0}", [dayjs(resetResult.expiresAt).format('HH:mm DD/MM/YYYY')])}</Typography.Paragraph><Typography.Paragraph>{t("Chủ trọ mở trang Đặt lại mật khẩu ở màn đăng nhập để nhập mã.")}</Typography.Paragraph></> : <><Typography.Paragraph>{t("Tạo mã sẽ kết thúc các phiên của chủ trọ và yêu cầu đặt mật khẩu mới trước khi đăng nhập.")}</Typography.Paragraph><Form form={resetForm} layout="vertical" onFinish={(values) => { if (!resetMutation.isPending) resetMutation.mutate(values.currentPassword); }}><Form.Item name="currentPassword" label={t("Mật khẩu hiện tại")} extra={t("Nhập mật khẩu tài khoản Quản trị viên của bạn để xác nhận cấp mã.")} rules={[{ required: true }]}><Input.Password autoComplete="current-password" maxLength={256} /></Form.Item></Form></>}
     </Modal>
 
     {/* Reason Target Modal (Reject / Suspend) */}
@@ -218,14 +218,20 @@ export default function AdminOwnersPage() {
             name="days"
             rules={[{ required: true, message: t("Vui lòng nhập số ngày.") }]}
             extra={
-              <Space style={{ marginTop: 6 }}>
-                <Button size="small" onClick={() => subForm.setFieldValue('days', 30)}>{t("+30 ngày (1 tháng)")}</Button>
-                <Button size="small" onClick={() => subForm.setFieldValue('days', 90)}>{t("+90 ngày (3 tháng)")}</Button>
-                <Button size="small" onClick={() => subForm.setFieldValue('days', 365)}>{t("+365 ngày (1 năm)")}</Button>
-              </Space>
+              <div>
+                <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                  {t("Nhập 0 ngày để cấp gói Pro vô thời hạn.")}
+                </Typography.Text>
+                <Space wrap style={{ marginTop: 2 }}>
+                  <Button size="small" onClick={() => subForm.setFieldValue('days', 0)}>{t("Vô thời hạn")}</Button>
+                  <Button size="small" onClick={() => subForm.setFieldValue('days', 30)}>{t("+30 ngày (1 tháng)")}</Button>
+                  <Button size="small" onClick={() => subForm.setFieldValue('days', 90)}>{t("+90 ngày (3 tháng)")}</Button>
+                  <Button size="small" onClick={() => subForm.setFieldValue('days', 365)}>{t("+365 ngày (1 năm)")}</Button>
+                </Space>
+              </div>
             }
           >
-            <InputNumber min={1} max={3650} style={{ width: '100%' }} addonAfter={t("ngày")} />
+            <InputNumber min={0} max={3650} style={{ width: '100%' }} addonAfter={t("ngày")} />
           </Form.Item>
         )}
 

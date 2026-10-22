@@ -17,6 +17,13 @@ export function useInvoicesPage() {
   const [period, setPeriod] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatusFilter>('All');
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
   const [adjustmentExpanded, setAdjustmentExpanded] = useState(false);
   const selectedId = searchParams.get('invoice');
   const [receiptForm] = Form.useForm<{ note?: string }>();
@@ -24,10 +31,10 @@ export function useInvoicesPage() {
   const receiptKeys = useRef(new Map<string, string>());
   const correctionKeys = useRef(new Map<string, string>());
   const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [kindFilter, issuanceFilter, period, statusFilter, searchText]);
-  const listQuery = useQuery({ queryKey: ['invoices', page, kindFilter, issuanceFilter, period, statusFilter, searchText], queryFn: () => invoicesApi.page({page: String(page), pageSize:'10',
+  useEffect(() => setPage(1), [kindFilter, issuanceFilter, period, statusFilter, debouncedSearchText]);
+  const listQuery = useQuery({ queryKey: ['invoices', page, kindFilter, issuanceFilter, period, statusFilter, debouncedSearchText], queryFn: () => invoicesApi.page({page: String(page), pageSize:'10',
     ...(kindFilter === 'All' ? {} : {kind: kindFilter}), ...(issuanceFilter === 'All' ? {} : {lifecycleState: issuanceFilter}),
-    ...(period ? {period} : {}), ...(statusFilter === 'All' ? {} : {status:statusFilter}), ...(searchText.trim() ? {search:searchText.trim()} : {})}) });
+    ...(period ? {period} : {}), ...(statusFilter === 'All' ? {} : {status:statusFilter}), ...(debouncedSearchText.trim() ? {search:debouncedSearchText.trim()} : {})}) });
   const detailQuery = useQuery({ queryKey: ['invoice', selectedId], queryFn: () => invoicesApi.get(selectedId!), enabled: !!selectedId });
   const invoices = listQuery.data?.items ?? [];
   const hasActiveFilters = kindFilter !== 'All' || issuanceFilter !== 'All' || period !== null || statusFilter !== 'All' || !!searchText.trim();

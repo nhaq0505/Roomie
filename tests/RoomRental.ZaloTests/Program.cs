@@ -229,6 +229,27 @@ var monthlyAuto = await db.Invoices.SingleAsync(x => x.OccupancyId == autoOccupa
 Assert(generatedAuto.Created == 1 && await db.ZaloReminders.AnyAsync(x => x.InvoiceId == monthlyAuto.Id), "monthly billing automatically commits its reminder");
 Assert((await autoBilling.GenerateForOwnerAsync(owner.Id, "2026-11")).Created == 0 && await db.ZaloReminders.CountAsync(x => x.InvoiceId == monthlyAuto.Id) == 1, "repeated monthly billing does not duplicate reminder");
 
+// Test Deposit and Supplemental message formatting
+var depositInvoice = new Invoice
+{
+    OwnerId = owner.Id, RoomId = Guid.NewGuid(), BuildingId = Guid.NewGuid(), OccupancyId = Guid.NewGuid(),
+    RoomName = "201", BuildingName = "Toa A", TenantName = "Nguyen Van A", Period = "2026-10",
+    Kind = "Deposit", Description = null, Total = 2000000, Paid = 0, DueDate = new(2026, 10, 25)
+};
+var depositMsg = ZaloReminderService.BuildMessage(depositInvoice, "https://roomie.example/t/sample");
+Assert(depositMsg.Contains("Nội dung hóa đơn: Tiền cọc") && !depositMsg.Contains("Tiền phòng: 0 đ;") && !depositMsg.Contains("Điện: 0 đ;"), "deposit message omits zero utility breakdown");
+Assert(depositMsg.Contains("Tổng: 2.000.000 đ;"), "deposit message includes total");
+
+var suppInvoice = new Invoice
+{
+    OwnerId = owner.Id, RoomId = Guid.NewGuid(), BuildingId = Guid.NewGuid(), OccupancyId = Guid.NewGuid(),
+    RoomName = "201", BuildingName = "Toa A", TenantName = "Nguyen Van A", Period = "2026-10",
+    Kind = "Supplemental", Description = "Phí sửa khóa", Total = 150000, Paid = 50000, DueDate = new(2026, 10, 25)
+};
+var suppMsg = ZaloReminderService.BuildMessage(suppInvoice, "https://roomie.example/t/sample");
+Assert(suppMsg.Contains("Nội dung hóa đơn: Phí sửa khóa") && !suppMsg.Contains("Tiền phòng: 0 đ;"), "supplemental message omits zero utility breakdown");
+Assert(suppMsg.Contains("Tổng: 150.000 đ;") && suppMsg.Contains("Còn lại: 100.000 đ;"), "supplemental message shows total and remaining balance");
+
 // PostgreSQL migration must build and preserve existing business data.
 await using (var migrationDb = await PostgresTestDb.CreateAsync(migrate: false, ensureCreated: false))
 {

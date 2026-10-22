@@ -370,6 +370,7 @@ export default function AdminPromotionsPage() {
           <Form.Item
             label={t("Mã khuyến mãi")}
             name="code"
+            normalize={(value) => (typeof value === 'string' ? value.toUpperCase() : value)}
             rules={[
               { required: true, message: t("Vui lòng nhập mã khuyến mãi.") },
               { min: 3, max: 32, message: t("Mã từ 3 đến 32 ký tự.") },
@@ -379,9 +380,6 @@ export default function AdminPromotionsPage() {
               disabled={!!editingCode}
               placeholder={t("Ví dụ: TET2026, BANMOI")}
               prefix={<GiftOutlined style={{ color: '#1890ff' }} />}
-              onChange={(e) => {
-                codeForm.setFieldValue('code', e.target.value.toUpperCase());
-              }}
             />
           </Form.Item>
 

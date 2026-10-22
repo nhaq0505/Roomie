@@ -28,6 +28,51 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
     }
     [GeneratedRegex(@"^0[35789]\d{8}$")]
     private static partial Regex PhonePattern();
+
+    public static string BuildMessage(Invoice invoice, string link)
+    {
+        var description = string.IsNullOrWhiteSpace(invoice.Description)
+            ? invoice.Kind == "Deposit" ? "Tiền cọc" : "Tiền phòng và dịch vụ"
+            : invoice.Description;
+        var culture = CultureInfo.GetCultureInfo("vi-VN");
+
+        var hasBreakdown = invoice.Kind == "Monthly" ||
+            invoice.Rent > 0 || invoice.ElectricityAmount > 0 || invoice.WaterAmount > 0 || invoice.ServiceAmount > 0;
+
+        var remainingLine = invoice.Paid > 0 && invoice.Total > invoice.Paid
+            ? string.Create(culture, $"\nCòn lại: {(invoice.Total - invoice.Paid):N0} đ;")
+            : "";
+
+        if (hasBreakdown)
+        {
+            return string.Create(culture, $"""
+                Roomie • Hóa đơn {invoice.Period}
+
+                {invoice.BuildingName} – Phòng {invoice.RoomName}
+                Người thuê: {invoice.TenantName}
+                Nội dung hóa đơn: {description}
+                Tiền phòng: {invoice.Rent:N0} đ;
+                Điện: {invoice.ElectricityAmount:N0} đ; Nước: {invoice.WaterAmount:N0} đ;
+                Dịch vụ: {invoice.ServiceAmount:N0} đ
+
+                Tổng: {invoice.Total:N0} đ;{remainingLine}
+
+                Thanh Toán Tại : {link}
+                """);
+        }
+
+        return string.Create(culture, $"""
+            Roomie • Hóa đơn {invoice.Period}
+
+            {invoice.BuildingName} – Phòng {invoice.RoomName}
+            Người thuê: {invoice.TenantName}
+            Nội dung hóa đơn: {description}
+
+            Tổng: {invoice.Total:N0} đ;{remainingLine}
+
+            Thanh Toán Tại : {link}
+            """);
+    }
     private string? ValidToken(Occupancy occupancy)
     {
         var token = tokens.Unprotect(occupancy);
@@ -144,21 +189,7 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
                 return;
             }
             var link = tokens.Url(token);
-            var description = string.IsNullOrWhiteSpace(invoice.Description) ? invoice.Kind == "Deposit" ? "Tiền cọc" : "Tiền phòng và dịch vụ" : invoice.Description;
-            var message = string.Create(CultureInfo.GetCultureInfo("vi-VN"), $"""
-                Roomie • Hóa đơn {invoice.Period}
-
-                {invoice.BuildingName} – Phòng {invoice.RoomName}
-                Người thuê: {invoice.TenantName}
-                Nội dung hóa đơn: {description}
-                Tiền phòng: {invoice.Rent:N0} đ;
-                Điện: {invoice.ElectricityAmount:N0} đ; Nước: {invoice.WaterAmount:N0} đ;
-                Dịch vụ: {invoice.ServiceAmount:N0} đ
-
-                Tổng: {invoice.Total:N0} đ;
-
-                Thanh Toán Tại : {link}
-                """);
+            var message = BuildMessage(invoice, link);
             var previousAttemptAtMs = job.LastAttemptAtMs;
             job.Status = "Sending";
             job.LastAttemptAtMs = clock.GetUtcNow().ToUnixTimeMilliseconds();

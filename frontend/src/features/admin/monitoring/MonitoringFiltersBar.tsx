@@ -1,6 +1,7 @@
 import { ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Button, DatePicker, Input, Radio, Select, Space, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
+import { useEffect, useRef, useState } from 'react';
 import { dateFormat, t } from '../../../shared/i18n/runtime';
 import type { DateRangePreset, MonitoringFilters, OpsWindowPreset } from './types';
 
@@ -67,8 +68,45 @@ export function MonitoringFiltersBar({
     onChange({ ...filters, source: val || undefined });
   };
 
+  const [campaignInput, setCampaignInput] = useState(filters.campaign ?? '');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setCampaignInput(filters.campaign ?? '');
+  }, [filters.campaign]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const flushCampaignChange = (val: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const trimmed = val.trim() || undefined;
+    if (trimmed !== filters.campaign) {
+      onChange({ ...filters, campaign: trimmed });
+    }
+  };
+
   const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...filters, campaign: e.target.value.trim() || undefined });
+    const val = e.target.value;
+    setCampaignInput(val);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      const trimmed = val.trim() || undefined;
+      if (trimmed !== filters.campaign) {
+        onChange({ ...filters, campaign: trimmed });
+      }
+    }, 300);
   };
 
   const handleOpsWindowChange = (val: OpsWindowPreset) => {
@@ -145,8 +183,10 @@ export function MonitoringFiltersBar({
 
             <Input
               style={{ width: 160 }}
-              value={filters.campaign ?? ''}
+              value={campaignInput}
               onChange={handleCampaignChange}
+              onBlur={() => flushCampaignChange(campaignInput)}
+              onPressEnter={() => flushCampaignChange(campaignInput)}
               placeholder={t("Chiến dịch")}
               allowClear
             />

@@ -38,6 +38,7 @@ interface OperationsTabProps {
   onRetry?: () => void;
   is501?: boolean;
   onUpdateIncidentState?: (id: string, state: string) => void;
+  isUpdatingIncident?: boolean;
 }
 
 export function OperationsTab({
@@ -49,6 +50,7 @@ export function OperationsTab({
   onRetry,
   is501,
   onUpdateIncidentState,
+  isUpdatingIncident,
 }: OperationsTabProps) {
   const windowText =
     window === '7d'
@@ -554,6 +556,7 @@ export function OperationsTab({
                     <Button
                       size="small"
                       type="primary"
+                      loading={isUpdatingIncident}
                       onClick={() => onUpdateIncidentState?.(inc.id, 'Resolved')}
                     >
                       {t("Đã xử lý")}

@@ -128,6 +128,12 @@ export function useTenantCheckout(token: string, invoiceId: string) {
     onError: (error: Error, variables) => {
       if (!mounted.current || requestGeneration.current !== variables.generation) return;
       if (closeForAccessError(error)) return;
+      const lower = error.message.toLowerCase();
+      if (lower.includes('already paid') || /đã được thanh toán|da duoc thanh toan/.test(lower)) {
+        setCreateError('');
+        void query.refetch();
+        return;
+      }
       setCreateError(error.message);
     },
   });

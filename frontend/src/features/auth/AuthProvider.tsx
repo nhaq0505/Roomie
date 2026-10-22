@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const generation = useRef(0);
   const setUser = useCallback((next: User | null) => {
     generation.current++;
+    void queryClient.cancelQueries();
     queryClient.clear(); setError(null); setUserState(next); setReady(true);
   }, [queryClient]);
   const refresh = useCallback(async () => {
@@ -31,11 +32,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const next = await authApi.me();
       if (request !== generation.current) return null;
+      void queryClient.cancelQueries();
       queryClient.clear(); setUserState(next);
       return next;
     } catch (error) {
       if (request !== generation.current) return null;
-      if (error instanceof ApiError && error.status === 401) { queryClient.clear(); setUserState(null); }
+      if (error instanceof ApiError && error.status === 401) {
+        void queryClient.cancelQueries();
+        queryClient.clear(); setUserState(null);
+      }
       else setError(error instanceof Error ? error : new Error(String(error)));
       return null;
     } finally {
@@ -43,8 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient]);
   const signOut = useCallback(async () => {
+    void queryClient.cancelQueries();
     await authApi.logout(); setUser(null);
-  }, [setUser]);
+  }, [queryClient, setUser]);
   useEffect(() => {
     if (/^\/(?:t|tenant)\/[^/]+/.test(window.location.pathname)) { setReady(true); return; }
     void refresh();

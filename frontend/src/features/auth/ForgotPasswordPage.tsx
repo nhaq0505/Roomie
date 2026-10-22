@@ -10,13 +10,35 @@ import { useAuth } from './AuthProvider';
 import PasswordPage from './PasswordPage';
 import { authApi, type PasswordRecoveryChallenge, type PasswordRecoveryGrant } from './index';
 
+const recoveryChallengeStorage = 'roomie.password_recovery.challenge';
+function readStoredRecoveryChallenge(): PasswordRecoveryChallenge | null {
+  try {
+    const raw = sessionStorage.getItem(recoveryChallengeStorage);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PasswordRecoveryChallenge;
+    if (parsed && typeof parsed.challengeToken === 'string' && typeof parsed.email === 'string' &&
+        parsed.expiresAt && new Date(parsed.expiresAt).getTime() > Date.now()) {
+      return parsed;
+    }
+    sessionStorage.removeItem(recoveryChallengeStorage);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ForgotPasswordPage() {
   const [params] = useSearchParams();
+  useEffect(() => {
+    if (params.get('method') === 'admin') {
+      try { sessionStorage.removeItem(recoveryChallengeStorage); } catch {}
+    }
+  }, [params]);
   return params.get('method') === 'admin' ? <PasswordPage reset /> : <EmailPasswordRecovery />;
 }
 
 function EmailPasswordRecovery() {
-  const [challenge, setChallenge] = useState<PasswordRecoveryChallenge | null>(null);
+  const [challenge, setChallenge] = useState<PasswordRecoveryChallenge | null>(readStoredRecoveryChallenge);
   const [grant, setGrant] = useState<PasswordRecoveryGrant | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -45,16 +67,19 @@ function EmailPasswordRecovery() {
   const send = (email: string) => run(async () => {
     const next = await authApi.forgotPassword(email);
     if (!mounted.current) return;
+    try { sessionStorage.setItem(recoveryChallengeStorage, JSON.stringify(next)); } catch {}
     setChallenge(next); setGrant(null); setNow(Date.now()); codeForm.resetFields(); passwordForm.resetFields();
   });
   const verify = ({ code }: { code: string }) => run(async () => {
     const next = await authApi.verifyPasswordRecovery(challenge!.challengeToken, code);
     if (!mounted.current) return;
+    try { sessionStorage.removeItem(recoveryChallengeStorage); } catch {}
     setGrant(next); setNow(Date.now()); codeForm.resetFields();
   });
   const complete = ({ newPassword, confirmPassword }: { newPassword: string; confirmPassword: string }) => run(async () => {
     await authApi.completePasswordRecovery(grant!.resetToken, newPassword, confirmPassword);
     if (!mounted.current) return;
+    try { sessionStorage.removeItem(recoveryChallengeStorage); } catch {}
     setUser(null); setGrant(null); passwordForm.resetFields();
     navigate('/login', { replace: true, state: { notice: t("Đã đổi mật khẩu. Vui lòng đăng nhập lại.") } });
   });
@@ -83,7 +108,7 @@ function EmailPasswordRecovery() {
         <Typography.Paragraph type="secondary">{t("Mã có hiệu lực trong 10 phút. Nếu chưa nhận được, hãy kiểm tra thư rác.")}</Typography.Paragraph>
         <Button className="auth-submit" type="primary" htmlType="submit" block loading={busy} disabled={expired}>{t("Xác minh mã OTP")}</Button>
       </Form>}
-      {challenge && <><Button block style={{ marginTop: 12 }} disabled={busy || wait > 0} onClick={() => void send(challenge.email)}>{wait > 0 ? t("Gửi lại mã sau {0} giây", [wait]) : grant ? t("Yêu cầu mã mới") : t("Gửi lại mã")}</Button><Button block type="link" disabled={busy} onClick={() => { setChallenge(null); setGrant(null); setError(''); codeForm.resetFields(); passwordForm.resetFields(); }}>{t("Đổi địa chỉ email")}</Button></>}
+      {challenge && !grant && <><Button block style={{ marginTop: 12 }} disabled={busy || wait > 0} onClick={() => void send(challenge.email)}>{wait > 0 ? t("Gửi lại mã sau {0} giây", [wait]) : t("Gửi lại mã")}</Button><Button block type="link" disabled={busy} onClick={() => { try { sessionStorage.removeItem(recoveryChallengeStorage); } catch {} setChallenge(null); setGrant(null); setError(''); codeForm.resetFields(); passwordForm.resetFields(); }}>{t("Đổi địa chỉ email")}</Button></>}
       <div className="auth-switch"><Link to="/reset-password?method=admin">{t("Dùng mã do quản trị viên cấp")}</Link></div>
     </div></section>
   </main>;

@@ -1438,3 +1438,26 @@
 1437|Quick electricity meter logging & batch invoice issuance|快速记录电表读数并批量生成账单|신속한 전기 검침 및 청구서 일괄 발행|त्वरित बिजली मीटर रिकॉर्डिंग और थोक चालान जारी करना
 1438|Payment not yet recorded. The system is still checking automatically...|尚未收到付款记录。系统仍在自动检查中...|아직 결제가 확인되지 않았습니다. 시스템에서 계속 자동 확인 중입니다...|भुगतान अभी दर्ज नहीं हुआ है। सिस्टम अभी भी स्वचालित रूप से जाँच कर रहा है...
 1439|Bank|银行|은행|बैंक
+1440|Enter your administrator password to confirm issuing the code.|输入管理员账户密码以确认发放验证码。|코드 발급을 확인하려면 관리자 계정 비밀번호를 입력하세요.|कोड जारी करने की पुष्टि के लिए अपना व्यवस्थापक पासवर्ड दर्ज करें।
+1441|Enter 0 days to grant lifetime Pro access.|输入 0 天以授予无期限专业版。|무제한 Pro 요금제를 부여하려면 0일을 입력하세요.|असीमित प्रो प्लान देने के लिए 0 दिन दर्ज करें।
+1442|Lifetime|无期限|무제한|असीमित
+1443|Payment settings|支付设置|결제 설정|भुगतान सेटिंग्स
+1444|Invoice published.|账单已发布。|청구서가 발행되었습니다.|चालान जारी कर दिया गया है।
+1445|Lock meter readings for {0} room(s)?|确认录入 {0} 间客房的读数？|{0}개 객실의 검침을 완료하시겠습니까?|{0} कमरों के मीटर की रीडिंग दर्ज करें?
+1446|The system will record meter readings and generate invoices for the entered rooms in sequence.|系统将按顺序录入电表读数并为已输入的房间生成账单。|시스템이 입력된 객실의 계량기 수치를 순차적으로 기록하고 청구서를 생성합니다.|सिस्टम दर्ज किए गए कमरों के लिए मीटर रीडिंग रिकॉर्ड करेगा और क्रमिक रूप से चालान तैयार करेगा।
+1447|Finalize entered rooms|批量录入已填房间|입력된 객실 일괄 검침|दर्ज किए गए कमरों को अंतिम रूप दें
+1448|Meter readings recorded and invoices issued for {0} room(s).|已完成 {0} 间客房的抄表并生成账单。|{0}개 객실의 검침 및 청구서 생성을 완료했습니다.|{0} कमरों के मीटर की रीडिंग दर्ज की गई और चालान जारी किए गए।
+1449|An error occurred while finalizing meter readings.|录入客房读数时发生错误。|객실 검침 처리 중 오류가 발생했습니다.|कमरों की मीटर रीडिंग दर्ज करते समय एक त्रुटि हुई।
+1450|Open deposit invoice to deduct|打开押金账单以进行扣除|공제를 위해 보증금 청구서 열기|कटौती के लिए जमा चालान खोलें
+1451|Please configure a receiving account (VietQR or payOS) in Payment Settings before sharing the tenant link.|在向租客提供链接之前，请在支付设置中配置收款账户（VietQR 或 payOS）。|임차인 링크를 제공하기 전에 결제 설정에서 수취 계좌(VietQR 또는 payOS)를 설정해 주세요.|किरायेदार को लिंक देने से पहले कृपया भुगतान सेटिंग्स में खाता (VietQR या payOS) कॉन्फ़िगर करें।
+1452|Please create a property building before adding rooms.|添加房间前请先创建楼宇。|객실을 추가하기 전에 건물을 먼저 생성해 주세요.|कमरा जोड़ने से पहले कृपया एक इमारत बनाएं।
+1453|Automatic reminder schedule saved.|已保存自动提醒计划。|자동 알림 일정이 저장되었습니다.|स्वचालित अनुस्मारक शेड्यूल सहेजा गया।
+1454|Monthly automatic reminder schedule|每月自动提醒日程|월별 자동 알림 일정|मासिक स्वचालित अनुस्मारक शेड्यूल
+1455|Automatically scan unpaid invoices and send reminder messages via Zalo on a periodic schedule.|按周期自动扫描未付款账单并通过 Zalo 发送提醒信息。|정기적으로 미납 청구서를 자동 검사하고 Zalo를 통해 알림 메시지를 전송합니다.|नियमित रूप से अवैतनिक चालानों को स्कैन करें और Zalo के माध्यम से अनुस्मारक संदेश भेजें।
+1456|Enable automatic reminder schedule|启用自动提醒计划|자동 알림 일정 활성화|स्वचालित अनुस्मारक शेड्यूल सक्षम करें
+1457|On|开启|켜짐|चालू
+1458|Off|关闭|꺼짐|बंद
+1459|Day of the month (1 - 28)|每月几号 (1 - 28)|해당 월의 일자 (1 - 28)|महीने का दिन (1 - 28)
+1460|Send hour (7h - 20h)|发送小时 (7h - 20h)|발송 시간 (7시 - 20시)|भेजने का समय (7h - 20h)
+1461|Minute (0 - 59)|分钟 (0 - 59)|분 (0 - 59)|मिनट (0 - 59)
+1462|Save reminder schedule|保存提醒计划|알림 일정 저장|अनुस्मारक शेड्यूल सहेजें

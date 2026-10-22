@@ -11,7 +11,8 @@ import { useAuth } from './AuthProvider';
 import { authApi, type RegistrationVerification } from './index';
 
 const challengeStorage = 'rehouse.registration-verification';
-function readChallenge(): RegistrationVerification | null {
+type StoredRegisterChallenge = RegistrationVerification & { name?: string; phone?: string };
+function readChallenge(): StoredRegisterChallenge | null {
   try {
     const saved = JSON.parse(sessionStorage.getItem(challengeStorage) ?? 'null');
     return saved?.verificationRequired === true && typeof saved.challengeToken === 'string' && saved.challengeToken.length === 64 &&
@@ -25,14 +26,14 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [otpForm] = Form.useForm();
-  const [challenge, setChallenge] = useState<RegistrationVerification | null>(readChallenge);
+  const [challenge, setChallenge] = useState<StoredRegisterChallenge | null>(readChallenge);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!challenge) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [challenge]);
-  const saveChallenge = (next: RegistrationVerification | null) => {
+  const saveChallenge = (next: StoredRegisterChallenge | null) => {
     setChallenge(next); setNow(Date.now());
     try { if (next) sessionStorage.setItem(challengeStorage, JSON.stringify(next)); else sessionStorage.removeItem(challengeStorage); } catch { /* In-memory flow still works. */ }
   };
@@ -53,7 +54,11 @@ export default function RegisterPage() {
   const resend = async () => {
     if (!challenge || busy || resendWait > 0) return;
     setBusy(true); setError('');
-    try { saveChallenge(await authApi.resendRegistration(challenge.challengeToken)); otpForm.resetFields(); }
+    try {
+      const next = await authApi.resendRegistration(challenge.challengeToken);
+      saveChallenge({ ...next, name: challenge.name, phone: challenge.phone });
+      otpForm.resetFields();
+    }
     catch (err) { setError(err instanceof Error ? err.message : t("Không thể gửi lại mã. Vui lòng thử lại.")); }
     finally { setBusy(false); }
   };
@@ -77,7 +82,7 @@ export default function RegisterPage() {
       const registration = await authApi.register({ ...values, attribution });
       if ('verificationRequired' in registration && registration.verificationRequired) {
         form.resetFields(['password']);
-        saveChallenge(registration);
+        saveChallenge({ ...registration, name: values.name, phone: values.phone });
         return;
       }
       accountCreated = true;
@@ -109,7 +114,22 @@ export default function RegisterPage() {
         <Button block style={{ marginTop: 12 }} disabled={busy || resendWait > 0} onClick={() => void resend()}>
           {resendWait > 0 ? t("Gửi lại mã sau {0} giây", [resendWait]) : t("Gửi lại mã")}
         </Button>
-        <Button type="link" block disabled={busy} style={{ marginTop: 8 }} onClick={() => { saveChallenge(null); setError(''); otpForm.resetFields(); }}>{t("Sửa thông tin đăng ký")}</Button>
+        <Button
+          type="link"
+          block
+          disabled={busy}
+          style={{ marginTop: 8 }}
+          onClick={() => {
+            if (challenge) {
+              form.setFieldsValue({ name: challenge.name, phone: challenge.phone, email: challenge.email });
+            }
+            saveChallenge(null);
+            setError('');
+            otpForm.resetFields();
+          }}
+        >
+          {t("Sửa thông tin đăng ký")}
+        </Button>
       </> : <Form form={form} layout="vertical" size="large" onFinish={submit} requiredMark={false}>
         <Form.Item label={t("Tên của bạn")} name="name" rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên.") }]}><Input prefix={<UserOutlined />} placeholder={t("Nguyễn Minh Anh")} autoComplete="name" /></Form.Item>
         <Form.Item label={t("Số điện thoại")} name="phone" rules={[{ required: true, message: t("Vui lòng nhập số điện thoại.") }]}><Input prefix={<PhoneOutlined />} placeholder="09xx xxx xxx" autoComplete="tel" /></Form.Item>

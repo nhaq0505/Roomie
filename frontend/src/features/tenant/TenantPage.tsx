@@ -1,7 +1,7 @@
 import { ArrowRightOutlined, CheckCircleFilled, CreditCardOutlined, FileTextOutlined, HomeOutlined, LockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Alert, App, Button, Card, Collapse, Pagination, Result, Skeleton, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { formatVnd, periodLabel } from '../../shared/format';
 import { errorText } from '../../shared/i18n/errors';
@@ -66,6 +66,18 @@ function TenantPageContent({ token }: { token: string }) {
     onError: (error: Error) => message.error(error.message),
   });
 
+  const hasAutoReconciledRef = useRef(false);
+  useEffect(() => {
+    if (hasAutoReconciledRef.current) return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('payment') !== 'returned') return;
+    const pendingInvoice = query.data?.invoices?.find((inv) => inv.hasPendingPayment);
+    if (pendingInvoice) {
+      hasAutoReconciledRef.current = true;
+      reconcileMutation.mutate(pendingInvoice.id);
+    }
+  }, [location.search, query.data, reconcileMutation]);
+
   if (query.isPending) return <div className="tenant-page"><TenantBrand /><div className="tenant-loading"><Skeleton active paragraph={{ rows: 8 }} /></div></div>;
   const pageAccessError = query.isError && isTenantAccessError(query.error) ? { status: httpStatus(query.error), message: query.error.message } : null;
   if (pageAccessError || query.isError && !query.data) {
@@ -75,6 +87,8 @@ function TenantPageContent({ token }: { token: string }) {
   const overview = query.data;
   const invoices = [...(overview?.invoices ?? [])].sort((a, b) => b.period.localeCompare(a.period));
   const outstanding = overview?.totals.outstanding ?? 0;
+  const unpaidInvoices = invoices.filter((inv) => inv.outstanding > 0);
+  const showPayAll = outstanding > 0 && unpaidInvoices.length > 1;
   const searchParams = new URLSearchParams(window.location.search || location.search);
   const invoicePath = location.pathname.startsWith('/tenant/') ? '/tenant' : '/t';
   const tenantPath = `${invoicePath}/${encodeURIComponent(token)}`;
@@ -88,7 +102,7 @@ function TenantPageContent({ token }: { token: string }) {
       {query.isError && query.data && !isTenantAccessError(query.error) && <Alert className="tenant-payment-error" type="warning" showIcon message={t("Đã có lỗi khi tải dữ liệu.")} description={errorText(query.error.message)} action={<Button size="small" onClick={() => void query.refetch()}>{t("Thử lại")}</Button>} />}
       {searchParams.get('payment') === 'returned' && <Alert className="tenant-payment-error" type="info" showIcon message={t("Đang xác minh thanh toán")} description={t("Khoản thanh toán sẽ được cập nhật sau khi payOS xác nhận giao dịch. Làm mới hóa đơn để kiểm tra trạng thái mới nhất.")} action={<Button size="small" onClick={() => void query.refetch()}>{t("Làm mới")}</Button>} />}
       {searchParams.get('payment') === 'cancelled' && <Alert className="tenant-payment-error" type="info" showIcon message={t("Bạn đã quay lại từ trang thanh toán")} description={t("Hóa đơn vẫn hiển thị số dư hiện tại. Bạn có thể thử thanh toán lại khi sẵn sàng.")} />}
-      {outstanding > 0 && <Button className="tenant-pay-all" type="primary" block onClick={() => openCheckout('all')}>{t("Thanh toán tất cả")}</Button>}
+      {showPayAll && <Button className="tenant-pay-all" type="primary" block onClick={() => openCheckout('all')}>{t("Thanh toán tất cả")}</Button>}
       <div className="tenant-section-heading"><div><Typography.Title level={4}>{t("Hóa đơn của bạn")}</Typography.Title><span>{t("Tiền cọc, hóa đơn tháng và khoản thu bổ sung được theo dõi riêng.")}</span></div><span className="tenant-count">{overview?.total ?? 0}  {t("hóa đơn")}</span></div>
       <Pagination current={page} total={overview?.total ?? 0} pageSize={10} onChange={setPage} showSizeChanger={false} hideOnSinglePage />
       {invoices.length ? <div className="tenant-invoice-list">{invoices.map((invoice) => <TenantInvoice key={invoice.id} invoice={invoice} busy={openingInvoiceId === invoice.id} paymentDisabled={false} reconciling={reconcileMutation.isPending && reconcileMutation.variables === invoice.id} onPay={() => openCheckout(invoice.id)} onReconcile={() => reconcileMutation.mutate(invoice.id)} />)}</div> : <Card className="tenant-empty" bordered={false}><FileTextOutlined /><strong>{t("Chưa có hóa đơn")}</strong><span>{t("Hóa đơn mới sẽ xuất hiện ở đây sau khi chủ trọ hoàn tất chốt kỳ.")}</span></Card>}

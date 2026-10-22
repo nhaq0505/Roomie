@@ -90,11 +90,17 @@ public static class PaymentEndpoints
             var totals = new { outstanding = await QueryAggregates.SumMoneyAsync(db, invoiceQuery.Select(x => x.Total - x.Paid), cancellationToken), unpaidCount = await invoiceQuery.CountAsync(x => x.Total > x.Paid, cancellationToken) };
             var invoices = await invoiceQuery.OrderByDescending(x => x.Period).ThenByDescending(x => x.IssuedAt).ThenBy(x => x.Id)
                 .Skip(paging.Offset).Take(paging.Size).ToListAsync(cancellationToken);
+            var rowIds = invoices.Select(x => x.Id).ToList();
+            var pendingIds = await PaymentReservations.Pending(db)
+                .Where(x => x.OwnerId == roomBuilding.Building.OwnerId && rowIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+            var pending = pendingIds.ToHashSet();
             var occupancyDto = roomDto.Occupancy ?? throw new ApiException(StatusCodes.Status404NotFound, "Tenant link is no longer active.");
             var paymentSettings = await webhookService.GetAsync(roomBuilding.Building.OwnerId, cancellationToken);
             if (milestoneTracker != null)
                 await milestoneTracker.RecordOwnerActivityAsync(roomBuilding.Building.OwnerId, ActorType.System, "TenantPortalOpen", cancellationToken);
-            return Results.Ok(new { confirmationMode = paymentSettings.ConfirmationMode, room = roomDto, occupancy = occupancyDto, invoices = invoices.Select(invoice => InvoiceService.ToDto(invoice)).ToList(), total, totals, page = paging.Number, pageSize = paging.Size });
+            return Results.Ok(new { confirmationMode = paymentSettings.ConfirmationMode, room = roomDto, occupancy = occupancyDto, invoices = invoices.Select(invoice => InvoiceService.ToDto(invoice, pending.Contains(invoice.Id))).ToList(), total, totals, page = paging.Number, pageSize = paging.Size });
         });
 
         app.MapPost("/api/tenant/{token}/payment", async (string token, AppDbContext db, PayOsService service, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default) => {
@@ -132,7 +138,8 @@ public static class PaymentEndpoints
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found for this tenant.");
             var status = await payOsService.ReconcileInvoiceAsync(invoice.OwnerId, invoice.Id, cancellationToken);
             var refreshed = await db.Invoices.Include(x => x.DepositSettlements).AsNoTracking().SingleAsync(row => row.Id == invoice.Id, cancellationToken);
-            return Results.Ok(new { status, invoice = InvoiceService.ToDto(refreshed) });
+            var isPending = await PaymentReservations.Pending(db).AnyAsync(x => x.OwnerId == invoice.OwnerId && x.Id == refreshed.Id, cancellationToken);
+            return Results.Ok(new { status, invoice = InvoiceService.ToDto(refreshed, isPending) });
         }).RequireRateLimiting("tenant-payment");
 
         app.MapPost("/api/payments/webhook/{ownerId:guid}", async (Guid ownerId, HttpRequest request, PayOsService payOsService, [FromServices] IMemoryCache? cache, CancellationToken cancellationToken) =>

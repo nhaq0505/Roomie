@@ -1,17 +1,48 @@
 import { statusLabel, statusClass } from './presentation';
 import { CheckCircleFilled, CreditCardOutlined, FileTextOutlined, MessageOutlined, WalletOutlined } from '@ant-design/icons';
-import { Alert, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Tag, Typography } from 'antd';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { formatVnd, periodLabel } from '../../shared/format';
 import { dateFormat, formatDate, t } from '../../shared/i18n/runtime';
 import MoneyInput from '../../shared/ui/MoneyInput';
 import { LoadError } from '../../shared/ui/Ui';
 import DepositLedger from './DepositLedger';
-import { type Invoice, type InvoiceCorrection } from './index';
+import { invoicesApi, type Invoice, type InvoiceCorrection } from './index';
 import type { useInvoicesPage } from './useInvoicesPage';
 
 export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useInvoicesPage> }) {
+  const { message } = App.useApp();
+  const client = useQueryClient();
   const { adjustmentExpanded, setAdjustmentExpanded, selectedId, receiptForm, correctionForm, detailQuery, reconcileMutation, receiptMutation, invoice, correctionQuery, correctionMutation, confirmReceipt, closeInvoice, confirmCorrection, adjustmentBlockedReason, hasMonthlyOverlap, copyReminderMessage } = state;
+
+  const publishMutation = useMutation({
+    mutationFn: async (targetInvoice: Invoice) => {
+      const requestId = crypto.randomUUID();
+      const fn = (invoicesApi as { publish?: (id: string, reqId: string) => Promise<unknown> }).publish;
+      if (typeof fn === 'function') {
+        return fn(targetInvoice.id, requestId);
+      }
+      return invoicesApi.publishDraft(targetInvoice.id, {
+        expectedVersion: targetInvoice.version ?? 0,
+        requestId,
+        rent: targetInvoice.rent,
+        electricityAmount: targetInvoice.electricityAmount,
+        waterAmount: targetInvoice.waterAmount,
+        serviceAmount: targetInvoice.serviceAmount,
+      });
+    },
+    onSuccess: async (_, targetInvoice) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['invoices'] }),
+        client.invalidateQueries({ queryKey: ['invoice', targetInvoice.id] }),
+        client.invalidateQueries({ queryKey: ['readings'] }),
+        client.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      message.success(t("Đã phát hành hóa đơn"));
+    },
+    onError: (e: Error) => message.error(e.message),
+  });
   return (
     <Drawer className="invoice-drawer" title={t("Chi tiết hóa đơn")} width={520} open={!!selectedId} onClose={closeInvoice} destroyOnClose>
       {detailQuery.isPending ? <div className="drawer-loading"><div className="loading-placeholder" /></div> : detailQuery.isError ? <LoadError error={detailQuery.error} onRetry={() => void detailQuery.refetch()} /> : invoice && <>
@@ -29,7 +60,12 @@ export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useI
           </div>
         )}
         {invoice.kind === 'Supplemental' ? <div className="invoice-breakdown"><div><span>{t("Nội dung")}</span><strong style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{invoice.description}</strong></div>{invoice.isFinalMeterReading && <><div><span>{t("Điện cuối kỳ ·")} {invoice.previousReading} → {invoice.currentReading} kWh</span><strong>{formatVnd(invoice.electricityAmount)}</strong></div><div><span>{t("Khoản còn lại")}</span><strong>{formatVnd(invoice.serviceAmount)}</strong></div></>}<div className="breakdown-total"><span>{t("Số tiền")}</span><strong>{formatVnd(invoice.total)}</strong></div></div> : invoice.kind === 'Deposit' ? <div className="invoice-breakdown"><div className="breakdown-total"><span>{t("Tiền cọc yêu cầu")}</span><strong>{formatVnd(invoice.total)}</strong></div></div> : <div className="invoice-breakdown"><div><span>{t("Tiền thuê phòng")}</span><strong>{formatVnd(invoice.rent)}</strong></div><div><span>{t("Tiền điện")} <small>{invoice.consumption} kWh · {invoice.previousReading} → {invoice.currentReading}</small></span><strong>{formatVnd(invoice.electricityAmount)}</strong></div><div><span>{t("Tiền nước")}</span><strong>{formatVnd(invoice.waterAmount)}</strong></div><div><span>{t("Phí dịch vụ")}</span><strong>{formatVnd(invoice.serviceAmount)}</strong></div><div className="breakdown-total"><span>{t("Tổng hóa đơn")}</span><strong>{formatVnd(invoice.total)}</strong></div></div>}
-        {invoice.lifecycleState === 'Draft' ? <Alert type="warning" showIcon message={t("Bản nháp chưa gửi cho khách")} description={t("Bản nháp chưa có trạng thái thanh toán. Mở trang Lập hóa đơn để chỉnh và phát hành.")} /> : <>
+        {invoice.lifecycleState === 'Draft' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+            <Alert type="warning" showIcon message={t("Bản nháp chưa gửi cho khách")} description={t("Bản nháp chưa có trạng thái thanh toán. Mở trang Lập hóa đơn để chỉnh và phát hành.")} />
+            <Button type="primary" loading={publishMutation.isPending} onClick={() => publishMutation.mutate(invoice)}>{t("Phát hành hóa đơn")}</Button>
+          </div>
+        ) : <>
           <div className="invoice-balance-box"><div><span>{t("Đã ghi nhận")}</span><strong>{formatVnd(invoice.paid)}</strong></div><div><span>{t("Còn phải thu")}</span><strong className={invoice.outstanding > 0 ? 'balance-due' : 'balance-clear'}>{formatVnd(invoice.outstanding)}</strong></div>{invoice.dueDate && <span className="due-date-note">{t("Hạn thanh toán:")} {dayjs(invoice.dueDate).format(dateFormat())}</span>}</div>
           {invoice.outstanding > 0 && <div className="receipt-form-block"><div className="receipt-form-title"><CreditCardOutlined /><div><strong>{t("Đối soát thanh toán payOS")}</strong><span>{t("Xem trạng thái thanh toán trực tuyến của hóa đơn.")}</span></div></div><Button block loading={reconcileMutation.isPending && reconcileMutation.variables === invoice.id} onClick={() => reconcileMutation.mutate(invoice.id)}>{t("Kiểm tra giao dịch payOS")}</Button></div>}
           {invoice.outstanding > 0 ? <div className="receipt-form-block"><div className="receipt-form-title"><WalletOutlined /><div><strong>{t("Ghi nhận khoản thu")}</strong><span>{invoice.hasPendingPayment ? t("Link payOS đang chờ sẽ được tự động kiểm tra và hủy khi ghi nhận khoản thu ngoài.") : t("Tiền mặt hoặc chuyển khoản đã nhận bên ngoài.")}</span></div></div><Form form={receiptForm} layout="vertical" requiredMark={false} onFinish={confirmReceipt}><Typography.Paragraph><strong>{t("Số tiền nhận")}: {formatVnd(invoice.outstanding)}</strong></Typography.Paragraph><Form.Item label={t("Ghi chú")} name="note"><Input placeholder={t("Ví dụ: Chuyển khoản ngày 12/10")} maxLength={200} /></Form.Item><Button type="primary" block htmlType="submit" loading={receiptMutation.isPending}>{t("Lưu khoản thu")}</Button></Form></div> : <div className="invoice-paid-note"><CheckCircleFilled /> {t("Hóa đơn đã được thanh toán đầy đủ.")}</div>}

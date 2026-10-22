@@ -55,7 +55,21 @@ export function useRoomsPage() {
   const archiveMutation = useMutation({ mutationFn: roomsApi.archive, onSuccess: async () => { await refreshData(); message.success(t("Đã lưu trữ phòng. Lịch sử và hóa đơn vẫn được giữ.")); }, onError: (error: Error) => message.error(error.message) });
   const restoreMutation = useMutation({ mutationFn: roomsApi.restore, onSuccess: async () => { await refreshData(); message.success(t("Đã khôi phục phòng.")); }, onError: (error: Error) => message.error(error.message) });
 
-  const rotateMutation = useMutation({ mutationFn: roomsApi.rotateLink, onSuccess: (result, id) => { setLinkInfo((prev) => ({ ...result, room: roomsQuery.data?.find((room) => room.id === id) ?? prev?.room, newlyIssued: true })); void refreshData(); }, onError: (e: Error) => message.error(e.message) });
+  const rotateMutation = useMutation({
+    mutationFn: roomsApi.rotateLink,
+    onSuccess: (result, id) => {
+      setLinkInfo((prev) => ({ ...result, room: roomsQuery.data?.find((room) => room.id === id) ?? prev?.room, newlyIssued: true }));
+      void refreshData();
+    },
+    onError: (e: Error) => {
+      const msg = e.message || '';
+      if (/thiết lập thanh toán|payos/i.test(msg)) {
+        message.error(t("Vui lòng thiết lập tài khoản nhận tiền (VietQR hoặc payOS) tại mục Cài đặt thanh toán trước khi cấp link cho khách."));
+      } else {
+        message.error(msg);
+      }
+    },
+  });
 
   const isPro = subQuery.data?.isPro ?? false;
   const maxRooms = subQuery.data?.maxRooms ?? 5;
@@ -102,7 +116,7 @@ export function useRoomsPage() {
     roomForm.setFieldsValue({ buildingId: room.buildingId, name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee });
     setMode('duplicate');
   };
-  const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee }); setMode('settings'); };
+  const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.resetFields(); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee }); setMode('settings'); };
   const openOccupancy = (room: Room) => { setSelectedRoom(room); occupancyForm.resetFields(); occupancyForm.setFieldsValue({ people: 1, startDate: dayjs(), depositAmount: 0, initialReading: room.previousReading ?? room.initialReading ?? 0 }); setMode('occupancy'); };
 
   const getActions = (room: Room): MenuProps['items'] => [
@@ -138,7 +152,26 @@ export function useRoomsPage() {
       rotateMutation.mutate(room.id);
     }
   };
-  useEffect(() => { if (searchParams.get('create') === '1' && buildingsQuery.isSuccess && buildingsQuery.data.length > 0) { openCreate(); const next = new URLSearchParams(searchParams); next.delete('create'); setSearchParams(next, { replace: true }); } else if (searchParams.get('links') === '1') { setStatusFilter('occupied'); const next = new URLSearchParams(searchParams); next.delete('links'); setSearchParams(next, { replace: true }); } }, [searchParams, buildingsQuery.isSuccess]);
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && buildingsQuery.isSuccess) {
+      if (buildingsQuery.data.length > 0) {
+        openCreate();
+        const next = new URLSearchParams(searchParams);
+        next.delete('create');
+        setSearchParams(next, { replace: true });
+      } else {
+        message.info(t("Vui lòng tạo dãy trọ trước khi thêm phòng."));
+        const next = new URLSearchParams(searchParams);
+        next.delete('create');
+        setSearchParams(next, { replace: true });
+      }
+    } else if (searchParams.get('links') === '1') {
+      setStatusFilter('occupied');
+      const next = new URLSearchParams(searchParams);
+      next.delete('links');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, buildingsQuery.isSuccess, buildingsQuery.data]);
 
   const roomStatus = (room: Room) => room.isArchived ? <Tag className="archived-state-tag">{t("Đã lưu trữ")}</Tag> : <Tag className={`room-state ${room.occupancy ? 'room-state-occupied' : 'room-state-vacant'}`}>{room.occupancy ? t("Đang thuê") : t("Còn trống")}</Tag>;
   const roomActions = (room: Room) => <div className="room-actions">

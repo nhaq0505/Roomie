@@ -181,6 +181,7 @@ export default function AdminMonitoringPage() {
             void incidentsQuery.refetch();
           }}
           onUpdateIncidentState={handleUpdateIncident}
+          isUpdatingIncident={updateIncidentMutation.isPending}
         />
       ),
     },

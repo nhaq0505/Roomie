@@ -27,7 +27,13 @@ export default function DepositLedger({ invoice }: { invoice: Invoice }) {
       await Promise.all(['invoice', 'invoices', 'rooms', 'dashboard', 'moveout', 'manual-payments', 'reports'].map(key => client.invalidateQueries({ queryKey: [key] })));
       message.success(t("Đã ghi nhận quyết toán cọc."));
     },
-    onError: (error: Error) => message.error(error.message),
+    onError: async (error: Error) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['invoices', 'deposit-targets', invoice.occupancyId] }),
+        client.invalidateQueries({ queryKey: ['invoice', invoice.id] }),
+      ]);
+      message.error(error.message);
+    },
   });
   const submit = (values: Values) => {
     const payload = { ...values, reason: values.reason.trim(), targetInvoiceId: values.kind === 'Deduction' ? values.targetInvoiceId : undefined };

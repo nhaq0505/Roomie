@@ -42,6 +42,7 @@ export default function MoveoutDrawer({ room, onClose }: { room: Room; onClose: 
   const completionRequests = useRef(new Map<string, string>());
   const data = query.data;
   const depositInvoice = data?.invoices.find((invoice) => invoice.kind === 'Deposit');
+  const depositInvoiceId = data?.deposit?.invoiceId ?? (data?.deposit as { depositInvoiceId?: string } | null)?.depositInvoiceId ?? depositInvoice?.id;
   const held = data?.deposit?.held ?? data?.heldDeposit ?? depositInvoice?.depositHeld ?? 0;
   const depositRequired = data?.deposit?.required ?? depositInvoice?.total ?? 0;
   const depositPaid = data?.deposit?.paid ?? depositInvoice?.paid ?? 0;
@@ -138,7 +139,14 @@ export default function MoveoutDrawer({ room, onClose }: { room: Room; onClose: 
       </div>
 
       {hasPending && <Alert className="moveout-block-alert" type="warning" showIcon message={t("Có giao dịch thanh toán đang chờ")} description={t("Đối soát giao dịch trong hóa đơn tương ứng trước khi kết thúc lượt thuê. Mở hóa đơn bên dưới để kiểm tra.")} />}
-      {hasDebt && <Alert className="moveout-block-alert" type="warning" showIcon message={t("Còn hóa đơn chưa thanh toán")} description={t("Hãy xử lý công nợ trong hóa đơn tương ứng trước khi kết thúc lượt thuê. Hệ thống không tự khấu trừ tiền cọc vào công nợ ở màn này.")} />}
+      {hasDebt && <Alert className="moveout-block-alert" type="warning" showIcon message={t("Còn hóa đơn chưa thanh toán")} description={<>
+        <p>{t("Hãy xử lý công nợ trong hóa đơn tương ứng trước khi kết thúc lượt thuê. Hệ thống không tự khấu trừ tiền cọc vào công nợ ở màn này.")}</p>
+        {held > 0 && depositInvoiceId && (
+          <Button size="small" type="primary" ghost style={{ marginTop: 8 }} onClick={() => { onClose(); navigate(`/invoices?invoice=${depositInvoiceId}`); }}>
+            {t("Mở hóa đơn cọc để khấu trừ")}
+          </Button>
+        )}
+      </>} />}
       {hasDraft && <Alert className="moveout-block-alert" type="warning" showIcon message={t("Còn bản nháp chưa phát hành")} description={t("Xử lý bản nháp trên trang hóa đơn rồi tải lại quyết toán trước khi kết thúc lượt thuê.")} />}
       {showFallbackBlock && <Alert className="moveout-block-alert" type="warning" showIcon message={t("Chưa thể kết thúc lượt thuê")} description={data.blockedReason || fallbackBlockMessage(data, hasDebt, hasPending, hasDraft)} />}
 

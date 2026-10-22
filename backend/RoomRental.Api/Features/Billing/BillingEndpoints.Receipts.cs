@@ -19,7 +19,8 @@ public static partial class BillingEndpoints
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Invoice was not found.");
             var status = await payOsService.ReconcileInvoiceAsync(ownerId, invoice.Id, cancellationToken);
             var refreshed = await db.Invoices.Include(x => x.DepositSettlements).AsNoTracking().SingleAsync(row => row.Id == invoice.Id, cancellationToken);
-            return Results.Ok(new { status, invoice = InvoiceService.ToDto(refreshed) });
+            var isPending = await PaymentReservations.Pending(db).AnyAsync(x => x.OwnerId == ownerId && x.Id == refreshed.Id, cancellationToken);
+            return Results.Ok(new { status, invoice = InvoiceService.ToDto(refreshed, isPending) });
         }).RequireRateLimiting("tenant-payment");
 
         routes.MapPost("/invoices/{id:guid}/receipts", async (Guid id, ReceiptRequest request, HttpContext context,

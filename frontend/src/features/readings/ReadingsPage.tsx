@@ -1,7 +1,7 @@
 import { CheckCircleFilled, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Tag, Typography } from 'antd';
+import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
@@ -26,6 +26,8 @@ export default function ReadingsPage() {
   const [drafts, setDrafts] = useState<Record<string, number | null>>({});
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [draftForm] = Form.useForm<DraftAmounts>();
+  const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
+  const [isBatchSaving, setIsBatchSaving] = useState(false);
   const publishKeys = useRef(new Map<string, string>());
   const roomsQuery = useQuery({ queryKey: ['rooms', period], queryFn: () => roomsApi.list(period) });
   const readingsQuery = useQuery({ queryKey: ['readings', period], queryFn: () => readingsApi.list(period) });
@@ -37,6 +39,32 @@ export default function ReadingsPage() {
       saved: (readingsQuery.data ?? []).find((reading) => reading.roomId === room.id && reading.occupancyId === room.occupancy?.id),
       draftInvoice: (invoicesQuery.data ?? []).find((invoice) => invoice.kind === 'Monthly' && invoice.roomId === room.id && invoice.period === period && invoice.lifecycleState === 'Draft' && invoice.occupancyId === room.occupancy?.id),
     })), [roomsQuery.data, readingsQuery.data, invoicesQuery.data, period]);
+
+  const buildingOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) {
+      if (r.room.buildingId) {
+        map.set(r.room.buildingId, r.room.buildingName || t("Dãy trọ"));
+      }
+    }
+    return [
+      { value: 'all', label: t("Tất cả dãy trọ") },
+      ...Array.from(map.entries()).map(([id, name]) => ({ value: id, label: name })),
+    ];
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    if (selectedBuilding === 'all') return rows;
+    return rows.filter((r) => r.room.buildingId === selectedBuilding);
+  }, [rows, selectedBuilding]);
+
+  const validBatchRooms = useMemo(() => {
+    return filteredRows.filter((r) => {
+      const initialValue = r.room.previousReading ?? r.room.initialReading ?? 0;
+      const draftVal = drafts[r.room.id];
+      return draftVal !== undefined && draftVal !== null && draftVal >= initialValue && !r.saved?.invoiceId && r.saved?.currentReading === undefined && !r.draftInvoice;
+    });
+  }, [filteredRows, drafts]);
   const prevPeriodRef = useRef(period);
   useEffect(() => {
     if (prevPeriodRef.current !== period) {
@@ -145,9 +173,46 @@ export default function ReadingsPage() {
       );
     } },
   ];
+  const handleBatchSave = () => {
+    if (validBatchRooms.length === 0) return;
+    modal.confirm({
+      title: t("Chốt chỉ số cho {0} phòng?", [validBatchRooms.length]),
+      content: t("Hệ thống sẽ lần lượt chốt chỉ số điện và lập hóa đơn cho các phòng đã nhập."),
+      okText: t("Chốt các phòng đã nhập"),
+      cancelText: t("Kiểm tra lại"),
+      onOk: async () => {
+        setIsBatchSaving(true);
+        let successCount = 0;
+        try {
+          for (const r of validBatchRooms) {
+            const currentReading = drafts[r.room.id]!;
+            await readingsApi.save({ roomId: r.room.id, period, currentReading });
+            successCount++;
+          }
+          await Promise.all([
+            client.invalidateQueries({ queryKey: ['readings', period] }),
+            client.invalidateQueries({ queryKey: ['invoices'] }),
+            client.invalidateQueries({ queryKey: ['dashboard'] }),
+            client.invalidateQueries({ queryKey: ['rooms'] }),
+          ]);
+          message.success(t("Đã chốt chỉ số và lập hóa đơn cho {0} phòng.", [successCount]));
+        } catch (error: unknown) {
+          await Promise.all([
+            client.invalidateQueries({ queryKey: ['readings', period] }),
+            client.invalidateQueries({ queryKey: ['invoices'] }),
+            client.invalidateQueries({ queryKey: ['dashboard'] }),
+          ]);
+          message.error(error instanceof Error ? error.message : t("Có lỗi khi chốt chỉ số các phòng."));
+        } finally {
+          setIsBatchSaving(false);
+        }
+      },
+    });
+  };
+
   const setMonth = (value: Dayjs | null) => { if (value) setPeriod(value.format('YYYY-MM')); };
-  const occupied = rows.length;
-  const done = rows.filter((row) => row.saved?.currentReading !== undefined).length;
+  const occupied = filteredRows.length;
+  const done = filteredRows.filter((row) => row.saved?.currentReading !== undefined).length;
   const draftSessionAmounts = Form.useWatch([], draftForm) as DraftAmounts | undefined;
   const draftTotal = (draftSessionAmounts?.rent ?? draftSession?.invoice.rent ?? 0) +
     (draftSessionAmounts?.electricityAmount ?? draftSession?.invoice.electricityAmount ?? 0) +
@@ -155,13 +220,46 @@ export default function ReadingsPage() {
     (draftSessionAmounts?.serviceAmount ?? draftSession?.invoice.serviceAmount ?? 0);
 
   return <>
-    <PageTitle eyebrow={t("CHỐT SỐ ĐIỆN HÀNG THÁNG")} title={t("Lập hóa đơn")} subtitle={t("Ghi nhận chỉ số cuối kỳ. Hóa đơn sẽ được lập ngay sau khi bạn chốt.")} extra={<DatePicker aria-label={t("Tháng ghi chỉ số")} picker="month" value={dayjs(`${period}-01`)} onChange={setMonth} format="MM/YYYY" maxDate={dayjs(`${currentPeriod()}-01`)} allowClear={false} />} />
+    <PageTitle
+      eyebrow={t("CHỐT SỐ ĐIỆN HÀNG THÁNG")}
+      title={t("Lập hóa đơn")}
+      subtitle={t("Ghi nhận chỉ số cuối kỳ. Hóa đơn sẽ được lập ngay sau khi bạn chốt.")}
+      extra={
+        <Space wrap>
+          <Select
+            aria-label={t("Lọc theo dãy trọ")}
+            style={{ minWidth: 160 }}
+            value={selectedBuilding}
+            onChange={setSelectedBuilding}
+            options={buildingOptions}
+          />
+          <DatePicker
+            aria-label={t("Tháng ghi chỉ số")}
+            picker="month"
+            value={dayjs(`${period}-01`)}
+            onChange={setMonth}
+            format="MM/YYYY"
+            maxDate={dayjs(`${currentPeriod()}-01`)}
+            allowClear={false}
+          />
+          {validBatchRooms.length > 0 && (
+            <Button
+              type="primary"
+              loading={isBatchSaving}
+              onClick={handleBatchSave}
+            >
+              {t("Chốt các phòng đã nhập")}
+            </Button>
+          )}
+        </Space>
+      }
+    />
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : readingsQuery.isError ? <LoadError error={readingsQuery.error} onRetry={() => void readingsQuery.refetch()} /> : invoicesQuery.isError ? <LoadError error={invoicesQuery.error} onRetry={() => void invoicesQuery.refetch()} /> : roomsQuery.isPending || readingsQuery.isPending || invoicesQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
       <div className="reading-progress-card"><div className="reading-progress-mark"><InfoCircleOutlined /></div><div className="reading-progress-copy"><strong>{periodLabel(period)} <span>·</span> {done}/{occupied} {t("phòng đã chốt")}</strong><span>{t("Chỉ số trước được lấy từ lần ghi gần nhất hoặc lúc tạo phòng.")}</span></div><div className="reading-progress-meter"><div style={{ width: `${occupied ? (done / occupied) * 100 : 0}%` }} /></div></div>
       <SectionCard className="reading-section" title={t("Danh sách phòng đang thuê")} extra={<span className="section-caption">{periodLabel(period)}</span>}>
         <div className="reading-notice"><InfoCircleOutlined /><span><strong>{t("Tiền thuê tính đủ theo tháng")}</strong> {t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê.")}</span></div>
-        {rows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={rows} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
-        {rows.length > 0 && done === rows.length && <div className="all-readings-done"><CheckCircleFilled /> {t("Tất cả phòng đang thuê đã có hóa đơn cho kỳ này.")}</div>}
+        {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
+        {filteredRows.length > 0 && done === filteredRows.length && <div className="all-readings-done"><CheckCircleFilled /> {t("Tất cả phòng đang thuê đã có hóa đơn cho kỳ này.")}</div>}
       </SectionCard>
     </>}
     <Modal className="legacy-draft-modal" title={t("Xem và phát hành bản nháp cũ")} open={!!draftSession} onCancel={() => { if (!publishMutation.isPending) setDraftSession(null); }} footer={null} confirmLoading={publishMutation.isPending} width={620} destroyOnClose>

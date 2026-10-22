@@ -24,7 +24,7 @@ export function UtmLinkBuilderModal({ open, onClose }: UtmLinkBuilderModalProps)
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://roomie.vn';
     if (baseUrlPreset === 'landing') return `${origin}/`;
     if (baseUrlPreset === 'register') return `${origin}/register`;
-    if (baseUrlPreset === 'pricing') return `${origin}/pricing`;
+    if (baseUrlPreset === 'pricing') return `${origin}/#pricing`;
     return customBaseUrl.trim() || `${origin}/`;
   }, [baseUrlPreset, customBaseUrl]);
 
