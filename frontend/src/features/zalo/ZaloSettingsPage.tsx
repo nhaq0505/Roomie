@@ -73,7 +73,6 @@ export default function ZaloSettingsPage() {
 
   const saveSettings = useMutation({
     mutationFn: async (body: { scheduleEnabled: boolean; dayOfMonth: number; hour: number; minute: number }) => {
-      const fn = (zaloApi as { updateSettings?: (b: unknown) => Promise<unknown>; save: (b: unknown) => Promise<unknown> }).updateSettings ?? zaloApi.save;
       const current = settings.data ?? {
         scheduleEnabled: false,
         dayOfMonth: 25,
@@ -84,7 +83,7 @@ export default function ZaloSettingsPage() {
         bankAccountName: '',
         gatewayEnabled: false,
       };
-      return fn({
+      return zaloApi.save({
         ...current,
         ...body,
       });
@@ -130,7 +129,7 @@ export default function ZaloSettingsPage() {
               <Switch checked={scheduleEnabled} onChange={setScheduleEnabled} checkedChildren={t("Bật")} unCheckedChildren={t("Tắt")} />
             </Form.Item>
             <Form.Item label={t("Ngày trong tháng (1 - 28)")}>
-              <InputNumber min={1} max={28} value={dayOfMonth} onChange={(val) => val != null && setDayOfMonth(val)} style={{ width: 140 }} />
+              <InputNumber min={1} max={31} value={dayOfMonth} onChange={(val) => val != null && setDayOfMonth(val)} style={{ width: 140 }} />
             </Form.Item>
             <Space wrap size="large">
               <Form.Item label={t("Giờ gửi (7h - 20h)")}>

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { statusLabel, statusClass } from './presentation';
 import { CheckCircleFilled, CreditCardOutlined, FileTextOutlined, MessageOutlined, WalletOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,17 +13,13 @@ import { invoicesApi, type Invoice, type InvoiceCorrection } from './index';
 import type { useInvoicesPage } from './useInvoicesPage';
 
 export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useInvoicesPage> }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const client = useQueryClient();
+  const publishKeys = useRef(new Map<string, string>());
   const { adjustmentExpanded, setAdjustmentExpanded, selectedId, receiptForm, correctionForm, detailQuery, reconcileMutation, receiptMutation, invoice, correctionQuery, correctionMutation, confirmReceipt, closeInvoice, confirmCorrection, adjustmentBlockedReason, hasMonthlyOverlap, copyReminderMessage } = state;
 
   const publishMutation = useMutation({
-    mutationFn: async (targetInvoice: Invoice) => {
-      const requestId = crypto.randomUUID();
-      const fn = (invoicesApi as { publish?: (id: string, reqId: string) => Promise<unknown> }).publish;
-      if (typeof fn === 'function') {
-        return fn(targetInvoice.id, requestId);
-      }
+    mutationFn: async ({ invoice: targetInvoice, requestId }: { invoice: Invoice; requestId: string; key: string }) => {
       return invoicesApi.publishDraft(targetInvoice.id, {
         expectedVersion: targetInvoice.version ?? 0,
         requestId,
@@ -32,10 +29,11 @@ export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useI
         serviceAmount: targetInvoice.serviceAmount,
       });
     },
-    onSuccess: async (_, targetInvoice) => {
+    onSuccess: async (_, variables) => {
+      publishKeys.current.delete(variables.key);
       await Promise.all([
         client.invalidateQueries({ queryKey: ['invoices'] }),
-        client.invalidateQueries({ queryKey: ['invoice', targetInvoice.id] }),
+        client.invalidateQueries({ queryKey: ['invoice', variables.invoice.id] }),
         client.invalidateQueries({ queryKey: ['readings'] }),
         client.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
@@ -43,6 +41,22 @@ export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useI
     },
     onError: (e: Error) => message.error(e.message),
   });
+
+  const handlePublish = (targetInvoice: Invoice) => {
+    const key = `${targetInvoice.id}:${targetInvoice.version ?? 0}`;
+    let requestId = publishKeys.current.get(key);
+    if (!requestId) {
+      requestId = crypto.randomUUID();
+      publishKeys.current.set(key, requestId);
+    }
+    modal.confirm({
+      title: t("Phát hành hóa đơn nháp?"),
+      content: t("Khách sẽ thấy hóa đơn sau khi phát hành. Kiểm tra đủ tiền thuê, điện, nước và phí dịch vụ trước khi tiếp tục."),
+      okText: t("Phát hành hóa đơn"),
+      cancelText: t("Kiểm tra lại"),
+      onOk: () => publishMutation.mutateAsync({ invoice: targetInvoice, requestId, key }),
+    });
+  };
   return (
     <Drawer className="invoice-drawer" title={t("Chi tiết hóa đơn")} width={520} open={!!selectedId} onClose={closeInvoice} destroyOnClose>
       {detailQuery.isPending ? <div className="drawer-loading"><div className="loading-placeholder" /></div> : detailQuery.isError ? <LoadError error={detailQuery.error} onRetry={() => void detailQuery.refetch()} /> : invoice && <>
@@ -63,7 +77,7 @@ export default function InvoiceDrawer({ state }: { state: ReturnType<typeof useI
         {invoice.lifecycleState === 'Draft' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
             <Alert type="warning" showIcon message={t("Bản nháp chưa gửi cho khách")} description={t("Bản nháp chưa có trạng thái thanh toán. Mở trang Lập hóa đơn để chỉnh và phát hành.")} />
-            <Button type="primary" loading={publishMutation.isPending} onClick={() => publishMutation.mutate(invoice)}>{t("Phát hành hóa đơn")}</Button>
+            <Button type="primary" loading={publishMutation.isPending} onClick={() => handlePublish(invoice)}>{t("Phát hành hóa đơn")}</Button>
           </div>
         ) : <>
           <div className="invoice-balance-box"><div><span>{t("Đã ghi nhận")}</span><strong>{formatVnd(invoice.paid)}</strong></div><div><span>{t("Còn phải thu")}</span><strong className={invoice.outstanding > 0 ? 'balance-due' : 'balance-clear'}>{formatVnd(invoice.outstanding)}</strong></div>{invoice.dueDate && <span className="due-date-note">{t("Hạn thanh toán:")} {dayjs(invoice.dueDate).format(dateFormat())}</span>}</div>

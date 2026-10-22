@@ -165,7 +165,7 @@ export function LandingContent({ user = null }: { user?: User | null }) {
         <div className="security-points"><p><LockOutlined />{t("Khóa kết nối thanh toán được mã hóa trên máy chủ.")}</p><p><CheckCircleFilled />{t("Kiểm tra xác nhận từ payOS trước khi ghi nhận thanh toán.")}</p><p><SafetyCertificateOutlined />{t("Liên kết của lượt thuê cũ hết hiệu lực sau khi trả phòng.")}</p></div>
       </section>
 
-      <section className="landing-cta">
+      <section id="pricing" className="landing-cta">
         <div className="cta-content"><span className="section-eyebrow">Roomie</span><h2>{t("Nhẹ đầu hơn từ tháng này.")}</h2><p>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</p><Link to={destination} className="landing-btn landing-btn-light landing-btn-lg" onClick={() => handleCta('cta_bottom_action', actionLabel)}><span>{user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ ngay")}</span><ArrowRightOutlined aria-hidden="true" /></Link></div>
         <ol className="setup-steps"><li><strong>{t("1. Đăng ký thông tin")}</strong><span>{t("Điền thông tin tài khoản.")}</span></li><li><strong>{t("2. Xác thực OTP email")}</strong><span>{t("Xác nhận bằng mã gửi qua email.")}</span></li><li><strong>{t("3. Thiết lập phòng & đón khách")}</strong><span>{t("Thêm dãy trọ và phòng đầu tiên.")}</span></li></ol>
       </section>
