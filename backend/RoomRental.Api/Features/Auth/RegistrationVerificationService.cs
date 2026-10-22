@@ -6,7 +6,12 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class RegistrationVerificationService(AppDbContext db, IRegistrationEmailSender sender, TimeProvider clock, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null)
+public sealed class RegistrationVerificationService(
+    AppDbContext db,
+    IRegistrationEmailSender sender,
+    TimeProvider clock,
+    RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null,
+    IConfiguration? configuration = null)
 {
     private const string InvalidCode = "Mã xác nhận không hợp lệ hoặc đã hết hạn.";
     private const string TooManyAttempts = "Bạn đã nhập sai mã quá nhiều lần. Vui lòng gửi lại mã.";
@@ -88,11 +93,15 @@ public sealed class RegistrationVerificationService(AppDbContext db, IRegistrati
             await transaction.CommitAsync(ct); // Failed attempts must survive the error response.
             throw new ApiException(400, pending.FailedAttempts >= 5 ? TooManyAttempts : InvalidCode);
         }
+        var promoMonths = configuration?.GetValue("Promotions:NewUserProMonths", 0) ?? 0;
+        var isPromo = promoMonths > 0;
         var user = new AppUser
         {
             Id = pending.UserId, Name = pending.Name, Email = pending.Email, Phone = pending.Phone,
             PasswordHash = pending.PasswordHash, Role = UserRole.Owner, Status = OwnerStatus.Approved,
-            SubscriptionTier = SubscriptionTier.Free, CreatedAt = now
+            SubscriptionTier = isPromo ? SubscriptionTier.Pro : SubscriptionTier.Free,
+            SubscriptionExpiresAt = isPromo ? now.AddMonths(promoMonths) : null,
+            CreatedAt = now
         };
         db.Users.Add(user);
         pending.ConsumedAt = now;

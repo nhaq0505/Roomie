@@ -32,6 +32,19 @@ internal static class RegistrationVerificationTests
         }
         using (var f = new Fixture())
         {
+            var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Promotions:NewUserProMonths"] = "3"
+            }).Build();
+            var promoService = new RegistrationVerificationService(f.Db, f.Sender, f.Clock, configuration: config);
+            var challenge = await promoService.StartAsync(new AppUser { Name = "Promo User", Email = "promo@example.invalid", PasswordHash = "x" }, default);
+            var user = await promoService.VerifyAsync(challenge.ChallengeToken, f.Sender.Code, default);
+            Check(user.SubscriptionTier == SubscriptionTier.Pro && user.SubscriptionExpiresAt is not null &&
+                  user.SubscriptionExpiresAt.Value > f.Clock.GetUtcNow().AddDays(80),
+                  "promotional registration activates 3 months Pro subscription");
+        }
+        using (var f = new Fixture())
+        {
             var challenge = await f.Start();
             var old = f.Sender.Code;
             for (var i = 0; i < 5; i++) await Reject(() => f.Service.VerifyAsync(challenge.ChallengeToken, "not-otp", default), 400, "invalid OTP attempt is rejected");

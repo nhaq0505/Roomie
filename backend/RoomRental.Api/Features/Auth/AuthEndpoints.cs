@@ -29,6 +29,8 @@ public static class AuthEndpoints
             if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
                 throw new ApiException(StatusCodes.Status409Conflict, "Email này đã được đăng ký.");
 
+            var promoMonths = configuration.GetValue("Promotions:NewUserProMonths", 0);
+            var isPromo = promoMonths > 0;
             var user = new AppUser
             {
                 Name = name,
@@ -37,7 +39,8 @@ public static class AuthEndpoints
                 PasswordHash = "",
                 Role = UserRole.Owner,
                 Status = OwnerStatus.Approved,
-                SubscriptionTier = SubscriptionTier.Free,
+                SubscriptionTier = isPromo ? SubscriptionTier.Pro : SubscriptionTier.Free,
+                SubscriptionExpiresAt = isPromo ? DateTimeOffset.UtcNow.AddMonths(promoMonths) : null,
                 CreatedAt = DateTimeOffset.UtcNow
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password!);

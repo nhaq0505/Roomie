@@ -8,7 +8,7 @@ Baseline rà soát: `7be139d`, ngày 21/10/2026. Mô tả dưới đây dựa tr
 
 Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ và dashboard growth/revenue/operations. Camera/OCR/AI chưa triển khai.
 
-- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free. Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
+- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free (hoặc Pro có thời hạn nếu cấu hình `Promotions:NewUserProMonths > 0`). Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
 - Free tối đa 5 phòng đang sử dụng; Pro có thời hạn hoặc vô thời hạn. Kiểm tra `AppUser.IsPro/MaxRooms` và endpoint subscription trước khi sửa quota.
 - Đăng nhập chỉ dùng mật khẩu. Các cột MFA cũ vẫn tồn tại để tương thích schema, không phải tính năng cần bật lại.
 - Mật khẩu mới 9–256 ký tự, không toàn khoảng trắng, không ép ký tự đặc biệt.
