@@ -87,20 +87,20 @@ const adminItems = [
         if (item.key === 'settings') {
           return (
             <Dropdown key={item.key} trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
-              <button type="button" data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span>{item.label} <DownOutlined /></span></button>
+              <button type="button" aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span className="compact-nav-text">{item.label} <DownOutlined className="compact-nav-caret" /></span></button>
             </Dropdown>
           );
         }
         return (
-          <Link key={item.key} to={item.key!} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={activeMenuKey === item.key ? 'page' : undefined}>
+          <Link key={item.key} to={item.key!} aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={activeMenuKey === item.key ? 'page' : undefined}>
             {item.icon}
             {item.key === '/rooms' ? (
-              <>
+              <span className="compact-nav-text">
                 <span className="compact-nav-label-full">{item.label}</span>
                 <span className="compact-nav-label-short">{t("Phòng")}</span>
-              </>
+              </span>
             ) : (
-              <span>{item.label}</span>
+              <span className="compact-nav-text">{item.label}</span>
             )}
           </Link>
         );

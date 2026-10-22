@@ -310,9 +310,34 @@
 }
 
 @media (max-width: 767px) {
+  .room-tenant-page .page-heading {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .room-tenant-page .page-heading-extra > .ant-space {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px !important;
+    width: 100%;
+  }
+  .room-tenant-page .page-heading-extra > .ant-space > .ant-space-item {
+    min-width: 0;
+  }
+  .room-tenant-page .page-heading-extra > .ant-space > .ant-space-item:nth-child(3) {
+    display: none;
+  }
+  .room-tenant-page .page-heading-extra .ant-btn {
+    width: 100%;
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: 13.5px;
+  }
   .room-tenant-card-header-flex > .ant-btn {
     width: 100%;
+    height: auto;
     min-height: 44px;
+    padding: 8px 14px;
+    white-space: normal;
     font-weight: 600;
   }
   .room-tenant-coresidents-header > .ant-space {
@@ -323,26 +348,43 @@
   }
   .room-tenant-coresidents-header > .ant-space .ant-btn {
     width: 100%;
+    height: auto;
     min-height: 42px;
+    padding: 8px 12px;
+    white-space: normal;
   }
   .room-tenant-mobile-bar {
     position: sticky;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
     z-index: 25;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 48px minmax(0, 1fr);
     gap: 10px;
     margin-top: 16px;
     padding: 10px 12px;
     border: 1px solid var(--room-line);
-    border-radius: 14px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(10px);
     box-shadow: 0 -4px 18px rgba(19, 48, 55, 0.08);
   }
-  .room-tenant-mobile-bar > .ant-btn {
-    min-height: 44px;
+  .room-tenant-mobile-qr-btn.ant-btn {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 46px;
+    padding: 0 !important;
+    border-radius: 13px;
+    border-color: #bce0d5;
+    background: #eaf6f2;
+    color: #087c69;
+    font-size: 20px;
+  }
+  .room-tenant-mobile-save-btn.ant-btn {
+    min-height: 46px;
+    height: 46px;
+    border-radius: 13px;
+    font-size: 15px;
     font-weight: 600;
-    padding-inline: 10px;
+    padding-inline: 16px;
   }
 }
