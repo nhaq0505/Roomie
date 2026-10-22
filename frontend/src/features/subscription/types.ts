@@ -18,3 +18,11 @@ export interface SubscriptionStatus {
   maxRooms: number | null;
   availablePackages: SubscriptionPackage[];
 }
+
+export interface RedeemResult {
+  success: boolean;
+  message: string;
+  subscriptionTier: string;
+  subscriptionExpiresAt: string | null;
+  addedMonths: number;
+}

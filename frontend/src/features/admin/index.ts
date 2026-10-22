@@ -1,3 +1,3 @@
-export { ownersApi } from './api';
+export { ownersApi, promotionsApi } from './api';
 export type * from './types';
 export type * from './monitoring/types';

@@ -29,7 +29,20 @@ public static class AuthEndpoints
             if (await db.Users.AnyAsync(user => user.Email == email, cancellationToken))
                 throw new ApiException(StatusCodes.Status409Conflict, "Email này đã được đăng ký.");
 
-            var promoMonths = configuration.GetValue("Promotions:NewUserProMonths", 0);
+            var now = DateTimeOffset.UtcNow;
+            var welcomePromo = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", cancellationToken);
+            int promoMonths;
+            if (welcomePromo is not null)
+            {
+                var isValid = welcomePromo.IsEnabled &&
+                    (!welcomePromo.StartsAt.HasValue || welcomePromo.StartsAt.Value <= now) &&
+                    (!welcomePromo.EndsAt.HasValue || welcomePromo.EndsAt.Value >= now);
+                promoMonths = isValid ? welcomePromo.RewardMonths : 0;
+            }
+            else
+            {
+                promoMonths = configuration.GetValue("Promotions:NewUserProMonths", 0);
+            }
             var isPromo = promoMonths > 0;
             var user = new AppUser
             {
@@ -40,8 +53,8 @@ public static class AuthEndpoints
                 Role = UserRole.Owner,
                 Status = OwnerStatus.Approved,
                 SubscriptionTier = isPromo ? SubscriptionTier.Pro : SubscriptionTier.Free,
-                SubscriptionExpiresAt = isPromo ? DateTimeOffset.UtcNow.AddMonths(promoMonths) : null,
-                CreatedAt = DateTimeOffset.UtcNow
+                SubscriptionExpiresAt = isPromo ? now.AddMonths(promoMonths) : null,
+                CreatedAt = now
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password!);
             var isVerificationEnabled = configuration.GetValue("EmailVerification:Enabled", true);

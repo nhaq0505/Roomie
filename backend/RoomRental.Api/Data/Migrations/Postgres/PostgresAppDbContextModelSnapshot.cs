@@ -1670,6 +1670,74 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("ProcessedWebhooks");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.PromotionCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RedeemedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RewardMonths")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("PromotionCodes");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.PromotionRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PromotionCodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PromotionCodeId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("PromotionRedemptions");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.RegistrationAttribution", b =>
                 {
                     b.Property<Guid>("OwnerId")
@@ -1937,6 +2005,37 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasIndex("BuildingId");
 
                     b.ToTable("Rooms");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.SystemPromotion", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("RewardMonths")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemPromotions");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.WorkerHeartbeatState", b =>

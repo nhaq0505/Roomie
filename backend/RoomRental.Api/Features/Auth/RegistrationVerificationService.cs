@@ -93,7 +93,19 @@ public sealed class RegistrationVerificationService(
             await transaction.CommitAsync(ct); // Failed attempts must survive the error response.
             throw new ApiException(400, pending.FailedAttempts >= 5 ? TooManyAttempts : InvalidCode);
         }
-        var promoMonths = configuration?.GetValue("Promotions:NewUserProMonths", 0) ?? 0;
+        var welcomePromo = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", ct);
+        int promoMonths;
+        if (welcomePromo is not null)
+        {
+            var isValid = welcomePromo.IsEnabled &&
+                (!welcomePromo.StartsAt.HasValue || welcomePromo.StartsAt.Value <= now) &&
+                (!welcomePromo.EndsAt.HasValue || welcomePromo.EndsAt.Value >= now);
+            promoMonths = isValid ? welcomePromo.RewardMonths : 0;
+        }
+        else
+        {
+            promoMonths = configuration?.GetValue("Promotions:NewUserProMonths", 0) ?? 0;
+        }
         var isPromo = promoMonths > 0;
         var user = new AppUser
         {

@@ -1364,3 +1364,49 @@
 1363|The invoices changed. Check the funds actually received before recording a receipt.|账单已变更。记录收款前请核对实际到账金额。|청구서가 변경되었습니다. 수납을 기록하기 전에 실제 입금액을 확인하세요.|बिल बदल गए हैं। प्राप्ति दर्ज करने से पहले वास्तव में प्राप्त राशि की जाँच करें।
 1364|Reconcile the pending payOS payment before recording a receipt.|记录收款前请先核对待处理的 payOS 交易。|수납을 기록하기 전에 대기 중인 payOS 결제를 대조하세요.|प्राप्ति दर्ज करने से पहले लंबित payOS भुगतान का मिलान करें।
 1365|This request is still valid. Check the invoices before removing it from the list.|此请求仍有效。请检查账单后再从列表移除。|이 요청은 아직 유효합니다. 목록에서 제거하기 전에 청구서를 확인하세요.|यह अनुरोध अभी मान्य है। सूची से हटाने से पहले बिल जाँचें।
+1366|Promotions|促销活动|프로모션|प्रचार
+1367|Gift code / Promo|礼品码 / 促销|기프트 코드 / 프로모션|गिफ्ट कोड / प्रोमो
+1368|If you have a voucher code to activate Pro, enter it below:|如果您有激活 Pro 的优惠券代码，请在下方输入：|Pro를 활성화할 바우처 코드가 있으면 아래에 입력하세요:|यदि आपके पास प्रो सक्रिय करने के लिए कोई वाउचर कोड है, तो नीचे दर्ज करें:
+1369|e.g. TET2026, BANMOI|例如：TET2026, BANMOI|예: TET2026, BANMOI|उदा. TET2026, BANMOI
+1370|Apply|应用|적용|लागू करें
+1371|Welcome campaign updated successfully.|欢迎活动更新成功。|웰컴 캠페인이 성공적으로 업데이트되었습니다.|स्वागत अभियान सफलतापूर्वक अपडेट किया गया।
+1372|Promo code updated.|优惠码已更新。|프로모션 코드가 업데이트되었습니다.|प्रोमो कोड अपडेट किया गया।
+1373|New promo code created.|新优惠码已创建。|새 프로모션 코드가 생성되었습니다.|नया प्रोमो कोड बनाया गया।
+1374|Code status updated.|优惠码状态已更新。|코드 상태가 업데이트되었습니다.|कोड स्थिति अपडेट की गई।
+1375|Promo code deleted.|优惠码已删除。|프로모션 코드가 삭제되었습니다.|प्रोमो कोड हटा दिया गया।
+1376|Voucher code|优惠券代码|바우처 코드|वाउचर कोड
+1377|Copied code {0}|已复制优惠码 {0}|코드 {0} 복사됨|कोड {0} कॉपी किया गया
+1378|Description|描述|설명|विवरण
+1379|Reward|奖励|보상|इनाम
+1380|+{0} months Pro|+{0} 个月 Pro|+{0}개월 Pro|+{0} महीने प्रो
+1381|Redemptions|使用次数|사용 횟수|उपयोग
+1382|Expiry|有效期|만료일|समाप्ति
+1383|No expiry|无有效期限制|무제한|कोई समाप्ति नहीं
+1384|Delete this promo code?|删除此优惠码？|이 프로모션 코드를 삭제할까요?|क्या इस प्रोमो कोड को हटाना है?
+1385|This action will delete the code and its redemption history.|此操作将删除该代码及其所有兑换历史记录。|이 작업은 코드와 해당 사용 내역을 모두 삭제합니다.|यह कार्रवाई कोड और इसके उपयोग के इतिहास को हटा देगी।
+1386|Delete|删除|삭제|हटाएँ
+1387|Promotions Campaign|促销活动|프로모션 캠페인|प्रचार अभियान
+1388|Configure welcome Pro offers for new members and manage voucher codes.|配置新用户赠送 Pro 活动并管理优惠券代码。|신규 회원을 위한 Pro 제공 구성 및 바우처 코드 관리.|नए सदस्यों के लिए प्रो ऑफ़र कॉन्फ़िगर करें और वाउचर कोड प्रबंधित करें।
+1389|Welcome campaign: Free Pro on signup|欢迎活动：新注册赠送 Pro|웰컴 캠페인: 신규 가입 시 Pro 무료 증정|स्वागत अभियान: साइन अप पर मुफ़्त प्रो
+1390|Campaign status|活动状态|캠페인 상태|अभियान स्थिति
+1391|Enabled|已开启|활성화됨|सक्षम
+1392|Disabled|已关闭|비활성화됨|अक्षम
+1393|Pro reward months|赠送 Pro 月数|제공 Pro 개월 수|प्रो इनाम महीने
+1394|Please enter reward months.|请输入赠送月数。|제공 개월 수를 입력하세요.|कृपया इनाम महीने दर्ज करें।
+1395|months|个月|개월|महीने
+1396|Valid period (Leave blank for no expiry)|生效时间（留空表示无限制）|유효 기간 (비워두면 무제한)|वैध अवधि (असीमित के लिए खाली छोड़ें)
+1397|From date|开始日期|시작일|प्रारंभ तिथि
+1398|To date|结束日期|종료일|अंतिम तिथि
+1399|Save campaign settings|保存活动设置|캠페인 설정 저장|अभियान सेटिंग्स सहेजें
+1400|Promo Codes / Vouchers|优惠码 / 优惠券列表|프로모션 코드 / 바우처 목록|प्रोमो कोड / वाउचर सूची
+1401|Create code|创建新码|새 코드 생성|नया कोड बनाएँ
+1402|Edit promo code|编辑优惠码|프로모션 코드 수정|प्रोमो कोड संपादित करें
+1403|Create new promo code|创建新优惠码|새 프로모션 코드 생성|नया प्रोमो कोड बनाएँ
+1404|Create code|创建代码|코드 생성|कोड बनाएँ
+1405|Promo code|优惠码|프로모션 코드|प्रोमो कोड
+1406|Please enter promo code.|请输入优惠码。|프로모션 코드를 입력하세요.|कृपया प्रोमो कोड दर्ज करें।
+1407|Code must be 3 to 32 characters.|代码长度为 3 至 32 个字符。|코드는 3~32자여야 합니다.|कोड 3 से 32 अक्षरों का होना चाहिए।
+1408|New year promo, partner gift...|新年促销，合作伙伴礼品...|신년 프로모션, 파트너 선물...|नया साल प्रोमो, पार्टनर उपहार...
+1409|Usage limit|使用次数限制|사용 한도|उपयोग सीमा
+1410|Unlimited|不限制|무제한|असीमित
+1411|Expiration date|到期日|만료 날짜|समाप्ति तिथि

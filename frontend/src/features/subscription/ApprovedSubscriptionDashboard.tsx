@@ -1,10 +1,12 @@
 import {
 CheckCircleFilled,
 CrownOutlined,
+GiftOutlined,
 SafetyCertificateOutlined
 } from '@ant-design/icons';
-import { Alert, Button, Card, Col, Progress, Radio, Row, Space, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Col, Input, Progress, Radio, Row, Space, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 import { formatVnd } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
 import { PageTitle, SectionCard } from '../../shared/ui/Ui';
@@ -13,7 +15,8 @@ import SubscriptionCheckoutModal from './SubscriptionCheckoutModal';
 import { useSubscriptionDashboard } from './useSubscriptionDashboard';
 
 export default function ApprovedSubscriptionDashboard() {
-const state = useSubscriptionDashboard();
+  const state = useSubscriptionDashboard();
+  const [promoCode, setPromoCode] = useState('');
   const { selectedPackageId, setSelectedPackageId, upgradeMutation, status, isPro, currentRooms, maxRooms, isLimitReached } = state;
   return <>
     <PageTitle
@@ -100,6 +103,42 @@ const state = useSubscriptionDashboard();
         </SectionCard>
       </Col>
     </Row>
+
+    <div style={{ marginBottom: 24 }}>
+      <SectionCard title={t("Mã quà tặng / Khuyến mãi")}>
+        <Space direction="vertical" size={10} style={{ width: '100%', maxWidth: 480 }}>
+          <Typography.Text type="secondary">
+            {t("Nếu bạn có mã voucher kích hoạt gói Pro từ các chương trình khuyến mãi, vui lòng nhập mã bên dưới:")}
+          </Typography.Text>
+          <Space.Compact style={{ width: '100%' }}>
+            <Input
+              placeholder={t("Ví dụ: TET2026, BANMOI")}
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              prefix={<GiftOutlined style={{ color: '#1890ff' }} />}
+              maxLength={32}
+              onPressEnter={() => {
+                if (promoCode.trim()) {
+                  state.redeemMutation.mutate(promoCode.trim(), { onSuccess: () => setPromoCode('') });
+                }
+              }}
+            />
+            <Button
+              type="primary"
+              loading={state.redeemMutation.isPending}
+              disabled={!promoCode.trim()}
+              onClick={() => {
+                if (promoCode.trim()) {
+                  state.redeemMutation.mutate(promoCode.trim(), { onSuccess: () => setPromoCode('') });
+                }
+              }}
+            >
+              {t("Áp dụng")}
+            </Button>
+          </Space.Compact>
+        </Space>
+      </SectionCard>
+    </div>
 
     <SectionCard
       title={isPro ? t("Gia hạn gói Pro") : t("Nâng cấp lên tài khoản Pro")}

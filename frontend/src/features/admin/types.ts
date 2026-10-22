@@ -14,3 +14,29 @@ export interface OwnerRequest {
   roomCount?: number;
   maxRooms?: number | null;
 }
+
+export interface WelcomePromotion {
+  id: string;
+  name: string;
+  isEnabled: boolean;
+  rewardMonths: number;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+export interface PromotionCode {
+  id: string;
+  code: string;
+  description: string | null;
+  rewardMonths: number;
+  maxRedemptions: number | null;
+  redeemedCount: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminPromotionsOverview {
+  welcome: WelcomePromotion;
+  codes: PromotionCode[];
+}

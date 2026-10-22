@@ -49,6 +49,19 @@ export function useSubscriptionDashboard() {
     },
   });
 
+  const redeemMutation = useMutation({
+    mutationFn: (code: string) => subscriptionApi.redeemCode(code),
+    onSuccess: async (data) => {
+      message.success(data.message);
+      await Promise.all([
+        subQuery.refetch(),
+        refreshUser(),
+        client.invalidateQueries({ queryKey: ['rooms'] }),
+      ]);
+    },
+    onError: (err: Error) => message.error(err.message),
+  });
+
   // Setup auto-reconciliation polling when modal is open
   useEffect(() => {
     if (checkout && checkout.orderCode && !paymentSuccess) {
@@ -79,5 +92,5 @@ export function useSubscriptionDashboard() {
   const maxRooms = status?.maxRooms ?? 5;
   const isLimitReached = !isPro && currentRooms >= maxRooms;
 
-  return { message, selectedPackageId, setSelectedPackageId, checkout, setCheckout, paymentSuccess, setPaymentSuccess, upgradeMutation, reconcileMutation, copyToClipboard, status, isPro, currentRooms, maxRooms, isLimitReached };
+  return { message, selectedPackageId, setSelectedPackageId, checkout, setCheckout, paymentSuccess, setPaymentSuccess, upgradeMutation, reconcileMutation, redeemMutation, copyToClipboard, status, isPro, currentRooms, maxRooms, isLimitReached };
 }

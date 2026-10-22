@@ -8,7 +8,7 @@ import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
-  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
+  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -47,6 +47,7 @@ const ownerItems = [
 const adminItems = [
   { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") },
   { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Giám sát") },
+  { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi") },
 ];
   const isAdmin = user?.role === 'Admin';
   const items = isAdmin ? adminItems : ownerItems;

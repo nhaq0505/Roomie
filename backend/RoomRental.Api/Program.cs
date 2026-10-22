@@ -186,6 +186,7 @@ app.MapGet("/api/health", async (AppDbContext db, CancellationToken cancellation
 app.MapAuthEndpoints();
 app.MapPasswordRecoveryEndpoints();
 app.MapAdminEndpoints();
+app.MapPromotionsRoutes();
 app.MapOwnerManagementEndpoints();
 app.MapReportsEndpoints();
 app.MapBillingEndpoints();

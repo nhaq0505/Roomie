@@ -45,6 +45,9 @@ public class AppDbContext : DbContext
     public DbSet<OperationalEventCounter> OperationalCounters => Set<OperationalEventCounter>();
     public DbSet<DailyAggregateMetric> DailyAggregateMetrics => Set<DailyAggregateMetric>();
     public DbSet<MilestoneOutboxEvent> MilestoneOutboxEvents => Set<MilestoneOutboxEvent>();
+    public DbSet<SystemPromotion> SystemPromotions => Set<SystemPromotion>();
+    public DbSet<PromotionCode> PromotionCodes => Set<PromotionCode>();
+    public DbSet<PromotionRedemption> PromotionRedemptions => Set<PromotionRedemption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -479,6 +482,29 @@ public class AppDbContext : DbContext
             entity.Property(x => x.LastError).HasMaxLength(1000);
             entity.HasIndex(x => new { x.Status, x.OccurredAt });
             entity.HasIndex(x => new { x.OwnerId, x.EventType });
+        });
+
+        modelBuilder.Entity<SystemPromotion>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(128).IsRequired();
+        });
+
+        modelBuilder.Entity<PromotionCode>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(255);
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => x.IsActive);
+        });
+
+        modelBuilder.Entity<PromotionRedemption>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.PromotionCodeId, x.UserId }).IsUnique();
+            entity.HasIndex(x => x.UserId);
         });
     }
 }
