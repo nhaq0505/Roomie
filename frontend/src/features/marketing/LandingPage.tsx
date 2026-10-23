@@ -127,9 +127,7 @@ export function LandingContent({
       </nav>
 
       <main>
-        <div style={{ maxWidth: 1180, margin: '12px auto 0', padding: '0 20px' }}>
-          <ActiveBannerStrip placement="LandingTop" />
-        </div>
+        <ActiveBannerStrip placement="LandingTop" />
         {page === 'home' && (
           <>
             <section className="landing-hero" id="hero">

@@ -47,6 +47,7 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
         "incident-check" => TimeSpan.FromMinutes(10),
         "monitoring-maintenance" => TimeSpan.FromHours(2),
         "invoice-sweep" => TimeSpan.FromHours(26),
+        "recurring-expenses" => TimeSpan.FromHours(3),
         _ => TimeSpan.FromMinutes(15)
     };
 

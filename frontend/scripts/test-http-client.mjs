@@ -4,17 +4,17 @@ import { build } from 'esbuild';
 
 // Exercise the extracted transport through the same public compatibility entry point.
 const bundle = await build({
-  stdin: { contents: 'export { api, ApiError, listFrom } from "./src/api";', resolveDir: process.cwd(), loader: 'ts' },
+  stdin: { contents: 'export { api, ApiError, listFrom } from "./src/api"; export { request } from "./src/shared/http/client";', resolveDir: process.cwd(), loader: 'ts' },
   bundle: true, write: false, format: 'cjs', platform: 'node',
 });
 let calls = [];
 let respond;
 const module = { exports: {} };
 vm.runInNewContext(bundle.outputFiles[0].text, {
-  module, exports: module.exports, URLSearchParams, Headers, AbortSignal, Intl, Date, Set, Map,
+  module, exports: module.exports, URLSearchParams, Headers, AbortSignal, Intl, Date, Set, Map, FormData, Blob,
   fetch: async (url, init) => { calls.push({ url, init }); return respond(); },
 });
-const { api, ApiError, listFrom } = module.exports;
+const { api, ApiError, listFrom, request } = module.exports;
 respond = () => ({ ok: true, status: 200, text: async () => JSON.stringify({ data: { id: 'fixture-owner' } }) });
 assert.equal((await api.auth.login('owner@example.invalid', 'fixture-password')).id, 'fixture-owner');
 assert.equal(calls.length, 1);
@@ -141,3 +141,13 @@ assert.equal(calls.at(-1).init.method, 'POST');
 assert.equal(JSON.parse(calls.at(-1).init.body).code, 'TET2026');
 assert.equal(redeemRes.addedMonths, 3);
 console.log('PASS: roomsApi documents/docx, promotionsApi, and subscriptionApi.redeemCode verified');
+
+// Multipart uploads must keep the browser-generated boundary instead of a JSON content type.
+calls = [];
+respond = () => ({ ok: true, status: 201, text: async () => JSON.stringify({ id: 'fixture-attachment' }) });
+const form = new FormData();
+form.append('file', new Blob(['%PDF-1.4']), 'receipt.pdf');
+assert.equal((await request('/api/expenses/fixture/attachments', { method: 'POST', body: form })).id, 'fixture-attachment');
+assert.equal(calls[0].init.headers.get('Content-Type'), null, 'FormData uploads must not be forced to application/json');
+assert.equal(calls[0].init.body, form);
+console.log('PASS: multipart uploads keep the browser boundary');

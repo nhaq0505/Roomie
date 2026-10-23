@@ -9,6 +9,7 @@ Baseline rà soát: `7be139d`, ngày 21/10/2026. Mô tả dưới đây dựa tr
 Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ, nhân sự Marketer và dashboard growth/revenue/operations. Marketer quản lý phễu tăng trưởng/doanh thu/chi phí chiến dịch (`/admin/monitoring`), mã khuyến mãi & link Auto-Promo (`/admin/promotions`), CRM & phân khúc chủ trọ (`/marketer/leads`), CMS Cẩm nang SEO & Banner (`/marketer/content`, `/huong-dan/:slug`) và chiến dịch Email theo phân khúc (`/marketer/emails`), nhưng bị chặn (`403 Forbidden`) khỏi toàn bộ dữ liệu vận hành hạ tầng (`Operations`, `Incidents`, `Maintenance`), duyệt/khóa chủ trọ và dữ liệu nhạy cảm của khách thuê/ngân hàng. Camera/OCR/AI chưa triển khai.
 
 - Đăng ký email OTP thành công tạo **Owner Approved**, gói Free (hoặc Pro có thời hạn nếu cấu hình `Promotions:NewUserProMonths > 0` hoặc đăng ký qua link Auto-Promo `/register?promo=CODE`). Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
+- Sổ chi phí (`/expenses`) mở cho cả Free; lãi/lỗ, đối chiếu điện EVN, Excel hai báo cáo đó, chi định kỳ và chứng từ là Pro. Chi tiết bất biến ở mục 5 "Sổ chi phí, lãi/lỗ và chứng từ".
 - Free tối đa 5 phòng đang sử dụng; Pro có thời hạn hoặc vô thời hạn. Kiểm tra `AppUser.IsPro/MaxRooms` và endpoint subscription trước khi sửa quota.
 - Đăng nhập chỉ dùng mật khẩu. Các cột MFA cũ vẫn tồn tại để tương thích schema, không phải tính năng cần bật lại.
 - Mật khẩu mới 9–256 ký tự, không toàn khoảng trắng, không ép ký tự đặc biệt.
@@ -60,6 +61,7 @@ Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/reho
 | VietQR, xác nhận chuyển khoản | `ManualPaymentEndpoints.cs`, `PaymentPreferencesEndpoints.cs`, `Domain/ManualPayments.cs` | `ManualPaymentRequests.tsx`, `PaymentModeSettings.tsx`, `ManualPaymentPanel.tsx`, `test_payment_modes.py` |
 | Nâng cấp Pro & Khuyến mãi | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Promotions.cs`, `Features/Auth/RegistrationVerificationService.cs` | `features/subscription`, `features/admin/AdminPromotionsPage.tsx`, `PromotionsTests.cs`, `test_billing_upgrade.py`, `admin.spec.ts`, `landlord.spec.ts` |
 | Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
+| Sổ chi phí, chi định kỳ, chứng từ, lãi/lỗ, đối chiếu điện EVN | `Features/Expenses/` (`ExpenseEndpoints*.cs`, `RecurringExpenseEndpoints.cs`, `RecurringExpenseGenerator.cs`, `ExpenseSupport.cs`), `Domain/Expenses.cs`, `Features/Reports/ReportsEndpoints.ProfitLoss.cs` | `features/expenses`, `features/reports/ProfitLossPanel.tsx`, `ElectricityReconciliationPanel.tsx`, `shared/ui/ProUpsell.tsx`, `ExpenseLedgerHttpTests.cs`, `e2e/expenses.spec.ts` |
 | Nhắc Zalo | `Features/Zalo/`, `Domain/Zalo.cs` | `features/zalo`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test` |
 | Theo dõi growth/revenue & ROAS | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests`, `MarketerSuiteHttpTests` |
 | Marketer CRM, CMS SEO/Banner & Email | `Features/Marketer/`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Marketer*.cs` | `features/marketer`, `features/marketing/GuideArticlePage.tsx`, `shared/ui/ActiveBannerStrip.tsx`, `MarketerSuiteHttpTests`, `admin.spec.ts` |
@@ -124,6 +126,16 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Cọc và phần giữ/hoàn/khấu trừ là ledger riêng; Refund chỉ ghi nhận giao dịch bên ngoài, không tự chuyển tiền. Không tính cọc/credit cọc thành doanh thu thuê trọ.
 - Trả phòng yêu cầu xử lý nợ Issued, Draft và pending payment; lưu completion chống replay, thu hồi token, ngày kết thúc Việt Nam, nâng meter baseline. Không tự tạo hóa đơn cuối hoặc chuyển khoản hoàn cọc.
 - Báo cáo Excel giữ ô tiền kiểu số và chống formula injection từ tên/note người dùng.
+
+### Sổ chi phí, lãi/lỗ và chứng từ
+
+- Free được ghi/sửa/xóa khoản chi thủ công. Pro mới có: báo cáo lãi/lỗ, đối chiếu điện EVN (kể cả ghi trường `UtilityPeriod/UtilityKwh`), Excel của hai báo cáo này, chi định kỳ và tải chứng từ. Hết Pro: dữ liệu cũ vẫn xem/tải được, mẫu định kỳ ngừng sinh (`skipReason=ProRequired`), không tải chứng từ mới. Kiểm Pro ở server bằng `ExpenseSupport.IsProAsync` (cùng điều kiện `AppUser.IsPro`), không tin UI.
+- "Thực thu" của lãi/lỗ dùng **đúng** điều kiện `invoiceCash` của tab Thu tiền: receipt `Source != "Deposit"` của hóa đơn Issued `Kind != "Deposit"`, theo tháng Việt Nam của `Receipt.CreatedAt`. Không cộng tiền cọc/khấu trừ cọc vào thu; đổi định nghĩa phải đổi cả hai báo cáo.
+- Lọc theo dãy loại khoản chi chung (`BuildingId == null`) và trả `sharedExpensesExcluded`; không tự phân bổ chi chung. Khoảng báo cáo tối đa 24 tháng.
+- Khoản chi: tiền VND nguyên 1..10 tỷ, `ExpenseDate` không ở tương lai theo ngày Việt Nam, xóa mềm (`DeletedAt`) và xóa luôn chứng từ để giải phóng quota. Tạo có `Idempotency-Key` + fingerprint (unique `(OwnerId, IdempotencyKey)`), sửa/xóa bắt buộc `expectedVersion`. Liên kết mới vào dãy/phòng lưu trữ bị chặn; liên kết cũ không đổi vẫn sửa được.
+- Chi định kỳ: `RecurringExpenseWorker` (mỗi giờ, tắt bằng `EnableRecurringExpenses=false`) và lúc tạo/sửa/tiếp tục mẫu gọi `RecurringExpenseGenerator`; chỉ backfill tối đa 2 tháng, ngày 1–28. Chống trùng bằng unique `(RecurringExpenseId, RecurrencePeriod)` gồm cả dòng đã xóa mềm + `INSERT … ON CONFLICT DO NOTHING`: xóa khoản đã sinh thì không sinh lại. Sửa mẫu không sửa các tháng đã ghi.
+- Chứng từ lưu `bytea` trong PostgreSQL để backup `pg_dump` hiện có bao gồm luôn; không chuyển sang file system/volume nếu chưa sửa backup/restore. Chỉ nhận JPEG/PNG/WebP/PDF theo magic bytes, ≤2 MB/tệp, ≤5 tệp/khoản, ≤200 MB/owner; tải về có `nosniff`, `private, no-store`, CSP sandbox, PDF luôn `attachment`. List không bao giờ select cột `Content`.
+- Đối chiếu điện: kWh/tiền EVN lấy từ khoản chi `Electricity` có `UtilityPeriod`; kWh/tiền đã lập lấy từ snapshot `Invoice.Consumption/ElectricityAmount` của hóa đơn Issued không phải cọc. Thiếu hóa đơn EVN → `lossPercent = null` + `lossNullReason`, không hiển thị 0%; cảnh báo số hóa đơn nháp.
 
 ### Zalo
 

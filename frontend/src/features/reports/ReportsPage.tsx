@@ -1,7 +1,7 @@
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { App, Button, DatePicker, Empty, Pagination, Select, Spin, Tabs, Tag, Typography } from 'antd';
+import { App, Button, DatePicker, Empty, Pagination, Select, Spin, Tabs, Tag, Tooltip, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useMemo, useState } from 'react';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
@@ -10,9 +10,14 @@ import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { buildingsApi } from '../buildings/index';
 import { roomsApi } from '../rooms/index';
-import { reportsApi, type DebtReportRow, type DebtReportTotals, type DepositReportRow, type DepositsReportTotals, type ReceiptReportRow, type ReceiptsReportTotals, type ReportFilters, type ReportPage } from './index';
+import { subscriptionApi } from '../subscription/index';
+import ElectricityReconciliationPanel from './ElectricityReconciliationPanel';
+import ProfitLossPanel from './ProfitLossPanel';
+import { reportsApi, type DebtReportRow, type DebtReportTotals, type DepositReportRow, type DepositsReportTotals, type ExportReportType, type ReceiptReportRow, type ReceiptsReportTotals, type ReportFilters, type ReportPage } from './index';
 
-type ReportTab = 'receipts' | 'debt' | 'deposits';
+type ReportTab = 'receipts' | 'debt' | 'deposits' | 'profit' | 'electricity';
+const proTabs = new Set<ReportTab>(['profit', 'electricity']);
+const exportType = (tab: ReportTab): ExportReportType => tab === 'profit' ? 'profit-loss' : tab;
 type ReportRow = ReceiptReportRow | DebtReportRow | DepositReportRow;
 type ReportData = ReportPage<ReceiptReportRow, ReceiptsReportTotals> | ReportPage<DebtReportRow, DebtReportTotals> | ReportPage<DepositReportRow, DepositsReportTotals>;
 const pageSize = 50;
@@ -49,20 +54,23 @@ export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const buildingsQuery = useQuery({ queryKey: ['buildings', 'reports', 'all'], queryFn: () => buildingsApi.list(true) });
   const roomsQuery = useQuery({ queryKey: ['rooms', 'reports', 'all'], queryFn: () => roomsApi.list(undefined, true) });
-  const filters: ReportFilters = { dateFrom, dateTo, buildingId, roomId, page, pageSize };
+  const subscriptionQuery = useQuery({ queryKey: ['subscription'], queryFn: subscriptionApi.getStatus });
+  const isPro = subscriptionQuery.data?.isPro === true;
+  const isProTab = proTabs.has(tab);
+  const filters: ReportFilters = { dateFrom, dateTo, buildingId, roomId: isProTab ? undefined : roomId, page, pageSize };
   const queryKey = ['reports', tab, dateFrom, dateTo, buildingId, roomId, page, pageSize];
   const reportQuery = useQuery<ReportData>({
     queryKey,
     queryFn: async (): Promise<ReportData> => tab === 'receipts' ? reportsApi.receipts(filters) : tab === 'debt' ? reportsApi.debt(filters) : reportsApi.deposits(filters),
-    enabled: dateFrom <= dateTo,
+    enabled: dateFrom <= dateTo && !isProTab,
   });
   const exportMutation = useMutation({
-    mutationFn: () => reportsApi.export(tab, filters),
+    mutationFn: () => reportsApi.export(exportType(tab), filters),
     onSuccess: (blob) => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `roomie-${tab}-${dateFrom}-${dateTo}.xlsx`;
+      anchor.download = `roomie-${exportType(tab)}-${dateFrom}-${dateTo}.xlsx`;
       document.body.append(anchor); anchor.click(); anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       message.success(t("Đã tải tệp Excel."));
@@ -84,6 +92,8 @@ export default function ReportsPage() {
     { key: 'receipts', label: t("Thu tiền") },
     { key: 'debt', label: t("Công nợ") },
     { key: 'deposits', label: t("Tiền cọc") },
+    { key: 'profit', label: <span className="reports-tab-label">{t("Lãi/lỗ")}{!isPro && <Tag color="gold">Pro</Tag>}</span> },
+    { key: 'electricity', label: <span className="reports-tab-label">{t("Đối chiếu điện")}{!isPro && <Tag color="gold">Pro</Tag>}</span> },
   ];
   const receiptColumns: TableProps<ReceiptReportRow>['columns'] = [
     { title: t("NGÀY NHẬN TIỀN"), dataIndex: 'receiptDate', key: 'receiptDate', width: 190, render: formatTimestamp },
@@ -118,20 +128,23 @@ export default function ReportsPage() {
   const selectedRange = [dayjs(dateFrom), dayjs(dateTo)] as [Dayjs, Dayjs];
 
   return <>
-    <PageTitle eyebrow={t("BÁO CÁO VÀ ĐỐI SOÁT")} title={t("Báo cáo") } subtitle={t("Theo dõi tiền thu, công nợ hiện tại và biến động tiền cọc.")} extra={<Button icon={<DownloadOutlined />} loading={exportMutation.isPending} disabled={dateFrom > dateTo} onClick={() => exportMutation.mutate()}>{t("Xuất Excel")}</Button>} />
+    <PageTitle eyebrow={t("BÁO CÁO VÀ ĐỐI SOÁT")} title={t("Báo cáo") } subtitle={t("Theo dõi tiền thu, công nợ, tiền cọc, lãi ròng và điện tổng.")} extra={<Tooltip title={isProTab && !isPro ? t("Xuất Excel báo cáo này dành cho gói Pro.") : undefined}><Button icon={<DownloadOutlined />} loading={exportMutation.isPending} disabled={dateFrom > dateTo || (isProTab && !isPro)} onClick={() => exportMutation.mutate()}>{t("Xuất Excel")}</Button></Tooltip>} />
     <SectionCard className="reports-workspace">
       <Tabs activeKey={tab} items={tabItems} onChange={setFilterTab} />
       <div className="reports-filter-toolbar">
         <label><span>{t("Khoảng ngày")}</span><DatePicker.RangePicker aria-label={t("Khoảng ngày")} format={dateFormat()} value={selectedRange} onChange={rangeChanged} allowClear={false} /></label>
         <label><span>{t("Dãy trọ")}</span><Select aria-label={t("Lọc theo dãy trọ")} value={buildingId} allowClear showSearch optionFilterProp="label" placeholder={t("Tất cả dãy trọ")} options={buildingOptions} onChange={(value) => { setBuildingId(value); setRoomId(undefined); setPage(1); }} /></label>
-        <label><span>{t("Phòng")}</span><Select aria-label={t("Lọc theo phòng")} value={roomId} allowClear showSearch optionFilterProp="label" placeholder={t("Tất cả phòng")} options={roomOptions} disabled={roomsQuery.isPending || roomsQuery.isError} onChange={(value) => { setRoomId(value); setPage(1); }} /></label>
+        {!isProTab && <label><span>{t("Phòng")}</span><Select aria-label={t("Lọc theo phòng")} value={roomId} allowClear showSearch optionFilterProp="label" placeholder={t("Tất cả phòng")} options={roomOptions} disabled={roomsQuery.isPending || roomsQuery.isError} onChange={(value) => { setRoomId(value); setPage(1); }} /></label>}
         <Button icon={<ReloadOutlined />} onClick={clearFilters}>{t("Đặt lại")}</Button>
       </div>
+      {tab === 'profit' && <Typography.Paragraph className="reports-scope-note">{t("Thực thu giống tab Thu tiền: tiền đã nhận cho hóa đơn, không gồm tiền cọc. Chi phí lấy từ Sổ chi phí theo ngày chi.")}</Typography.Paragraph>}
+      {tab === 'profit' && <ProfitLossPanel filters={filters} isPro={isPro} />}
+      {tab === 'electricity' && <ElectricityReconciliationPanel filters={filters} isPro={isPro} />}
       {tab === 'receipts' && <Typography.Paragraph className="reports-scope-note">{t("Tiền cọc thu được hiển thị riêng; tổng thu hóa đơn không cộng khoản cọc.")}</Typography.Paragraph>}
       {tab === 'debt' && <Typography.Paragraph className="reports-scope-note">{t("Công nợ là số dư hiện tại của hóa đơn có kỳ nằm trong khoảng đã chọn, không phải số dư tại ngày cuối kỳ.")}</Typography.Paragraph>}
       {tab === 'deposits' && <Typography.Paragraph className="reports-scope-note">{t("Biến động hoàn và khấu trừ theo khoảng ngày; tiền cọc đang giữ là số hiện tại.")}</Typography.Paragraph>}
-      {!buildingsQuery.isError && !roomsQuery.isError && <ReportTotals tab={tab} totals={totals} />}
-      {buildingsQuery.isError ? <LoadError error={buildingsQuery.error} onRetry={() => void buildingsQuery.refetch()} /> : roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : reportQuery.isError ? <LoadError error={reportQuery.error} onRetry={() => void reportQuery.refetch()} /> : reportQuery.isPending && !reportQuery.data ? <div className="reports-loading"><Spin /> <span>{t("Đang tải báo cáo…")}</span></div> : <div className="reports-table-wrap">
+      {!isProTab && !buildingsQuery.isError && !roomsQuery.isError && <ReportTotals tab={tab} totals={totals} />}
+      {isProTab ? null : buildingsQuery.isError ? <LoadError error={buildingsQuery.error} onRetry={() => void buildingsQuery.refetch()} /> : roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : reportQuery.isError ? <LoadError error={reportQuery.error} onRetry={() => void reportQuery.refetch()} /> : reportQuery.isPending && !reportQuery.data ? <div className="reports-loading"><Spin /> <span>{t("Đang tải báo cáo…")}</span></div> : <div className="reports-table-wrap">
         <ResponsiveTable<ReportRow>
           className="reports-table"
           rowKey={(row) => 'receiptId' in row ? row.receiptId : row.invoiceId}
@@ -146,7 +159,7 @@ export default function ReportsPage() {
         />
         {totalCount > pageSize && <div className="reports-pagination"><Pagination current={page} pageSize={pageSize} total={totalCount} showSizeChanger={false} showTotal={(total) => t("{0} kết quả", [total])} onChange={(nextPage) => setPage(nextPage)} /></div>}
       </div>}
-      {reportQuery.isError && <div className="reports-error-retry"><Button onClick={() => void reportQuery.refetch()}>{t("Thử lại")}</Button></div>}
+      {!isProTab && reportQuery.isError && <div className="reports-error-retry"><Button onClick={() => void reportQuery.refetch()}>{t("Thử lại")}</Button></div>}
     </SectionCard>
   </>;
 }

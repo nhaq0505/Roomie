@@ -9,7 +9,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
   SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined,
-  MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined,
+  MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -40,6 +40,7 @@ const ownerItems = [
   { key: '/rooms', icon: <HomeOutlined />, label: t("Phòng & người thuê") },
   { key: '/readings', icon: <CalculatorOutlined />, label: t("Lập hóa đơn") },
   { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
+  { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
   { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
   { type: 'divider' as const },
   { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },

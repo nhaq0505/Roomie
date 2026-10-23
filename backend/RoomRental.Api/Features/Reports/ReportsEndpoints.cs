@@ -50,10 +50,15 @@ public static partial class ReportsEndpoints
         });
 
         routes.MapGet("/{reportType}/export.xlsx", async (string reportType, DateOnly? dateFrom, DateOnly? dateTo,
-            Guid? buildingId, Guid? roomId, HttpContext context, AppDbContext db, CancellationToken ct) =>
+            Guid? buildingId, Guid? roomId, string? periodFrom, string? periodTo, HttpContext context, AppDbContext db,
+            TimeProvider clock, CancellationToken ct) =>
         {
             var filters = ParseFilters(dateFrom, dateTo, buildingId, roomId, page: 1, pageSize: MaxPageSize);
             var ownerId = ApiSupport.OwnerId(context);
+            var normalizedType = reportType.ToLowerInvariant();
+            if (normalizedType is "profit-loss" or "electricity")
+                await ExpenseSupport.EnsureProAsync(db, ownerId, clock.GetUtcNow(), ct,
+                    normalizedType == "profit-loss" ? ProfitLossProMessage : ElectricityProMessage);
             await using var snapshot = await BeginReadSnapshotAsync(db, ct);
             using var workbook = new XLWorkbook();
             switch (reportType.ToLowerInvariant())
@@ -90,6 +95,15 @@ public static partial class ReportsEndpoints
                     AddDepositDetails(workbook, report.Items);
                     break;
                 }
+                case "profit-loss":
+                    await AddProfitLossWorkbookAsync(workbook, db, ownerId, ParseProfitLossFilters(dateFrom, dateTo, buildingId), ct);
+                    break;
+                case "electricity":
+                {
+                    var (from, to) = ParsePeriodRange(periodFrom, periodTo);
+                    await AddElectricityWorkbookAsync(workbook, db, ownerId, from, to, buildingId, ct);
+                    break;
+                }
                 default:
                     throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy loại báo cáo.");
             }
@@ -97,9 +111,11 @@ public static partial class ReportsEndpoints
             await snapshot.CommitAsync(ct);
             await using var stream = new MemoryStream();
             workbook.SaveAs(stream);
-            var fileName = $"roomie-{reportType.ToLowerInvariant()}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx";
+            var fileName = $"roomie-{normalizedType}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xlsx";
             return Results.File(stream.ToArray(), XlsxContentType, fileName);
         });
+
+        MapProfitLossRoutes(routes);
     }
 
     private static Task<decimal> SumMoneyAsync(AppDbContext db, IQueryable<decimal> values, CancellationToken ct) =>
