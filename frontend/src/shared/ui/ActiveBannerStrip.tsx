@@ -58,8 +58,11 @@ export function ActiveBannerStrip({
     }
   };
 
-  return (
-    <div className={`active-marketing-banner ${themeClass}`}>
+  const content = (
+    <div
+      className={`active-marketing-banner ${themeClass}`}
+      style={placement === 'LandingTop' ? { marginBottom: 0 } : undefined}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1 }}>
         <GiftOutlined style={{ fontSize: 20 }} />
         <div>
@@ -108,4 +111,14 @@ export function ActiveBannerStrip({
       )}
     </div>
   );
+
+  if (placement === 'LandingTop') {
+    return (
+      <div style={{ background: 'var(--landing-deep, #0a2028)', padding: '12px 20px 0' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>{content}</div>
+      </div>
+    );
+  }
+
+  return content;
 }
