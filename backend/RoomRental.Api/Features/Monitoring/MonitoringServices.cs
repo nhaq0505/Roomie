@@ -1223,17 +1223,81 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         );
 
         // 4. Sources
-        var sourceEventGroups = events
+        var sourceEvents = events;
+        var sourceRegisteredMilestones = registeredMilestones;
+        var sourceHasRawCoverageMissing = hasRawCoverageMissing;
+        var sourceIsEventsTruncated = isEventsTruncated;
+
+        if (!string.IsNullOrWhiteSpace(filter.SourcesWindow))
+        {
+            var win = filter.SourcesWindow.Trim().ToLowerInvariant();
+            if (win is "1d" or "7d" or "all")
+            {
+                DateTimeOffset? srcStartUtc = win switch
+                {
+                    "1d" => ApiSupport.StartOfVietnamDate(today),
+                    "7d" => ApiSupport.StartOfVietnamDate(today.AddDays(-6)),
+                    _ => null
+                };
+                var srcEndUtc = ApiSupport.EndOfVietnamDate(today);
+
+                var srcEventsQuery = db.AnalyticsEvents.AsNoTracking().AsQueryable();
+                if (srcStartUtc.HasValue)
+                {
+                    srcEventsQuery = srcEventsQuery.Where(e => e.ServerTimestamp >= srcStartUtc.Value && e.ServerTimestamp < srcEndUtc);
+                }
+                else
+                {
+                    srcEventsQuery = srcEventsQuery.Where(e => e.ServerTimestamp < srcEndUtc);
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.Source))
+                    srcEventsQuery = srcEventsQuery.Where(e => e.UtmSource == filter.Source);
+                if (!string.IsNullOrWhiteSpace(filter.Campaign))
+                    srcEventsQuery = srcEventsQuery.Where(e => e.UtmCampaign == filter.Campaign);
+                if (!string.IsNullOrWhiteSpace(filter.Channel))
+                {
+                    srcEventsQuery = srcEventsQuery.Where(e => e.UtmMedium == filter.Channel || (e.UtmCampaign != null && campaignChannels.Contains(e.UtmCampaign)));
+                }
+
+                sourceEvents = await srcEventsQuery.Take(50_001).ToListAsync(ct);
+                sourceIsEventsTruncated = sourceEvents.Count > 50_000;
+                if (sourceIsEventsTruncated)
+                    sourceEvents.RemoveAt(50_000);
+                sourceHasRawCoverageMissing = false;
+
+                var srcMilestonesQuery = db.OwnerMilestones.AsNoTracking().AsQueryable();
+                if (srcStartUtc.HasValue)
+                {
+                    srcMilestonesQuery = srcMilestonesQuery.Where(m => m.RegisteredAt >= srcStartUtc.Value && m.RegisteredAt < srcEndUtc);
+                }
+                else
+                {
+                    srcMilestonesQuery = srcMilestonesQuery.Where(m => m.RegisteredAt != null && m.RegisteredAt < srcEndUtc);
+                }
+
+                if (matchingOwnerIdsQuery != null)
+                {
+                    srcMilestonesQuery = srcMilestonesQuery.Where(m => matchingOwnerIdsQuery.Contains(m.OwnerId));
+                }
+
+                sourceRegisteredMilestones = await srcMilestonesQuery.Take(50_001).ToListAsync(ct);
+                if (sourceRegisteredMilestones.Count > 50_000)
+                    sourceRegisteredMilestones.RemoveAt(50_000);
+            }
+        }
+
+        var sourceEventGroups = sourceEvents
             .GroupBy(e => (Source: e.UtmSource ?? "(direct)", Medium: e.UtmMedium ?? "(none)"))
             .ToDictionary(g => g.Key, g => g.Select(x => x.SessionId).Distinct().Count());
 
-        var regOwnerIds = registeredMilestones.Select(m => m.OwnerId).ToList();
+        var regOwnerIds = sourceRegisteredMilestones.Select(m => m.OwnerId).ToList();
         var attributions = regOwnerIds.Count > 0
             ? await db.RegistrationAttributions.AsNoTracking().Where(a => regOwnerIds.Contains(a.OwnerId)).ToListAsync(ct)
             : [];
         var attrMap = attributions.ToDictionary(a => a.OwnerId);
 
-        var sourceRegGroups = registeredMilestones
+        var sourceRegGroups = sourceRegisteredMilestones
             .GroupBy(m => {
                 if (attrMap.TryGetValue(m.OwnerId, out var attr))
                 {
@@ -1249,7 +1313,7 @@ public sealed class DefaultGrowthMonitoringQueryService(AppDbContext db, TimePro
         var sources = allKeys.Select(k => {
             sourceEventGroups.TryGetValue(k, out var sCount);
             sourceRegGroups.TryGetValue(k, out var regInfo);
-            int? reportedSessions = (hasRawCoverageMissing || isEventsTruncated) ? null : sCount;
+            int? reportedSessions = (sourceHasRawCoverageMissing || sourceIsEventsTruncated) ? null : sCount;
             return new TrafficSourceStatsDto(
                 k.Source,
                 k.Medium == "(none)" ? null : k.Medium,

@@ -60,7 +60,8 @@ public sealed record MonitoringFilterRequest(
     DateOnly? ToDate = null,
     string? Source = null,
     string? Channel = null,
-    string? Campaign = null
+    string? Campaign = null,
+    string? SourcesWindow = null
 );
 
 // Admin Growth Tab DTOs

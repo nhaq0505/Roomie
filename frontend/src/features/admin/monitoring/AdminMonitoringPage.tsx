@@ -25,6 +25,7 @@ import {
 import type {
   CreateCampaignRequest,
   MonitoringFilters,
+  SourcesWindowPreset,
   UpdateCampaignRequest,
   UpsertCampaignCostRequest,
 } from './types';
@@ -64,6 +65,7 @@ export default function AdminMonitoringPage() {
     opsWindow: '1h',
   });
 
+  const [sourcesWindow, setSourcesWindow] = useState<SourcesWindowPreset>('all');
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(new Date());
 
   const filterRequest = {
@@ -74,6 +76,11 @@ export default function AdminMonitoringPage() {
     campaign: filters.campaign,
   };
 
+  const growthFilterRequest = {
+    ...filterRequest,
+    sourcesWindow,
+  };
+
   const campaignCostsFilter = {
     fromDate: filters.dateFrom,
     toDate: filters.dateTo,
@@ -81,7 +88,7 @@ export default function AdminMonitoringPage() {
   };
 
   // Queries
-  const growthQuery = useGrowthMonitoring(filterRequest, activeTab === 'growth');
+  const growthQuery = useGrowthMonitoring(growthFilterRequest, activeTab === 'growth');
   const revenueQuery = useRevenueMonitoring(filterRequest, activeTab === 'revenue');
   const operationsQuery = useOperationsMonitoring(filters.opsWindow, !isMarketer && activeTab === 'operations');
   const incidentsQuery = useMonitoringIncidents(!isMarketer && activeTab === 'operations');
@@ -159,6 +166,8 @@ export default function AdminMonitoringPage() {
           onRetry={() => void growthQuery.refetch()}
           requestedFromDate={filters.dateFrom}
           requestedToDate={filters.dateTo}
+          sourcesWindow={sourcesWindow}
+          onSourcesWindowChange={setSourcesWindow}
         />
       ),
     },

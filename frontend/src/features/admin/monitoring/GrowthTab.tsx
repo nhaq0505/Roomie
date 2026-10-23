@@ -6,7 +6,7 @@ import {
   UserAddOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Col, Row, Space, Table, Tag } from 'antd';
+import { Col, Radio, Row, Space, Table, Tag } from 'antd';
 import type { TableProps } from 'antd';
 import { t } from '../../../shared/i18n/runtime';
 import { SectionCard } from '../../../shared/ui/Ui';
@@ -22,6 +22,7 @@ import type {
   AdminMonitoringGrowthResponse,
   CohortRetentionRowDto,
   CtaPerformanceDto,
+  SourcesWindowPreset,
   TrafficSourceStatsDto,
 } from './types';
 
@@ -33,6 +34,8 @@ interface GrowthTabProps {
   is501?: boolean;
   requestedFromDate?: string;
   requestedToDate?: string;
+  sourcesWindow?: SourcesWindowPreset;
+  onSourcesWindowChange?: (window: SourcesWindowPreset) => void;
 }
 
 export function GrowthTab({
@@ -43,6 +46,8 @@ export function GrowthTab({
   is501,
   requestedFromDate,
   requestedToDate,
+  sourcesWindow = 'all',
+  onSourcesWindowChange,
 }: GrowthTabProps) {
   // Source table columns
   const sourceColumns: TableProps<TrafficSourceStatsDto>['columns'] = [
@@ -327,7 +332,23 @@ export function GrowthTab({
       {/* Traffic & UTM Section */}
       <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
         <Col xs={24} lg={14}>
-          <SectionCard title={t("Thống kê nguồn & UTM")}>
+          <SectionCard
+            title={t("Thống kê nguồn & UTM")}
+            extra={
+              onSourcesWindowChange ? (
+                <Radio.Group
+                  size="small"
+                  buttonStyle="solid"
+                  value={sourcesWindow}
+                  onChange={(e) => onSourcesWindowChange(e.target.value as SourcesWindowPreset)}
+                >
+                  <Radio.Button value="1d">{t("1 ngày")}</Radio.Button>
+                  <Radio.Button value="7d">{t("7 ngày")}</Radio.Button>
+                  <Radio.Button value="all">{t("Tất cả")}</Radio.Button>
+                </Radio.Group>
+              ) : undefined
+            }
+          >
             <div className="monitoring-table-wrapper">
               <Table
                 size="small"

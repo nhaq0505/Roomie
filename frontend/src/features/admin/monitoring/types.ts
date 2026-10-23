@@ -3,6 +3,7 @@
 
 export type DateRangePreset = '7d' | '30d' | '90d' | 'custom';
 export type OpsWindowPreset = '1h' | '24h' | '7d';
+export type SourcesWindowPreset = '1d' | '7d' | 'all';
 
 export interface MonitoringFilters {
   rangePreset: DateRangePreset;
@@ -20,6 +21,7 @@ export interface MonitoringFilterRequest {
   source?: string;
   channel?: string;
   campaign?: string;
+  sourcesWindow?: SourcesWindowPreset;
 }
 
 export interface CampaignCostFilterRequest {

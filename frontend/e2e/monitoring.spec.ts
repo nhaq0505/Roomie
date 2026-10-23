@@ -511,11 +511,16 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
 
   test('Ops Window & Campaign Filter: verifies actual network URLs and window/campaign parameters', async ({ page }) => {
     const requestedOpsWindows: string[] = [];
+    const requestedSourcesWindows: string[] = [];
     let requestedCampaignFilter: string | null = null;
 
     page.on('request', (req) => {
       try {
         const url = new URL(req.url());
+        if (url.pathname.includes('/api/admin/monitoring/growth')) {
+          const sw = url.searchParams.get('sourcesWindow');
+          if (sw) requestedSourcesWindows.push(sw);
+        }
         if (url.pathname.includes('/api/admin/monitoring/operations')) {
           requestedOpsWindows.push(url.searchParams.get('window') || '1h');
         }
@@ -528,6 +533,14 @@ test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
     });
 
     await page.goto('/admin/monitoring');
+
+    // Verify Traffic & UTM sources window filter (1 ngày, 7 ngày, Tất cả)
+    await expect.poll(() => requestedSourcesWindows).toContain('all');
+    const sourcesCard = page.locator('.section-card', { hasText: 'Thống kê nguồn & UTM' });
+    await sourcesCard.locator('label', { hasText: '1 ngày' }).click();
+    await expect.poll(() => requestedSourcesWindows).toContain('1d');
+    await sourcesCard.locator('label', { hasText: '7 ngày' }).click();
+    await expect.poll(() => requestedSourcesWindows).toContain('7d');
 
     // Switch to Operations tab
     await page.getByRole('tab', { name: 'Vận hành' }).click();

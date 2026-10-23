@@ -41,6 +41,7 @@ export const monitoringApi = {
       source: filter.source,
       channel: filter.channel,
       campaign: filter.campaign,
+      sourcesWindow: filter.sourcesWindow,
     });
     return request<AdminMonitoringGrowthResponse>(`/api/admin/monitoring/growth${qs}`);
   },
