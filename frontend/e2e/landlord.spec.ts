@@ -1094,4 +1094,99 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(preview).toContainText('Phạm Hoàng Gia Bảo', { timeout: 8000 });
     await expect(preview).toContainText('079095009999');
   });
+
+  test('Scenario L10: Owner Subscription Voucher Redemption & Error Handling (/account-status)', async ({ page }) => {
+    let currentUser = {
+      ...landlordUser,
+      isPro: false,
+      subscriptionTier: 'Free' as 'Free' | 'Pro',
+      subscriptionExpiresAt: null as string | null,
+      maxRooms: 5 as number | null,
+    };
+
+    let subStatus = {
+      tier: 'Free' as 'Free' | 'Pro',
+      isPro: false,
+      expiresAt: null as string | null,
+      roomCount: 5,
+      maxRooms: 5,
+      availablePackages: [
+        { id: 'pro_1m', name: 'Gói 1 tháng', days: 30, price: 99000, description: 'Gia hạn theo tháng' },
+      ],
+    };
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: currentUser });
+      if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
+      if (path === '/api/subscription') return route.fulfill({ json: subStatus });
+      if (path === '/api/subscription/redeem-code' && method === 'POST') {
+        const body = route.request().postDataJSON() as { code?: string };
+        const code = (body.code ?? '').trim().toUpperCase();
+        if (code === 'HET_HAN') {
+          return route.fulfill({
+            status: 400,
+            json: { message: 'Mã khuyến mãi này đã hết hạn sử dụng.' },
+          });
+        }
+        if (code === 'TANGPRO3') {
+          currentUser = {
+            ...currentUser,
+            isPro: true,
+            subscriptionTier: 'Pro',
+            subscriptionExpiresAt: '2027-01-23T08:00:00Z',
+            maxRooms: null,
+          };
+          subStatus = {
+            ...subStatus,
+            tier: 'Pro',
+            isPro: true,
+            expiresAt: '2027-01-23T08:00:00Z',
+            maxRooms: 999,
+          };
+          return route.fulfill({
+            json: {
+              success: true,
+              message: 'Kích hoạt thành công!',
+              subscriptionTier: 'Pro',
+              subscriptionExpiresAt: '2027-01-23T08:00:00Z',
+              addedMonths: 3,
+            },
+          });
+        }
+        return route.fulfill({ status: 404, json: { message: 'Mã khuyến mãi không tồn tại.' } });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    await page.goto('/account-status');
+    await expect(page.getByRole('heading', { name: 'Gói cước dịch vụ & Giới hạn phòng' })).toBeVisible();
+    await expect(page.getByText('Đã đạt giới hạn phòng của gói Miễn phí')).toBeVisible();
+
+    const voucherInput = page.getByPlaceholder('Ví dụ: TET2026, BANMOI');
+    const applyButton = page.getByRole('button', { name: 'Áp dụng' });
+    await expect(applyButton).toBeDisabled();
+
+    // 1. Try expired voucher code -> error toast shown, input retained for correction
+    await voucherInput.fill('het_han');
+    await expect(voucherInput).toHaveValue('HET_HAN');
+    await expect(applyButton).toBeEnabled();
+    await applyButton.click();
+    await expect(page.getByText('Mã khuyến mãi này đã hết hạn sử dụng.')).toBeVisible();
+    await expect(voucherInput).toHaveValue('HET_HAN');
+
+    // 2. Redeem valid voucher code -> upgraded to Pro, input cleared, limit warning disappears
+    await voucherInput.fill('tangpro3');
+    await expect(voucherInput).toHaveValue('TANGPRO3');
+    await expect(applyButton).not.toHaveClass(/ant-btn-loading/);
+    await applyButton.click();
+
+    await expect(page.getByText('Kích hoạt thành công! Bạn nhận được 3 tháng sử dụng gói Pro.')).toBeVisible();
+    await expect(voucherInput).toHaveValue('');
+    await expect(page.locator('.ant-tag-gold').filter({ hasText: 'PRO' })).toBeVisible();
+    await expect(page.getByText('5 phòng (Không giới hạn)')).toBeVisible();
+  });
 });

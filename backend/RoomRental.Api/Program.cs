@@ -162,7 +162,6 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseMiddleware<SeoMiddleware>();
-app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();

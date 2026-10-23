@@ -9,12 +9,13 @@ test('login enters the owner area and sends credentials only once', async ({page
   let authenticated=false, logins=0;
   await page.route('**/api/**', async route => {
     const path=new URL(route.request().url()).pathname;
-    if(path==='/api/auth/login') {authenticated=true; logins++; return route.fulfill({json:owner});}
+    if(path==='/api/auth/login') {expect(route.request().postDataJSON().rememberMe).toBe(true); authenticated=true; logins++; return route.fulfill({json:owner});}
     if(path==='/api/auth/me') return route.fulfill({status:authenticated?200:401,json:authenticated?owner:{message:'Please sign in.'}});
     return route.fulfill({json:path==='/api/dashboard'?dashboard:path==='/api/invoices'?emptyInvoices:[]});
   });
   await page.goto('/login');
   await expect(page.locator('input[autocomplete=one-time-code]')).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Ghi nhớ đăng nhập' })).toBeChecked();
   await page.getByLabel('Email',{exact:true}).fill(owner.email);
   await page.getByLabel('Mật khẩu',{exact:true}).fill('SmokeOwner123!');
   await page.locator('button[type=submit]').click();
@@ -76,10 +77,14 @@ test('a delayed failed session lookup cannot overwrite a successful login',async
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
     if(path==='/api/auth/me'){await pending;return route.fulfill({status:503,json:{message:'Temporary failure'}});}
-    if(path==='/api/auth/login')return route.fulfill({json:owner});
+    if(path==='/api/auth/login'){expect(route.request().postDataJSON().rememberMe).toBe(false);return route.fulfill({json:owner});}
     return route.fulfill({json:path==='/api/invoices'?emptyInvoices:dashboard});
   });
   await page.goto('/login');
+  const rememberCheckbox=page.getByRole('checkbox', { name: 'Ghi nhớ đăng nhập' });
+  await expect(rememberCheckbox).toBeChecked();
+  await rememberCheckbox.uncheck();
+  await expect(rememberCheckbox).not.toBeChecked();
   await page.getByLabel('Email',{exact:true}).fill(owner.email);
   await page.getByLabel('Mật khẩu',{exact:true}).fill('SmokeOwner123!');
   await page.locator('button[type=submit]').click();await expect(page).toHaveURL(/dashboard/);

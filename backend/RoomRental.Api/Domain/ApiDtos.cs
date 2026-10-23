@@ -13,7 +13,7 @@ public sealed record RegistrationVerificationDto(bool VerificationRequired, stri
 public sealed record VerifyRegistrationRequest(string ChallengeToken, string Code);
 public sealed record ResendRegistrationRequest(string ChallengeToken);
 // Code is accepted only for compatibility with older clients and is ignored.
-public sealed record LoginRequest(string Email, string Password, string? Code = null);
+public sealed record LoginRequest(string Email, string Password, string? Code = null, bool RememberMe = false);
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword, string? ConfirmPassword = null);
 public sealed record ResetPasswordRequest(string Email, string Token, string NewPassword, string ConfirmPassword);
 public sealed record AdminResetPasswordRequest(string CurrentPassword);

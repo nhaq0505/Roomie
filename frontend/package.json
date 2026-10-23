@@ -15,7 +15,8 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "test:dates": "node scripts/test-monitoring-dates.mjs",
     "test:http": "node scripts/test-http-client.mjs",
-    "test:cccd": "node scripts/test-cccd-qr.mjs"
+    "test:cccd": "node scripts/test-cccd-qr.mjs",
+    "test:cccd-qr": "node scripts/test-cccd-qr.mjs"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.24.0",

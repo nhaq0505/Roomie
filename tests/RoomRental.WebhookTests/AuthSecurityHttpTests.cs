@@ -35,7 +35,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -81,7 +82,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -111,13 +113,206 @@ internal static class AuthSecurityHttpTests
         // 4. Request without cookie is rejected
         var unauthResp = await client.GetAsync("/api/auth/me");
         Assert(unauthResp.StatusCode == HttpStatusCode.Unauthorized, "unauthenticated request to protected endpoint returns 401");
+
+        // 5. RememberMe login sets 14-day session and slides when remaining <= 7 days
+        var rememberLoginResp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, RememberMe: true));
+        Assert(rememberLoginResp.StatusCode == HttpStatusCode.OK, "rememberMe login succeeds with 200 OK");
+        var rememberCookie = ExtractSessionCookie(rememberLoginResp);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latest = await db.AuthSessions.OrderByDescending(x => x.ExpiresAt).FirstAsync();
+            Assert(Math.Abs((latest.ExpiresAt - latest.CreatedAt - TimeSpan.FromDays(14)).TotalSeconds) < 2,
+                "rememberMe session has 14-day lifetime in database");
+        }
+
+        // Advance 5 days (9 days remaining > 7 days threshold): no slide yet
+        clock.Advance(TimeSpan.FromDays(5));
+        var beforeHalfResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", rememberCookie);
+        Assert(beforeHalfResp.StatusCode == HttpStatusCode.OK && string.IsNullOrEmpty(ExtractSessionCookie(beforeHalfResp)),
+            "session with more than half lifetime remaining is not re-issued");
+
+        // Advance another 3 days (8 days elapsed, 6 days remaining <= 7 days threshold): slides to now + 14 days
+        clock.Advance(TimeSpan.FromDays(3));
+        var slideResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", rememberCookie);
+        var slidCookie = ExtractSessionCookie(slideResp);
+        Assert(slideResp.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(slidCookie),
+            "session with <= half lifetime remaining slides and re-issues cookie");
+
+        // Advance 10 days after renewal (would have expired without sliding, but still has 4 days left)
+        clock.Advance(TimeSpan.FromDays(10));
+        var afterSlideResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", slidCookie);
+        Assert(afterSlideResp.StatusCode == HttpStatusCode.OK,
+            "slid rememberMe session remains valid past original 14-day window");
+
+        // 6. Standard login (RememberMe: false) sets 12-hour session and slides when remaining <= 6 hours
+        var stdLoginResp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, RememberMe: false));
+        Assert(stdLoginResp.StatusCode == HttpStatusCode.OK, "RememberMe=false login succeeds with 200 OK");
+        var stdCookie = ExtractSessionCookie(stdLoginResp);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latestStd = await db.AuthSessions.OrderByDescending(x => x.CreatedAt).FirstAsync();
+            Assert(Math.Abs((latestStd.ExpiresAt - latestStd.CreatedAt - TimeSpan.FromHours(12)).TotalSeconds) < 2,
+                "RememberMe=false session has 12-hour lifetime in database");
+        }
+
+        // Advance 5 hours (7h remaining > 6h threshold): no slide
+        clock.Advance(TimeSpan.FromHours(5));
+        var stdBeforeHalf = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", stdCookie);
+        Assert(stdBeforeHalf.StatusCode == HttpStatusCode.OK && string.IsNullOrEmpty(ExtractSessionCookie(stdBeforeHalf)),
+            "12h session with 7h remaining (> 6h threshold) does not slide");
+
+        // Advance 1.5 hours (6.5h elapsed, 5.5h remaining <= 6h threshold):
+        // Cross-origin mutating request must be blocked by CSRF guard BEFORE sliding session
+        clock.Advance(TimeSpan.FromMinutes(90));
+        DateTimeOffset preCsrfExpiresAt;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            preCsrfExpiresAt = (await db.AuthSessions.OrderByDescending(x => x.CreatedAt).FirstAsync()).ExpiresAt;
+        }
+        var csrfBlockedReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/change-password")
+        {
+            Content = JsonContent.Create(new ChangePasswordRequest(password, "NewPass12345!", "NewPass12345!"))
+        };
+        csrfBlockedReq.Headers.Add("Cookie", stdCookie);
+        csrfBlockedReq.Headers.Add("Origin", "https://evil.example.com");
+        var csrfBlockedResp = await client.SendAsync(csrfBlockedReq);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var postCsrfExpiresAt = (await db.AuthSessions.OrderByDescending(x => x.CreatedAt).FirstAsync()).ExpiresAt;
+            Assert(csrfBlockedResp.StatusCode == HttpStatusCode.Forbidden &&
+                   string.IsNullOrEmpty(ExtractSessionCookie(csrfBlockedResp)) &&
+                   postCsrfExpiresAt == preCsrfExpiresAt,
+                "cross-origin mutating request is rejected with 403 and does NOT slide session");
+        }
+
+        // Valid GET request at 5.5h remaining slides 12h session to now + 12h
+        var stdSlideResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", stdCookie);
+        var stdSlidCookie = ExtractSessionCookie(stdSlideResp);
+        Assert(stdSlideResp.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(stdSlidCookie),
+            "12h session with <= 6h remaining slides and re-issues cookie");
+
+        // Slide a second time (+6.5h -> 13h since CreatedAt, new ExpiresAt = 25h since CreatedAt > 24h)
+        clock.Advance(TimeSpan.FromMinutes(390));
+        var stdSlide2Resp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", stdSlidCookie);
+        var stdSlid2Cookie = ExtractSessionCookie(stdSlide2Resp);
+        Assert(stdSlide2Resp.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(stdSlid2Cookie),
+            "second slide of 12h session succeeds");
+
+        // Slide a third time (+6.5h -> 19.5h since CreatedAt, when ExpiresAt - CreatedAt == 25h > 1 day):
+        // must remain a 12h session (rm=0), never promoted to 14-day RememberMe lifetime
+        clock.Advance(TimeSpan.FromMinutes(390));
+        var stdSlide3Resp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", stdSlid2Cookie);
+        var stdSlid3Cookie = ExtractSessionCookie(stdSlide3Resp);
+        Assert(stdSlide3Resp.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(stdSlid3Cookie),
+            "third slide of 12h session past 24h since CreatedAt succeeds");
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latestStd = await db.AuthSessions.OrderByDescending(x => x.CreatedAt).FirstAsync();
+            Assert(Math.Abs((latestStd.ExpiresAt - clock.GetUtcNow() - TimeSpan.FromHours(12)).TotalSeconds) < 2,
+                "12h session sliding past 24h total age retains 12h sliding window and is not promoted to 14d");
+        }
+
+        // Advance 7 hours (5h remaining <= 6h threshold):
+        // Re-login request with existing cookie must NOT slide the existing session or emit duplicate Set-Cookie headers
+        clock.Advance(TimeSpan.FromHours(7));
+        DateTimeOffset preReloginExpiresAt;
+        string preReloginSessionId;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latestStd = await db.AuthSessions.OrderByDescending(x => x.CreatedAt).FirstAsync();
+            preReloginExpiresAt = latestStd.ExpiresAt;
+            preReloginSessionId = latestStd.Id;
+        }
+
+        var failedReloginReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new LoginRequest(email, "WrongPassword123!"))
+        };
+        failedReloginReq.Headers.Add("Cookie", stdSlid3Cookie);
+        failedReloginReq.Headers.Add("Origin", "http://localhost");
+        var failedReloginResp = await client.SendAsync(failedReloginReq);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var oldSession = await db.AuthSessions.SingleAsync(x => x.Id == preReloginSessionId);
+            Assert(failedReloginResp.StatusCode == HttpStatusCode.Unauthorized &&
+                   string.IsNullOrEmpty(ExtractSessionCookie(failedReloginResp)) &&
+                   oldSession.ExpiresAt == preReloginExpiresAt,
+                "failed /api/auth/login with active cookie at <= half lifetime does not slide session or emit Set-Cookie");
+        }
+
+        // Now call /api/auth/logout at 5h remaining (<= 6h threshold): must revoke and not slide
+        var logoutReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
+        logoutReq.Headers.Add("Cookie", stdSlid3Cookie);
+        logoutReq.Headers.Add("Origin", "http://localhost");
+        var logoutAtHalfResp = await client.SendAsync(logoutReq);
+        Assert(logoutAtHalfResp.StatusCode == HttpStatusCode.OK, "logout at <= half lifetime succeeds");
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latestStd = await db.AuthSessions.SingleAsync(x => x.Id == preReloginSessionId);
+            Assert(latestStd.RevokedAt.HasValue &&
+                   Math.Abs((latestStd.RevokedAt.Value - clock.GetUtcNow()).TotalSeconds) < 2 &&
+                   Math.Abs((latestStd.ExpiresAt - clock.GetUtcNow() - TimeSpan.FromHours(5)).TotalSeconds) < 2,
+                "logout at <= half lifetime revokes session at clock time without sliding ExpiresAt");
+        }
+
+        // 7. Admin password reset after clock has advanced > 20 days issues valid 30-min token and revokes sessions at clock time
+        Guid ownerId;
+        const string adminEmail = "admin-reset@example.com";
+        const string adminPass = "AdminPass123!";
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<AppUser>>();
+            var ownerUser = await db.Users.SingleAsync(x => x.Email == email);
+            ownerId = ownerUser.Id;
+            var adminUser = new AppUser
+            {
+                Name = "Admin Reset Tester",
+                Email = adminEmail,
+                PasswordHash = "",
+                Role = UserRole.Admin,
+                Status = OwnerStatus.Approved,
+                CreatedAt = clock.GetUtcNow()
+            };
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, adminPass);
+            db.Users.Add(adminUser);
+            await db.SaveChangesAsync();
+        }
+
+        var adminLoginResp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(adminEmail, adminPass));
+        var adminCookie = ExtractSessionCookie(adminLoginResp);
+        var adminResetReq = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/owners/{ownerId}/reset-password")
+        {
+            Content = JsonContent.Create(new AdminResetPasswordRequest(adminPass))
+        };
+        adminResetReq.Headers.Add("Cookie", adminCookie);
+        adminResetReq.Headers.Add("Origin", "http://localhost");
+        var adminResetResp = await client.SendAsync(adminResetReq);
+        Assert(adminResetResp.StatusCode == HttpStatusCode.OK, "admin reset-password succeeds when clock is advanced");
+        using var adminResetDoc = JsonDocument.Parse(await adminResetResp.Content.ReadAsStringAsync());
+        var resetToken = adminResetDoc.RootElement.GetProperty("token").GetString()!;
+
+        const string resetNewPass = "ResetByAdminPass123!";
+        var completeResetResp = await client.PostAsJsonAsync("/api/auth/reset-password",
+            new ResetPasswordRequest(email, resetToken, resetNewPass, resetNewPass));
+        Assert(completeResetResp.StatusCode == HttpStatusCode.OK,
+            "owner completes admin-issued password reset when TimeProvider clock is advanced > 20 days");
     }
 
     private static async Task MultiDevicePasswordChangeSessionRevocationAsync()
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -191,7 +386,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -257,7 +453,7 @@ internal static class AuthSecurityHttpTests
         Assert(rateLimitHit, "endpoint with 'auth' rate limiting policy returns 429 TooManyRequests when limit exceeded");
     }
 
-    private static WebApplication CreateTestApp(string connectionString, TestRegistrationEmailSender emailSender, int authRateLimit = 50)
+    private static WebApplication CreateTestApp(string connectionString, TestRegistrationEmailSender emailSender, int authRateLimit = 50, TimeProvider? clock = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -281,7 +477,7 @@ internal static class AuthSecurityHttpTests
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<IRegistrationEmailSender>(emailSender);
         builder.Services.AddScoped<RegistrationVerificationService>();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(clock ?? TimeProvider.System);
 
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
         {
@@ -290,6 +486,8 @@ internal static class AuthSecurityHttpTests
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             options.ExpireTimeSpan = TimeSpan.FromHours(12);
+            options.SlidingExpiration = false;
+            options.TimeProvider = clock ?? TimeProvider.System;
             options.Events.OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -336,6 +534,7 @@ internal static class AuthSecurityHttpTests
         app.UseMiddleware<RequestSecurityMiddleware>();
         app.UseAuthorization();
         app.MapAuthEndpoints();
+        app.MapAdminEndpoints();
 
         return app;
     }
@@ -368,6 +567,13 @@ internal static class AuthSecurityHttpTests
     {
         if (!condition) throw new Exception("Assertion failed: " + name);
         Console.WriteLine("PASS: " + name);
+    }
+
+    private sealed class ControllableClock(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset _now = initial;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan delta) => _now = _now.Add(delta);
     }
 
     private sealed class TestRegistrationEmailSender : IRegistrationEmailSender

@@ -1,13 +1,16 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { Zalo } from 'zca-js';
 import { Gateway } from './gateway.mjs';
 import { EncryptedStore } from './store.mjs';
 
+const { Zalo } = await import('zca-js').catch(err => {
+  if (err?.code === 'ERR_MODULE_NOT_FOUND') return { Zalo: null };
+  throw err;
+});
 const token = process.env.ZALO_GATEWAY_TOKEN;
 if (!token || token.length < 32) throw new Error('ZALO_GATEWAY_TOKEN must contain at least 32 characters');
 const store = new EncryptedStore(process.env.ZALO_DATA_DIR ?? '.local-data', process.env.ZALO_SESSION_KEY);
-const gateway = new Gateway(store, () => new Zalo({ logging: false, selfListen: false }));
+const gateway = new Gateway(store, () => { if (!Zalo) throw new Error('zca-js is required'); return new Zalo({ logging: false, selfListen: false }); });
 const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json'); res.setHeader('Cache-Control', 'no-store');
   const reply = (status, value) => { res.writeHead(status); res.end(JSON.stringify(value)); };

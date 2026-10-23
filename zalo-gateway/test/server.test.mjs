@@ -27,4 +27,10 @@ test('real HTTP gateway protects session endpoints and exposes no credentials', 
   assert.match(response.headers.get('cache-control'), /no-store/);
   assert.equal((await fetch(url, { method: 'POST', headers })).status, 405);
   assert.equal((await fetch(url.replace('/status', '/unknown'), { headers })).status, 404);
+  const disconnectRes = await fetch(url.replace('/status', '/disconnect'), { method: 'POST', headers });
+  assert.equal(disconnectRes.status, 200);
+  assert.deepEqual(await disconnectRes.json(), { status: 'Disconnected', qrImage: null });
+  const sendUrl = url.replace('/status', '/send');
+  assert.equal((await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify({ attemptId: 'bad', phone: 'bad', message: 'hi' }) })).status, 503);
+  assert.equal((await fetch(sendUrl, { method: 'POST', headers, body: 'x'.repeat(16005) })).status, 413);
 });

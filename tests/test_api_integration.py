@@ -20,9 +20,14 @@ import unittest
 import urllib.error
 import urllib.request
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+try:
+    VIETNAM_TZ: Any = ZoneInfo("Asia/Ho_Chi_Minh")
+except ZoneInfoNotFoundError:
+    VIETNAM_TZ = timezone(timedelta(hours=7))
 
 
 BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:5080").rstrip("/")
@@ -118,7 +123,7 @@ class ApiSession:
 
 def period_offset(month_offset: int) -> str:
     """Return a YYYY-MM period relative to this month."""
-    today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    today = datetime.now(VIETNAM_TZ).date()
     year, month = today.year, today.month + month_offset
     while month < 1:
         year -= 1
@@ -130,7 +135,7 @@ def period_offset(month_offset: int) -> str:
 
 
 def today_vietnam() -> date:
-    return datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    return datetime.now(VIETNAM_TZ).date()
 
 
 def first_day(period: str) -> str:

@@ -226,63 +226,63 @@ public static class AdminPromotionsEndpoints
             if (string.IsNullOrWhiteSpace(code))
                 throw new ApiException(StatusCodes.Status400BadRequest, "Vui lòng nhập mã khuyến mãi.");
 
-            await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-            var promo = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Code == code, ct)
-                ?? throw new ApiException(StatusCodes.Status404NotFound, "Mã khuyến mãi không tồn tại.");
-
-            if (!promo.IsActive)
-                throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này hiện đang bị khóa hoặc ngừng áp dụng.");
-
-            var now = clock.GetUtcNow();
-            if (promo.ExpiresAt.HasValue && promo.ExpiresAt.Value < now)
-                throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã hết hạn sử dụng.");
-
-            if (promo.MaxRedemptions.HasValue && promo.RedeemedCount >= promo.MaxRedemptions.Value)
-                throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã đạt giới hạn lượt sử dụng.");
-
-            var alreadyRedeemed = await db.PromotionRedemptions.AnyAsync(x => x.PromotionCodeId == promo.Id && x.UserId == ownerId, ct);
-            if (alreadyRedeemed)
-                throw new ApiException(StatusCodes.Status400BadRequest, "Bạn đã sử dụng mã khuyến mãi này rồi.");
-
-            var owner = await db.Users.SingleAsync(x => x.Id == ownerId, ct);
-            if (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt == null)
-                throw new ApiException(StatusCodes.Status409Conflict, "Tài khoản của bạn đang ở gói Pro vĩnh viễn, không cần sử dụng thêm mã khuyến mãi.");
-
-            var baseExpiry = (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt.HasValue && owner.SubscriptionExpiresAt.Value > now)
-                ? owner.SubscriptionExpiresAt.Value
-                : now;
-
-            owner.SubscriptionTier = SubscriptionTier.Pro;
-            owner.SubscriptionExpiresAt = baseExpiry.AddMonths(promo.RewardMonths);
-            promo.RedeemedCount++;
-
-            db.PromotionRedemptions.Add(new PromotionRedemption
-            {
-                PromotionCodeId = promo.Id,
-                UserId = ownerId,
-                RedeemedAt = now
-            });
-
             try
             {
+                await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+                var promo = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Code == code, ct)
+                    ?? throw new ApiException(StatusCodes.Status404NotFound, "Mã khuyến mãi không tồn tại.");
+
+                if (!promo.IsActive)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này hiện đang bị khóa hoặc ngừng áp dụng.");
+
+                var now = clock.GetUtcNow();
+                if (promo.ExpiresAt.HasValue && promo.ExpiresAt.Value < now)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã hết hạn sử dụng.");
+
+                if (promo.MaxRedemptions.HasValue && promo.RedeemedCount >= promo.MaxRedemptions.Value)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã đạt giới hạn lượt sử dụng.");
+
+                var alreadyRedeemed = await db.PromotionRedemptions.AnyAsync(x => x.PromotionCodeId == promo.Id && x.UserId == ownerId, ct);
+                if (alreadyRedeemed)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Bạn đã sử dụng mã khuyến mãi này rồi.");
+
+                var owner = await db.Users.SingleAsync(x => x.Id == ownerId, ct);
+                if (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt == null)
+                    throw new ApiException(StatusCodes.Status409Conflict, "Tài khoản của bạn đang ở gói Pro vĩnh viễn, không cần sử dụng thêm mã khuyến mãi.");
+
+                var baseExpiry = (owner.SubscriptionTier == SubscriptionTier.Pro && owner.SubscriptionExpiresAt.HasValue && owner.SubscriptionExpiresAt.Value > now)
+                    ? owner.SubscriptionExpiresAt.Value
+                    : now;
+
+                owner.SubscriptionTier = SubscriptionTier.Pro;
+                owner.SubscriptionExpiresAt = baseExpiry.AddMonths(promo.RewardMonths);
+                promo.RedeemedCount++;
+
+                db.PromotionRedemptions.Add(new PromotionRedemption
+                {
+                    PromotionCodeId = promo.Id,
+                    UserId = ownerId,
+                    RedeemedAt = now
+                });
+
                 await db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
+
+                return Results.Ok(new RedeemPromotionResultDto(
+                    Success: true,
+                    Message: $"Kích hoạt thành công! Bạn nhận được {promo.RewardMonths} tháng sử dụng gói Pro.",
+                    SubscriptionTier: owner.SubscriptionTier.ToString(),
+                    SubscriptionExpiresAt: owner.SubscriptionExpiresAt,
+                    AddedMonths: promo.RewardMonths
+                ));
             }
-            catch (Exception ex) when (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" })
+            catch (Exception ex) when (ex is not ApiException && (ex is DbUpdateConcurrencyException || GetPostgresException(ex) is { SqlState: "40001" or "23505" or "40P01" or "55P03" }))
             {
                 var pg = GetPostgresException(ex);
                 if (pg?.SqlState == "23505")
                     throw new ApiException(StatusCodes.Status409Conflict, "Bạn đã sử dụng mã khuyến mãi này rồi.");
                 throw new ApiException(StatusCodes.Status409Conflict, "Dữ liệu khuyến mãi đang được cập nhật bởi thao tác khác. Vui lòng thử lại.");
             }
-
-            return Results.Ok(new RedeemPromotionResultDto(
-                Success: true,
-                Message: $"Kích hoạt thành công! Bạn nhận được {promo.RewardMonths} tháng sử dụng gói Pro.",
-                SubscriptionTier: owner.SubscriptionTier.ToString(),
-                SubscriptionExpiresAt: owner.SubscriptionExpiresAt,
-                AddedMonths: promo.RewardMonths
-            ));
         }).RequireAuthorization(policy => policy.RequireRole("Owner")).RequireRateLimiting("tenant-payment");
     }
 }

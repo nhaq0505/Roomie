@@ -87,7 +87,8 @@ public sealed class PasswordRecoveryService(AppDbContext db, IPasswordRecoveryEm
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var hash = PasswordSecurity.HashToken(token);
         var row = await db.PasswordRecoveries.SingleOrDefaultAsync(x => x.ResetHash == hash, ct);
-        if (row is null || row.ConsumedAt is not null || row.ResetExpiresAt is null || row.ResetExpiresAt <= clock.GetUtcNow())
+        var now = clock.GetUtcNow();
+        if (row is null || row.ConsumedAt is not null || row.ResetExpiresAt is null || row.ResetExpiresAt <= now)
             throw new ApiException(400, Invalid);
         var user = await db.Users.SingleOrDefaultAsync(x => x.Id == row.UserId && x.Email == row.Email, ct);
         if (user is null || Binding(user) != row.PasswordBinding) throw new ApiException(400, Invalid);
@@ -96,13 +97,13 @@ public sealed class PasswordRecoveryService(AppDbContext db, IPasswordRecoveryEm
         user.PasswordHash = hasher.HashPassword(user, password);
         user.PasswordResetHash = null;
         user.PasswordResetExpiresAt = null;
-        row.ConsumedAt = clock.GetUtcNow();
+        row.ConsumedAt = now;
         row.CodeHash = "";
         row.ProtectedCode = null;
         row.ResetHash = null;
         row.ResetExpiresAt = null;
         row.NotificationPending = true;
-        await PasswordSecurity.RevokeSessionsAsync(db, user.Id, ct);
+        await PasswordSecurity.RevokeSessionsAsync(db, user.Id, ct, now);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }

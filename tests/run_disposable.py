@@ -31,7 +31,7 @@ def wait(url, process):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--app'); parser.add_argument('--image'); parser.add_argument('--provider', choices=['postgres','otp-postgres'], required=True)
     args = parser.parse_args(); app = Path(args.app).resolve() if args.app else ROOT
-    with tempfile.TemporaryDirectory(prefix='roomie-ci-', dir='/tmp') as folder:
+    with tempfile.TemporaryDirectory(prefix='roomie-ci-', dir='/tmp' if os.path.isdir('/tmp') else None) as folder:
         temp = Path(folder); api_port = port(); smtp_port = port(); base = f'http://127.0.0.1:{api_port}'
         outbox = temp/'outbox'; children=[]
         connection = os.environ.get('TEST_HTTP_POSTGRES_CONNECTION', '')
