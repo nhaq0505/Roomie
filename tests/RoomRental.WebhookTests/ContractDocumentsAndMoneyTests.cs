@@ -302,6 +302,7 @@ internal static class ContractDocumentsAndMoneyTests
 
         var req = new UpdateOccupancyDocumentRequest(
             OccupancyId: occ.Id,
+            OwnerName: " Nguyễn Chủ Trọ Mới ",
             OwnerPhone: " 0909888777 ",
             OwnerCitizenId: " 079088001122 ",
             OwnerDateOfBirth: new DateOnly(1985, 5, 15),
@@ -329,9 +330,9 @@ internal static class ContractDocumentsAndMoneyTests
 
         OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(req, owner, building, occ);
 
-        Assert(owner.Phone == "0909888777" && owner.CitizenId == "079088001122" &&
+        Assert(owner.Name == "Nguyễn Chủ Trọ Mới" && owner.Phone == "0909888777" && owner.CitizenId == "079088001122" &&
                owner.CitizenIdIssuedPlace == "Cục CS QLHC" && owner.PermanentAddress == "12 Nguyễn Huệ, Quận 1",
-            "ValidateAndApplyDocumentUpdates updates and trims owner fields");
+            "ValidateAndApplyDocumentUpdates updates and trims owner fields including OwnerName");
         Assert(building.Address == "200 Trần Hưng Đạo, Quận 1" && building.PoliceStationName == "Công an Phường Cầu Kho",
             "ValidateAndApplyDocumentUpdates updates and trims building fields");
         Assert(occ.TenantName == "Trần Văn Mới" && occ.Phone == "0987654321" && occ.TenantCitizenId == "079099003344" &&
@@ -365,8 +366,32 @@ internal static class ContractDocumentsAndMoneyTests
             new UpdateOccupancyDocumentRequest(occ.Id, TenantCitizenId: "ABC123456"), owner, building, occ),
             "ValidateAndApplyDocumentUpdates rejects invalid TenantCitizenId");
         ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(
+            new UpdateOccupancyDocumentRequest(occ.Id, OwnerName: new string('O', 161)), owner, building, occ),
+            "ValidateAndApplyDocumentUpdates rejects OwnerName > 160 chars");
+        ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(
             new UpdateOccupancyDocumentRequest(occ.Id, TenantName: new string('T', 161)), owner, building, occ),
             "ValidateAndApplyDocumentUpdates rejects TenantName > 160 chars");
+
+        // ValidateAndApplyOwnerProfileUpdates (PUT /api/auth/profile)
+        OwnerManagementEndpoints.ValidateAndApplyOwnerProfileUpdates(
+            new UpdateProfileRequest(
+                Name: "  Trần Chủ Hộ Mới  ",
+                Phone: " 0988777666 ",
+                CitizenId: " 079085009988 ",
+                DateOfBirth: new DateOnly(1985, 8, 20),
+                CitizenIdIssuedDate: new DateOnly(2022, 10, 1),
+                CitizenIdIssuedPlace: " Cục Cảnh sát QLHC về TTXH ",
+                PermanentAddress: " 88 Lê Lợi, Quận 1, TP.HCM "),
+            owner);
+        Assert(owner.Name == "Trần Chủ Hộ Mới" && owner.Phone == "0988777666" && owner.CitizenId == "079085009988" &&
+               owner.DateOfBirth == new DateOnly(1985, 8, 20) && owner.PermanentAddress == "88 Lê Lợi, Quận 1, TP.HCM",
+            "ValidateAndApplyOwnerProfileUpdates updates and trims owner profile fields");
+        ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyOwnerProfileUpdates(
+            new UpdateProfileRequest("   "), owner),
+            "ValidateAndApplyOwnerProfileUpdates rejects blank Name");
+        ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyOwnerProfileUpdates(
+            new UpdateProfileRequest(new string('N', 161)), owner),
+            "ValidateAndApplyOwnerProfileUpdates rejects Name > 160 chars");
         ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(
             new UpdateOccupancyDocumentRequest(occ.Id, PoliceStationName: new string('P', 251)), owner, building, occ),
             "ValidateAndApplyDocumentUpdates rejects PoliceStationName > 250 chars");

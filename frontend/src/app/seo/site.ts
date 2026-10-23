@@ -31,7 +31,7 @@ export const privatePageTitles: Record<string, string> = {
   '/reset-password': 'Đặt lại mật khẩu', '/change-password': 'Đổi mật khẩu',
   '/account-status': 'Trạng thái tài khoản', '/dashboard': 'Tổng quan',
   '/buildings': 'Dãy trọ', '/rooms': 'Phòng & người thuê', '/readings': 'Lập hóa đơn',
-  '/invoices': 'Hóa đơn', '/expenses': 'Chi phí', '/reports': 'Báo cáo',
+  '/invoices': 'Hóa đơn', '/expenses': 'Chi phí', '/reports': 'Báo cáo', '/profile': 'Hồ sơ',
   '/settings/zalo': 'Nhắc hóa đơn qua Zalo', '/settings/payment': 'Cấu hình', '/admin/owners': 'Quản lý chủ trọ',
   '/admin/monitoring': 'Giám sát hệ thống', '/admin/promotions': 'Quản lý khuyến mãi',
   '/marketer/leads': 'Chăm sóc chủ trọ', '/marketer/content': 'Cẩm nang & Banner', '/marketer/emails': 'Chiến dịch Email',

@@ -428,7 +428,7 @@ function RoomTenantWorkspace() {
               </Row>
 
               <Row gutter={16}>
-                <Col xs={24} md={10}>
+                <Col xs={24} md={14}>
                   <Form.Item
                     label={t("Số CCCD / Định danh cá nhân (12 số)")}
                     name="tenantCitizenId"
@@ -437,12 +437,7 @@ function RoomTenantWorkspace() {
                     <Input size="large" inputMode="numeric" placeholder={t("Số CCCD")} maxLength={12} />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={7}>
-                  <Form.Item label={t("Ngày sinh")} name="tenantDateOfBirth">
-                    <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                  </Form.Item>
-                </Col>
-                <Col xs={12} md={7}>
+                <Col xs={24} md={10}>
                   <Form.Item label={t("Giới tính")} name="tenantGender">
                     <Select
                       size="large"
@@ -458,14 +453,27 @@ function RoomTenantWorkspace() {
               </Row>
 
               <Row gutter={16}>
-                <Col xs={12} md={8}>
+                <Col xs={12} md={12}>
+                  <Form.Item label={t("Ngày sinh")} name="tenantDateOfBirth">
+                    <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} md={12}>
                   <Form.Item label={t("Ngày cấp CCCD")} name="tenantCitizenIdIssuedDate">
                     <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={16}>
+              </Row>
+
+              <Row gutter={16}>
+                <Col xs={24} md={14}>
                   <Form.Item label={t("Nơi cấp CCCD")} name="tenantCitizenIdIssuedPlace">
                     <Input size="large" maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={10}>
+                  <Form.Item label={t("Mối quan hệ với chủ hộ")} name="householdHeadRelation">
+                    <Input size="large" maxLength={100} placeholder={t("Người thuê trọ")} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -479,14 +487,6 @@ function RoomTenantWorkspace() {
                 <Col xs={24} md={10}>
                   <Form.Item label={t("Email liên hệ (nếu có)")} name="tenantEmail">
                     <Input size="large" maxLength={320} placeholder="email@example.com" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} md={12}>
-                  <Form.Item label={t("Mối quan hệ với chủ hộ")} name="householdHeadRelation">
-                    <Input size="large" maxLength={100} placeholder={t("Người thuê trọ")} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -581,7 +581,7 @@ function RoomTenantWorkspace() {
                               </Space>
                             </div>
                             <Row gutter={12}>
-                              <Col xs={24} md={7}>
+                              <Col xs={24} md={14}>
                                 <Form.Item
                                   label={t("Họ và tên")}
                                   name={[field.name, 'fullName']}
@@ -590,7 +590,7 @@ function RoomTenantWorkspace() {
                                   <Input placeholder={t("Họ và tên")} maxLength={160} />
                                 </Form.Item>
                               </Col>
-                              <Col xs={14} md={5}>
+                              <Col xs={24} md={10}>
                                 <Form.Item
                                   label={t("Số CCCD")}
                                   name={[field.name, 'citizenId']}
@@ -599,7 +599,14 @@ function RoomTenantWorkspace() {
                                   <Input placeholder={t("Số CCCD")} maxLength={12} />
                                 </Form.Item>
                               </Col>
-                              <Col xs={10} md={3}>
+                            </Row>
+                            <Row gutter={12}>
+                              <Col xs={12} md={8}>
+                                <Form.Item label={t("Ngày sinh")} name={[field.name, 'dateOfBirth']}>
+                                  <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={12} md={6}>
                                 <Form.Item label={t("Giới tính")} name={[field.name, 'gender']}>
                                   <Select
                                     allowClear
@@ -611,12 +618,7 @@ function RoomTenantWorkspace() {
                                   />
                                 </Form.Item>
                               </Col>
-                              <Col xs={12} md={4}>
-                                <Form.Item label={t("Ngày sinh")} name={[field.name, 'dateOfBirth']}>
-                                  <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={12} md={5}>
+                              <Col xs={24} md={10}>
                                 <Form.Item label={t("Mối quan hệ với chủ hộ")} name={[field.name, 'relation']}>
                                   <Input placeholder={t("Người thuê trọ")} maxLength={100} />
                                 </Form.Item>
@@ -638,7 +640,7 @@ function RoomTenantWorkspace() {
                 </Typography.Title>
               </div>
               <Row gutter={16}>
-                <Col xs={12} md={8}>
+                <Col xs={12} md={9}>
                   <Form.Item label={t("Ngày kết thúc hợp đồng")} name="contractEndDate">
                     <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                   </Form.Item>
@@ -648,7 +650,7 @@ function RoomTenantWorkspace() {
                     <InputNumber size="large" min={1} max={28} precision={0} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={8}>
+                <Col xs={24} md={7}>
                   <Form.Item label={t("Diện tích phòng")} name="roomAreaSqm">
                     <InputNumber size="large" min={0} max={10000} step={1} addonAfter="m²" style={{ width: '100%' }} />
                   </Form.Item>
@@ -711,7 +713,7 @@ function RoomTenantWorkspace() {
                     extra={t("Nhập 0 nếu không thu cọc. Đây là khoản phải thu, chưa ghi nhận khách đã trả.")}
                     rules={[{ required: true, type: 'number', min: 0, max: 2147483647, message: t("Nhập số tiền cọc hợp lệ.") }]}
                   >
-                    <MoneyInput min={0} max={2147483647} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} />
+                    <MoneyInput size="large" min={0} max={2147483647} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} />
                   </Form.Item>
                 </>
               )}

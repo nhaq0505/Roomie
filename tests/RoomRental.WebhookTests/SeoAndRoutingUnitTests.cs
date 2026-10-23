@@ -48,7 +48,7 @@ internal static class SeoAndRoutingUnitTests
         // 2. Private SPA paths (including new routes: /rooms/:id/tenant, /rooms/:id/documents, /admin/promotions, /settings/zalo, /admin/monitoring)
         string[] validAppPaths =
         [
-            "/login", "/login/", "/register", "/reset-password", "/change-password", "/account-status",
+            "/login", "/login/", "/register", "/reset-password", "/change-password", "/account-status", "/profile",
             "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/expenses", "/reports",
             "/settings/payment", "/settings/zalo",
             "/admin/owners", "/admin/monitoring", "/admin/promotions", "/admin/promotions/",

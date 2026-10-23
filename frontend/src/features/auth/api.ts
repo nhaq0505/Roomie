@@ -1,5 +1,5 @@
-import { post, request } from '../../shared/http/client';
-import type { RegistrationVerification, User } from './types';
+import { json, post, request } from '../../shared/http/client';
+import type { RegistrationVerification, UpdateProfilePayload, User } from './types';
 
 
 export const authApi = {
@@ -10,6 +10,7 @@ export const authApi = {
     verifyRegistration: (challengeToken: string, code: string) => request<User>('/api/auth/verify-registration', post({ challengeToken, code })),
     resendRegistration: (challengeToken: string) => request<RegistrationVerification>('/api/auth/resend-registration', post({ challengeToken })),
     me: () => request<User>('/api/auth/me'),
+    updateProfile: (body: UpdateProfilePayload) => request<User>('/api/auth/profile', { method: 'PUT', body: json(body) }),
     changePassword: (body: { currentPassword: string; newPassword: string; confirmPassword?: string }) => request<{ success: boolean }>('/api/auth/change-password', post(body)),
     resetPassword: (body: { email: string; token: string; newPassword: string; confirmPassword: string }) => request<{ success: boolean }>('/api/auth/reset-password', post(body)),
     logout: () => request<void>('/api/auth/logout', post()),

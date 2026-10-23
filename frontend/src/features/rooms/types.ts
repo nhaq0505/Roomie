@@ -154,6 +154,7 @@ export interface OccupancyDocumentData {
 
 export interface UpdateOccupancyDocumentRequest {
   occupancyId: string;
+  ownerName?: string | null;
   ownerPhone?: string | null;
   ownerCitizenId?: string | null;
   ownerDateOfBirth?: string | null;

@@ -2130,5 +2130,10 @@
   "Hướng dẫn bắt đầu ({0}/{1})": "Getting started ({0}/{1})",
   "Cần thiết lập tài khoản nhận tiền": "Payment account setup required",
   "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "Simply select your bank and enter your VietQR account number (or connect payOS) to start sharing invoice links with tenants.",
-  "Mở Cài đặt thanh toán": "Open Payment Settings"
+  "Mở Cài đặt thanh toán": "Open Payment Settings",
+  "Thông tin chủ trọ (Bên A)": "Landlord profile (Party A)",
+  "Cập nhật họ tên, số điện thoại và CCCD của chủ trọ dùng chung cho mọi hợp đồng thuê phòng và tờ khai CT01.": "Update the landlord's full name, phone number, and Citizen ID shared across all rental contracts and CT01 forms.",
+  "Đã cập nhật thông tin chủ trọ.": "Landlord information updated.",
+  "Hồ sơ": "Profile",
+  "HỒ SƠ CHỦ TRỌ": "LANDLORD PROFILE"
 }

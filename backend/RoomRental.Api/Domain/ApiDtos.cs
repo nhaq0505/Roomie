@@ -1,6 +1,30 @@
 namespace RoomRental.Api.Domain;
 
-public sealed record UserDto(Guid Id, string Name, string Email, string Role, string Status, string SubscriptionTier = "Free", DateTimeOffset? SubscriptionExpiresAt = null, int MaxRooms = 5, bool MfaEnabled = false, bool MfaRequired = false);
+public sealed record UserDto(
+    Guid Id,
+    string Name,
+    string Email,
+    string Role,
+    string Status,
+    string SubscriptionTier = "Free",
+    DateTimeOffset? SubscriptionExpiresAt = null,
+    int MaxRooms = 5,
+    bool MfaEnabled = false,
+    bool MfaRequired = false,
+    string? Phone = null,
+    string? CitizenId = null,
+    DateOnly? DateOfBirth = null,
+    DateOnly? CitizenIdIssuedDate = null,
+    string? CitizenIdIssuedPlace = null,
+    string? PermanentAddress = null);
+public sealed record UpdateProfileRequest(
+    string Name,
+    string? Phone = null,
+    string? CitizenId = null,
+    DateOnly? DateOfBirth = null,
+    DateOnly? CitizenIdIssuedDate = null,
+    string? CitizenIdIssuedPlace = null,
+    string? PermanentAddress = null);
 public sealed record OwnerAdminDto(Guid Id, string Name, string Email, string? Phone, string Status, string? Reason, DateTimeOffset CreatedAt, string SubscriptionTier = "Free", DateTimeOffset? SubscriptionExpiresAt = null, bool IsPro = false, int RoomCount = 0, int MaxRooms = 5);
 public sealed record MarketerAdminDto(Guid Id, string Name, string Email, string? Phone, string Status, string? Reason, DateTimeOffset CreatedAt);
 public sealed record CreateMarketerRequest(string Name, string Email, string Password, string? Phone = null);

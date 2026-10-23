@@ -9,6 +9,7 @@ interface AuthValue {
   ready: boolean;
   error: Error | null;
   setUser: (user: User | null) => void;
+  patchUser: (patch: Partial<User>) => void;
   refresh: () => Promise<User | null>;
   signOut: () => Promise<void>;
 }
@@ -26,6 +27,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void queryClient.cancelQueries();
     queryClient.clear(); setError(null); setUserState(next); setReady(true);
   }, [queryClient]);
+  const patchUser = useCallback((patch: Partial<User>) => {
+    setUserState((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
   const refresh = useCallback(async () => {
     const request = ++generation.current;
     setError(null);
@@ -55,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (/^\/(?:t|tenant)\/[^/]+/.test(window.location.pathname)) { setReady(true); return; }
     void refresh();
   }, [refresh]);
-  const value = useMemo(() => ({ user, ready, error, setUser, refresh, signOut }), [user, ready, error, refresh, signOut]);
+  const value = useMemo(() => ({ user, ready, error, setUser, patchUser, refresh, signOut }), [user, ready, error, setUser, patchUser, refresh, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

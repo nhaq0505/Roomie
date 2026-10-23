@@ -2130,5 +2130,10 @@
   "Hướng dẫn bắt đầu ({0}/{1})": "시작 가이드 ({0}/{1})",
   "Cần thiết lập tài khoản nhận tiền": "수취 계좌 설정 필요",
   "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "은행을 선택하고 VietQR 계좌번호를 입력(또는 payOS 연결)하면 세입자에게 청구서 링크를 발급할 수 있습니다.",
-  "Mở Cài đặt thanh toán": "결제 설정 열기"
+  "Mở Cài đặt thanh toán": "결제 설정 열기",
+  "Thông tin chủ trọ (Bên A)": "임대인 정보 (갑)",
+  "Cập nhật họ tên, số điện thoại và CCCD của chủ trọ dùng chung cho mọi hợp đồng thuê phòng và tờ khai CT01.": "모든 임대차 계약서 및 CT01 신고서에 공통으로 사용되는 임대인 성명, 전화번호 및 신분증 정보를 수정합니다.",
+  "Đã cập nhật thông tin chủ trọ.": "임대인 정보가 업데이트되었습니다.",
+  "Hồ sơ": "프로필",
+  "HỒ SƠ CHỦ TRỌ": "임대인 프로필"
 }

@@ -234,6 +234,19 @@ public static class AuthEndpoints
             return Results.Ok(ToDto(user));
         }).RequireAuthorization();
 
+        routes.MapPut("/profile", async (UpdateProfileRequest request, HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+        {
+            var userId = ApiSupport.UserId(context);
+            await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+            var user = await db.Users.SingleOrDefaultAsync(row => row.Id == userId, cancellationToken)
+                ?? throw new ApiException(StatusCodes.Status401Unauthorized, "Please sign in.");
+            OwnerManagementEndpoints.ValidateAndApplyOwnerProfileUpdates(request, user);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(ToDto(user));
+        }).RequireAuthorization();
+
         routes.MapPost("/logout", async (HttpContext context, AppDbContext db, TimeProvider clock, CancellationToken cancellationToken) =>
         {
             var sessionId = context.User.FindFirst("sid")?.Value;
@@ -260,6 +273,14 @@ public static class AuthEndpoints
         user.Status.ToString(),
         user.SubscriptionTier.ToString(),
         user.SubscriptionExpiresAt,
-        user.MaxRooms, false, false
+        user.MaxRooms,
+        false,
+        false,
+        user.Phone,
+        user.CitizenId,
+        user.DateOfBirth,
+        user.CitizenIdIssuedDate,
+        user.CitizenIdIssuedPlace,
+        user.PermanentAddress
     );
 }

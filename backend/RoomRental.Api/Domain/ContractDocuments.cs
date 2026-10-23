@@ -82,4 +82,5 @@ public sealed record UpdateOccupancyDocumentRequest(
     string? HandoverAssets = null,
     string? AdditionalTerms = null,
     string? HouseholdHeadRelation = null,
-    IReadOnlyList<CoResidentDto>? CoResidents = null);
+    IReadOnlyList<CoResidentDto>? CoResidents = null,
+    string? OwnerName = null);

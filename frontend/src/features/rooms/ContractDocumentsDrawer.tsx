@@ -7,6 +7,7 @@ import { formatVnd } from '../../shared/format';
 import { legalContractTemplate, legalCt01Template } from '../../shared/i18n/legalTemplates';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import { LoadError, PageTitle } from '../../shared/ui/Ui';
+import { useAuth } from '../auth/session';
 import CccdQrScannerModal from './CccdQrScannerModal';
 import type { ParsedCccdQr } from './cccdQr';
 import { roomsApi } from './api';
@@ -30,6 +31,7 @@ interface CoResidentFormItem {
 }
 
 interface DocumentFormValues {
+  ownerName?: string;
   ownerPhone?: string;
   ownerCitizenId?: string;
   ownerDateOfBirth?: Dayjs | null;
@@ -88,6 +90,7 @@ export default function ContractDocumentsDrawer({
 }) {
   const targetRoomId = room?.id ?? propRoomId ?? '';
   const { message } = App.useApp();
+  const { patchUser } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<DocumentTab>(initialTab);
   const [form] = Form.useForm<DocumentFormValues>();
@@ -121,6 +124,7 @@ export default function ContractDocumentsDrawer({
     initializedOccupancyId.current = data.occupancyId;
     serverDocSignatureRef.current = nextSignature;
     form.setFieldsValue({
+      ownerName: data.ownerName ?? '',
       ownerPhone: data.ownerPhone ?? '',
       ownerCitizenId: data.ownerCitizenId ?? '',
       ownerDateOfBirth: toDayjs(data.ownerDateOfBirth),
@@ -175,6 +179,7 @@ export default function ContractDocumentsDrawer({
 
     if (qrTarget.kind === 'owner') {
       form.setFieldsValue({
+        ownerName: parsed.fullName || form.getFieldValue('ownerName'),
         ownerCitizenId: parsed.citizenId,
         ownerDateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : form.getFieldValue('ownerDateOfBirth'),
         ownerPermanentAddress: parsed.permanentAddress || form.getFieldValue('ownerPermanentAddress'),
@@ -226,6 +231,7 @@ export default function ContractDocumentsDrawer({
 
   const buildPayload = (values: DocumentFormValues): UpdateOccupancyDocumentRequest => ({
     occupancyId: data!.occupancyId,
+    ownerName: values.ownerName?.trim() || data!.ownerName,
     ownerPhone: values.ownerPhone?.trim() || null,
     ownerCitizenId: values.ownerCitizenId?.trim() || null,
     ownerDateOfBirth: values.ownerDateOfBirth ? values.ownerDateOfBirth.format('YYYY-MM-DD') : null,
@@ -265,6 +271,15 @@ export default function ContractDocumentsDrawer({
     onSuccess: async (updated) => {
       serverDocSignatureRef.current = JSON.stringify(updated);
       queryClient.setQueryData(['room-documents', targetRoomId], updated);
+      patchUser({
+        name: updated.ownerName,
+        phone: updated.ownerPhone,
+        citizenId: updated.ownerCitizenId,
+        dateOfBirth: updated.ownerDateOfBirth,
+        citizenIdIssuedDate: updated.ownerCitizenIdIssuedDate,
+        citizenIdIssuedPlace: updated.ownerCitizenIdIssuedPlace,
+        permanentAddress: updated.ownerPermanentAddress,
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['rooms'] }),
         queryClient.invalidateQueries({ queryKey: ['buildings'] }),
@@ -401,6 +416,7 @@ export default function ContractDocumentsDrawer({
     const v = watchedValues ?? {};
     return {
       ...data,
+      ownerName: v.ownerName?.trim() || data.ownerName,
       ownerPhone: v.ownerPhone ?? data.ownerPhone,
       ownerCitizenId: v.ownerCitizenId ?? data.ownerCitizenId,
       ownerDateOfBirth: v.ownerDateOfBirth ?? toDayjs(data.ownerDateOfBirth),
@@ -516,7 +532,7 @@ export default function ContractDocumentsDrawer({
                           </Col>
                         </Row>
                         <Row gutter={12}>
-                          <Col xs={24} sm={12}>
+                          <Col xs={24} sm={16}>
                             <Form.Item
                               name="tenantCitizenId"
                               label={t("Số CCCD / Định danh cá nhân (12 số)")}
@@ -525,12 +541,7 @@ export default function ContractDocumentsDrawer({
                               <Input maxLength={12} placeholder="07909900xxxx" />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={6}>
-                            <Form.Item name="tenantDateOfBirth" label={t("Ngày sinh")}>
-                              <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={12} sm={6}>
+                          <Col xs={24} sm={8}>
                             <Form.Item name="tenantGender" label={t("Giới tính")}>
                               <Select
                                 allowClear
@@ -544,17 +555,20 @@ export default function ContractDocumentsDrawer({
                           </Col>
                         </Row>
                         <Row gutter={12}>
-                          <Col xs={12} sm={8}>
+                          <Col xs={12} sm={12}>
+                            <Form.Item name="tenantDateOfBirth" label={t("Ngày sinh")}>
+                              <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={12} sm={12}>
                             <Form.Item name="tenantCitizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={16}>
-                            <Form.Item name="tenantCitizenIdIssuedPlace" label={t("Nơi cấp CCCD")}>
-                              <Input maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
-                            </Form.Item>
-                          </Col>
                         </Row>
+                        <Form.Item name="tenantCitizenIdIssuedPlace" label={t("Nơi cấp CCCD")}>
+                          <Input maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
+                        </Form.Item>
                         <Form.Item name="tenantPermanentAddress" label={t("Địa chỉ thường trú")}>
                           <Input maxLength={500} placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")} />
                         </Form.Item>
@@ -582,8 +596,12 @@ export default function ContractDocumentsDrawer({
                         </div>
                         <Row gutter={12}>
                           <Col xs={24} sm={12}>
-                            <Form.Item label={t("Họ và tên chủ trọ")}>
-                              <Input value={data.ownerName} disabled />
+                            <Form.Item
+                              name="ownerName"
+                              label={t("Họ và tên chủ trọ")}
+                              rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên.") }]}
+                            >
+                              <Input maxLength={160} placeholder={t("Họ và tên")} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={12}>
@@ -592,22 +610,20 @@ export default function ContractDocumentsDrawer({
                             </Form.Item>
                           </Col>
                         </Row>
+                        <Form.Item
+                          name="ownerCitizenId"
+                          label={t("Số CCCD / Định danh chủ hộ (12 số)")}
+                          rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                        >
+                          <Input maxLength={12} placeholder="07908800xxxx" />
+                        </Form.Item>
                         <Row gutter={12}>
-                          <Col xs={24} sm={12}>
-                            <Form.Item
-                              name="ownerCitizenId"
-                              label={t("Số CCCD / Định danh chủ hộ (12 số)")}
-                              rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
-                            >
-                              <Input maxLength={12} placeholder="07908800xxxx" />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={12} sm={6}>
+                          <Col xs={12} sm={12}>
                             <Form.Item name="ownerDateOfBirth" label={t("Ngày sinh")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={6}>
+                          <Col xs={12} sm={12}>
                             <Form.Item name="ownerCitizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
@@ -630,8 +646,8 @@ export default function ContractDocumentsDrawer({
                         <Form.Item name="buildingAddress" label={t("Địa chỉ nhà trọ / nơi đăng ký tạm trú")}>
                           <Input maxLength={500} placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")} />
                         </Form.Item>
-                        <Row gutter={12}>
-                          <Col xs={24} sm={8}>
+                        <Row gutter={8}>
+                          <Col xs={12} sm={9}>
                             <Form.Item name="contractEndDate" label={t("Ngày kết thúc hợp đồng")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
@@ -641,7 +657,7 @@ export default function ContractDocumentsDrawer({
                               <InputNumber min={1} max={28} precision={0} style={{ width: '100%' }} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={8}>
+                          <Col xs={24} sm={7}>
                             <Form.Item name="roomAreaSqm" label={t("Diện tích phòng")}>
                               <InputNumber min={0} max={10000} step={1} style={{ width: '100%' }} addonAfter="m²" />
                             </Form.Item>
@@ -697,8 +713,27 @@ export default function ContractDocumentsDrawer({
                             <div className="co-residents-list">
                               {fields.map(({ key, name, ...restField }, index) => (
                                 <div key={key} className="co-resident-item">
-                                  <Row gutter={8} align="middle">
-                                    <Col xs={24} sm={9}>
+                                  <div className="co-resident-item-head">
+                                    <Typography.Text strong style={{ fontSize: 13 }}>#{index + 1}</Typography.Text>
+                                    <Space size={4}>
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<QrcodeOutlined />}
+                                        onClick={() => setQrTarget({ kind: 'coResident-row', index })}
+                                      />
+                                      <Button
+                                        danger
+                                        size="small"
+                                        type="text"
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => remove(name)}
+                                        aria-label={t("Xóa thành viên")}
+                                      />
+                                    </Space>
+                                  </div>
+                                  <Row gutter={10}>
+                                    <Col xs={24} sm={14}>
                                       <Form.Item
                                         {...restField}
                                         name={[name, 'fullName']}
@@ -708,12 +743,24 @@ export default function ContractDocumentsDrawer({
                                         <Input placeholder={t("Họ và tên")} maxLength={160} />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={12} sm={6}>
+                                    <Col xs={24} sm={10}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'citizenId']}
+                                        label={t("Số CCCD")}
+                                        rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                                      >
+                                        <Input maxLength={12} placeholder="07909900xxxx" />
+                                      </Form.Item>
+                                    </Col>
+                                  </Row>
+                                  <Row gutter={10}>
+                                    <Col xs={12} sm={8}>
                                       <Form.Item {...restField} name={[name, 'dateOfBirth']} label={t("Ngày sinh")}>
                                         <DatePicker format={dateFormat()} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={12} sm={4}>
+                                    <Col xs={12} sm={6}>
                                       <Form.Item {...restField} name={[name, 'gender']} label={t("Giới tính")}>
                                         <Select
                                           allowClear
@@ -724,37 +771,10 @@ export default function ContractDocumentsDrawer({
                                         />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={12} sm={5}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'citizenId']}
-                                        label={t("Số CCCD")}
-                                        rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
-                                      >
-                                        <Input maxLength={12} placeholder="07909900xxxx" />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={10} sm={18}>
+                                    <Col xs={24} sm={10}>
                                       <Form.Item {...restField} name={[name, 'relation']} label={t("Mối quan hệ với chủ hộ")}>
                                         <Input maxLength={100} placeholder={t("Người thuê trọ")} />
                                       </Form.Item>
-                                    </Col>
-                                    <Col xs={14} sm={6} style={{ textAlign: 'right' }}>
-                                      <Space size={4}>
-                                        <Button
-                                          size="small"
-                                          type="text"
-                                          icon={<QrcodeOutlined />}
-                                          onClick={() => setQrTarget({ kind: 'coResident-row', index })}
-                                        />
-                                        <Button
-                                          danger
-                                          type="text"
-                                          icon={<DeleteOutlined />}
-                                          onClick={() => remove(name)}
-                                          aria-label={t("Xóa thành viên")}
-                                        />
-                                      </Space>
                                     </Col>
                                   </Row>
                                 </div>
@@ -864,7 +884,7 @@ export default function ContractDocumentsDrawer({
     <Drawer
       className="contract-documents-drawer"
       title={t("Hợp đồng thuê trọ & Tờ khai CT01 · {0}", [displayRoomName])}
-      width={1220}
+      width={1280}
       open
       onClose={onClose}
       extra={headerActions}

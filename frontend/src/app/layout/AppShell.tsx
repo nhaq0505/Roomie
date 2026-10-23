@@ -44,7 +44,8 @@ const ownerItems = [
   { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
   { type: 'divider' as const },
   { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
-  { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
+  { key: '/profile', icon: <UserOutlined />, label: t("Hồ sơ") },
+  { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước") },
 ];
 const marketerItems = [
   { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Tăng trưởng & Doanh thu") },
@@ -73,11 +74,15 @@ const adminItems = [
   const userMenu: MenuProps['items'] = [
     { key: 'account', label: <div className="user-menu-info"><strong>{user?.name}</strong><span>{user?.email}</span></div>, disabled: true },
     { type: 'divider' },
-    ...(!isStaff ? [{ key: 'subscription', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") }] : []),
+    ...(!isStaff ? [
+      { key: 'profile', icon: <UserOutlined />, label: t("Hồ sơ") },
+      { key: 'subscription', icon: <CrownOutlined />, label: t("Gói cước") },
+    ] : []),
     { key: 'password', label: t("Đổi mật khẩu") },
     { key: 'logout', icon: <LogoutOutlined />, label: t("Đăng xuất") },
   ];
   const handleMenu = ({ key }: { key: string }) => {
+    if (key === 'profile') navigate('/profile');
     if (key === 'subscription') navigate('/account-status');
     if (key === 'password') setPasswordOpen(true);
     if (key === 'logout') void signOut().then(() => navigate('/login')).catch((error: Error) => message.error(error.message));

@@ -110,12 +110,14 @@
 }
 
 .room-tenant-main-column {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
 .room-tenant-side-column {
+  min-width: 0;
   position: sticky;
   top: 20px;
 }

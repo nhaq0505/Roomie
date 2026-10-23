@@ -1,5 +1,22 @@
 .archive-filter-toolbar { display: flex; justify-content: flex-end; margin: -7px 0 16px; }
 .archive-filter-toolbar > label { display: grid; width: min(100%, 260px); gap: 6px; color: #526970; font-size: 12px; font-weight: 600; }
-.building-card-archived { opacity: .91; }
+.building-card-archived {
+  opacity: 0.94;
+  border-color: #e4dcc8;
+  background: linear-gradient(180deg, #fbf7ee 0%, #ffffff 96px);
+}
+.building-card-archived::before {
+  background: linear-gradient(90deg, #b8924a 0%, #d4b06a 100%);
+}
+.building-card-archived .building-card-icon {
+  background: linear-gradient(135deg, #8b6f3b 0%, #ad8b4c 100%);
+  box-shadow: 0 6px 14px rgba(139, 111, 59, 0.2);
+}
+.building-card-archived .building-room-count {
+  border-color: #e6dec8;
+}
+.building-card-archived .building-room-count strong {
+  color: #796030;
+}
 .building-archived-tag { margin: 0; white-space: normal; }
 .archived-summary .summary-icon { color: #79673d; background: #f8f1dd; }

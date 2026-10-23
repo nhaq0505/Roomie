@@ -163,6 +163,24 @@ public static partial class OwnerManagementEndpoints
             CoResidents: coResidents);
     }
 
+    internal static void ValidateAndApplyOwnerProfileUpdates(
+        UpdateProfileRequest request,
+        AppUser owner)
+    {
+        var name = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 160)
+            throw new ApiException(StatusCodes.Status400BadRequest, "Vui lòng nhập họ tên tối đa 160 ký tự.");
+        var ownerCitizenId = ValidateAndCleanCitizenId(request.CitizenId, "Số CCCD/Định danh của chủ trọ");
+
+        owner.Name = name;
+        owner.Phone = CleanOptional(request.Phone, 60, "Số điện thoại chủ trọ");
+        owner.CitizenId = ownerCitizenId;
+        owner.DateOfBirth = request.DateOfBirth;
+        owner.CitizenIdIssuedDate = request.CitizenIdIssuedDate;
+        owner.CitizenIdIssuedPlace = CleanOptional(request.CitizenIdIssuedPlace, 200, "Nơi cấp CCCD của chủ trọ");
+        owner.PermanentAddress = CleanOptional(request.PermanentAddress, 500, "Địa chỉ thường trú của chủ trọ");
+    }
+
     internal static void ValidateAndApplyDocumentUpdates(
         UpdateOccupancyDocumentRequest request,
         AppUser owner,
@@ -171,6 +189,14 @@ public static partial class OwnerManagementEndpoints
     {
         var ownerCitizenId = ValidateAndCleanCitizenId(request.OwnerCitizenId, "Số CCCD/Định danh của chủ trọ");
         var tenantCitizenId = ValidateAndCleanCitizenId(request.TenantCitizenId, "Số CCCD/Định danh của người thuê");
+
+        if (!string.IsNullOrWhiteSpace(request.OwnerName))
+        {
+            var ownerName = request.OwnerName.Trim();
+            if (ownerName.Length > 160)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Vui lòng nhập họ tên tối đa 160 ký tự.");
+            owner.Name = ownerName;
+        }
 
         if (request.OwnerPhone is not null)
             owner.Phone = CleanOptional(request.OwnerPhone, 60, "Số điện thoại chủ trọ");

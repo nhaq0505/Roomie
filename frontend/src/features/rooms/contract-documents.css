@@ -9,15 +9,25 @@
 
 .contract-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(380px, 480px) minmax(0, 1fr);
+  grid-template-columns: minmax(460px, 500px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
 
 .contract-form-pane {
+  min-width: 0;
   max-height: calc(100vh - 130px);
   overflow-y: auto;
   padding-right: 6px;
+}
+
+.contract-form-pane .ant-form-item .ant-form-item-label > label {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.contract-form-pane .ant-form-item .ant-form-item-label > label::after {
+  margin-inline-end: 0;
 }
 
 .room-documents-page .contract-form-pane {
@@ -48,7 +58,15 @@
   background: #fbfdfc;
 }
 
+.co-resident-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .contract-preview-pane {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -60,11 +78,17 @@
 }
 
 .contract-preview-toolbar {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.contract-preview-toolbar .ant-segmented {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .contract-a4-scroll {
@@ -243,6 +267,12 @@
   font-style: italic;
   font-size: 10pt;
   margin-top: 14px;
+}
+
+@media (max-width: 1199px) {
+  .contract-workspace-grid {
+    grid-template-columns: minmax(380px, 460px) minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 991px) {

@@ -97,10 +97,18 @@ respond = () => ({ ok: true, status: 200, text: async () => JSON.stringify({ roo
 await roomsApi.getDocuments('room 1');
 assert.equal(calls.at(-1).url, '/api/rooms/room%201/documents');
 
-await roomsApi.saveDocuments('room-1', { occupancyId: 'occ-1', tenantCitizenId: '079099001234', paymentDueDay: 5 });
+await roomsApi.saveDocuments('room-1', { occupancyId: 'occ-1', ownerName: 'Chủ trọ mới', tenantCitizenId: '079099001234', paymentDueDay: 5 });
 assert.equal(calls.at(-1).url, '/api/rooms/room-1/documents');
 assert.equal(calls.at(-1).init.method, 'PUT');
+assert.equal(JSON.parse(calls.at(-1).init.body).ownerName, 'Chủ trọ mới');
 assert.equal(JSON.parse(calls.at(-1).init.body).tenantCitizenId, '079099001234');
+
+respond = () => ({ ok: true, status: 200, text: async () => JSON.stringify({ id: 'fixture-owner', name: 'Chủ trọ cập nhật', phone: '0909888777', citizenId: '079088009999' }) });
+const updatedProfile = await api.auth.updateProfile({ name: 'Chủ trọ cập nhật', phone: '0909888777', citizenId: '079088009999' });
+assert.equal(calls.at(-1).url, '/api/auth/profile');
+assert.equal(calls.at(-1).init.method, 'PUT');
+assert.equal(JSON.parse(calls.at(-1).init.body).name, 'Chủ trọ cập nhật');
+assert.equal(updatedProfile.citizenId, '079088009999');
 
 const docxBlob = new Blob(['fixture-docx']);
 respond = () => ({ ok: true, blob: async () => docxBlob });

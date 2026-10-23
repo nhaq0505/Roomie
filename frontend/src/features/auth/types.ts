@@ -13,13 +13,28 @@ export interface User {
   mfaEnabled?: boolean;
   mfaRequired?: boolean;
   status?: AccountStatus;
-  phone?: string;
+  phone?: string | null;
+  citizenId?: string | null;
+  dateOfBirth?: string | null;
+  citizenIdIssuedDate?: string | null;
+  citizenIdIssuedPlace?: string | null;
+  permanentAddress?: string | null;
   rejectionReason?: string | null;
   subscriptionTier?: SubscriptionTier;
   subscriptionExpiresAt?: string | null;
   isPro?: boolean;
   roomCount?: number;
   maxRooms?: number | null;
+}
+
+export interface UpdateProfilePayload {
+  name: string;
+  phone?: string | null;
+  citizenId?: string | null;
+  dateOfBirth?: string | null;
+  citizenIdIssuedDate?: string | null;
+  citizenIdIssuedPlace?: string | null;
+  permanentAddress?: string | null;
 }
 
 export interface RegistrationVerification {

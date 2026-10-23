@@ -2130,5 +2130,10 @@
   "Hướng dẫn bắt đầu ({0}/{1})": "入门指南 ({0}/{1})",
   "Cần thiết lập tài khoản nhận tiền": "需要设置收款账户",
   "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "只需选择银行并输入 VietQR 账号（或连接 payOS），即可开始向租客发送账单链接。",
-  "Mở Cài đặt thanh toán": "打开收款设置"
+  "Mở Cài đặt thanh toán": "打开收款设置",
+  "Thông tin chủ trọ (Bên A)": "房东信息（甲方）",
+  "Cập nhật họ tên, số điện thoại và CCCD của chủ trọ dùng chung cho mọi hợp đồng thuê phòng và tờ khai CT01.": "更新用于所有租房合同和 CT01 申报表的房东姓名、电话号码和公民身份证信息。",
+  "Đã cập nhật thông tin chủ trọ.": "已更新房东信息。",
+  "Hồ sơ": "个人资料",
+  "HỒ SƠ CHỦ TRỌ": "房东资料"
 }

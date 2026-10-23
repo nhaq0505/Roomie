@@ -899,12 +899,38 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(preview).toContainText('NGUYỄN VĂN KHÁCH');
     await expect(preview).toContainText('Công an Phường Tân Phong, Quận 7, TP.HCM');
 
-    // Update tenant Citizen ID in the form and verify live A4 preview updates
+    // Update owner Name and tenant Citizen ID in the form and verify live A4 preview updates
+    const ownerNameInput = drawer.getByLabel('Họ và tên chủ trọ');
+    await expect(ownerNameInput).toBeEnabled();
+    await ownerNameInput.fill('Nguyễn Hoàng Chủ Trọ');
+    await expect(preview).toContainText('NGUYỄN HOÀNG CHỦ TRỌ');
+
     const tenantIdInput = drawer.getByLabel('Số CCCD / Định danh cá nhân (12 số)');
     await tenantIdInput.fill('079099887766');
+
+    // Verify multi-column form controls stay horizontally aligned on the same baseline
+    const controlBoxFor = (label: string) =>
+      drawer.getByLabel(label).first().locator('xpath=ancestor::div[contains(@class,"ant-form-item-control-input")][1]').boundingBox();
+
+    const tenantDobBox = await controlBoxFor('Ngày sinh');
+    const tenantIssuedBox = await controlBoxFor('Ngày cấp CCCD');
+    expect(tenantDobBox).not.toBeNull();
+    expect(tenantIssuedBox).not.toBeNull();
+    expect(Math.abs(tenantDobBox!.y - tenantIssuedBox!.y)).toBeLessThanOrEqual(1);
+
+    const endDateBox = await controlBoxFor('Ngày kết thúc hợp đồng');
+    const dueDayBox = await controlBoxFor('Hạn đóng tiền (ngày)');
+    const areaBox = await controlBoxFor('Diện tích phòng');
+    expect(endDateBox).not.toBeNull();
+    expect(dueDayBox).not.toBeNull();
+    expect(areaBox).not.toBeNull();
+    expect(Math.abs(endDateBox!.y - dueDayBox!.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(dueDayBox!.y - areaBox!.y)).toBeLessThanOrEqual(1);
+
     await drawer.getByRole('button', { name: 'Lưu thông tin' }).click();
 
     expect(savedPayload).toBeTruthy();
+    expect(savedPayload?.ownerName).toBe('Nguyễn Hoàng Chủ Trọ');
     expect(savedPayload?.tenantCitizenId).toBe('079099887766');
   });
 
@@ -1121,6 +1147,17 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       const method = route.request().method();
 
       if (path === '/api/auth/me') return route.fulfill({ json: currentUser });
+      if (path === '/api/auth/profile' && method === 'PUT') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        currentUser = {
+          ...currentUser,
+          name: String(body.name ?? currentUser.name),
+          phone: (body.phone as string | null) ?? null,
+          citizenId: (body.citizenId as string | null) ?? null,
+          permanentAddress: (body.permanentAddress as string | null) ?? null,
+        };
+        return route.fulfill({ json: currentUser });
+      }
       if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
       if (path === '/api/subscription') return route.fulfill({ json: subStatus });
       if (path === '/api/subscription/redeem-code' && method === 'POST') {
@@ -1188,6 +1225,17 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(voucherInput).toHaveValue('');
     await expect(page.locator('.ant-tag-gold').filter({ hasText: 'PRO' })).toBeVisible();
     await expect(page.getByText('5 phòng (Không giới hạn)')).toBeVisible();
+
+    // 3. Navigate to dedicated "Hồ sơ" (/profile) menu item and update Landlord Profile (Bên A)
+    await page.locator('.app-sider').getByText('Hồ sơ', { exact: true }).click();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole('heading', { name: 'Hồ sơ' })).toBeVisible();
+    await page.getByLabel('Họ và tên chủ trọ').fill('Trần Văn Chủ Hộ');
+    await page.getByLabel('Số điện thoại chủ trọ').fill('0909555666');
+    await page.getByLabel('Số CCCD / Định danh chủ hộ (12 số)').fill('079088005566');
+    await page.getByRole('button', { name: 'Lưu thông tin' }).click();
+    await expect(page.getByText('Đã cập nhật thông tin chủ trọ.')).toBeVisible();
+    await expect(page.locator('.profile-button')).toContainText('Trần Văn Chủ Hộ');
   });
 
   // Scenario L11: New Landlord Onboarding Checklist (5 steps, progress, dismiss & reopen)

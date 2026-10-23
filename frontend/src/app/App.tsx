@@ -14,6 +14,7 @@ const ChangePasswordModal = lazy(() => import('../features/auth/ChangePasswordMo
 const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('../features/auth/RegisterPage'));
+const OwnerProfilePage = lazy(() => import('../features/auth/OwnerProfilePage'));
 const AccountStatusPage = lazy(() => import('../features/subscription/AccountStatusPage'));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage'));
 const BuildingsPage = lazy(() => import('../features/buildings/BuildingsPage'));
@@ -114,6 +115,7 @@ export default function App() {
     <Route path="/invoices" element={<Gate><AppShell><InvoicesPage /></AppShell></Gate>} />
     <Route path="/expenses" element={<Gate><AppShell><ExpensesPage /></AppShell></Gate>} />
     <Route path="/reports" element={<Gate><AppShell><ReportsPage /></AppShell></Gate>} />
+    <Route path="/profile" element={<Gate><AppShell><OwnerProfilePage /></AppShell></Gate>} />
     <Route path="/settings/zalo" element={<Gate><AppShell><ZaloSettingsPage /></AppShell></Gate>} />
     <Route path="/settings/payment" element={<Gate><AppShell><PaymentSettingsPage /></AppShell></Gate>} />
     <Route path="/admin/owners" element={<Gate admin><AppShell><AdminOwnersPage /></AppShell></Gate>} />
