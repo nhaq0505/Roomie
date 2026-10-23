@@ -98,8 +98,8 @@ internal static class MarketerSuiteHttpTests
         var regStartResp = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(
             "Chu Tro Promo", "chutropromo@example.com", "OwnerPass123!", "0912345678",
             new RegistrationAttributionDto("bs_123",
-                new AttributionTouchDto("facebook", "cpc", "tet_2026_campaign", null, null, "/register?promo=TET2026", null, DateTimeOffset.UtcNow),
-                new AttributionTouchDto("facebook", "cpc", "tet_2026_campaign", null, null, "/register?promo=TET2026", null, DateTimeOffset.UtcNow)),
+                new AttributionTouchDto("facebook", "cpc", "fb_tet_2026", null, null, "/register?promo=TET2026", null, DateTimeOffset.UtcNow),
+                new AttributionTouchDto("facebook", "cpc", "fb_tet_2026", null, null, "/register?promo=TET2026", null, DateTimeOffset.UtcNow)),
             "TET2026"));
         Check(regStartResp.StatusCode == HttpStatusCode.Accepted, "Registration with valid PromoCode returns 202 Accepted");
         var regChallenge = await regStartResp.Content.ReadFromJsonAsync<RegistrationVerificationDto>();
