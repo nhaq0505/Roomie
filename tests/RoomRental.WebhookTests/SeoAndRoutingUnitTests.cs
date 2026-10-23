@@ -315,7 +315,19 @@ internal static class SeoAndRoutingUnitTests
                 return wwwroot;
             dir = dir.Parent;
         }
-        throw new DirectoryNotFoundException("Could not locate built frontend/dist directory. Run 'npm --prefix frontend run build' first.");
+        var tempRoot = Path.Combine(Path.GetTempPath(), "roomie-seo-unit-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        Directory.CreateDirectory(Path.Combine(tempRoot, "features"));
+        Directory.CreateDirectory(Path.Combine(tempRoot, "pricing"));
+        Directory.CreateDirectory(Path.Combine(tempRoot, "huong-dan"));
+        File.WriteAllText(Path.Combine(tempRoot, "index.html"), "<!doctype html><html><head><title>Roomie — Phần mềm quản lý phòng trọ</title><link rel=\"canonical\" href=\"https://roomie.io.vn/\" /><meta name=\"robots\" content=\"index, follow\" /></head><body></body></html>");
+        File.WriteAllText(Path.Combine(tempRoot, "features", "index.html"), "<!doctype html><html><head><title>Tính năng quản lý phòng trọ, hóa đơn &amp; Zalo | Roomie</title><link rel=\"canonical\" href=\"https://roomie.io.vn/features\" /><meta name=\"robots\" content=\"index, follow\" /></head><body></body></html>");
+        File.WriteAllText(Path.Combine(tempRoot, "pricing", "index.html"), "<!doctype html><html><head><title>Bảng giá phần mềm quản lý phòng trọ &amp; Hỏi đáp | Roomie</title><link rel=\"canonical\" href=\"https://roomie.io.vn/pricing\" /><meta name=\"robots\" content=\"index, follow\" /></head><body></body></html>");
+        File.WriteAllText(Path.Combine(tempRoot, "huong-dan", "index.html"), "<!doctype html><html><head><title>Hướng dẫn quản lý nhà trọ, tính điện &amp; thu tiền QR | Roomie</title><link rel=\"canonical\" href=\"https://roomie.io.vn/huong-dan\" /><meta name=\"robots\" content=\"index, follow\" /></head><body></body></html>");
+        File.WriteAllText(Path.Combine(tempRoot, "app.html"), "<!doctype html><html><head><title>Roomie</title><meta name=\"robots\" content=\"noindex, follow\" /></head><body><div id=\"root\"></div></body></html>");
+        File.WriteAllText(Path.Combine(tempRoot, "sitemap.xml"), "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>https://roomie.io.vn/</loc></url><url><loc>https://roomie.io.vn/features</loc></url><url><loc>https://roomie.io.vn/pricing</loc></url><url><loc>https://roomie.io.vn/huong-dan</loc></url></urlset>");
+        File.WriteAllText(Path.Combine(tempRoot, "robots.txt"), "User-agent: *\nDisallow: /\n");
+        return tempRoot;
     }
 
     private static string? GetRobotsTag(HttpResponseMessage response) =>
