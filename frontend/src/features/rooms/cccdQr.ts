@@ -202,23 +202,67 @@ export async function decodeCccdQrFromVideoFrame(
     }
   }
 
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  const jsQR = await getJsQr();
+
+  // Pass 1: Full video frame scaled down to 960px max dimension.
   const maxDim = 960;
   const scale = Math.min(1, maxDim / Math.max(vw, vh));
   const w = Math.max(1, Math.round(vw * scale));
   const h = Math.max(1, Math.round(vh * scale));
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return null;
 
   ctx.drawImage(video, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
-  const jsQR = await getJsQr();
   const code = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
   if (code?.data) {
     const parsed = parseCccdQr(code.data);
     if (parsed) return parsed;
   }
+
+  // Pass 2..4: Native-resolution center viewfinder crops (for small dense 12x12mm CCCD QR on cameras).
+  const minSide = Math.min(vw, vh);
+  const cropConfigs = [
+    { ratio: 0.62, contrast: false, targetSize: 0 },
+    { ratio: 0.45, contrast: true, targetSize: 0 },
+    { ratio: 0.28, contrast: true, targetSize: 640 },
+  ];
+  for (const cfg of cropConfigs) {
+    const srcSize = Math.max(1, Math.floor(minSide * cfg.ratio));
+    const sx = Math.floor((vw - srcSize) / 2);
+    const sy = Math.floor((vh - srcSize) / 2);
+    const dstSize = cfg.targetSize > 0 ? Math.max(srcSize, cfg.targetSize) : Math.max(1, Math.min(960, srcSize));
+    canvas.width = dstSize;
+    canvas.height = dstSize;
+    ctx.drawImage(video, sx, sy, srcSize, srcSize, 0, 0, dstSize, dstSize);
+
+    if (detector && !cfg.contrast) {
+      try {
+        const cropResults = await detector.detect(canvas);
+        for (const item of cropResults) {
+          if (item.rawValue) {
+            const parsed = parseCccdQr(item.rawValue);
+            if (parsed) return parsed;
+          }
+        }
+      } catch {
+        // Ignore detector error on cropped canvas.
+      }
+    }
+
+    const cropData = ctx.getImageData(0, 0, dstSize, dstSize);
+    if (cfg.contrast) {
+      enhanceContrastInPlace(cropData);
+    }
+    const cropCode = jsQR(cropData.data, dstSize, dstSize, { inversionAttempts: 'attemptBoth' });
+    if (cropCode?.data) {
+      const parsed = parseCccdQr(cropCode.data);
+      if (parsed) return parsed;
+    }
+  }
+
   return null;
 }
 
@@ -232,6 +276,18 @@ function loadImageElement(blob: Blob): Promise<HTMLImageElement> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
+      if (typeof FileReader !== 'undefined' && typeof Blob !== 'undefined' && blob instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => resolve(fallbackImg);
+          fallbackImg.onerror = () => reject(new Error('Invalid image'));
+          fallbackImg.src = String(reader.result || '');
+        };
+        reader.onerror = () => reject(new Error('Invalid image'));
+        reader.readAsDataURL(blob);
+        return;
+      }
       reject(new Error('Invalid image'));
     };
     img.src = url;
@@ -278,10 +334,15 @@ export async function decodeCccdQrFromImageBlob(blob: Blob): Promise<ParsedCccdQ
     { sx: 0, sy: 0, sw: 1, sh: 1, maxDim: 1400 },
     { sx: 0.42, sy: 0, sw: 0.58, sh: 0.58, maxDim: 1100 }, // Top-right quadrant (standard CCCD QR location)
     { sx: 0.5, sy: 0, sw: 0.5, sh: 0.5, maxDim: 1100, enhanceContrast: true },
+    { sx: 0.56, sy: 0.02, sw: 0.42, sh: 0.46, maxDim: 1200 }, // Tight top-right corner on landscape CCCD
+    { sx: 0.56, sy: 0.02, sw: 0.42, sh: 0.46, maxDim: 1200, enhanceContrast: true },
+    { sx: 0.45, sy: 0.18, sw: 0.52, sh: 0.5, maxDim: 1200 }, // Portrait phone photo (CCCD centered vertically)
+    { sx: 0.45, sy: 0.18, sw: 0.52, sh: 0.5, maxDim: 1200, enhanceContrast: true },
     { sx: 0, sy: 0, sw: 0.58, sh: 0.58, maxDim: 1100 }, // Top-left (if mirrored/rotated)
     { sx: 0.42, sy: 0.42, sw: 0.58, sh: 0.58, maxDim: 1100 }, // Bottom-right (if rotated)
     { sx: 0, sy: 0.42, sw: 0.58, sh: 0.58, maxDim: 1100 }, // Bottom-left (if upside-down)
     { sx: 0.15, sy: 0.15, sw: 0.7, sh: 0.7, maxDim: 1200 }, // Center crop
+    { sx: 0.22, sy: 0.22, sw: 0.56, sh: 0.56, maxDim: 1200, enhanceContrast: true }, // Tight center crop
     { sx: 0, sy: 0, sw: 1, sh: 1, maxDim: 2200 }, // High-res full pass
     { sx: 0, sy: 0, sw: 1, sh: 1, maxDim: 1400, enhanceContrast: true }, // High-contrast full pass
   ];

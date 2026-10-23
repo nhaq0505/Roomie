@@ -303,6 +303,12 @@ const { parseCccdQr, parseCccdDate, normalizeCccdGender } = module.exports;
   assert.deepEqual(drawnDims, { w: 960, h: 540 }, 'Video frame 1920x1080 scales down to 960x540');
   assert.equal(fromJsQrVideo.fullName, 'Lê Thị Mai Anh');
 
+  // 9c-2. When full-frame pass misses small dense QR, native-resolution center viewfinder crop (669x669) succeeds
+  jsQrResponder = (_data, w, h) => (w === 669 && h === 669 ? { data: sampleQrText } : null);
+  const fromCenterCropVideo = await decodeCccdQrFromVideoFrame({ videoWidth: 1920, videoHeight: 1080 }, mockCanvas);
+  assert.ok(fromCenterCropVideo, 'Center viewfinder crop should decode small dense CCCD QR on mobile video');
+  assert.equal(fromCenterCropVideo.citizenId, '079098001234');
+
   // 9d. decodeCccdQrFromImageBlob: invalid image rejects and revokes object URL
   envState.imageShouldError = true;
   await assert.rejects(() => decodeCccdQrFromImageBlob({}), /Invalid image/);

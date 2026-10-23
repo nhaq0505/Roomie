@@ -28,6 +28,7 @@ export default function CccdQrScannerModal({
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [cameraRetryTick, setCameraRetryTick] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -49,6 +50,14 @@ export default function CccdQrScannerModal({
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const attachVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && streamRef.current && node.srcObject !== streamRef.current) {
+      node.srcObject = streamRef.current;
+      void node.play().catch(() => undefined);
     }
   }, []);
 
@@ -114,17 +123,40 @@ export default function CccdQrScannerModal({
       setIsCameraLoading(true);
       setErrorMsg(null);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: facingMode },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+            audio: false,
+          });
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: facingMode } },
+              audio: false,
+            });
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false,
+            });
+          }
+        }
         if (cancelled) {
           for (const track of stream.getTracks()) track.stop();
           return;
+        }
+        const [videoTrack] = stream.getVideoTracks();
+        if (videoTrack?.applyConstraints) {
+          void videoTrack
+            .applyConstraints({
+              advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+            })
+            .catch(() => undefined);
         }
         streamRef.current = stream;
         if (videoRef.current) {
@@ -164,7 +196,7 @@ export default function CccdQrScannerModal({
       cancelled = true;
       stopCamera();
     };
-  }, [open, tab, facingMode, handleSuccess, stopCamera]);
+  }, [open, tab, facingMode, cameraRetryTick, handleSuccess, stopCamera]);
 
   useEffect(() => {
     if (!open) return;
@@ -262,6 +294,18 @@ export default function CccdQrScannerModal({
           showIcon
           style={{ marginBottom: 14 }}
           message={errorMsg}
+          action={
+            tab === 'camera' ? (
+              <Button
+                size="small"
+                type="primary"
+                icon={<CameraOutlined />}
+                onClick={() => setCameraRetryTick((c) => c + 1)}
+              >
+                {t("Thử lại")}
+              </Button>
+            ) : undefined
+          }
         />
       )}
 
@@ -347,7 +391,7 @@ export default function CccdQrScannerModal({
         <div className="cccd-qr-camera-pane">
           <div className="cccd-qr-video-wrapper">
             <video
-              ref={videoRef}
+              ref={attachVideoRef}
               playsInline
               muted
               autoPlay
