@@ -89,7 +89,7 @@ const adminItems = [
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div>
       <div className="sider-label">{t("MENU CHÍNH")}</div>
       {menu}
-      <div className="sider-bottom"><div className="help-card"><div className="help-icon">✦</div><strong>{t("Cần hỗ trợ?")}</strong><span>{t("Quản lý nhà trọ dễ dàng, từng bước một.")}</span></div><div className="sider-foot">Roomie <span>•</span>  {t("Phiên bản 1.0")}</div></div>
+      <div className="sider-bottom"><Link to="/huong-dan" className="help-card"><div className="help-icon">✦</div><strong>{t("Cần hỗ trợ?")}</strong><span>{t("Quản lý nhà trọ dễ dàng, từng bước một.")}</span></Link><div className="sider-foot">Roomie <span>•</span>  {t("Phiên bản 1.0")}</div></div>
     </Sider>
     <Drawer className="mobile-menu-drawer" placement="left" width={280} open={mobileOpen} onClose={() => setMobileOpen(false)} title={t("Menu chính")} closable>
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div><div className="sider-label">{t("MENU CHÍNH")}</div>{menu}

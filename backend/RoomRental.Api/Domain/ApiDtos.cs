@@ -109,7 +109,7 @@ public sealed record PaymentSettingsRequest(string ClientId, string ApiKey, stri
 public sealed record PaymentSettingsDto(bool Configured, string? ClientId, string? WebhookUrl,
     string WebhookStatus, string? WebhookVerifiedAt, string? WebhookError)
 {
-    public string ConfirmationMode { get; init; } = "Automatic";
+    public string ConfirmationMode { get; init; } = "Manual";
     public ManualBankDto? ManualBank { get; init; }
 }
 public sealed record PaymentCheckoutDto(string CheckoutUrl, string? QrCode, int Amount, long OrderCode,

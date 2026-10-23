@@ -502,7 +502,8 @@ internal sealed class PayOsFixture : IDisposable
             Email = $"{OwnerId:N}@example.invalid",
             PasswordHash = "unused-test-hash",
             Role = UserRole.Owner,
-            Status = OwnerStatus.Approved
+            Status = OwnerStatus.Approved,
+            PaymentConfirmationMode = PaymentConfirmationMode.Automatic
         });
 
         var protector = _protection.CreateProtector("RoomRental.OwnerPayOsCredentials.v1");

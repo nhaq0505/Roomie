@@ -13,9 +13,9 @@ async function isolated(page: Page) {
   });
 }
 
-test('owner saves manual bank details separately from payOS credentials', async ({ page }) => {
+test('owner defaults to manual VietQR mode and saves manual bank details separately from payOS credentials', async ({ page }) => {
   await isolated(page);
-  let settings: object = { configured: false, webhookStatus: 'NotConfigured', confirmationMode: 'Automatic', webhookUrl: null };
+  let settings: object = { configured: false, webhookStatus: 'NotConfigured', confirmationMode: 'Manual', webhookUrl: null };
   let saves = 0;
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
@@ -31,7 +31,7 @@ test('owner saves manual bank details separately from payOS credentials', async 
     return route.fulfill({ json: [] });
   });
   await page.goto('/settings/payment');
-  await page.getByRole('radio', { name: 'Xác nhận thanh toán thủ công', exact: true }).check();
+  await expect(page.getByRole('radio', { name: 'Xác nhận thanh toán thủ công', exact: true })).toBeChecked();
   await expect(page.getByLabel('Client ID', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Hướng dẫn thiết lập', exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Cấu hình payOS', exact: true })).toHaveCount(0);

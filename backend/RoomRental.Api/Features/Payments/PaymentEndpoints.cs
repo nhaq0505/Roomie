@@ -59,6 +59,8 @@ public static class PaymentEndpoints
                 if (!string.IsNullOrWhiteSpace(checksumKey)) settings.ProtectedChecksumKey = protector.Protect(checksumKey);
                 settings.UpdatedAt = DateTimeOffset.UtcNow;
             }
+            var owner = await db.Users.SingleOrDefaultAsync(row => row.Id == ownerId, cancellationToken);
+            if (owner is not null) owner.PaymentConfirmationMode = PaymentConfirmationMode.Automatic;
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Results.Ok(await webhookService.ConfirmAsync(ownerId, cancellationToken));

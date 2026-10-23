@@ -106,7 +106,9 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - DataProtection keys giải mã tenant tokens, payOS credentials và recovery code đang chờ. Mất keys có thể làm mất khả năng dùng dữ liệu dù DB vẫn còn; backup DB và key ring cùng recovery point.
 - Tenant token là bearer secret theo **lượt thuê**, hash để lookup, bản mã để chủ trọ chia sẻ lại. Rotate/thu hồi/trả phòng vô hiệu token cũ; không đổi sang token theo RoomId.
 - Cấp/hiện link mới yêu cầu Automatic có webhook Verified hoặc Manual có bank details hợp lệ; xem `TenantTokenService.CanShareAsync`. Bypass chỉ dùng fixture Development, không Production.
+- Chế độ nhận tiền mặc định của chủ trọ mới là `Manual` (VietQR thủ công). Lưu cấu hình payOS (`PUT /api/settings/payment`) tự chuyển `PaymentConfirmationMode` sang `Automatic`.
 - payOS cấu hình riêng từng owner: Client ID/API Key/Checksum Key lưu mã hóa, không trả secret về UI. Lưu và xác minh gọi `confirm-webhook` với origin HTTPS từ config server; đổi origin/khóa làm verification cũ hết hiệu lực. Manual lưu ngân hàng/tài khoản riêng, không xóa khóa payOS; pending attempt chặn đổi chế độ/thông tin nhận tiền.
+- Dashboard chủ trọ (`DashboardPage.tsx`, `OnboardingChecklist.tsx`) hiển thị checklist 5 bước bắt đầu nhanh (Tạo dãy → Tạo phòng → Cài đặt VietQR → Thêm người thuê → Chốt điện & phát hành hóa đơn đầu tiên), cho phép ẩn tạm (`localStorage`) và mở lại từ Thao tác nhanh.
 
 ### Hóa đơn, tiền và trả phòng
 

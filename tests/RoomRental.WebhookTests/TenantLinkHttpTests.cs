@@ -110,7 +110,11 @@ internal static class TenantLinkHttpTests
             occupancyId, tenantName = "Edited Fixture Tenant", people = 1
         })), "occupancy edits cannot leak a tenant link");
 
-        // Saved credentials are insufficient when confirmation fails.
+        var initialPaymentSettings = await JsonAsync(await client.GetAsync("/api/settings/payment"));
+        Assert(initialPaymentSettings.GetProperty("confirmationMode").GetString() == "Manual",
+            "new owner defaults to Manual VietQR confirmation mode");
+
+        // Saved credentials switch mode to Automatic and remain insufficient when confirmation fails.
         var settings = await JsonAsync(await client.PutAsJsonAsync("/api/settings/payment", new
         {
             clientId = "synthetic-client", apiKey = "synthetic-api", checksumKey = "synthetic-checksum"

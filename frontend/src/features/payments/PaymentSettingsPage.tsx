@@ -37,7 +37,7 @@ export default function PaymentSettingsPage() {
   });
   const submit = (values: PaymentForm) => updateMutation.mutate(values);
   const webhookUrl = settingsQuery.data?.webhookUrl || '';
-  const isManual = (selectedMode ?? settingsQuery.data?.confirmationMode) === 'Manual';
+  const isManual = (selectedMode ?? settingsQuery.data?.confirmationMode ?? 'Manual') === 'Manual';
   useEffect(() => { if (isManual) setGuideOpen(false); }, [isManual]);
   const verified = settingsQuery.data?.webhookStatus === 'Verified';
   const busy = updateMutation.isPending || verifyMutation.isPending;

@@ -97,7 +97,7 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Automatic");
+                        .HasDefaultValue("Manual");
 
                     b.Property<DateTimeOffset?>("PendingMfaExpiresAt")
                         .HasColumnType("timestamp with time zone");

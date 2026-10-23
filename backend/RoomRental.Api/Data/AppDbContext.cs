@@ -91,7 +91,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Role).HasConversion<string>().HasMaxLength(24);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
             entity.Property(x => x.StatusReason).HasMaxLength(1000);
-            entity.Property(x => x.PaymentConfirmationMode).HasConversion<string>().HasMaxLength(20).HasDefaultValue(PaymentConfirmationMode.Automatic);
+            entity.Property(x => x.PaymentConfirmationMode).HasConversion<string>().HasMaxLength(20).HasDefaultValue(PaymentConfirmationMode.Manual);
             entity.Property(x => x.ManualBankBin).HasMaxLength(6);
             entity.Property(x => x.ManualAccountNumber).HasMaxLength(34);
             entity.Property(x => x.ManualAccountName).HasMaxLength(100);

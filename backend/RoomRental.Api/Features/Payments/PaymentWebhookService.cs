@@ -43,7 +43,7 @@ public sealed class PaymentWebhookService(AppDbContext db, IDataProtectionProvid
             .SingleOrDefaultAsync(cancellationToken);
         PaymentSettingsDto Dto(bool configured, string? clientId, string? webhookUrl, string status, string? verifiedAt, string? error) =>
             new(configured, clientId, webhookUrl, status, verifiedAt, error) {
-                ConfirmationMode = owner?.PaymentConfirmationMode.ToString() ?? "Automatic",
+                ConfirmationMode = owner?.PaymentConfirmationMode.ToString() ?? "Manual",
                 ManualBank = owner?.ManualBankBin is not null ? new(owner.ManualBankBin, owner.ManualAccountNumber!, owner.ManualAccountName!) : null
             };
         var url = WebhookUrl(ownerId);

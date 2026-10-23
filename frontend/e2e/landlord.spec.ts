@@ -1189,4 +1189,73 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(page.locator('.ant-tag-gold').filter({ hasText: 'PRO' })).toBeVisible();
     await expect(page.getByText('5 phòng (Không giới hạn)')).toBeVisible();
   });
+
+  // Scenario L11: New Landlord Onboarding Checklist (5 steps, progress, dismiss & reopen)
+  test('Scenario L11: New Landlord Onboarding Checklist on Dashboard tracks progress and supports dismiss/reopen', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
+      if (path === '/api/dashboard') {
+        return route.fulfill({
+          json: {
+            ...defaultDashboard,
+            totalRooms: 1,
+            occupiedRooms: 0,
+            totalBilled: 0,
+            monthlyBilled: 0,
+          },
+        });
+      }
+      if (path === '/api/buildings') {
+        return route.fulfill({ json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', roomCount: 1, isArchived: false }] });
+      }
+      if (path === '/api/rooms') {
+        return route.fulfill({
+          json: [
+            {
+              id: 'room-01',
+              buildingId: 'bld-01',
+              buildingName: 'Nhà trọ Bình An',
+              name: 'Phòng 101',
+              rent: 3000000,
+              electricityRate: 3500,
+              waterFee: 100000,
+              waterPerPerson: false,
+              serviceFee: 50000,
+              occupancy: null,
+              isArchived: false,
+            },
+          ],
+        });
+      }
+      if (path === '/api/settings/payment') {
+        return route.fulfill({
+          json: {
+            configured: false,
+            webhookStatus: 'NotConfigured',
+            confirmationMode: 'Manual',
+            manualBank: null,
+          },
+        });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    await page.goto('/dashboard');
+    const checklist = page.getByTestId('onboarding-checklist');
+    await expect(checklist).toBeVisible();
+    await expect(checklist.getByText('Hoàn thành 2/5 bước thiết lập')).toBeVisible();
+    await expect(page.getByTestId('onboarding-step-building')).toHaveAttribute('data-done', 'true');
+    await expect(page.getByTestId('onboarding-step-room')).toHaveAttribute('data-done', 'true');
+    await expect(page.getByTestId('onboarding-step-payment')).toHaveAttribute('data-done', 'false');
+    await expect(page.getByTestId('onboarding-step-payment').getByText('Bước tiếp theo')).toBeVisible();
+
+    // Dismiss checklist and reopen from Quick Actions header
+    await page.getByTestId('onboarding-dismiss').click();
+    await expect(checklist).toHaveCount(0);
+    const reopenBtn = page.getByTestId('onboarding-reopen');
+    await expect(reopenBtn).toBeVisible();
+    await reopenBtn.click();
+    await expect(checklist).toBeVisible();
+  });
 });

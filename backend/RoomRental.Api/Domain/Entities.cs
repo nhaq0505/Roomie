@@ -1,6 +1,6 @@
 namespace RoomRental.Api.Domain;
 
-public enum PaymentConfirmationMode { Automatic, Manual }
+public enum PaymentConfirmationMode { Manual, Automatic }
 
 public enum UserRole { Admin, Owner, Marketer }
 public enum OwnerStatus { Pending, Approved, Rejected, Suspended }
@@ -22,7 +22,7 @@ public sealed class AppUser
     public DateOnly? CitizenIdIssuedDate { get; set; }
     public string? CitizenIdIssuedPlace { get; set; }
     public string? PermanentAddress { get; set; }
-    public PaymentConfirmationMode PaymentConfirmationMode { get; set; } = PaymentConfirmationMode.Automatic;
+    public PaymentConfirmationMode PaymentConfirmationMode { get; set; } = PaymentConfirmationMode.Manual;
     public string? ManualBankBin { get; set; }
     public string? ManualAccountNumber { get; set; }
     public string? ManualAccountName { get; set; }

@@ -1932,5 +1932,22 @@
   "BÀI VIẾT CHUYÊN SÂU": "BÀI VIẾT CHUYÊN SÂU",
   "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ": "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ",
   "Ghi nhớ đăng nhập": "로그인 상태 유지",
-  "1 ngày": "1일"
+  "1 ngày": "1일",
+  "Thêm địa điểm cho thuê để gom nhóm các phòng.": "방들을 그룹화할 임대 건물 위치를 추가하세요.",
+  "Cài đặt tài khoản nhận tiền VietQR": "VietQR 수취 계좌 설정",
+  "Chọn ngân hàng và nhập số tài khoản để tự tạo mã VietQR trên hóa đơn.": "은행을 선택하고 계좌번호를 입력하여 청구서에 VietQR 코드를 생성하세요.",
+  "Thêm người thuê & cấp link phòng": "세입자 추가 및 방 링크 발급",
+  "Chốt chỉ số điện & phát hành hóa đơn": "전기 계량기 검침 및 청구서 발행",
+  "HƯỚNG DẪN BẮT ĐẦU NHANH": "빠른 시작 가이드",
+  "Hoàn thành {0}/{1} bước thiết lập": "설정 {0}/{1}단계 완료",
+  "Bắt đầu quản lý nhà trọ với Roomie": "Roomie로 임대 관리를 시작하세요",
+  "Thực hiện lần lượt 5 bước dưới đây để thiết lập phòng, tạo mã VietQR nhận tiền và gửi hóa đơn cho người thuê.": "아래 5단계를 순서대로 진행하여 방 설정, VietQR 수취 설정 및 세입자 청구서 발송을 완료하세요.",
+  "Xem cẩm nang hướng dẫn": "사용 가이드 보기",
+  "Ẩn hướng dẫn": "가이드 숨기기",
+  "Đã hoàn tất": "완료됨",
+  "Bước tiếp theo": "다음 단계",
+  "Hướng dẫn bắt đầu ({0}/{1})": "시작 가이드 ({0}/{1})",
+  "Cần thiết lập tài khoản nhận tiền": "수취 계좌 설정 필요",
+  "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "은행을 선택하고 VietQR 계좌번호를 입력(또는 payOS 연결)하면 세입자에게 청구서 링크를 발급할 수 있습니다.",
+  "Mở Cài đặt thanh toán": "결제 설정 열기"
 }

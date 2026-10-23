@@ -1932,5 +1932,22 @@
   "BÀI VIẾT CHUYÊN SÂU": "BÀI VIẾT CHUYÊN SÂU",
   "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ": "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ",
   "Ghi nhớ đăng nhập": "记住登录状态",
-  "1 ngày": "1天"
+  "1 ngày": "1天",
+  "Thêm địa điểm cho thuê để gom nhóm các phòng.": "添加出租地点以对房间进行分组。",
+  "Cài đặt tài khoản nhận tiền VietQR": "设置 VietQR 收款账户",
+  "Chọn ngân hàng và nhập số tài khoản để tự tạo mã VietQR trên hóa đơn.": "选择银行并输入账号以在账单上自动生成 VietQR 码。",
+  "Thêm người thuê & cấp link phòng": "添加租客并生成房间链接",
+  "Chốt chỉ số điện & phát hành hóa đơn": "抄录电表读数并发布账单",
+  "HƯỚNG DẪN BẮT ĐẦU NHANH": "快速入门指南",
+  "Hoàn thành {0}/{1} bước thiết lập": "已完成 {0}/{1} 个设置步骤",
+  "Bắt đầu quản lý nhà trọ với Roomie": "开始使用 Roomie 管理您的出租屋",
+  "Thực hiện lần lượt 5 bước dưới đây để thiết lập phòng, tạo mã VietQR nhận tiền và gửi hóa đơn cho người thuê.": "按照以下 5 个步骤设置房间、配置 VietQR 收款并向租客发送账单。",
+  "Xem cẩm nang hướng dẫn": "查看使用指南",
+  "Ẩn hướng dẫn": "隐藏指南",
+  "Đã hoàn tất": "已完成",
+  "Bước tiếp theo": "下一步",
+  "Hướng dẫn bắt đầu ({0}/{1})": "入门指南 ({0}/{1})",
+  "Cần thiết lập tài khoản nhận tiền": "需要设置收款账户",
+  "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "只需选择银行并输入 VietQR 账号（或连接 payOS），即可开始向租客发送账单链接。",
+  "Mở Cài đặt thanh toán": "打开收款设置"
 }

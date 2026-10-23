@@ -72,6 +72,14 @@ export function useRoomsPage() {
       const msg = e.message || '';
       if (/thiết lập thanh toán|payos/i.test(msg)) {
         message.error(t("Vui lòng thiết lập tài khoản nhận tiền (VietQR hoặc payOS) tại mục Cài đặt thanh toán trước khi cấp link cho khách."));
+        modal.confirm({
+          title: t("Cần thiết lập tài khoản nhận tiền"),
+          content: t("Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê."),
+          okText: t("Mở Cài đặt thanh toán"),
+          cancelText: t("Để sau"),
+          centered: true,
+          onOk: () => navigate('/settings/payment'),
+        });
       } else {
         message.error(msg);
       }

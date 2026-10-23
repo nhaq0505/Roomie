@@ -1932,5 +1932,22 @@
   "BÀI VIẾT CHUYÊN SÂU": "BÀI VIẾT CHUYÊN SÂU",
   "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ": "Kinh nghiệm quản lý & tối ưu vận hành nhà trọ",
   "Ghi nhớ đăng nhập": "मुझे याद रखें",
-  "1 ngày": "1 दिन"
+  "1 ngày": "1 दिन",
+  "Thêm địa điểm cho thuê để gom nhóm các phòng.": "कमरों को समूहित करने के लिए किराये का स्थान जोड़ें।",
+  "Cài đặt tài khoản nhận tiền VietQR": "VietQR भुगतान खाता सेट करें",
+  "Chọn ngân hàng và nhập số tài khoản để tự tạo mã VietQR trên hóa đơn.": "चालान पर VietQR कोड बनाने के लिए बैंक चुनें और खाता संख्या दर्ज करें।",
+  "Thêm người thuê & cấp link phòng": "किरायेदार जोड़ें और रूम लिंक जारी करें",
+  "Chốt chỉ số điện & phát hành hóa đơn": "बिजली मीटर रीडिंग दर्ज करें और चालान जारी करें",
+  "HƯỚNG DẪN BẮT ĐẦU NHANH": "त्वरित प्रारंभ मार्गदर्शिका",
+  "Hoàn thành {0}/{1} bước thiết lập": "{0}/{1} सेटअप चरण पूर्ण",
+  "Bắt đầu quản lý nhà trọ với Roomie": "Roomie के साथ अपनी प्रॉपर्टी का प्रबंधन शुरू करें",
+  "Thực hiện lần lượt 5 bước dưới đây để thiết lập phòng, tạo mã VietQR nhận tiền và gửi hóa đơn cho người thuê.": "कमरे सेट करने, VietQR भुगतान कॉन्फ़िगर करने और किरायेदारों को चालान भेजने के लिए नीचे दिए गए 5 चरणों का पालन करें।",
+  "Xem cẩm nang hướng dẫn": "उपयोगकर्ता गाइड देखें",
+  "Ẩn hướng dẫn": "गाइड छिपाएँ",
+  "Đã hoàn tất": "पूर्ण",
+  "Bước tiếp theo": "अगला चरण",
+  "Hướng dẫn bắt đầu ({0}/{1})": "प्रारंभ गाइड ({0}/{1})",
+  "Cần thiết lập tài khoản nhận tiền": "भुगतान खाता सेटअप आवश्यक है",
+  "Bạn chỉ cần chọn ngân hàng và nhập số tài khoản VietQR (hoặc kết nối payOS) để bắt đầu cấp link hóa đơn cho khách thuê.": "किरायेदारों के साथ चालान लिंक साझा करना शुरू करने के लिए बस अपना बैंक चुनें और VietQR खाता संख्या दर्ज करें (या payOS कनेक्ट करें)।",
+  "Mở Cài đặt thanh toán": "भुगतान सेटिंग्स खोलें"
 }

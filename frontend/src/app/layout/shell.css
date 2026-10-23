@@ -17,7 +17,8 @@
 .app-sider .ant-menu-item:hover { color: #fff !important; background: rgba(255,255,255,.06) !important; }
 .app-sider .ant-menu-item-divider { margin: 15px 10px; border-color: rgba(237, 248, 245, .1); }
 .sider-bottom { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: flex-end; padding: 26px 4px 0; }
-.help-card { padding: 16px; border-radius: 13px; background: rgba(246, 255, 252, .07); border: 1px solid rgba(233, 251, 246, .08); color: #f1fffc; }
+.help-card { display: block; padding: 16px; border-radius: 13px; background: rgba(246, 255, 252, .07); border: 1px solid rgba(233, 251, 246, .08); color: #f1fffc; text-decoration: none; transition: background .15s ease, border-color .15s ease; }
+.help-card:hover { background: rgba(246, 255, 252, .12); border-color: rgba(233, 251, 246, .18); color: #ffffff; }
 .help-icon { display: grid; place-items: center; width: 26px; height: 26px; margin-bottom: 10px; border-radius: 8px; color: #77dec7; background: rgba(39, 181, 151, .16); font-size: 17px; }
 .help-card strong, .help-card span { display: block; }
 .help-card strong { margin-bottom: 5px; font-size: 14px; }

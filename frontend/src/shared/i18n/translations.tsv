@@ -1932,3 +1932,20 @@
 1931|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ
 1932|Remember me|记住登录状态|로그인 상태 유지|मुझे याद रखें
 1933|1 day|1天|1일|1 दिन
+1934|Add a rental property location to group your rooms.|添加出租地点以对房间进行分组。|방들을 그룹화할 임대 건물 위치를 추가하세요.|कमरों को समूहित करने के लिए किराये का स्थान जोड़ें।
+1935|Set up VietQR bank account|设置 VietQR 收款账户|VietQR 수취 계좌 설정|VietQR भुगतान खाता सेट करें
+1936|Select your bank and enter your account number to generate VietQR codes on invoices.|选择银行并输入账号以在账单上自动生成 VietQR 码。|은행을 선택하고 계좌번호를 입력하여 청구서에 VietQR 코드를 생성하세요.|चालान पर VietQR कोड बनाने के लिए बैंक चुनें और खाता संख्या दर्ज करें।
+1937|Add tenant & issue room link|添加租客并生成房间链接|세입자 추가 및 방 링크 발급|किरायेदार जोड़ें और रूम लिंक जारी करें
+1938|Record meter readings & issue invoices|抄录电表读数并发布账单|전기 계량기 검침 및 청구서 발행|बिजली मीटर रीडिंग दर्ज करें और चालान जारी करें
+1939|QUICK START GUIDE|快速入门指南|빠른 시작 가이드|त्वरित प्रारंभ मार्गदर्शिका
+1940|Completed {0}/{1} setup steps|已完成 {0}/{1} 个设置步骤|설정 {0}/{1}단계 완료|{0}/{1} सेटअप चरण पूर्ण
+1941|Get started managing your property with Roomie|开始使用 Roomie 管理您的出租屋|Roomie로 임대 관리를 시작하세요|Roomie के साथ अपनी प्रॉपर्टी का प्रबंधन शुरू करें
+1942|Follow the 5 steps below to set up rooms, configure VietQR payments, and send invoices to tenants.|按照以下 5 个步骤设置房间、配置 VietQR 收款并向租客发送账单。|아래 5단계를 순서대로 진행하여 방 설정, VietQR 수취 설정 및 세입자 청구서 발송을 완료하세요.|कमरे सेट करने, VietQR भुगतान कॉन्फ़िगर करने और किरायेदारों को चालान भेजने के लिए नीचे दिए गए 5 चरणों का पालन करें।
+1943|View user guides|查看使用指南|사용 가이드 보기|उपयोगकर्ता गाइड देखें
+1944|Hide guide|隐藏指南|가이드 숨기기|गाइड छिपाएँ
+1945|Completed|已完成|완료됨|पूर्ण
+1946|Next step|下一步|다음 단계|अगला चरण
+1947|Getting started ({0}/{1})|入门指南 ({0}/{1})|시작 가이드 ({0}/{1})|प्रारंभ गाइड ({0}/{1})
+1948|Payment account setup required|需要设置收款账户|수취 계좌 설정 필요|भुगतान खाता सेटअप आवश्यक है
+1949|Simply select your bank and enter your VietQR account number (or connect payOS) to start sharing invoice links with tenants.|只需选择银行并输入 VietQR 账号（或连接 payOS），即可开始向租客发送账单链接。|은행을 선택하고 VietQR 계좌번호를 입력(또는 payOS 연결)하면 세입자에게 청구서 링크를 발급할 수 있습니다.|किरायेदारों के साथ चालान लिंक साझा करना शुरू करने के लिए बस अपना बैंक चुनें और VietQR खाता संख्या दर्ज करें (या payOS कनेक्ट करें)।
+1950|Open Payment Settings|打开收款设置|결제 설정 열기|भुगतान सेटिंग्स खोलें
