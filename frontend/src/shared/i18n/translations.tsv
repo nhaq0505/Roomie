@@ -1932,3 +1932,184 @@
 1931|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ
 1932|Remember me|记住登录状态|로그인 상태 유지|मुझे याद रखें
 1933|1 day|1天|1일|1 दिन
+1934|Receipt files can be at most {0}.|凭证文件最大 {0}。|증빙 파일은 최대 {0}입니다.|रसीद फ़ाइल अधिकतम {0} हो सकती है।
+1935|Receipt uploaded.|凭证已上传。|증빙을 업로드했습니다.|रसीद अपलोड हो गई।
+1936|Receipt deleted.|凭证已删除。|증빙을 삭제했습니다.|रसीद हटा दी गई।
+1937|Expense receipts|支出凭证|지출 증빙|व्यय रसीदें
+1938|Upload image or PDF|上传图片或 PDF|이미지 또는 PDF 업로드|छवि या PDF अपलोड करें
+1939|Up to {0} files, 2 MB each. Images are compressed automatically.|最多 {0} 个文件，每个 2 MB。图片会自动压缩。|최대 {0}개 파일, 파일당 2 MB. 이미지는 자동으로 압축됩니다.|अधिकतम {0} फ़ाइलें, प्रत्येक 2 MB। छवियाँ स्वतः संपीड़ित होती हैं।
+1940|Storage used: {0} / {1}|已用空间：{0} / {1}|사용한 용량: {0} / {1}|उपयोग किया गया स्थान: {0} / {1}
+1941|Store receipt images with the Pro plan|使用 Pro 套餐保存凭证图片|Pro 요금제로 증빙 이미지 저장|Pro प्लान के साथ रसीद छवियाँ सहेजें
+1942|Snap electricity and water bills or repair slips and attach them to expenses. Saved receipts remain viewable after Pro expires.|拍摄电费、水费账单和维修单并附在支出中。Pro 到期后仍可查看已保存的凭证。|전기·수도 고지서와 수리 영수증을 촬영해 지출에 첨부하세요. Pro가 만료되어도 저장된 증빙은 계속 볼 수 있습니다.|बिजली, पानी के बिल और मरम्मत पर्चियों की फ़ोटो लेकर व्यय के साथ सहेजें। Pro समाप्त होने के बाद भी सहेजी गई रसीदें देखी जा सकती हैं।
+1943|No receipts yet|暂无凭证|증빙 없음|अभी कोई रसीद नहीं
+1944|Download {0}|下载 {0}|{0} 다운로드|{0} डाउनलोड करें
+1945|Delete this receipt?|删除此凭证？|이 증빙을 삭제할까요?|यह रसीद हटाएँ?
+1946|Delete {0}|删除 {0}|{0} 삭제|{0} हटाएँ
+1947|Master electricity (EVN)|总电费 (EVN)|전체 전기 (EVN)|मुख्य बिजली (EVN)
+1948|Master water|总水费|전체 수도|मुख्य पानी
+1949|Internet / TV|网络 / 电视|인터넷 / TV|इंटरनेट / टीवी
+1950|Repairs & maintenance|维修保养|수리 및 유지보수|मरम्मत और रखरखाव
+1951|Cleaning & waste|清洁、垃圾|청소 및 쓰레기|सफ़ाई और कचरा
+1952|Manager / staff wages|管理员 / 员工工资|관리인 / 직원 급여|प्रबंधक / कर्मचारी वेतन
+1953|Property rent (sublease)|房屋租金（转租）|건물 임차료 (전대)|संपत्ति किराया (उप-किराया)
+1954|Taxes & fees|税费|세금 및 수수료|कर और शुल्क
+1955|Other|其他|기타|अन्य
+1956|Paused because the account no longer has the Pro plan|因账户不再拥有 Pro 套餐而暂停|계정에 더 이상 Pro 요금제가 없어 일시 중지됨|खाते में अब Pro प्लान न होने के कारण रोका गया
+1957|Paused because the building or room is archived|因楼栋或房间已归档而暂停|건물 또는 방이 보관되어 일시 중지됨|भवन या कमरा संग्रहीत होने के कारण रोका गया
+1958|Ended|已结束|종료됨|समाप्त
+1959|Paused|已暂停|일시 중지됨|रुका हुआ
+1960|Not started yet|尚未到开始周期|시작 기간 전|आरंभ अवधि अभी नहीं आई
+1961|Edit expense|编辑支出|지출 수정|व्यय संपादित करें
+1962|Add expense|添加支出|지출 추가|व्यय जोड़ें
+1963|Record expense|记录支出|지출 기록|व्यय दर्ज करें
+1964|This expense was created automatically from a recurring expense template. Edits here only change this month.|此支出由定期支出模板自动生成。在此编辑只会更改本月。|이 지출은 정기 지출 템플릿에서 자동 생성되었습니다. 여기서 수정하면 이번 달만 변경됩니다.|यह व्यय आवर्ती व्यय टेम्पलेट से स्वतः बनाया गया था। यहाँ संपादन केवल इस महीने को बदलेगा।
+1965|Expense date|支出日期|지출일|व्यय तिथि
+1966|Select the expense date.|请选择支出日期。|지출일을 선택하세요.|व्यय तिथि चुनें।
+1967|Category|类别|카테고리|श्रेणी
+1968|Select a category.|请选择类别。|카테고리를 선택하세요.|श्रेणी चुनें।
+1969|Amount (VND)|金额 (VND)|금액 (VND)|राशि (VND)
+1970|Enter the expense amount.|请输入支出金额。|지출 금액을 입력하세요.|व्यय राशि दर्ज करें।
+1971|Amount must be between 1 and 10 billion VND.|金额须在 1 至 100 亿 VND 之间。|금액은 1 ~ 100억 VND 사이여야 합니다.|राशि 1 से 10 अरब VND के बीच होनी चाहिए।
+1972|Leave blank for a shared expense across all buildings.|若为所有楼栋的共同支出，请留空。|모든 건물의 공동 지출이면 비워 두세요.|सभी भवनों के साझा व्यय के लिए खाली छोड़ें।
+1973|Shared expense|共同支出|공동 지출|साझा व्यय
+1974|No room|不关联房间|방 미지정|कोई कमरा नहीं
+1975|EVN electricity reconciliation|EVN 电费对账|EVN 전기 대조|EVN बिजली मिलान
+1976|Enter the billing period and kWh on the EVN bill to compare with the electricity billed to rooms.|输入 EVN 账单上的周期和 kWh 数，与已为各房间开具的电量进行比较。|EVN 고지서의 기간과 kWh를 입력해 방별로 청구된 전기량과 비교하세요.|कमरों को बिल की गई बिजली से तुलना करने के लिए EVN बिल पर अवधि और kWh दर्ज करें।
+1977|Select a building to enter kWh from the EVN bill.|请选择楼栋以输入 EVN 账单上的 kWh 数。|EVN 고지서의 kWh를 입력하려면 건물을 선택하세요.|EVN बिल से kWh दर्ज करने के लिए भवन चुनें।
+1978|Reconciliation period|对账周期|대조 기간|मिलान अवधि
+1979|Select the reconciliation period.|请选择对账周期。|대조 기간을 선택하세요.|मिलान अवधि चुनें।
+1980|EVN kWh|EVN kWh 数|EVN kWh|EVN kWh
+1981|Enter EVN kWh.|请输入 EVN kWh 数。|EVN kWh를 입력하세요.|EVN kWh दर्ज करें।
+1982|E.g. Replace 2nd-floor hallway bulb|例如：更换二楼走廊灯泡|예: 2층 복도 전구 교체|उदाहरण: दूसरी मंज़िल के गलियारे का बल्ब बदलना
+1983|EXPENSE DATE|支出日期|지출일|व्यय तिथि
+1984|CATEGORY|类别|카테고리|श्रेणी
+1985|Recurring|定期|정기|आवर्ती
+1986|APPLIES TO|适用范围|적용 대상|लागू
+1987|EVN {0}: {1} kWh|EVN {0}：{1} kWh|EVN {0}: {1} kWh|EVN {0}: {1} kWh
+1988|Receipts|凭证|증빙|रसीदें
+1989|Receipts for expense|支出的凭证|지출의 증빙|व्यय की रसीदें
+1990|Delete this expense?|删除此支出？|이 지출을 삭제할까요?|यह व्यय हटाएँ?
+1991|The expense and its attached receipts will be removed from the ledger.|该支出及附带凭证将从账本中删除。|지출과 첨부된 증빙이 장부에서 삭제됩니다.|व्यय और संलग्न रसीदें बही से हटा दी जाएँगी।
+1992|Delete expense|删除支出|지출 삭제|व्यय हटाएँ
+1993|EXPENSE LEDGER|支出账本|지출 장부|व्यय बही
+1994|Record master electricity and water, repairs, wages and other expenses to see your net profit.|记录总电费水费、维修、工资及其他支出，了解净利润。|전체 전기·수도 요금, 수리비, 급여 등 지출을 기록해 순이익을 확인하세요.|शुद्ध लाभ जानने के लिए मुख्य बिजली-पानी, मरम्मत, वेतन और अन्य व्यय दर्ज करें।
+1995|Add recurring template|添加定期模板|정기 템플릿 추가|आवर्ती टेम्पलेट जोड़ें
+1996|Expenses|支出|지출|व्यय
+1997|Recurring expenses|定期支出|정기 지출|आवर्ती व्यय
+1998|Filter by category|按类别筛选|카테고리별 필터|श्रेणी के अनुसार फ़िल्टर करें
+1999|All categories|所有类别|모든 카테고리|सभी श्रेणियाँ
+2000|When filtering by building, shared expenses not tied to a building are excluded.|按楼栋筛选时，不关联楼栋的共同支出不计入。|건물별로 필터링하면 건물에 연결되지 않은 공동 지출은 제외됩니다.|भवन के अनुसार फ़िल्टर करने पर, किसी भवन से न जुड़े साझा व्यय शामिल नहीं होते।
+2001|Total expenses|总支出|총 지출|कुल व्यय
+2002|Number of expenses|支出笔数|지출 건수|व्ययों की संख्या
+2003|Top expense category|支出最多的类别|지출이 가장 많은 카테고리|सबसे अधिक व्यय वाली श्रेणी
+2004|Loading expenses…|正在加载支出…|지출을 불러오는 중…|व्यय लोड हो रहे हैं…
+2005|No expenses in this range|此期间暂无支出|이 기간에 지출이 없습니다|इस अवधि में कोई व्यय नहीं
+2006|Click "Add expense" to record your first one.|点击"添加支出"记录第一笔支出。|"지출 추가"를 눌러 첫 지출을 기록하세요.|पहला व्यय दर्ज करने के लिए "व्यय जोड़ें" पर क्लिक करें।
+2007|EVN bill|EVN 账单|EVN 고지서|EVN बिल
+2008|The recurring expense template was changed elsewhere. The list has been reloaded.|定期支出模板已在其他地方更改。列表已重新加载。|정기 지출 템플릿이 다른 곳에서 변경되었습니다. 목록을 다시 불러왔습니다.|आवर्ती व्यय टेम्पलेट कहीं और बदला गया। सूची फिर से लोड की गई।
+2009|Recurring expense template updated.|定期支出模板已更新。|정기 지출 템플릿을 업데이트했습니다.|आवर्ती व्यय टेम्पलेट अपडेट किया गया।
+2010|Recurring expense template created. Due months have been recorded in the expense ledger.|定期支出模板已创建。到期月份已记入支出账本。|정기 지출 템플릿을 만들었습니다. 도래한 달은 지출 장부에 기록되었습니다.|आवर्ती व्यय टेम्पलेट बनाया गया। देय महीने व्यय बही में दर्ज कर दिए गए।
+2011|Expense template paused.|支出模板已暂停。|지출 템플릿을 일시 중지했습니다.|व्यय टेम्पलेट रोका गया।
+2012|Expense template resumed.|支出模板已恢复。|지출 템플릿을 재개했습니다.|व्यय टेम्पलेट फिर से शुरू किया गया।
+2013|Expense template deleted. Recorded expenses are kept.|支出模板已删除。已记录的支出仍保留。|지출 템플릿을 삭제했습니다. 기록된 지출은 유지됩니다.|व्यय टेम्पलेट हटाया गया। दर्ज किए गए व्यय बने रहेंगे।
+2014|EXPENSE|支出|지출|व्यय
+2015|SCHEDULE|周期|일정|अनुसूची
+2016|Day {0} of each month|每月 {0} 日|매월 {0}일|हर महीने की {0} तारीख
+2017|Recorded through {0}|已记录至 {0}|{0}까지 기록됨|{0} तक दर्ज
+2018|Edit expense template|编辑支出模板|지출 템플릿 수정|व्यय टेम्पलेट संपादित करें
+2019|Resume|恢复|재개|फिर से शुरू करें
+2020|Pause|暂停|일시 중지|रोकें
+2021|Delete recurring expense template?|删除定期支出模板？|정기 지출 템플릿을 삭제할까요?|आवर्ती व्यय टेम्पलेट हटाएँ?
+2022|Recorded expenses are kept.|已记录的支出仍保留。|기록된 지출은 유지됩니다.|दर्ज किए गए व्यय बने रहेंगे।
+2023|Delete expense template|删除支出模板|지출 템플릿 삭제|व्यय टेम्पलेट हटाएँ
+2024|Automatic recurring expenses with the Pro plan|使用 Pro 套餐自动记录定期支出|Pro 요금제로 정기 지출 자동 기록|Pro प्लान के साथ स्वचालित आवर्ती व्यय
+2025|Set up once for internet, manager wages, property rent… Roomie records them in the expense ledger every month.|网络、管理员工资、房屋租金…只需设置一次，Roomie 每月自动记入支出账本。|인터넷, 관리인 급여, 건물 임차료… 한 번만 만들면 Roomie가 매달 지출 장부에 자동 기록합니다.|इंटरनेट, प्रबंधक वेतन, संपत्ति किराया… के लिए एक बार बनाएँ। Roomie हर महीने व्यय बही में स्वतः दर्ज करता है।
+2026|Roomie records the expense on the chosen day each month (Vietnam time). Editing the template does not change months already recorded.|Roomie 每月在所选日期自动记录支出（越南时间）。编辑模板不会更改已记录的月份。|Roomie는 매달 선택한 날짜(베트남 시간)에 지출을 자동 기록합니다. 템플릿을 수정해도 이미 기록된 달은 바뀌지 않습니다.|Roomie हर महीने चुनी गई तारीख (वियतनाम समय) पर व्यय स्वतः दर्ज करता है। टेम्पलेट संपादित करने से पहले से दर्ज महीने नहीं बदलते।
+2027|No recurring expense templates yet|暂无定期支出模板|정기 지출 템플릿 없음|अभी कोई आवर्ती व्यय टेम्पलेट नहीं
+2028|Edit recurring expense template|编辑定期支出模板|정기 지출 템플릿 수정|आवर्ती व्यय टेम्पलेट संपादित करें
+2029|Add recurring expense template|添加定期支出模板|정기 지출 템플릿 추가|आवर्ती व्यय टेम्पलेट जोड़ें
+2030|Create template|创建模板|템플릿 만들기|टेम्पलेट बनाएँ
+2031|Monthly amount (VND)|每月金额 (VND)|월 금액 (VND)|मासिक राशि (VND)
+2032|Choose a day from 1 to 28.|请选择 1 至 28 日。|1~28일 중에서 선택하세요.|1 से 28 के बीच तारीख चुनें।
+2033|From period|起始周期|시작 기간|आरंभ अवधि
+2034|Select the start period.|请选择起始周期。|시작 기간을 선택하세요.|आरंभ अवधि चुनें।
+2035|To period|结束周期|종료 기간|अंतिम अवधि
+2036|The end period must be on or after the start period.|结束周期不得早于起始周期。|종료 기간은 시작 기간과 같거나 이후여야 합니다.|अंतिम अवधि आरंभ अवधि के बराबर या उसके बाद की होनी चाहिए।
+2037|When the template is created, months already due (up to 2 months back) are recorded immediately.|创建模板时，已到期的月份（最多前 2 个月）将立即记录。|템플릿을 만들면 이미 도래한 달(최대 2개월 전까지)이 즉시 기록됩니다.|टेम्पलेट बनाते ही, देय हो चुके महीने (अधिकतम 2 महीने पहले तक) तुरंत दर्ज किए जाएँगे।
+2038|E.g. FPT Internet 300 Mbps|例如：FPT 网络 300 Mbps|예: FPT 인터넷 300 Mbps|उदाहरण: FPT इंटरनेट 300 Mbps
+2039|The expense was changed elsewhere. The list has been reloaded.|该支出已在其他地方更改。列表已重新加载。|지출이 다른 곳에서 변경되었습니다. 목록을 다시 불러왔습니다.|व्यय कहीं और बदला गया। सूची फिर से लोड की गई।
+2040|Expense updated.|支出已更新。|지출을 업데이트했습니다.|व्यय अपडेट किया गया।
+2041|Expense recorded.|支出已记录。|지출을 기록했습니다.|व्यय दर्ज किया गया।
+2042|Expense deleted.|支出已删除。|지출을 삭제했습니다.|व्यय हटाया गया।
+2043|Expense ledger: record master electricity and water, repairs, wages and other expenses|支出账本：记录总电费水费、维修、工资及其他支出|지출 장부: 전체 전기·수도, 수리비, 급여 및 기타 지출 기록|व्यय बही: मुख्य बिजली-पानी, मरम्मत, वेतन और अन्य व्यय दर्ज करें
+2044|Monthly profit/loss reports, automatic recurring expenses and receipt image storage|月度盈亏报告、自动定期支出及凭证图片存储|월별 손익 보고서, 정기 지출 자동 기록, 증빙 이미지 저장|मासिक लाभ/हानि रिपोर्ट, स्वचालित आवर्ती व्यय और रसीद छवि संग्रहण
+2045|Reconcile EVN master electricity against electricity billed to rooms to detect losses|将 EVN 总电量与已为房间开具的电量对账，发现损耗|EVN 전체 전기와 방별 청구 전기를 대조해 손실 감지|नुकसान पकड़ने के लिए EVN मुख्य बिजली का कमरों को बिल की गई बिजली से मिलान करें
+2046|After signing up and verifying the OTP sent by email, landlord accounts are activated immediately on the Free plan with core operating features (including the expense ledger) for up to 5 occupied rooms. The Pro plan, available for 1 month, 3 months or 1 year, unlocks unlimited rooms plus profit/loss reports, recurring expenses, receipt storage and EVN electricity reconciliation.|注册并通过电子邮件验证 OTP 后，房东账户将立即启用免费套餐，提供核心运营功能（包括支出账本），最多支持 5 间在用房间。Pro 套餐提供 1 个月、3 个月或 1 年期限，解锁不限房间数以及盈亏报告、定期支出、凭证存储和 EVN 电费对账。|가입 후 이메일로 OTP를 인증하면 임대인 계정이 즉시 무료 요금제로 활성화되어 사용 중인 방 최대 5개까지 핵심 운영 기능(지출 장부 포함)을 이용할 수 있습니다. 1개월, 3개월 또는 1년 기간의 Pro 요금제는 방 수 제한 없이 손익 보고서, 정기 지출, 증빙 저장, EVN 전기 대조를 제공합니다.|साइन अप करके ईमेल से OTP सत्यापित करने के बाद, मकान मालिक का खाता तुरंत मुफ़्त प्लान पर सक्रिय हो जाता है, जिसमें अधिकतम 5 उपयोग में कमरों के लिए मुख्य संचालन सुविधाएँ (व्यय बही सहित) मिलती हैं। 1 महीने, 3 महीने या 1 साल की अवधि वाला Pro प्लान असीमित कमरे और लाभ/हानि रिपोर्ट, आवर्ती व्यय, रसीद संग्रहण तथा EVN बिजली मिलान खोलता है।
+2047|EVN kWh is 0|EVN kWh 数为 0|EVN kWh가 0입니다|EVN kWh 0 है
+2048|No data: no EVN bill entered for this period|暂无数据：本周期尚未录入 EVN 账单|데이터 없음: 이 기간의 EVN 고지서가 입력되지 않았습니다|कोई डेटा नहीं: इस अवधि का EVN बिल दर्ज नहीं किया गया
+2049|EVN electricity reconciliation with the Pro plan|使用 Pro 套餐进行 EVN 电费对账|Pro 요금제로 EVN 전기 대조|Pro प्लान के साथ EVN बिजली मिलान
+2050|Compare kWh on the EVN bill with electricity billed to rooms to detect losses and price differences.|将 EVN 账单上的 kWh 数与已为房间开具的电量比较，发现损耗和价差。|EVN 고지서의 kWh와 방별 청구 전기를 비교해 손실과 요금 차이를 찾아내세요.|नुकसान और मूल्य अंतर पकड़ने के लिए EVN बिल के kWh की तुलना कमरों को बिल की गई बिजली से करें।
+2051|PERIOD / BUILDING|周期 / 楼栋|기간 / 건물|अवधि / भवन
+2052|EVN|EVN|EVN|EVN
+2053|Not entered|未录入|미입력|दर्ज नहीं
+2054|BILLED TO ROOMS|已开给房间|방별 청구|कमरों को बिल किया गया
+2055|LOSS|损耗|손실|नुकसान
+2056|AMOUNT DIFFERENCE|金额差额|금액 차이|राशि अंतर
+2057|There are unissued draft invoices in this period, so the billed amount may be incomplete.|本周期仍有未开具的草稿账单，因此已开数量可能不完整。|이 기간에 발행되지 않은 임시 청구서가 있어 청구량이 누락될 수 있습니다.|इस अवधि में अभी भी जारी न किए गए ड्राफ़्ट चालान हैं, इसलिए बिल की गई मात्रा अधूरी हो सकती है।
+2058|{0} drafts|{0} 张草稿|임시 {0}건|{0} ड्राफ़्ट
+2059|The reconciliation period follows the months in the selected date range. Only issued room invoices are counted; enter EVN kWh when recording a "Master electricity" expense with a building selected.|对账周期按所选日期范围的月份确定。仅统计已开具的房间账单；记录选择了楼栋的"总电费"支出时输入 EVN kWh 数。|대조 기간은 선택한 날짜 범위의 월을 기준으로 합니다. 발행된 방 청구서만 계산되며, 건물을 선택한 "전체 전기" 지출을 기록할 때 EVN kWh를 입력하세요.|मिलान अवधि चुनी गई तिथि सीमा के महीनों पर आधारित है। केवल जारी किए गए कमरे के चालान गिने जाते हैं; भवन चुनकर "मुख्य बिजली" व्यय दर्ज करते समय EVN kWh दर्ज करें।
+2060|No electricity data in these periods|这些周期暂无电量数据|이 기간에 전기 데이터가 없습니다|इन अवधियों में बिजली का कोई डेटा नहीं
+2061|Billed to rooms|已开给房间|방별 청구|कमरों को बिल किया गया
+2062|Amount difference|金额差额|금액 차이|राशि अंतर
+2063|Draft invoices|草稿账单|임시 청구서|ड्राफ़्ट चालान
+2064|See monthly net profit with the Pro plan|使用 Pro 套餐查看月度净利润|Pro 요금제로 월별 순이익 확인|Pro प्लान के साथ मासिक शुद्ध लाभ देखें
+2065|Roomie subtracts expenses from cash collected by month and by category, with Excel export.|Roomie 按月份和类别以实收金额减去支出，并可导出到 Excel。|Roomie는 월별·카테고리별로 실수령액에서 지출을 빼서 보여 주며 Excel로 내보낼 수 있습니다.|Roomie हर महीने और हर श्रेणी के अनुसार प्राप्त नकद से व्यय घटाता है, और इसे Excel में निर्यात किया जा सकता है।
+2066|MONTH|月份|월|महीना
+2067|CASH COLLECTED|实收|실수령액|प्राप्त नकद
+2068|EXPENSES|支出|지출|व्यय
+2069|NET PROFIT|净利润|순이익|शुद्ध लाभ
+2070|Cash collected (excluding deposits)|实收（不含押金）|실수령액 (보증금 제외)|प्राप्त नकद (जमा राशि को छोड़कर)
+2071|Net profit|净利润|순이익|शुद्ध लाभ
+2072|{0} in shared expenses (not tied to a building) is excluded when filtering by building.|有 {0} 的共同支出（不关联楼栋）在按楼栋筛选时未计入。|건물에 연결되지 않은 공동 지출 {0}은(는) 건물별 필터링 시 제외됩니다.|भवन के अनुसार फ़िल्टर करने पर {0} का साझा व्यय (किसी भवन से न जुड़ा) शामिल नहीं होता।
+2073|Monthly income and expense chart|月度收支图表|월별 수입·지출 차트|मासिक आय और व्यय चार्ट
+2074|Cash collected|实收|실수령액|प्राप्त नकद
+2075|Expenses by category|按类别统计支出|카테고리별 지출|श्रेणी के अनुसार व्यय
+2076|COUNT|笔数|건수|संख्या
+2077|Profit/loss|盈亏|손익|लाभ/हानि
+2078|Electricity reconciliation|电费对账|전기 대조|बिजली मिलान
+2079|Track collections, receivables, deposits, net profit and master electricity.|跟踪收款、欠款、押金、净利润和总电量。|수금, 미수금, 보증금, 순이익, 전체 전기를 추적하세요.|संग्रह, बकाया, जमा राशि, शुद्ध लाभ और मुख्य बिजली पर नज़र रखें।
+2080|Exporting this report to Excel requires the Pro plan.|将此报告导出到 Excel 需要 Pro 套餐。|이 보고서의 Excel 내보내기는 Pro 요금제 전용입니다.|इस रिपोर्ट को Excel में निर्यात करना Pro प्लान के लिए है।
+2081|Cash collected matches the Collections tab: money received for invoices, excluding deposits. Expenses come from the Expense ledger by expense date.|实收与"收款"标签一致：为账单收到的款项，不含押金。支出按支出日期取自支出账本。|실수령액은 수금 탭과 같습니다: 청구서에 대해 받은 금액이며 보증금은 제외됩니다. 지출은 지출 장부에서 지출일 기준으로 가져옵니다.|प्राप्त नकद "संग्रह" टैब जैसा ही है: चालानों के लिए प्राप्त राशि, जमा राशि को छोड़कर। व्यय, व्यय बही से व्यय तिथि के अनुसार लिए जाते हैं।
+2082|Upgrade to Pro|升级 Pro|Pro 업그레이드|Pro में अपग्रेड करें
+2083|This feature requires the Pro plan. Please upgrade to use it.|此功能仅限 Pro 套餐。请升级后使用。|이 기능은 Pro 요금제 전용입니다. 업그레이드 후 이용하세요.|यह सुविधा Pro प्लान के लिए है। उपयोग करने के लिए कृपया अपग्रेड करें।
+2084|Invalid expense category.|支出类别无效。|잘못된 지출 카테고리입니다.|अमान्य व्यय श्रेणी।
+2085|Expense amount must be a whole VND amount greater than 0 and no more than 10 billion.|支出金额必须为大于 0 且不超过 100 亿的整数 VND。|지출 금액은 0보다 크고 100억 이하인 정수 VND여야 합니다.|व्यय राशि 0 से अधिक और 10 अरब से अनधिक पूर्ण VND संख्या होनी चाहिए।
+2086|Expense notes can be at most 500 characters.|支出备注最多 500 个字符。|지출 메모는 최대 500자입니다.|व्यय नोट अधिकतम 500 वर्णों का हो सकता है।
+2087|The room does not belong to the selected building.|该房间不属于所选楼栋。|방이 선택한 건물에 속하지 않습니다.|कमरा चुने गए भवन का नहीं है।
+2088|Expense not found.|未找到支出。|지출을 찾을 수 없습니다.|व्यय नहीं मिला।
+2089|The expense has changed. Reload and try again.|支出已更改。请重新加载后重试。|지출이 변경되었습니다. 새로고침 후 다시 시도하세요.|व्यय बदल गया है। फिर से लोड करके दोबारा प्रयास करें।
+2090|The expense for this request has been deleted.|此请求对应的支出已被删除。|이 요청의 지출이 삭제되었습니다.|इस अनुरोध का व्यय हटा दिया गया है।
+2091|Invalid expense date.|支出日期无效。|잘못된 지출일입니다.|अमान्य व्यय तिथि।
+2092|Expense date cannot be in the future.|支出日期不能是未来日期。|지출일은 미래일 수 없습니다.|व्यय तिथि भविष्य की नहीं हो सकती।
+2093|Both the reconciliation period and EVN kWh are required.|需同时输入对账周期和 EVN kWh 数。|대조 기간과 EVN kWh를 모두 입력해야 합니다.|मिलान अवधि और EVN kWh दोनों दर्ज करना आवश्यक है।
+2094|Only master electricity expenses can have EVN kWh.|只有总电费支出才能填写 EVN kWh 数。|전체 전기 지출에만 EVN kWh를 입력할 수 있습니다.|केवल मुख्य बिजली व्यय में EVN kWh हो सकता है।
+2095|Select a building for EVN electricity reconciliation.|请选择楼栋以进行 EVN 电费对账。|EVN 전기 대조를 위해 건물을 선택하세요.|EVN बिजली मिलान के लिए भवन चुनें।
+2096|EVN kWh must be between 0 and 10,000,000 with at most 2 decimal places.|EVN kWh 数须在 0 至 10,000,000 之间，最多 2 位小数。|EVN kWh는 0 ~ 10,000,000 사이, 소수점 이하 최대 2자리여야 합니다.|EVN kWh 0 से 10,000,000 के बीच और अधिकतम 2 दशमलव स्थानों तक होना चाहिए।
+2097|EVN electricity reconciliation requires the Pro plan. Please upgrade to use it.|EVN 电费对账仅限 Pro 套餐。请升级后使用。|EVN 전기 대조는 Pro 요금제 전용입니다. 업그레이드 후 이용하세요.|EVN बिजली मिलान Pro प्लान के लिए है। उपयोग करने के लिए कृपया अपग्रेड करें।
+2098|Attaching receipts requires the Pro plan. Please upgrade to use it.|附加凭证仅限 Pro 套餐。请升级后使用。|증빙 첨부는 Pro 요금제 전용입니다. 업그레이드 후 이용하세요.|रसीदें संलग्न करना Pro प्लान के लिए है। उपयोग करने के लिए कृपया अपग्रेड करें।
+2099|Receipt files can be at most 2 MB.|凭证文件最大 2 MB。|증빙 파일은 최대 2 MB입니다.|रसीद फ़ाइल अधिकतम 2 MB हो सकती है।
+2100|Send receipt files as multipart/form-data.|请以 multipart/form-data 发送凭证文件。|증빙 파일은 multipart/form-data로 보내세요.|रसीद फ़ाइल multipart/form-data के रूप में भेजें।
+2101|Could not read the receipt file.|无法读取凭证文件。|증빙 파일을 읽을 수 없습니다.|रसीद फ़ाइल पढ़ी नहीं जा सकी।
+2102|Select exactly one receipt file.|请只选择一个凭证文件。|증빙 파일을 정확히 하나 선택하세요.|ठीक एक रसीद फ़ाइल चुनें।
+2103|The receipt file is empty.|凭证文件为空。|증빙 파일이 비어 있습니다.|रसीद फ़ाइल खाली है।
+2104|Only JPEG, PNG, WebP images or PDF files are accepted.|仅接受 JPEG、PNG、WebP 图片或 PDF 文件。|JPEG, PNG, WebP 이미지 또는 PDF 파일만 허용됩니다.|केवल JPEG, PNG, WebP छवियाँ या PDF फ़ाइलें स्वीकार की जाती हैं।
+2105|Each expense can have at most 5 attached files.|每笔支出最多附加 5 个文件。|지출당 최대 5개 파일만 첨부할 수 있습니다.|प्रत्येक व्यय में अधिकतम 5 फ़ाइलें संलग्न की जा सकती हैं।
+2106|Receipt storage is full (200 MB). Delete old files to upload more.|凭证存储空间已用完（200 MB）。请删除旧文件后再上传。|증빙 저장 용량(200 MB)을 모두 사용했습니다. 오래된 파일을 삭제한 후 업로드하세요.|रसीद संग्रहण (200 MB) भर गया है। और अपलोड करने के लिए पुरानी फ़ाइलें हटाएँ।
+2107|Receipt file not found.|未找到凭证文件。|증빙 파일을 찾을 수 없습니다.|रसीद फ़ाइल नहीं मिली।
+2108|Recurring expenses require the Pro plan. Please upgrade to use them.|定期支出仅限 Pro 套餐。请升级后使用。|정기 지출은 Pro 요금제 전용입니다. 업그레이드 후 이용하세요.|आवर्ती व्यय Pro प्लान के लिए है। उपयोग करने के लिए कृपया अपग्रेड करें।
+2109|The monthly expense day must be between 1 and 28.|每月支出日期须在 1 至 28 日之间。|월 지출일은 1~28일이어야 합니다.|मासिक व्यय तिथि 1 से 28 के बीच होनी चाहिए।
+2110|Recurring expense template not found.|未找到定期支出模板。|정기 지출 템플릿을 찾을 수 없습니다.|आवर्ती व्यय टेम्पलेट नहीं मिला।
+2111|The recurring expense template has changed. Reload and try again.|定期支出模板已更改。请重新加载后重试。|정기 지출 템플릿이 변경되었습니다. 새로고침 후 다시 시도하세요.|आवर्ती व्यय टेम्पलेट बदल गया है। फिर से लोड करके दोबारा प्रयास करें।
+2112|The recurring expense template for this request has been deleted.|此请求对应的定期支出模板已被删除。|이 요청의 정기 지출 템플릿이 삭제되었습니다.|इस अनुरोध का आवर्ती व्यय टेम्पलेट हटा दिया गया है।
+2113|Profit/loss reports require the Pro plan. Please upgrade to use them.|盈亏报告仅限 Pro 套餐。请升级后使用。|손익 보고서는 Pro 요금제 전용입니다. 업그레이드 후 이용하세요.|लाभ/हानि रिपोर्ट Pro प्लान के लिए है। उपयोग करने के लिए कृपया अपग्रेड करें।
+2114|The report range can be at most 24 months.|报告范围最多 24 个月。|보고서 기간은 최대 24개월입니다.|रिपोर्ट अवधि अधिकतम 24 महीने हो सकती है।
