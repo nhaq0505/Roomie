@@ -126,9 +126,9 @@ export function PricingSection({ destination, actionLabel, isAuthenticated, onCt
   return (
     <section id="pricing" className="landing-pricing">
       <div className="landing-section-heading">
-        <span className="section-eyebrow">{t("BẢNG GIÁ MINH BẠCH")}</span>
+        <span className="section-eyebrow">{t("Gói & Ưu đãi")}</span>
         <h2>{t("Bắt đầu miễn phí. Nâng cấp khi nhà trọ mở rộng.")}</h2>
-        <p>{t("Trải nghiệm đầy đủ mọi tính năng cốt lõi ngay từ gói Miễn phí. Chỉ nâng cấp khi quy mô vượt quá 5 phòng.")}</p>
+        <p>{t("Mở khóa toàn bộ giới hạn phòng cùng các gói kỳ hạn linh hoạt giúp tiết kiệm chi phí vận hành.")}</p>
       </div>
 
       <div className="pricing-grid">
@@ -356,9 +356,9 @@ export function GuidesSection() {
   return (
     <section id="guides-list" className="landing-guides">
       <div className="landing-section-heading">
-        <span className="section-eyebrow"><BookOutlined /> {t("CẨM NANG CHỦ TRỌ")}</span>
+        <span className="section-eyebrow">{t("HƯỚNG DẪN BẮT ĐẦU NHANH")}</span>
         <h2>{t("4 quy trình cốt lõi vận hành nhà trọ trên Roomie.")}</h2>
-        <p>{t("Hướng dẫn chi tiết từng bước từ lúc thiết lập phòng đầu tiên đến khi chốt điện, nhắc nợ Zalo và đối soát cuối tháng.")}</p>
+        <p>{t("Mọi quy tắc vận hành trên Roomie đều được thiết kế sát với thực tế quản lý nhà trọ tại Việt Nam.")}</p>
       </div>
       <div className="guides-grid">
         {guides.map((guide) => (
@@ -366,7 +366,7 @@ export function GuidesSection() {
             <div className="guide-card-top">
               <span className="guide-index">{guide.index} / {guide.icon} {guide.category}</span>
               <h3>
-                <Link to={`/huong-dan/${guide.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                <Link to={`/huong-dan/${guide.slug}`} className="guide-card-title-link">
                   {guide.title}
                 </Link>
               </h3>
@@ -380,7 +380,7 @@ export function GuidesSection() {
                 </li>
               ))}
             </ol>
-            <div style={{ marginTop: 16 }}>
+            <div className="guide-card-footer">
               <Link to={`/huong-dan/${guide.slug}`} className="landing-text-link">
                 {t("Đọc bài viết chi tiết")} <ArrowRightOutlined />
               </Link>
@@ -390,10 +390,10 @@ export function GuidesSection() {
       </div>
 
       {cmsGuides.length > 0 && (
-        <div style={{ marginTop: 40 }}>
-          <div className="landing-section-heading" style={{ marginBottom: 20 }}>
-            <span className="section-eyebrow"><BookOutlined /> {t("BÀI VIẾT CHUYÊN SÂU")}</span>
-            <h3>{t("Kinh nghiệm quản lý & tối ưu vận hành nhà trọ")}</h3>
+        <div className="guides-cms-group">
+          <div className="landing-section-heading landing-section-heading--compact">
+            <span className="section-eyebrow">{t("BÀI VIẾT CHUYÊN SÂU")}</span>
+            <h2>{t("Kinh nghiệm quản lý & tối ưu vận hành nhà trọ")}</h2>
           </div>
           <div className="guides-grid">
             {cmsGuides.map((article, idx) => (
@@ -404,13 +404,13 @@ export function GuidesSection() {
                     {article.readTimeLabel ? ` · ${article.readTimeLabel}` : ''}
                   </span>
                   <h3>
-                    <Link to={`/huong-dan/${article.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Link to={`/huong-dan/${article.slug}`} className="guide-card-title-link">
                       {article.title}
                     </Link>
                   </h3>
                   <p>{article.summary}</p>
                 </div>
-                <div style={{ marginTop: 16 }}>
+                <div className="guide-card-footer">
                   <Link to={`/huong-dan/${article.slug}`} className="landing-text-link">
                     {t("Đọc bài viết chi tiết")} <ArrowRightOutlined />
                   </Link>

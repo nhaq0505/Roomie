@@ -1,12 +1,14 @@
 import { ArrowLeftOutlined, ArrowRightOutlined, BookOutlined, ClockCircleOutlined, OrderedListOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Spin, Tag } from 'antd';
+import { Spin } from 'antd';
+import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
 import { post, request } from '../../shared/http/client';
+import { ActiveBannerStrip } from '../../shared/ui/ActiveBannerStrip';
+import { useAuth } from '../auth/session';
 import './LandingPage.css';
-import { Brand } from './LandingVisuals';
+import { LandingCtaSection, LandingFooter, LandingHeader } from './LandingPage';
 
 type PublicGuideArticle = {
   id?: string;
@@ -108,11 +110,9 @@ function renderMarkdownBlocks(markdown: string) {
   const flushList = (keyPrefix: number) => {
     if (listItems.length > 0) {
       elements.push(
-        <ul key={`list-${keyPrefix}`} style={{ paddingLeft: 22, marginBottom: 16 }}>
+        <ul key={`list-${keyPrefix}`}>
           {listItems.map((li, idx) => (
-            <li key={idx} style={{ marginBottom: 6 }}>
-              {li}
-            </li>
+            <li key={idx}>{li}</li>
           ))}
         </ul>
       );
@@ -149,8 +149,17 @@ function renderMarkdownBlocks(markdown: string) {
 }
 
 export default function GuideArticlePage() {
+  const { user } = useAuth();
   const { slug = '' } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    } catch {
+      // Non-blocking
+    }
+  }, [slug]);
 
   const query = useQuery({
     queryKey: ['public-guide', slug],
@@ -178,121 +187,102 @@ export default function GuideArticlePage() {
   };
 
   return (
-    <div className="landing-page" style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <header className="landing-header">
-        <div className="landing-header-inner">
-          <Brand />
-          <nav className="landing-nav" aria-label={t("Điều hướng chính")}>
-            <Link to="/">{t("Trang chủ")}</Link>
-            <Link to="/features">{t("Tính năng")}</Link>
-            <Link to="/pricing">{t("Bảng giá")}</Link>
-            <Link to="/huong-dan" className="is-active">
-              {t("Hướng dẫn")}
-            </Link>
-          </nav>
-          <div className="landing-header-actions">
-            <LanguageSelector />
-            <Link to="/register" className="landing-btn landing-btn-light">
-              <span>{t("Đăng ký")}</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="landing-page">
+      <LandingHeader user={user} page="guides" />
 
-      <main className="guide-article-shell">
-        <div style={{ marginBottom: 20 }}>
-          <Link to="/huong-dan" style={{ color: '#0f766e', fontWeight: 600, textDecoration: 'none' }}>
-            <ArrowLeftOutlined style={{ marginRight: 6 }} />
-            {t("Quay lại Cẩm nang hướng dẫn")}
-          </Link>
-        </div>
+      <main>
+        <ActiveBannerStrip placement="LandingTop" />
 
-        {query.isLoading && !article ? (
-          <div style={{ textAlign: 'center', padding: 64 }}>
-            <Spin size="large" />
-          </div>
-        ) : !article ? (
-          <div className="guide-article-card" style={{ textAlign: 'center' }}>
-            <h2>{t("Không tìm thấy bài viết hướng dẫn")}</h2>
-            <p>{t("Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.")}</p>
-            <Button type="primary" onClick={() => navigate('/huong-dan')}>
-              {t("Xem toàn bộ Cẩm nang")}
-            </Button>
-          </div>
-        ) : (
-          <article className="guide-article-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-              <Tag color="cyan">
-                <BookOutlined style={{ marginRight: 4 }} />
-                {article.category}
-              </Tag>
-              <span style={{ fontSize: 13, color: '#64748b' }}>
-                <ClockCircleOutlined style={{ marginRight: 4 }} />
-                {article.readingTimeMinutes} {t("phút đọc")}
-              </span>
+        <section className="landing-hero landing-hero--subpage landing-hero--article" id="hero">
+          <div className="hero-atmosphere" aria-hidden="true" />
+          <div className="hero-content">
+            <div className="guide-article-back-row">
+              <Link to="/huong-dan" className="guide-article-back">
+                <ArrowLeftOutlined aria-hidden="true" />
+                <span>{t("Quay lại Cẩm nang hướng dẫn")}</span>
+              </Link>
             </div>
-
-            <h1 style={{ fontSize: 30, fontWeight: 800, color: '#0f292d', lineHeight: 1.3, marginBottom: 16 }}>
-              {article.title}
-            </h1>
-
-            <p style={{ fontSize: 17, color: '#475569', lineHeight: 1.65, fontWeight: 500, marginBottom: 20 }}>
-              {article.summary}
-            </p>
-
-            {headings.length > 0 && (
-              <nav
-                aria-label={t("Mục lục bài viết")}
-                style={{
-                  background: '#f1f5f9',
-                  borderRadius: 10,
-                  padding: '12px 16px',
-                  marginBottom: 20,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f292d', marginBottom: 8 }}>
-                  <OrderedListOutlined style={{ marginRight: 6, color: '#0f766e' }} />
-                  {t("Mục lục bài viết")}
+            {article ? (
+              <>
+                <div className="hero-kicker">
+                  <span />
+                  <BookOutlined aria-hidden="true" />
+                  <span>{article.category}</span>
+                  <span aria-hidden="true">·</span>
+                  <ClockCircleOutlined aria-hidden="true" />
+                  <span>{article.readingTimeMinutes} {t("phút đọc")}</span>
                 </div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {headings.map((h) => (
-                    <li key={h.id} style={{ marginBottom: 4, fontSize: 14 }}>
-                      <a href={`#${h.id}`} style={{ color: '#0f766e', textDecoration: 'none' }}>
-                        {h.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            )}
+                <h1>{article.title}</h1>
+                <p>{article.summary}</p>
+              </>
+            ) : !query.isLoading ? (
+              <>
+                <div className="hero-kicker"><span />{t("CẨM NANG CHỦ TRỌ")}</div>
+                <h1>{t("Không tìm thấy bài viết hướng dẫn")}</h1>
+                <p>{t("Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.")}</p>
+              </>
+            ) : null}
+          </div>
+        </section>
 
-            <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '24px 0' }} />
-
-            <div className="guide-article-body">{renderMarkdownBlocks(article.contentMarkdown)}</div>
-
-            <div className="guide-article-cta">
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ fontWeight: 700, fontSize: 17, color: '#0f292d' }}>
-                  {t("Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?")}
-                </div>
-                <div style={{ fontSize: 14, color: '#334155', marginTop: 4 }}>
-                  {t("Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.")}
-                </div>
+        <section className="guide-article-section">
+          <div className="guide-article-shell">
+            {query.isLoading && !article ? (
+              <div className="guide-article-loading">
+                <Spin size="large" />
               </div>
-              <Button
-                type="primary"
-                size="large"
-                icon={<ArrowRightOutlined />}
-                onClick={handleCtaClick}
-                style={{ background: '#0f766e', borderColor: '#0f766e', fontWeight: 600 }}
-              >
-                {article.ctaText || t("Dùng thử miễn phí cho 5 phòng")}
-              </Button>
-            </div>
-          </article>
-        )}
+            ) : !article ? (
+              <div className="guide-article-card guide-article-card--empty">
+                <h2>{t("Không tìm thấy bài viết hướng dẫn")}</h2>
+                <p>{t("Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.")}</p>
+                <Link to="/huong-dan" className="landing-btn landing-btn-teal">
+                  <span>{t("Xem toàn bộ Cẩm nang")}</span>
+                  <ArrowRightOutlined aria-hidden="true" />
+                </Link>
+              </div>
+            ) : (
+              <article className="guide-article-card">
+                {headings.length > 0 && (
+                  <nav aria-label={t("Mục lục bài viết")} className="guide-article-toc">
+                    <div className="guide-article-toc-title">
+                      <OrderedListOutlined aria-hidden="true" />
+                      <span>{t("Mục lục bài viết")}</span>
+                    </div>
+                    <ul>
+                      {headings.map((h) => (
+                        <li key={h.id}>
+                          <a href={`#${h.id}`}>{h.text}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                )}
+
+                <div className="guide-article-body">{renderMarkdownBlocks(article.contentMarkdown)}</div>
+
+                <div className="guide-article-cta">
+                  <div className="guide-article-cta-copy">
+                    <strong>{t("Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?")}</strong>
+                    <p>{t("Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.")}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="landing-btn landing-btn-teal landing-btn-lg"
+                    onClick={handleCtaClick}
+                  >
+                    <span>{article.ctaText || t("Dùng thử miễn phí cho 5 phòng")}</span>
+                    <ArrowRightOutlined aria-hidden="true" />
+                  </button>
+                </div>
+              </article>
+            )}
+          </div>
+        </section>
+
+        <LandingCtaSection user={user} />
       </main>
+
+      <LandingFooter />
     </div>
   );
 }

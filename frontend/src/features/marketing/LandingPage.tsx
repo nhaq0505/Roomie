@@ -38,14 +38,7 @@ import { useLandingMotion } from './useLandingMotion';
 
 export type LandingPageKind = 'home' | 'features' | 'pricing' | 'guides';
 
-export function LandingContent({
-  user = null,
-  page = 'home',
-}: {
-  user?: User | null;
-  page?: LandingPageKind;
-}) {
-  const rootRef = useLandingMotion(page);
+export function getLandingAction(user?: User | null) {
   const workspace =
     user?.role === 'Admin'
       ? '/admin/owners'
@@ -54,6 +47,178 @@ export function LandingContent({
       : '/dashboard';
   const destination = user ? workspace : '/register';
   const actionLabel = user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ");
+  return { destination, actionLabel };
+}
+
+export function LandingHeader({
+  user = null,
+  page = 'home',
+  onCta,
+}: {
+  user?: User | null;
+  page?: LandingPageKind;
+  onCta?: (ctaId: string, label: string) => void;
+}) {
+  const { destination, actionLabel } = getLandingAction(user);
+  return (
+    <>
+      <header className="landing-header">
+        <div className="landing-header-inner">
+          <Brand />
+          <nav className="landing-nav" aria-label={t("Điều hướng chính")}>
+            <Link to="/" className={page === 'home' ? 'is-active' : undefined} aria-current={page === 'home' ? 'page' : undefined}>
+              {t("Trang chủ")}
+            </Link>
+            <Link to="/features" className={page === 'features' ? 'is-active' : undefined} aria-current={page === 'features' ? 'page' : undefined}>
+              {t("Tính năng")}
+            </Link>
+            <Link to="/pricing" className={page === 'pricing' ? 'is-active' : undefined} aria-current={page === 'pricing' ? 'page' : undefined}>
+              {t("Bảng giá")}
+            </Link>
+            <Link to="/huong-dan" className={page === 'guides' ? 'is-active' : undefined} aria-current={page === 'guides' ? 'page' : undefined}>
+              {t("Hướng dẫn")}
+            </Link>
+          </nav>
+          <div className="landing-header-actions">
+            <LanguageSelector />
+            {!user && (
+              <Link
+                to="/login"
+                className="landing-btn landing-btn-outline landing-login"
+                onClick={() => onCta?.('cta_header_login', 'Header Login')}
+              >
+                {t("Đăng nhập")}
+              </Link>
+            )}
+            <Link
+              to={destination}
+              className="landing-btn landing-btn-light"
+              onClick={() => onCta?.('cta_header_action', actionLabel)}
+            >
+              <span className="btn-text-full">{actionLabel}</span>
+              <span className="btn-text-short">{user ? t("Tổng quan") : t("Đăng ký")}</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <nav className="landing-subnav" aria-label={t("Chuyển trang nhanh")}>
+        <Link to="/" className={page === 'home' ? 'is-active' : undefined}>{t("Trang chủ")}</Link>
+        <Link to="/features" className={page === 'features' ? 'is-active' : undefined}>{t("Tính năng")}</Link>
+        <Link to="/pricing" className={page === 'pricing' ? 'is-active' : undefined}>{t("Bảng giá")}</Link>
+        <Link to="/huong-dan" className={page === 'guides' ? 'is-active' : undefined}>{t("Hướng dẫn")}</Link>
+      </nav>
+    </>
+  );
+}
+
+export function LandingSecuritySection() {
+  return (
+    <section className="landing-security" aria-labelledby="landing-security-title">
+      <div className="landing-security-inner">
+        <div className="security-intro">
+          <span className="security-icon"><SafetyCertificateOutlined /></span>
+          <h2 id="landing-security-title">{t("Bảo mật giao dịch")}</h2>
+        </div>
+        <div className="security-points">
+          <div className="security-card">
+            <LockOutlined />
+            <p>{t("Khóa kết nối thanh toán được mã hóa trên máy chủ.")}</p>
+          </div>
+          <div className="security-card">
+            <CheckCircleFilled />
+            <p>{t("Kiểm tra xác nhận từ payOS trước khi ghi nhận thanh toán.")}</p>
+          </div>
+          <div className="security-card">
+            <SafetyCertificateOutlined />
+            <p>{t("Liên kết của lượt thuê cũ hết hiệu lực sau khi trả phòng.")}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function LandingCtaSection({
+  user = null,
+  onCta,
+}: {
+  user?: User | null;
+  onCta?: (ctaId: string, label: string) => void;
+}) {
+  const { destination, actionLabel } = getLandingAction(user);
+  return (
+    <section id="get-started" className="landing-cta">
+      <div className="cta-content">
+        <span className="section-eyebrow">Roomie</span>
+        <h2>{t("Nhẹ đầu hơn từ tháng này.")}</h2>
+        <p>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</p>
+        <Link
+          to={destination}
+          className="landing-btn landing-btn-light landing-btn-lg"
+          onClick={() => onCta?.('cta_bottom_action', actionLabel)}
+        >
+          <span>{user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ ngay")}</span>
+          <ArrowRightOutlined aria-hidden="true" />
+        </Link>
+      </div>
+      <ol className="setup-steps">
+        <li>
+          <strong>{t("1. Đăng ký thông tin")}</strong>
+          <span>{t("Điền thông tin tài khoản.")}</span>
+        </li>
+        <li>
+          <strong>{t("2. Xác thực OTP email")}</strong>
+          <span>{t("Xác nhận bằng mã gửi qua email.")}</span>
+        </li>
+        <li>
+          <strong>{t("3. Thiết lập phòng & đón khách")}</strong>
+          <span>{t("Thêm dãy trọ và phòng đầu tiên.")}</span>
+        </li>
+      </ol>
+    </section>
+  );
+}
+
+export function LandingFooter() {
+  return (
+    <footer className="landing-footer">
+      <div className="footer-inner">
+        <div className="footer-brand">
+          <Brand footer />
+          <p>{t("Đơn giản hóa việc quản lý nhà trọ mỗi ngày.")}</p>
+        </div>
+        <div className="footer-links">
+          <strong>{t("Tính năng")}</strong>
+          <Link to="/">{t("Trang chủ")}</Link>
+          <Link to="/features">{t("Tính năng")}</Link>
+          <Link to="/pricing">{t("Bảng giá")}</Link>
+          <Link to="/huong-dan">{t("Hướng dẫn")}</Link>
+        </div>
+        <div className="footer-links">
+          <strong>{t("Chủ trọ")}</strong>
+          <Link to="/login">{t("Đăng nhập")}</Link>
+          <Link to="/register">{t("Đăng ký làm chủ trọ")}</Link>
+          <Link to="/pricing">{t("Gói Pro")}</Link>
+        </div>
+      </div>
+      <div className="footer-bottom">
+        <span>© 2026 Roomie</span>
+        <span>{t("Đơn giản hóa việc quản lý mỗi ngày")}</span>
+      </div>
+    </footer>
+  );
+}
+
+export function LandingContent({
+  user = null,
+  page = 'home',
+}: {
+  user?: User | null;
+  page?: LandingPageKind;
+}) {
+  const rootRef = useLandingMotion(page);
+  const { destination, actionLabel } = getLandingAction(user);
 
   useEffect(() => {
     try {
@@ -79,52 +244,7 @@ export function LandingContent({
 
   return (
     <div className="landing-page" ref={rootRef}>
-      <header className="landing-header">
-        <div className="landing-header-inner">
-          <Brand />
-          <nav className="landing-nav" aria-label={t("Điều hướng chính")}>
-            <Link to="/" className={page === 'home' ? 'is-active' : undefined} aria-current={page === 'home' ? 'page' : undefined}>
-              {t("Trang chủ")}
-            </Link>
-            <Link to="/features" className={page === 'features' ? 'is-active' : undefined} aria-current={page === 'features' ? 'page' : undefined}>
-              {t("Tính năng")}
-            </Link>
-            <Link to="/pricing" className={page === 'pricing' ? 'is-active' : undefined} aria-current={page === 'pricing' ? 'page' : undefined}>
-              {t("Bảng giá")}
-            </Link>
-            <Link to="/huong-dan" className={page === 'guides' ? 'is-active' : undefined} aria-current={page === 'guides' ? 'page' : undefined}>
-              {t("Hướng dẫn")}
-            </Link>
-          </nav>
-          <div className="landing-header-actions">
-            <LanguageSelector />
-            {!user && (
-              <Link
-                to="/login"
-                className="landing-btn landing-btn-outline landing-login"
-                onClick={() => handleCta('cta_header_login', 'Header Login')}
-              >
-                {t("Đăng nhập")}
-              </Link>
-            )}
-            <Link
-              to={destination}
-              className="landing-btn landing-btn-light"
-              onClick={() => handleCta('cta_header_action', actionLabel)}
-            >
-              <span className="btn-text-full">{actionLabel}</span>
-              <span className="btn-text-short">{user ? t("Tổng quan") : t("Đăng ký")}</span>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <nav className="landing-subnav" aria-label={t("Chuyển trang nhanh")}>
-        <Link to="/" className={page === 'home' ? 'is-active' : undefined}>{t("Trang chủ")}</Link>
-        <Link to="/features" className={page === 'features' ? 'is-active' : undefined}>{t("Tính năng")}</Link>
-        <Link to="/pricing" className={page === 'pricing' ? 'is-active' : undefined}>{t("Bảng giá")}</Link>
-        <Link to="/huong-dan" className={page === 'guides' ? 'is-active' : undefined}>{t("Hướng dẫn")}</Link>
-      </nav>
+      <LandingHeader user={user} page={page} onCta={handleCta} />
 
       <main>
         <ActiveBannerStrip placement="LandingTop" />
@@ -203,6 +323,10 @@ export function LandingContent({
                       <li><CheckCircleFilled />{t("Ghi chỉ số hàng tháng, kiểm tra số liệu trước khi lưu.")}</li>
                       <li><CheckCircleFilled />{t("Chốt điện, tính tiền và lập hóa đơn cùng một nơi.")}</li>
                     </ul>
+                    <Link to="/features" className="landing-text-link">
+                      {t("Xem chi tiết")}
+                      <ArrowRightOutlined aria-hidden="true" />
+                    </Link>
                   </div>
                   <BillingIllustration />
                 </div>
@@ -212,27 +336,27 @@ export function LandingContent({
             <section className="product-story tenant-story" id="how-it-works">
               <div className="story-copy">
                 <span className="story-index">03 / <CreditCardOutlined />{t("Thanh toán trực tuyến (payOS)")} &amp; VietQR</span>
-                <h2>{t("Tiện lợi cho khách, nhàn hạ cho chủ trọ")}</h2>
+                <h3>{t("Tiện lợi cho khách, nhàn hạ cho chủ trọ")}</h3>
                 <p>{t("Nhận tiền linh hoạt qua chế độ VietQR thủ công hoặc gạch nợ tự động với payOS.")}</p>
                 <ol className="tenant-steps">
                   <li>
                     <span>01</span>
                     <div>
-                      <h3>{t("Nhận liên kết riêng tư")}</h3>
+                      <strong>{t("Nhận liên kết riêng tư")}</strong>
                       <p>{t("Mở liên kết do chủ trọ gửi ngay trên điện thoại.")}</p>
                     </div>
                   </li>
                   <li>
                     <span>02</span>
                     <div>
-                      <h3>{t("Xem hóa đơn minh bạch")}</h3>
+                      <strong>{t("Xem hóa đơn minh bạch")}</strong>
                       <p>{t("Kiểm tra tiền phòng, điện nước và từng khoản phí.")}</p>
                     </div>
                   </li>
                   <li>
                     <span>03</span>
                     <div>
-                      <h3>{t("Thanh toán bằng mã QR")}</h3>
+                      <strong>{t("Thanh toán bằng mã QR")}</strong>
                       <p>{t("Quét VietQR bằng ứng dụng ngân hàng. Hóa đơn cập nhật khi thanh toán được xác nhận.")}</p>
                     </div>
                   </li>
@@ -242,6 +366,11 @@ export function LandingContent({
             </section>
 
             <section className="landing-explore" aria-label={t("Khám phá chi tiết")}>
+              <div className="landing-section-heading">
+                <span className="section-eyebrow">{t("Khám phá chi tiết")}</span>
+                <h2>{t("Mọi nghiệp vụ nhà trọ.")} {t("Gói gọn trong một nơi.")}</h2>
+                <p>{t("Từ quản lý phòng, sổ cái tiền cọc, chốt chỉ số điện, nhắc lịch Zalo đến đối soát thanh toán VietQR và payOS.")}</p>
+              </div>
               <div className="explore-grid">
                 <Link to="/features" className="explore-card">
                   <span className="explore-icon"><BellOutlined /></span>
@@ -300,6 +429,12 @@ export function LandingContent({
             </section>
 
             <section id="features" className="landing-features">
+              <div className="landing-section-heading">
+                <span className="section-eyebrow">{t("TÍNH NĂNG NỔI BẬT")}</span>
+                <h2>{t("Từ phòng trống đến hóa đơn đã thu.")}</h2>
+                <p>{t("Đơn giản hóa việc quản lý mỗi ngày")}</p>
+              </div>
+
               <div className="product-story">
                 <div className="story-copy">
                   <span className="story-index">01 / <HomeOutlined />{t("Phòng & người thuê")}</span>
@@ -333,6 +468,10 @@ export function LandingContent({
                       <li><CheckCircleFilled />{t("Chốt điện, tính tiền và lập hóa đơn cùng một nơi.")}</li>
                       <li><CheckCircleFilled />{t("Lưu cố định đơn giá lịch sử, không nhảy số khi đổi giá phòng.")}</li>
                     </ul>
+                    <Link to="/huong-dan/cach-chot-chi-so-dien-va-lap-hoa-don" className="landing-text-link">
+                      {t("Xem hướng dẫn")}
+                      <ArrowRightOutlined aria-hidden="true" />
+                    </Link>
                   </div>
                   <BillingIllustration />
                 </div>
@@ -348,56 +487,52 @@ export function LandingContent({
                     <li><CheckCircleFilled />{t("Khóa chống gửi trùng lặp và tự động dừng nhắc khi hóa đơn đã thu đủ.")}</li>
                     <li><CheckCircleFilled />{t("Xuất báo cáo Excel chuẩn kế toán, tách bạch doanh thu thuê trọ và tiền cọc.")}</li>
                   </ul>
+                  <Link to="/huong-dan/quan-ly-cong-no-ghi-thu-va-xuat-excel" className="landing-text-link">
+                    {t("Xem hướng dẫn")}
+                    <ArrowRightOutlined aria-hidden="true" />
+                  </Link>
                 </div>
                 <ZaloAndReportsIllustration />
+              </div>
+
+              <div className="story-band">
+                <div className="product-story product-story--reverse tenant-story" id="how-it-works">
+                  <div className="story-copy">
+                    <span className="story-index">04 / <CreditCardOutlined />{t("Thanh toán trực tuyến (payOS)")} &amp; VietQR</span>
+                    <h3>{t("Tiện lợi cho khách, nhàn hạ cho chủ trọ")}</h3>
+                    <p>{t("Nhận tiền linh hoạt qua chế độ VietQR thủ công hoặc gạch nợ tự động với payOS.")}</p>
+                    <ol className="tenant-steps">
+                      <li>
+                        <span>01</span>
+                        <div>
+                          <strong>{t("Nhận liên kết riêng tư")}</strong>
+                          <p>{t("Mở liên kết do chủ trọ gửi ngay trên điện thoại.")}</p>
+                        </div>
+                      </li>
+                      <li>
+                        <span>02</span>
+                        <div>
+                          <strong>{t("Xem hóa đơn minh bạch")}</strong>
+                          <p>{t("Kiểm tra tiền phòng, điện nước và từng khoản phí.")}</p>
+                        </div>
+                      </li>
+                      <li>
+                        <span>03</span>
+                        <div>
+                          <strong>{t("Thanh toán bằng mã QR")}</strong>
+                          <p>{t("Quét VietQR bằng ứng dụng ngân hàng. Hóa đơn cập nhật khi thanh toán được xác nhận.")}</p>
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+                  <TenantPhoneIllustration />
+                </div>
               </div>
             </section>
 
             <ComparisonSection />
 
-            <section className="product-story tenant-story" id="how-it-works">
-              <div className="story-copy">
-                <span className="story-index">04 / <CreditCardOutlined />{t("Thanh toán trực tuyến (payOS)")} &amp; VietQR</span>
-                <h2>{t("Tiện lợi cho khách, nhàn hạ cho chủ trọ")}</h2>
-                <p>{t("Nhận tiền linh hoạt qua chế độ VietQR thủ công hoặc gạch nợ tự động với payOS.")}</p>
-                <ol className="tenant-steps">
-                  <li>
-                    <span>01</span>
-                    <div>
-                      <h3>{t("Nhận liên kết riêng tư")}</h3>
-                      <p>{t("Mở liên kết do chủ trọ gửi ngay trên điện thoại.")}</p>
-                    </div>
-                  </li>
-                  <li>
-                    <span>02</span>
-                    <div>
-                      <h3>{t("Xem hóa đơn minh bạch")}</h3>
-                      <p>{t("Kiểm tra tiền phòng, điện nước và từng khoản phí.")}</p>
-                    </div>
-                  </li>
-                  <li>
-                    <span>03</span>
-                    <div>
-                      <h3>{t("Thanh toán bằng mã QR")}</h3>
-                      <p>{t("Quét VietQR bằng ứng dụng ngân hàng. Hóa đơn cập nhật khi thanh toán được xác nhận.")}</p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-              <TenantPhoneIllustration />
-            </section>
-
-            <section className="landing-security" aria-labelledby="landing-security-title">
-              <div className="security-intro">
-                <SafetyCertificateOutlined />
-                <h2 id="landing-security-title">{t("Bảo mật giao dịch")}</h2>
-              </div>
-              <div className="security-points">
-                <p><LockOutlined />{t("Khóa kết nối thanh toán được mã hóa trên máy chủ.")}</p>
-                <p><CheckCircleFilled />{t("Kiểm tra xác nhận từ payOS trước khi ghi nhận thanh toán.")}</p>
-                <p><SafetyCertificateOutlined />{t("Liên kết của lượt thuê cũ hết hiệu lực sau khi trả phòng.")}</p>
-              </div>
-            </section>
+            <LandingSecuritySection />
           </>
         )}
 
@@ -412,6 +547,19 @@ export function LandingContent({
                   <span>{t("Mở rộng không giới hạn.")}</span>
                 </h1>
                 <p>{t("Trải nghiệm đầy đủ mọi tính năng cốt lõi ngay từ gói Miễn phí. Chỉ nâng cấp khi quy mô vượt quá 5 phòng.")}</p>
+                <div className="hero-actions">
+                  <Link
+                    to={destination}
+                    className="landing-btn landing-btn-light landing-btn-lg"
+                    onClick={() => handleCta('btn_pricing_signup', actionLabel)}
+                  >
+                    <span>{actionLabel}</span>
+                    <ArrowRightOutlined aria-hidden="true" />
+                  </Link>
+                  <a href="#faq" className="hero-secondary-link">
+                    <span>{t("Hỏi đáp")}</span>
+                  </a>
+                </div>
               </div>
             </section>
 
@@ -424,17 +572,7 @@ export function LandingContent({
 
             <FaqSection />
 
-            <section className="landing-security" aria-labelledby="landing-security-title">
-              <div className="security-intro">
-                <SafetyCertificateOutlined />
-                <h2 id="landing-security-title">{t("Bảo mật giao dịch")}</h2>
-              </div>
-              <div className="security-points">
-                <p><LockOutlined />{t("Khóa kết nối thanh toán được mã hóa trên máy chủ.")}</p>
-                <p><CheckCircleFilled />{t("Kiểm tra xác nhận từ payOS trước khi ghi nhận thanh toán.")}</p>
-                <p><SafetyCertificateOutlined />{t("Liên kết của lượt thuê cũ hết hiệu lực sau khi trả phòng.")}</p>
-              </div>
-            </section>
+            <LandingSecuritySection />
           </>
         )}
 
@@ -449,6 +587,19 @@ export function LandingContent({
                   <span>{t("Vận hành chuẩn từng bước.")}</span>
                 </h1>
                 <p>{t("Hướng dẫn chi tiết từng bước từ lúc thiết lập phòng đầu tiên đến khi chốt điện, nhắc nợ Zalo và đối soát cuối tháng.")}</p>
+                <div className="hero-actions">
+                  <Link
+                    to={destination}
+                    className="landing-btn landing-btn-light landing-btn-lg"
+                    onClick={() => handleCta('btn_guides_signup', actionLabel)}
+                  >
+                    <span>{actionLabel}</span>
+                    <ArrowRightOutlined aria-hidden="true" />
+                  </Link>
+                  <Link to="/features" className="hero-secondary-link">
+                    <span>{t("Tính năng & So sánh")}</span>
+                  </Link>
+                </div>
               </div>
             </section>
 
@@ -456,62 +607,10 @@ export function LandingContent({
           </>
         )}
 
-        <section id="get-started" className="landing-cta">
-          <div className="cta-content">
-            <span className="section-eyebrow">Roomie</span>
-            <h2>{t("Nhẹ đầu hơn từ tháng này.")}</h2>
-            <p>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</p>
-            <Link
-              to={destination}
-              className="landing-btn landing-btn-light landing-btn-lg"
-              onClick={() => handleCta('cta_bottom_action', actionLabel)}
-            >
-              <span>{user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ ngay")}</span>
-              <ArrowRightOutlined aria-hidden="true" />
-            </Link>
-          </div>
-          <ol className="setup-steps">
-            <li>
-              <strong>{t("1. Đăng ký thông tin")}</strong>
-              <span>{t("Điền thông tin tài khoản.")}</span>
-            </li>
-            <li>
-              <strong>{t("2. Xác thực OTP email")}</strong>
-              <span>{t("Xác nhận bằng mã gửi qua email.")}</span>
-            </li>
-            <li>
-              <strong>{t("3. Thiết lập phòng & đón khách")}</strong>
-              <span>{t("Thêm dãy trọ và phòng đầu tiên.")}</span>
-            </li>
-          </ol>
-        </section>
+        <LandingCtaSection user={user} onCta={handleCta} />
       </main>
 
-      <footer className="landing-footer">
-        <div className="footer-inner">
-          <div className="footer-brand">
-            <Brand footer />
-            <p>{t("Đơn giản hóa việc quản lý nhà trọ mỗi ngày.")}</p>
-          </div>
-          <div className="footer-links">
-            <strong>{t("Tính năng")}</strong>
-            <Link to="/">{t("Trang chủ")}</Link>
-            <Link to="/features">{t("Tính năng")}</Link>
-            <Link to="/pricing">{t("Bảng giá")}</Link>
-            <Link to="/huong-dan">{t("Hướng dẫn")}</Link>
-          </div>
-          <div className="footer-links">
-            <strong>{t("Chủ trọ")}</strong>
-            <Link to="/login">{t("Đăng nhập")}</Link>
-            <Link to="/register">{t("Đăng ký làm chủ trọ")}</Link>
-            <Link to="/pricing">{t("Gói Pro")}</Link>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <span>© 2026 Roomie</span>
-          <span>{t("Đơn giản hóa việc quản lý mỗi ngày")}</span>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 }

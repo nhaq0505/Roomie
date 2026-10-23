@@ -114,8 +114,8 @@ export function ActiveBannerStrip({
 
   if (placement === 'LandingTop') {
     return (
-      <div style={{ background: 'var(--landing-deep, #0a2028)', padding: '12px 20px 0' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto' }}>{content}</div>
+      <div className="landing-banner-strip">
+        <div className="landing-banner-inner">{content}</div>
       </div>
     );
   }
