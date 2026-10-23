@@ -29,6 +29,10 @@
 .auth-form-wrap .ant-form-item-label { padding-bottom: 5px; }
 .auth-form-wrap .ant-input-affix-wrapper, .auth-form-wrap .ant-input { font-size: 14px; }
 .auth-form-wrap .ant-input-prefix { color: #a1b0b1; margin-right: 8px; }
+.auth-options-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px 0 16px; font-size: 13px; }
+.auth-options-row .ant-checkbox-wrapper { color: #365259; font-size: 13px; }
+.auth-forgot-link { color: var(--teal-dark); font-size: 13px; font-weight: 600; }
+.auth-forgot-link:hover { text-decoration: underline; }
 .auth-submit { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 45px; margin-top: 4px; font-size: 14px; }
 .form-alert { margin-bottom: 17px; border-radius: 10px; font-size: 13px; }
 .auth-switch { margin-top: 21px; color: var(--muted); text-align: center; font-size: 13px; }

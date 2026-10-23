@@ -35,7 +35,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -81,7 +82,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -111,13 +113,45 @@ internal static class AuthSecurityHttpTests
         // 4. Request without cookie is rejected
         var unauthResp = await client.GetAsync("/api/auth/me");
         Assert(unauthResp.StatusCode == HttpStatusCode.Unauthorized, "unauthenticated request to protected endpoint returns 401");
+
+        // 5. RememberMe login sets 14-day session and slides when remaining <= 7 days
+        var rememberLoginResp = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, RememberMe: true));
+        Assert(rememberLoginResp.StatusCode == HttpStatusCode.OK, "rememberMe login succeeds with 200 OK");
+        var rememberCookie = ExtractSessionCookie(rememberLoginResp);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var latest = await db.AuthSessions.OrderByDescending(x => x.ExpiresAt).FirstAsync();
+            Assert(Math.Abs((latest.ExpiresAt - latest.CreatedAt - TimeSpan.FromDays(14)).TotalSeconds) < 2,
+                "rememberMe session has 14-day lifetime in database");
+        }
+
+        // Advance 5 days (9 days remaining > 7 days threshold): no slide yet
+        clock.Advance(TimeSpan.FromDays(5));
+        var beforeHalfResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", rememberCookie);
+        Assert(beforeHalfResp.StatusCode == HttpStatusCode.OK && string.IsNullOrEmpty(ExtractSessionCookie(beforeHalfResp)),
+            "session with more than half lifetime remaining is not re-issued");
+
+        // Advance another 3 days (8 days elapsed, 6 days remaining <= 7 days threshold): slides to now + 14 days
+        clock.Advance(TimeSpan.FromDays(3));
+        var slideResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", rememberCookie);
+        var slidCookie = ExtractSessionCookie(slideResp);
+        Assert(slideResp.StatusCode == HttpStatusCode.OK && !string.IsNullOrEmpty(slidCookie),
+            "session with <= half lifetime remaining slides and re-issues cookie");
+
+        // Advance 10 days after renewal (would have expired without sliding, but still has 4 days left)
+        clock.Advance(TimeSpan.FromDays(10));
+        var afterSlideResp = await SendWithCookie(client, HttpMethod.Get, "/api/auth/me", slidCookie);
+        Assert(afterSlideResp.StatusCode == HttpStatusCode.OK,
+            "slid rememberMe session remains valid past original 14-day window");
     }
 
     private static async Task MultiDevicePasswordChangeSessionRevocationAsync()
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -191,7 +225,8 @@ internal static class AuthSecurityHttpTests
     {
         await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
         var emailSender = new TestRegistrationEmailSender();
-        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50);
+        var clock = new ControllableClock(DateTimeOffset.UtcNow);
+        await using var app = CreateTestApp(fixture.ConnectionString, emailSender, authRateLimit: 50, clock: clock);
         await app.StartAsync();
         using var client = app.GetTestClient();
 
@@ -257,7 +292,7 @@ internal static class AuthSecurityHttpTests
         Assert(rateLimitHit, "endpoint with 'auth' rate limiting policy returns 429 TooManyRequests when limit exceeded");
     }
 
-    private static WebApplication CreateTestApp(string connectionString, TestRegistrationEmailSender emailSender, int authRateLimit = 50)
+    private static WebApplication CreateTestApp(string connectionString, TestRegistrationEmailSender emailSender, int authRateLimit = 50, TimeProvider? clock = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
@@ -281,7 +316,7 @@ internal static class AuthSecurityHttpTests
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<IRegistrationEmailSender>(emailSender);
         builder.Services.AddScoped<RegistrationVerificationService>();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(clock ?? TimeProvider.System);
 
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
         {
@@ -289,7 +324,8 @@ internal static class AuthSecurityHttpTests
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.ExpireTimeSpan = TimeSpan.FromHours(12);
+            options.ExpireTimeSpan = TimeSpan.FromDays(14);
+            options.TimeProvider = clock ?? TimeProvider.System;
             options.Events.OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -368,6 +404,13 @@ internal static class AuthSecurityHttpTests
     {
         if (!condition) throw new Exception("Assertion failed: " + name);
         Console.WriteLine("PASS: " + name);
+    }
+
+    private sealed class ControllableClock(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset _now = initial;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan delta) => _now = _now.Add(delta);
     }
 
     private sealed class TestRegistrationEmailSender : IRegistrationEmailSender

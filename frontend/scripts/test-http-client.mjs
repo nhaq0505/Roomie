@@ -26,6 +26,9 @@ assert.equal(calls[0].init.headers.get('Content-Type'), 'application/json');
 assert.equal(calls[0].init.headers.get('Accept'), 'application/json');
 assert.ok(calls[0].init.signal instanceof AbortSignal);
 assert.equal(JSON.parse(calls[0].init.body).email, 'owner@example.invalid');
+assert.equal(JSON.parse(calls[0].init.body).rememberMe, false);
+await api.auth.login('owner@example.invalid', 'fixture-password', true);
+assert.equal(JSON.parse(calls[1].init.body).rememberMe, true);
 
 calls = [];
 respond = () => ({ ok: false, status: 409, text: async () => JSON.stringify({ message: 'fixture-conflict', version: 2 }) });

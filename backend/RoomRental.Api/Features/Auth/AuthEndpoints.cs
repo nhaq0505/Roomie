@@ -12,6 +12,9 @@ namespace RoomRental.Api.Endpoints;
 
 public static class AuthEndpoints
 {
+    public static readonly TimeSpan DefaultSessionLifetime = TimeSpan.FromHours(12);
+    public static readonly TimeSpan RememberMeSessionLifetime = TimeSpan.FromDays(14);
+
     public static void MapAuthEndpoints(this WebApplication app)
     {
         var routes = app.MapGroup("/api/auth");
@@ -91,7 +94,7 @@ public static class AuthEndpoints
             RegistrationVerificationService verification, CancellationToken ct) =>
             Results.Ok(await verification.ResendAsync(request.ChallengeToken, ct))).RequireRateLimiting("auth");
 
-        routes.MapPost("/login", async (LoginRequest request, HttpContext context, AppDbContext db, IPasswordHasher<AppUser> hasher, CancellationToken cancellationToken) =>
+        routes.MapPost("/login", async (LoginRequest request, HttpContext context, AppDbContext db, IPasswordHasher<AppUser> hasher, TimeProvider clock, CancellationToken cancellationToken) =>
         {
             var normalizedEmail = request.Email?.Trim().ToLowerInvariant() ?? "";
             if (normalizedEmail.Length > 320 || request.Password?.Length > 256) throw new ApiException(400, "Thông tin đăng nhập không hợp lệ.");
@@ -112,13 +115,13 @@ public static class AuthEndpoints
 
             if (user.PasswordResetHash is not null)
                 throw new ApiException(403, "Tài khoản cần đặt lại mật khẩu bằng mã do quản trị viên cấp.");
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             var session = new AuthSession
             {
                 Id = Guid.NewGuid().ToString("N"),
                 UserId = user.Id,
                 CreatedAt = now,
-                ExpiresAt = now.AddHours(12)
+                ExpiresAt = now.Add(request.RememberMe ? RememberMeSessionLifetime : DefaultSessionLifetime)
             };
             db.AuthSessions.Add(session);
             if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
@@ -132,7 +135,8 @@ public static class AuthEndpoints
                 new(ClaimTypes.Name, user.Name),
                 new(ClaimTypes.Email, user.Email),
                 new(ClaimTypes.Role, user.Role.ToString()),
-                new("sid", session.Id)
+                new("sid", session.Id),
+                new("rm", request.RememberMe ? "1" : "0")
             };
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), new AuthenticationProperties
@@ -145,7 +149,7 @@ public static class AuthEndpoints
         }).RequireRateLimiting("auth");
 
         routes.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext context,
-            AppDbContext db, IPasswordHasher<AppUser> hasher, CancellationToken ct) =>
+            AppDbContext db, IPasswordHasher<AppUser> hasher, TimeProvider clock, CancellationToken ct) =>
         {
             await AccountLoginLimiter.ReserveAsync(db, "password-change:" + ApiSupport.UserId(context), app.Environment.IsDevelopment() ? 1000 : 10, ct);
             PasswordSecurity.ValidateNewPassword(request.NewPassword, request.ConfirmPassword ?? request.NewPassword);
@@ -160,7 +164,7 @@ public static class AuthEndpoints
             user.PasswordResetHash = null;
             user.PasswordResetExpiresAt = null;
             var sessionId = context.User.FindFirst("sid")?.Value;
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             await db.AuthSessions.Where(x => x.UserId == user.Id && x.RevokedAt == null && x.Id != sessionId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RevokedAt, (DateTimeOffset?)now), ct);
             await db.SaveChangesAsync(ct);
@@ -170,7 +174,7 @@ public static class AuthEndpoints
         }).RequireAuthorization().RequireRateLimiting("auth");
 
         routes.MapPost("/reset-password", async (ResetPasswordRequest request, HttpContext context,
-            AppDbContext db, IPasswordHasher<AppUser> hasher, CancellationToken ct) =>
+            AppDbContext db, IPasswordHasher<AppUser> hasher, TimeProvider clock, CancellationToken ct) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             PasswordSecurity.ValidateNewPassword(request.NewPassword, request.ConfirmPassword);

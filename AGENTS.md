@@ -97,7 +97,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 
 ### Auth và dữ liệu riêng tư
 
-- Cookie HttpOnly/SameSite=Lax, 12 giờ, không sliding; Production Secure. Session `sid` phải còn hiệu lực trong DB ở mỗi request. Rejected/Suspended bị chặn; Owner Pending chỉ đi auth/account flow.
+- Cookie HttpOnly/SameSite=Lax, mặc định 12 giờ (hoặc 14 ngày khi chọn "Ghi nhớ đăng nhập" `RememberMe = true`), tự động gia hạn trượt (sliding) cả `AuthSessions.ExpiresAt` và cookie khi thời hạn còn lại ≤ một nửa; Production Secure. Session `sid` phải còn hiệu lực trong DB ở mỗi request. Rejected/Suspended bị chặn; Owner Pending chỉ đi auth/account flow.
 - Request ghi của phiên đã đăng nhập phải qua same-origin guard; webhook payOS có ngoại lệ riêng và xác minh chữ ký. Không bỏ guard để chữa test thiếu Origin.
 - Đổi mật khẩu giữ phiên hiện tại và thu hồi thiết bị khác; reset hoàn tất thu hồi tất cả. OTP không phải MFA login.
 - Đăng ký OTP: code 6 số/10 phút, challenge 30 phút, tối đa 5 lần sai, resend 60 giây, 5 email/giờ. Xác minh tạo user và consume bằng chứng nguyên tử. Đừng tạo user login được trước xác minh.

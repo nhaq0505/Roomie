@@ -1661,5 +1661,6 @@
   "Quét CCCD thêm thành viên": "Scan ID to add member",
   "Quét mã QR CCCD chủ trọ": "Scan Landlord Citizen ID QR",
   "Quét mã QR CCCD người thuê": "Scan Tenant Citizen ID QR",
-  "Quét mã QR CCCD thành viên ở cùng": "Scan Co-resident Citizen ID QR"
+  "Quét mã QR CCCD thành viên ở cùng": "Scan Co-resident Citizen ID QR",
+  "Ghi nhớ đăng nhập": "Remember me"
 }
