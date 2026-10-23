@@ -101,7 +101,7 @@ const adminItems = [
         const isSecondary = !isStaff && !primaryMobileKeys.has(String(item.key));
         if (item.key === 'settings') {
           return (
-            <Dropdown key={item.key} trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
+            <Dropdown key={item.key} overlayClassName="compact-nav-dropdown" trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
               <button type="button" aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span className="compact-nav-text">{item.label} <DownOutlined className="compact-nav-caret" /></span></button>
             </Dropdown>
           );

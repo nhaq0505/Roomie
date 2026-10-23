@@ -40,6 +40,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 }
 @media (max-width: 767px) {
   .compact-navigation { position: fixed; inset: auto 0 0 0; z-index: 95; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px); border-top: 1px solid #dce7e3; border-bottom: 0; box-shadow: 0 -4px 18px rgba(19, 48, 55, 0.06); overflow: visible; }
+  .compact-nav-dropdown.ant-dropdown { position: fixed; }
   .compact-navigation > [data-mobile-secondary="true"] { display: none !important; }
   .compact-navigation .compact-nav-label-full { display: none; }
   .compact-navigation .compact-nav-label-short { display: inline; }

@@ -180,6 +180,17 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
           ],
         });
       }
+      if (path === '/api/expenses') {
+        return route.fulfill({
+          json: {
+            items: [],
+            totalCount: 0,
+            page: 1,
+            pageSize: 50,
+            totals: { total: 0, count: 0, byCategory: [] },
+          },
+        });
+      }
       if (path === '/api/reports/monthly') {
         return route.fulfill({
           json: {

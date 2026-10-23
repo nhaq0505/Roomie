@@ -28,7 +28,7 @@ export default function ExpensesPage() {
     .map((room) => ({ value: room.id, label: `${room.name}${room.isArchived ? ` · ${t("Đã lưu trữ")}` : ''}` })), [rooms, filters.buildingId]);
   const data = expensesQuery.data;
   const totals = data?.totals;
-  const topCategory = totals?.byCategory[0];
+  const topCategory = totals?.byCategory?.[0];
 
   const columns: TableProps<Expense>['columns'] = [
     { title: t("NGÀY CHI"), dataIndex: 'expenseDate', key: 'expenseDate', width: 130, render: (value: string) => formatDate(value) },
@@ -83,7 +83,7 @@ export default function ExpensesPage() {
         </div>
         {loadError ? <LoadError error={loadError.error} onRetry={() => void loadError.refetch()} />
           : expensesQuery.isPending && !data ? <div className="reports-loading"><Spin /> <span>{t("Đang tải khoản chi…")}</span></div>
-            : (data?.items.length ?? 0) === 0 ? <Empty className="expenses-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span><strong>{t("Chưa có khoản chi trong khoảng này")}</strong><span className="empty-description">{t("Bấm \"Thêm khoản chi\" để ghi khoản đầu tiên.")}</span></span>} />
+            : (data?.items?.length ?? 0) === 0 ? <Empty className="expenses-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span><strong>{t("Chưa có khoản chi trong khoảng này")}</strong><span className="empty-description">{t("Bấm \"Thêm khoản chi\" để ghi khoản đầu tiên.")}</span></span>} />
             : <div className="reports-table-wrap">
               <ResponsiveTable<Expense> className="reports-table expenses-table" rowKey="id" columns={columns} dataSource={data?.items ?? []}
                 loading={expensesQuery.isFetching} pagination={false} scroll={{ x: 960 }} disableCompactPagination
