@@ -53,17 +53,17 @@ Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/reho
 | --- | --- | --- |
 | Đăng ký, login, đổi/reset mật khẩu | `Features/Auth/`, `Shared/RequestSecurityMiddleware.cs` | `features/auth/`, `AuthSecurityHttpTests`, `RegistrationVerificationTests`, `PasswordRecoveryTests` |
 | Dãy, phòng, lượt thuê, cấp link | `Features/Properties/OwnerManagementEndpoints.*`, `TenantTokenService.cs` | `features/buildings`, `features/rooms`, `RoomTenantPage.tsx`, `RoomTenantLifecycleHttpTests`, `TenantLinkHttpTests` |
-| Hợp đồng thuê trọ, CT01 & quét QR CCCD | `Features/Properties/OwnerManagementEndpoints.Documents.cs`, `ContractWordGenerator.cs`, `Domain/ContractDocuments.cs`, `Shared/VietnameseMoneyReader.cs` | `RoomDocumentsPage.tsx`, `ContractDocumentsDrawer.tsx`, `CccdQrScannerModal.tsx`, `cccdQr.ts`, `shared/i18n/legalTemplates.ts`, `test-cccd-qr.mjs`, `RoomTenantLifecycleHttpTests`, `landlord.spec.ts` |
+| Hợp đồng thuê trọ, CT01 & quét QR CCCD | `Features/Properties/OwnerManagementEndpoints.Documents.cs`, `ContractWordGenerator.cs`, `Domain/ContractDocuments.cs`, `Shared/VietnameseMoneyReader.cs` | `RoomDocumentsPage.tsx`, `ContractDocumentsDrawer.tsx`, `CccdQrScannerModal.tsx`, `cccdQr.ts`, `shared/i18n/legalTemplates.ts`, `ContractDocumentsAndMoneyTests.cs`, `test-cccd-qr.mjs`, `RoomTenantLifecycleHttpTests`, `landlord.spec.ts` |
 | Chốt điện, tạo/phát hành/sửa hóa đơn | `Features/Billing/BillingEndpoints.*`, `InvoiceService.cs` | `features/readings`, `features/invoices`, `AccountingBillingHttpTests` |
 | Ghi thu, cọc, trả phòng | `ManualReceiptService.cs`, `DepositEndpoints.cs`, `Properties/MoveoutEndpoints.cs` | `DepositLedger.tsx`, `MoveoutDrawer.tsx`, `ManualReceiptTests` |
 | payOS, checkout gộp, webhook | `Features/Payments/PayOsService.*`, `PaymentEndpoints.cs`, `PaymentReservations.cs` | `features/tenant`, `PayOsPaymentTests`, `BatchPaymentTests`, `PayOsOperationsHttpTests` |
 | VietQR, xác nhận chuyển khoản | `ManualPaymentEndpoints.cs`, `PaymentPreferencesEndpoints.cs`, `Domain/ManualPayments.cs` | `ManualPaymentRequests.tsx`, `PaymentModeSettings.tsx`, `ManualPaymentPanel.tsx`, `test_payment_modes.py` |
-| Nâng cấp Pro | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs` | `features/subscription`, `test_billing_upgrade.py` |
+| Nâng cấp Pro & Khuyến mãi | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Promotions.cs`, `Features/Auth/RegistrationVerificationService.cs` | `features/subscription`, `features/admin/AdminPromotionsPage.tsx`, `PromotionsTests.cs`, `test_billing_upgrade.py`, `admin.spec.ts`, `landlord.spec.ts` |
 | Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
 | Nhắc Zalo | `Features/Zalo/`, `Domain/Zalo.cs` | `features/zalo`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test` |
 | Theo dõi growth/revenue | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests` |
 | Host/API/worker monitoring | `Features/Monitoring/Operations/`, `deploy/monitoring/` | `OperationsTab.tsx`, `OperationsMonitoringTests`, `test_host_collector.py` |
-| Landing/SEO | `Shared/SeoMiddleware.cs` | `features/marketing`, `app/seo`, `scripts/prerender.mjs`, `test_seo_http.py` |
+| Landing/SEO | `Shared/SeoMiddleware.cs` | `features/marketing`, `app/seo`, `scripts/prerender.mjs`, `SeoAndRoutingUnitTests.cs`, `test_seo_http.py`, `smoke.spec.ts` |
 
 API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoint trên; DTO ở `Domain/ApiDtos.cs`, `MonitoringDtos.cs`, `ReportDtos.cs`, `ManualPayments.cs`, `PasswordRecovery.cs`. Đối chiếu handler và DTO trước khi sửa consumer; không duy trì một bản liệt kê API thủ công tách rời code.
 
@@ -189,6 +189,7 @@ npm --prefix frontend run test:api
 npm --prefix frontend run test:http
 npm --prefix frontend run test:analytics
 npm --prefix frontend run test:dates
+npm --prefix frontend run test:cccd-qr
 npm --prefix frontend run test:e2e -- --workers=4
 dotnet ef migrations has-pending-model-changes --project backend/RoomRental.Api --context PostgresAppDbContext
 git diff --check
@@ -323,3 +324,25 @@ CI lần đầu của bản sửa VietQR: backend/integration đạt, Playwright
 - Playwright E2E: 69/69 passed.
 - PostgreSQL migrations và model snapshot được bảo toàn nguyên vẹn; startup fail-fast đã được xác nhận khi cấu hình `DatabaseProvider=SQLite` hoặc để trống chuỗi kết nối.
 - Tiến hành phát hành qua luồng CI/CD chính thức lên VPS 116.118.3.40 sau khi dọn container QA tạm thời; bảo toàn container dev `rehouse-pg-migration-db` cổng 15432.
+
+## 14. Bổ sung test toàn diện và sửa lỗi biên — 23/10/2026
+
+- **Sửa lỗi sản phẩm & tương thích**:
+  - `backend/RoomRental.Api/Program.cs`: bỏ `app.UseDefaultFiles()` trước `SeoMiddleware` để `/index.html`, `/welcome`, `/app.html` xử lý đúng chuẩn redirect/404 và canonical/CSP của `SeoMiddleware`.
+  - `backend/RoomRental.Api/Features/Properties/OwnerManagementEndpoints.Documents.cs`: clamp giá trị `RoomAreaSqm` ngoài khoảng `(0, 10000]` (ví dụ dữ liệu âm cũ) về `null` và `PaymentDueDay` ngoài `[1, 28]` về `5` trong `BuildOccupancyDocumentDtoAsync` khi đọc `GET /api/rooms/{roomId:guid}/documents` để không kẹt validation khi người dùng chưa sửa diện tích/ngày hạn.
+  - `backend/RoomRental.Api/Features/Admin/AdminPromotionsEndpoints.cs`: bọc toàn bộ thân transaction `IsolationLevel.Serializable` của `POST /api/subscription/redeem-code` trong khối `try/catch` bắt `DbUpdateConcurrencyException` và lỗi PostgreSQL (`40001`, `23505`, `40P01`, `55P03`) để trả `409 Conflict` nhất quán khi đua tranh đồng thời.
+  - `backend/RoomRental.Api/Shared/RequestSecurityMiddleware.cs`: dùng null-conditional trên `context.RequestServices` khi đọc `TimeProvider`, `IAuthenticationService` và `IMemoryCache` để an toàn khi middleware được gọi trực tiếp với `DefaultHttpContext` tối giản.
+  - `frontend/src/app/seo/site.ts`: chuẩn hóa dấu gạch chéo cuối (`pathname.replace(/\/+$/, '') || '/'`) trước khi tra `publicPages` trong `metadataFor` để `/features/`, `/pricing/`, `/huong-dan/` giữ nguyên `public: true` và canonical URL khi hydration ở client.
+  - `frontend/src/features/rooms/ContractDocumentsDrawer.tsx` & `frontend/src/features/admin/AdminPromotionsPage.tsx`: bổ sung rule kiểm tra CCCD 9–12 chữ số và giới hạn tối đa 29 thành viên ở cùng trên `Form.List` của drawer hợp đồng/CT01; đặt `name="welcomePromo"` và `name="voucherCode"` cho hai `Form` trên trang khuyến mãi admin để tránh trùng id; thêm alias script `test:cccd-qr` bên cạnh `test:cccd` trong `frontend/package.json`.
+  - `zalo-gateway/src/store.mjs` & `tests/run_disposable.py`: chỉ `fsyncSync` thư mục trên nền tảng khác `win32` trong `EncryptedStore.write`, và fallback thư mục tạm hệ thống khi `/tmp` không tồn tại trên Windows trong `tests/run_disposable.py`.
+- **Mở rộng bộ kiểm thử**:
+  - Backend C# (`tests/RoomRental.WebhookTests`): thêm `ContractDocumentsAndMoneyTests.cs` (`VietnameseMoneyReader`, `ContractWordGenerator` DOCX/CT01 OpenXML, escape ký tự đặc biệt XML `& < > " '`, chuỗi giống công thức và tối đa 29 thành viên ở cùng), `SeoAndRoutingUnitTests.cs` (toàn bộ nhánh `SeoMiddleware`), mở rộng `PromotionsTests.cs` (HTTP endpoints admin/redeem, quota, idempotency, hết hạn, thu hồi và đua tranh `Serializable` trên voucher 1 lượt), `RoomTenantLifecycleHttpTests.cs` (check-in meter validation, cập nhật/xuất DOCX hợp đồng & CT01, clamp dữ liệu cũ trên `GET /documents`, cross-owner isolation), `AuthSecurityHttpTests.cs` (sliding session 12h/14d `RememberMe` và chặn trượt phiên khi vi phạm CSRF Origin).
+  - Frontend & Gateway & Python & E2E: mở rộng `frontend/scripts/test-cccd-qr.mjs` (parser CCCD 6/7 trường, ngày năm nhuận/thế kỷ, video/image QR decoders, `legalTemplates`, và `metadataFor` gồm cả biến thể có dấu `/` cuối), `frontend/scripts/test-http-client.mjs` (`requestBlob`), `zalo-gateway/test/gateway.test.mjs` (13 tests gồm kiểm tra khóa sai độ dài, phát hiện giả mạo ciphertext/auth-tag, `owners()`, sự kiện QR trung gian và giới hạn đầu vào `send`), `tests/test_seo_http.py` (14 tests cho 4 trang prerender `/`, `/features`, `/pricing`, `/huong-dan`), `frontend/e2e/admin.spec.ts`, `landlord.spec.ts`, `smoke.spec.ts` (tổng cộng 81 E2E tests).
+- **Kết quả kiểm chứng thực tế trên PostgreSQL 17 QA container (`postgres:17-alpine`, cổng 55432)**:
+  - `dotnet run --project tests/RoomRental.WebhookTests`: **1.289 dòng `PASS:`**, mã thoát 0.
+  - `dotnet run --project tests/RoomRental.ZaloTests`: **57 assertions (`58` dòng `PASS:`)**, mã thoát 0.
+  - `python tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider postgres`: **90/90 tests PASS, 0 skip**.
+  - `python tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp-postgres`: **15/15 tests PASS, 0 skip**.
+  - `npm --prefix zalo-gateway test`: **13/13 tests PASS**.
+  - `npm --prefix frontend run test:e2e -- --workers=4`: **81/81 tests PASS**.
+  - Frontend build, `i18n:check` (`1664 keys × 4 catalogs`), `check:architecture` (`118 source modules`), `test:api`, `test:http`, `test:analytics`, `test:dates`, `test:cccd` / `test:cccd-qr`, `dotnet ef migrations has-pending-model-changes` và `git diff --check` đều đạt 100%. (Lưu ý: `test_backup_restore.py` và 2 ca `os.statvfs`/POSIX mode trong `test_host_collector.py` phụ thuộc môi trường Linux/POSIX nên chạy trên runner Ubuntu CI; 32/34 ca logic của `test_host_collector.py` đạt trên Windows). Container QA tạm và thư mục publish tạm đã được dọn sạch sau kiểm thử.

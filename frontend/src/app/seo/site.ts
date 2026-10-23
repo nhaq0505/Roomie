@@ -37,13 +37,14 @@ export const privatePageTitles: Record<string, string> = {
 };
 
 export function metadataFor(pathname: string) {
-  const published = publicPages.find(page => page.path === pathname);
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  const published = publicPages.find(page => page.path === normalized);
   if (published) return { ...published, canonical: `${site.origin}${published.path}`, public: true };
   const guest = /^\/(t|tenant)\/[^/]+(?:\/invoices\/[^/]+\/checkout)?\/?$/.test(pathname);
   const roomTenant = /^\/rooms\/[^/]+\/(tenant|documents)\/?$/.test(pathname);
   const title = guest ? (pathname.includes('/checkout') ? 'Thanh toán hóa đơn' : 'Thông tin phòng thuê')
     : roomTenant ? privatePageTitles['/rooms']
-    : privatePageTitles[pathname.replace(/\/$/, '')] ?? 'Không tìm thấy trang';
+    : privatePageTitles[normalized] ?? 'Không tìm thấy trang';
   return { title: `${title} | Roomie`, description: 'Khu vực tài khoản và quản lý phòng trọ Roomie.', canonical: null, public: false };
 }
 

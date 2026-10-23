@@ -52,6 +52,23 @@ class SeoHttpTests(unittest.TestCase):
         self.assertIn('property="og:image" content="https://roomie.io.vn/roomie-social.png"', html)
         self.assertIn('name="twitter:card" content="summary_large_image"', html)
 
+    def test_subpages_have_real_html_and_canonical_urls(self):
+        expected_pages = [
+            ("/features", "https://roomie.io.vn/features", "Tính năng quản lý phòng trọ, hóa đơn &amp; Zalo | Roomie"),
+            ("/pricing", "https://roomie.io.vn/pricing", "Bảng giá phần mềm quản lý phòng trọ &amp; Hỏi đáp | Roomie"),
+            ("/huong-dan", "https://roomie.io.vn/huong-dan", "Hướng dẫn quản lý nhà trọ, tính điện &amp; thu tiền QR | Roomie"),
+        ]
+        for path, canonical, title in expected_pages:
+            with self.subTest(path=path):
+                status, headers, body = self.fetch(path)
+                html = body.decode()
+                self.assertEqual(status, 200)
+                self.assertNotIn("noindex", headers.get("X-Robots-Tag", ""))
+                self.assertEqual(html.count('rel="canonical"'), 1)
+                self.assertIn(f'href="{canonical}"', html)
+                self.assertIn('content="index, follow"', html)
+                self.assertIn(f"{title}</title>", html)
+
     def test_public_styles_exist_without_javascript(self):
         _, _, body = self.fetch("/")
         styles = re.findall(r'<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"', body.decode())
@@ -86,7 +103,9 @@ class SeoHttpTests(unittest.TestCase):
     def test_private_shell_never_inherits_landing_or_canonical(self):
         paths = ["/login", "/register", "/reset-password", "/change-password", "/account-status",
                  "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/reports",
-                 "/settings/payment", "/admin/owners", "/rooms/", "/t/synthetic-seo-token",
+                 "/settings/payment", "/settings/zalo", "/admin/owners", "/admin/monitoring", "/admin/promotions",
+                 "/rooms/", "/rooms/fixture-room/tenant", "/rooms/fixture-room/documents",
+                 "/t/synthetic-seo-token",
                  "/tenant/synthetic-seo-token", "/t/synthetic-seo-token/invoices/fixture/checkout",
                  "/tenant/synthetic-seo-token/invoices/fixture/checkout"]
         for path in paths:
@@ -149,7 +168,7 @@ class SeoHttpTests(unittest.TestCase):
         status, headers, body = self.fetch("/robots.txt")
         self.assertEqual(status, 200)
         self.assertIn("text/plain", headers["Content-Type"])
-        self.assertEqual(body.decode().strip(), "User-agent: *\nDisallow: /")
+        self.assertEqual(body.decode().replace("\r\n", "\n").strip(), "User-agent: *\nDisallow: /")
 
     def test_social_image_is_valid_1200_by_630_png(self):
         status, headers, body = self.fetch("/roomie-social.png")

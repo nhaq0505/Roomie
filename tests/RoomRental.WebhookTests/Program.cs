@@ -9,6 +9,10 @@ using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
 using RoomRental.Tests;
 
+RegistrationEmailTemplateTests.Run();
+ContractDocumentsAndMoneyTests.Run();
+await SeoAndRoutingUnitTests.RunAsync();
+
 await using var testDb = await PostgresTestDb.CreateAsync(ensureCreated: true);
 using var db = testDb.CreateDbContext();
 var protection = new EphemeralDataProtectionProvider();
@@ -75,7 +79,6 @@ await BatchPaymentTests.RunAsync();
 await TenantLinkHttpTests.RunAsync();
 
 AccountOccupancyTests.Run();
-RegistrationEmailTemplateTests.Run();
 await RegistrationVerificationTests.RunAsync();
 await PasswordRecoveryTests.RunAsync();
 await ManualReceiptTests.RunAsync();

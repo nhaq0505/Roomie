@@ -30,9 +30,10 @@ public static class PasswordSecurity
     public static bool MatchesToken(string token, string hash) => CryptographicOperations.FixedTimeEquals(
         Encoding.ASCII.GetBytes(HashToken(token)), Encoding.ASCII.GetBytes(hash));
 
-    public static async Task RevokeSessionsAsync(AppDbContext db, Guid userId, CancellationToken ct)
+    public static async Task RevokeSessionsAsync(AppDbContext db, Guid userId, CancellationToken ct, DateTimeOffset? now = null)
     {
+        var revokedAt = now ?? DateTimeOffset.UtcNow;
         var sessions = await db.AuthSessions.Where(x => x.UserId == userId && x.RevokedAt == null).ToListAsync(ct);
-        foreach (var session in sessions) session.RevokedAt = DateTimeOffset.UtcNow;
+        foreach (var session in sessions) session.RevokedAt = revokedAt;
     }
 }

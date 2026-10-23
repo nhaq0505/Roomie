@@ -107,6 +107,7 @@ public static partial class OwnerManagementEndpoints
         var coResidents = DeserializeCoResidents(occupancy.CoResidentsJson);
 
         var paymentDueDay = occupancy.PaymentDueDay is >= 1 and <= 28 ? occupancy.PaymentDueDay : 5;
+        var roomAreaSqm = occupancy.RoomAreaSqm is > 0m and <= 10_000m ? occupancy.RoomAreaSqm : null;
         var householdRelation = string.IsNullOrWhiteSpace(occupancy.HouseholdHeadRelation)
             ? "Người thuê trọ"
             : occupancy.HouseholdHeadRelation;
@@ -132,7 +133,7 @@ public static partial class OwnerManagementEndpoints
             BuildingAddress: building.Address,
             PoliceStationName: building.PoliceStationName,
             RoomName: room.Name,
-            RoomAreaSqm: occupancy.RoomAreaSqm,
+            RoomAreaSqm: roomAreaSqm,
             Rent: room.Rent,
             RentInWords: VietnameseMoneyReader.ToVietnameseWords(room.Rent),
             ElectricityRate: room.ElectricityRate,
@@ -162,7 +163,7 @@ public static partial class OwnerManagementEndpoints
             CoResidents: coResidents);
     }
 
-    private static void ValidateAndApplyDocumentUpdates(
+    internal static void ValidateAndApplyDocumentUpdates(
         UpdateOccupancyDocumentRequest request,
         AppUser owner,
         Building building,
@@ -356,7 +357,7 @@ public static partial class OwnerManagementEndpoints
         return trimmed;
     }
 
-    private static string SanitizeFileSegment(string value)
+    internal static string SanitizeFileSegment(string value)
     {
         var lower = value.Trim().ToLowerInvariant();
         var cleaned = Regex.Replace(lower, "[^a-z0-9_-]+", "-").Trim('-');

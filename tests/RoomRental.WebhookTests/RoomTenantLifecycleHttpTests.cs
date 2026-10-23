@@ -659,6 +659,59 @@ internal static class RoomTenantLifecycleHttpTests
         var ct01Bytes = await ct01DocxResp.Content.ReadAsByteArrayAsync();
         Assert(ct01Bytes.Length > 1000 && ct01Bytes[0] == 'P' && ct01Bytes[1] == 'K',
             "ct01.docx is a valid non-empty OpenXML zip archive");
+
+        // 4. Edge cases: vacant room returns 409 Conflict for GET documents / contract.docx / ct01.docx
+        var vacantRoomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg.Id, "Phong Trong 202", 3_000_000, 3_500, 80_000, false, 0, 0));
+        var vacantRoomId = (await vacantRoomResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var vacantDocGet = await client.GetAsync($"/api/rooms/{vacantRoomId}/documents");
+        var vacantContractGet = await client.GetAsync($"/api/rooms/{vacantRoomId}/documents/contract.docx");
+        var vacantCt01Get = await client.GetAsync($"/api/rooms/{vacantRoomId}/documents/ct01.docx");
+        Assert(vacantDocGet.StatusCode == HttpStatusCode.Conflict &&
+               vacantContractGet.StatusCode == HttpStatusCode.Conflict &&
+               vacantCt01Get.StatusCode == HttpStatusCode.Conflict,
+            "vacant room returns 409 Conflict for document preview and docx export endpoints");
+
+        // 5. Edge case: stale OccupancyId on PUT /api/rooms/{id}/documents returns 409 Conflict
+        var stalePutResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents",
+            updateReq with { OccupancyId = Guid.NewGuid() });
+        Assert(stalePutResp.StatusCode == HttpStatusCode.Conflict, "PUT /documents with stale OccupancyId returns 409 Conflict");
+
+        // 6. Edge cases: invalid CitizenId, ContractEndDate < StartDate, PaymentDueDay out of [1,28], RoomAreaSqm out of [0,10000] -> 400 BadRequest
+        var badCitizenResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents",
+            updateReq with { TenantCitizenId = "12345" });
+        var badEndDateResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents",
+            updateReq with { ContractEndDate = new DateOnly(2026, 9, 30) });
+        var badDueDayResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents",
+            updateReq with { PaymentDueDay = 29 });
+        var badAreaResp = await client.PutAsJsonAsync($"/api/rooms/{roomId}/documents",
+            updateReq with { RoomAreaSqm = -5m });
+        Assert(badCitizenResp.StatusCode == HttpStatusCode.BadRequest &&
+               badEndDateResp.StatusCode == HttpStatusCode.BadRequest &&
+               badDueDayResp.StatusCode == HttpStatusCode.BadRequest &&
+               badAreaResp.StatusCode == HttpStatusCode.BadRequest,
+            "PUT /documents rejects invalid CitizenId, ContractEndDate < StartDate, PaymentDueDay > 28, and negative RoomAreaSqm with 400 BadRequest");
+
+        // 7. Cross-owner isolation: OwnerB cannot read or export OwnerA's room documents (404 NotFound)
+        using var ownerBGet = new HttpRequestMessage(HttpMethod.Get, $"/api/rooms/{roomId}/documents");
+        ownerBGet.Headers.Add("X-Fixture-Owner", OwnerBId.ToString());
+        using var ownerBResp = await client.SendAsync(ownerBGet);
+        Assert(ownerBResp.StatusCode == HttpStatusCode.NotFound, "cross-owner GET /documents returns 404 NotFound");
+
+        // 8. Legacy DB values: negative RoomAreaSqm clamped to null and out-of-range PaymentDueDay clamped to 5 on GET /documents
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var occ = await db.Occupancies.SingleAsync(o => o.Id == occId);
+            occ.RoomAreaSqm = -12.5m;
+            occ.PaymentDueDay = 0;
+            occ.HouseholdHeadRelation = "   ";
+            await db.SaveChangesAsync();
+        }
+        var clampedDto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
+        Assert(clampedDto!.RoomAreaSqm is null && clampedDto.PaymentDueDay == 5 && clampedDto.HouseholdHeadRelation == "Người thuê trọ",
+            "GET /documents clamps legacy negative RoomAreaSqm to null, PaymentDueDay 0 to 5, and blank HouseholdHeadRelation to default");
     }
 
     private static WebApplication CreateTestApp(string connectionString)

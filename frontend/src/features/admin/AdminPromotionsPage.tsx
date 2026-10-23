@@ -273,6 +273,7 @@ export default function AdminPromotionsPage() {
           title={t("Chiến dịch chào mừng: Tặng Pro khi đăng ký mới")}
         >
           <Form
+            name="welcomePromo"
             form={welcomeForm}
             layout="vertical"
             onFinish={(values) => welcomeMutation.mutate(values)}
@@ -362,6 +363,7 @@ export default function AdminPromotionsPage() {
         destroyOnClose
       >
         <Form
+          name="voucherCode"
           form={codeForm}
           layout="vertical"
           style={{ marginTop: 16 }}

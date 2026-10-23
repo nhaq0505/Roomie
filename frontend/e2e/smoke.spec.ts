@@ -77,11 +77,14 @@ test('a delayed failed session lookup cannot overwrite a successful login',async
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
     if(path==='/api/auth/me'){await pending;return route.fulfill({status:503,json:{message:'Temporary failure'}});}
-    if(path==='/api/auth/login')return route.fulfill({json:owner});
+    if(path==='/api/auth/login'){expect(route.request().postDataJSON().rememberMe).toBe(false);return route.fulfill({json:owner});}
     return route.fulfill({json:path==='/api/invoices'?emptyInvoices:dashboard});
   });
   await page.goto('/login');
-  await expect(page.getByRole('checkbox', { name: 'Ghi nhớ đăng nhập' })).toBeChecked();
+  const rememberCheckbox=page.getByRole('checkbox', { name: 'Ghi nhớ đăng nhập' });
+  await expect(rememberCheckbox).toBeChecked();
+  await rememberCheckbox.uncheck();
+  await expect(rememberCheckbox).not.toBeChecked();
   await page.getByLabel('Email',{exact:true}).fill(owner.email);
   await page.getByLabel('Mật khẩu',{exact:true}).fill('SmokeOwner123!');
   await page.locator('button[type=submit]').click();await expect(page).toHaveURL(/dashboard/);

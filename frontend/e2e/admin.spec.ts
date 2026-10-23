@@ -262,4 +262,148 @@ test.describe('Admin Workflows (Quản trị viên)', () => {
     await expect(ownerCard.locator('.ant-tag-gold')).toHaveText('PRO');
     await expect(ownerCard.getByText('5 / ∞')).toBeVisible();
   });
+
+  // Scenario A5: Admin Promotions & Voucher Management (/admin/promotions)
+  test('Scenario A5: Admin Promotions & Voucher Management (welcome campaign, create, edit, toggle, delete)', async ({ page }) => {
+    let welcomePromo = {
+      id: 'welcome',
+      name: 'Tặng Pro người đăng ký mới',
+      isEnabled: true,
+      rewardMonths: 3,
+      startsAt: null as string | null,
+      endsAt: null as string | null,
+    };
+
+    let codes = [
+      {
+        id: 'code-01',
+        code: 'CHAO2026',
+        description: 'Ưu đãi chào năm mới',
+        rewardMonths: 2,
+        maxRedemptions: 20,
+        redeemedCount: 5,
+        isActive: true,
+        expiresAt: null as string | null,
+        createdAt: '2026-10-01T08:00:00Z',
+      },
+    ];
+
+    let capturedWelcomeUpdate: Record<string, unknown> | null = null;
+    let capturedCreatedCode: Record<string, unknown> | null = null;
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: adminUser });
+      if (path === '/api/admin/promotions' && method === 'GET') {
+        return route.fulfill({ json: { welcome: welcomePromo, codes } });
+      }
+      if (path === '/api/admin/promotions/welcome' && method === 'PUT') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        capturedWelcomeUpdate = body;
+        welcomePromo = {
+          ...welcomePromo,
+          isEnabled: Boolean(body.isEnabled),
+          rewardMonths: Number(body.rewardMonths),
+        };
+        return route.fulfill({ json: welcomePromo });
+      }
+      if (path === '/api/admin/promotions/codes' && method === 'POST') {
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        capturedCreatedCode = body;
+        const created = {
+          id: 'code-02',
+          code: String(body.code),
+          description: (body.description as string) || '',
+          rewardMonths: Number(body.rewardMonths),
+          maxRedemptions: (body.maxRedemptions as number | null) ?? null,
+          redeemedCount: 0,
+          isActive: Boolean(body.isActive ?? true),
+          expiresAt: (body.expiresAt as string | null) ?? null,
+          createdAt: '2026-10-23T08:00:00Z',
+        };
+        codes = [created, ...codes];
+        return route.fulfill({ status: 201, json: created });
+      }
+      if (path.startsWith('/api/admin/promotions/codes/') && method === 'PATCH') {
+        const id = path.split('/').pop()!;
+        const body = route.request().postDataJSON() as Record<string, unknown>;
+        codes = codes.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                description: (body.description as string) ?? c.description,
+                rewardMonths: Number(body.rewardMonths ?? c.rewardMonths),
+                maxRedemptions: (body.maxRedemptions as number | null) ?? null,
+                isActive: Boolean(body.isActive),
+              }
+            : c,
+        );
+        const updated = codes.find((c) => c.id === id);
+        return route.fulfill({ json: updated });
+      }
+      if (path.startsWith('/api/admin/promotions/codes/') && method === 'DELETE') {
+        const id = path.split('/').pop()!;
+        codes = codes.filter((c) => c.id !== id);
+        return route.fulfill({ status: 204, body: '' });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    await page.goto('/admin/promotions');
+    await expect(page.getByRole('heading', { name: 'Chương trình Khuyến mãi' })).toBeVisible();
+    await expect(page.getByText('CHAO2026')).toBeVisible();
+    await expect(page.getByText('+2 tháng Pro')).toBeVisible();
+
+    // 1. Update welcome campaign rewardMonths from 3 -> 6
+    const welcomeMonthInput = page.getByLabel('Số tháng Pro tặng kèm').first();
+    await welcomeMonthInput.fill('6');
+    await page.getByRole('button', { name: 'Lưu cấu hình chiến dịch' }).click();
+    await expect(page.getByText('Đã cập nhật chiến dịch chào mừng thành công.')).toBeVisible();
+    expect(capturedWelcomeUpdate?.rewardMonths).toBe(6);
+
+    // 2. Open "Tạo mã mới" modal and test form validation (< 3 chars rejected)
+    await page.getByRole('button', { name: 'Tạo mã mới' }).click();
+    const modal = page.locator('.ant-modal').filter({ hasText: 'Tạo mã khuyến mãi mới' });
+    await expect(modal).toBeVisible();
+
+    const codeInput = modal.getByLabel('Mã khuyến mãi');
+    await codeInput.fill('ab');
+    await modal.getByRole('button', { name: 'Tạo mã' }).click();
+    await expect(modal.getByText('Mã từ 3 đến 32 ký tự.')).toBeVisible();
+
+    // 3. Fill valid lowercase code (auto-normalized to uppercase) and create
+    await codeInput.fill('tet2026');
+    await expect(codeInput).toHaveValue('TET2026');
+    await modal.getByLabel('Ghi chú').fill('Chiến dịch Tết 2026');
+    await modal.getByLabel('Số tháng Pro tặng kèm').fill('3');
+    await modal.getByLabel('Giới hạn lượt dùng').fill('50');
+    await modal.getByRole('button', { name: 'Tạo mã' }).click();
+
+    await expect(modal).toBeHidden();
+    expect(capturedCreatedCode?.code).toBe('TET2026');
+    expect(capturedCreatedCode?.rewardMonths).toBe(3);
+    expect(capturedCreatedCode?.maxRedemptions).toBe(50);
+    await expect(page.getByText('TET2026')).toBeVisible();
+    await expect(page.getByText('+3 tháng Pro')).toBeVisible();
+
+    // 4. Edit existing voucher code
+    await page.getByRole('button', { name: 'Sửa mã TET2026' }).click();
+    const editModal = page.locator('.ant-modal').filter({ hasText: 'Sửa mã khuyến mãi' });
+    await expect(editModal).toBeVisible();
+    await expect(editModal.getByLabel('Mã khuyến mãi')).toBeDisabled();
+    await editModal.getByLabel('Ghi chú').fill('Chiến dịch Tết Bính Ngọ 2026');
+    await editModal.getByRole('button', { name: 'Lưu thay đổi' }).click();
+    await expect(editModal).toBeHidden();
+    await expect(page.getByText('Chiến dịch Tết Bính Ngọ 2026')).toBeVisible();
+
+    // 5. Delete voucher code via Popconfirm
+    await page.getByRole('button', { name: 'Xóa mã TET2026' }).click();
+    const popconfirm = page.locator('.ant-popover').filter({ hasText: 'Xóa mã khuyến mãi này?' });
+    await expect(popconfirm).toBeVisible();
+    await popconfirm.getByRole('button', { name: 'Xóa' }).click();
+    await expect(page.getByText('TET2026')).toBeHidden();
+  });
 });

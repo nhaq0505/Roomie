@@ -37,10 +37,15 @@ function fixture(t) {
 async function connect(f) { f.gateway.connect(owner); await new Promise(resolve => setImmediate(resolve)); assert.equal((await f.gateway.status(owner)).status, 'Connected'); }
 test('saved session is encrypted and authentication failures do not reveal credentials', t => {
   const f = fixture(t); f.store.write(owner, { cookie: 'COOKIE_SECRET' });
+  assert.deepEqual(f.store.owners(), [owner]);
   assert.deepEqual(f.store.read(owner), { cookie: 'COOKIE_SECRET' });
   assert.equal(fs.readFileSync(f.store.file(owner)).includes('COOKIE_SECRET'), false);
   assert.throws(() => new EncryptedStore(f.dir, randomBytes(32).toString('base64')).read(owner));
   assert.throws(() => f.store.read('../../secret'));
+  const raw = Buffer.from(fs.readFileSync(f.store.file(owner)));
+  raw[raw.length - 1] ^= 0xff;
+  fs.writeFileSync(f.store.file(owner), raw);
+  assert.throws(() => f.store.read(owner));
 });
 test('QR login persists credentials and a restart restores the real session', async t => {
   const f = fixture(t); await connect(f);
@@ -105,4 +110,39 @@ test('disconnect while QR login is pending fences late credentials and stale API
   callback({ type: 4, data: { cookie: 'STALE_SECRET' } }); finish(f.api);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.store.read(owner).credentials, null); assert.equal((await gateway.status(owner)).status, 'Disconnected'); assert.equal(stopped, true);
+});
+test('QR intermediate events, expiry abort, listener reconnect and send input validation edge cases', async t => {
+  const f = fixture(t);
+  let qrCallback;
+  let aborted = 0;
+  const qrGateway = new Gateway(f.store, () => ({
+    loginQR: (_, cb) => {
+      qrCallback = cb;
+      return new Promise(() => {});
+    }
+  }));
+  qrGateway.connect(owner);
+  qrCallback({ type: 0, data: { image: 'QUJD' }, actions: { abort: () => { aborted++; } } });
+  assert.deepEqual(await qrGateway.status(owner), { status: 'QrReady', qrImage: 'data:image/png;base64,QUJD' });
+  qrCallback({ type: 2, actions: { abort: () => { aborted++; } } });
+  assert.deepEqual(await qrGateway.status(owner), { status: 'AwaitingConfirmation', qrImage: null });
+  qrCallback({ type: 1, actions: { abort: () => { aborted++; } } });
+  assert.deepEqual(await qrGateway.status(owner), { status: 'Expired', qrImage: null });
+  assert.equal(aborted, 1);
+
+  await connect(f);
+  f.api.listener.emit('disconnected');
+  assert.equal((await f.gateway.status(owner)).status, 'Restoring');
+  f.api.listener.emit('connected');
+  assert.equal((await f.gateway.status(owner)).status, 'Connected');
+  f.api.listener.emit('error', new Error('socket glitch'));
+  assert.equal((await f.gateway.status(owner)).status, 'Restoring');
+  f.api.listener.emit('connected');
+
+  const valid = f.body();
+  await assert.rejects(() => f.gateway.send(owner, { ...valid, attemptId: 'not-a-uuid' }), /Invalid message/);
+  await assert.rejects(() => f.gateway.send(owner, { ...valid, phone: '0123456789' }), /Invalid message/);
+  await assert.rejects(() => f.gateway.send(owner, { ...valid, phone: '091234567' }), /Invalid message/);
+  await assert.rejects(() => f.gateway.send(owner, { ...valid, message: 'x'.repeat(6001) }), /Invalid message/);
+  assert.throws(() => new EncryptedStore(f.dir, 'short-key'), /32 bytes/);
 });

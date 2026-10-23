@@ -28,10 +28,12 @@ export class EncryptedStore {
     const body = Buffer.concat([cipher.update(JSON.stringify(value)), cipher.final()]);
     fs.writeFileSync(file + '.tmp', Buffer.concat([iv, cipher.getAuthTag(), body]), { mode: 0o600 });
     // Flush before returning: a crash must not turn a submitted message back into an unsent attempt.
-    const fd = fs.openSync(file + '.tmp', 'r');
+    const fd = fs.openSync(file + '.tmp', 'r+');
     try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     fs.renameSync(file + '.tmp', file);
-    const dir = fs.openSync(this.directory, 'r');
-    try { fs.fsyncSync(dir); } finally { fs.closeSync(dir); }
+    if (process.platform !== 'win32') {
+      const dir = fs.openSync(this.directory, 'r');
+      try { fs.fsyncSync(dir); } finally { fs.closeSync(dir); }
+    }
   }
 }

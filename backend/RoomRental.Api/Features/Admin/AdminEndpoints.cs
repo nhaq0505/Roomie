@@ -45,7 +45,7 @@ public static class AdminEndpoints
         });
 
         routes.MapPost("/owners/{id:guid}/reset-password", async (Guid id, AdminResetPasswordRequest request,
-            HttpContext context, AppDbContext db, Microsoft.AspNetCore.Identity.IPasswordHasher<AppUser> hasher, CancellationToken ct) =>
+            HttpContext context, AppDbContext db, Microsoft.AspNetCore.Identity.IPasswordHasher<AppUser> hasher, TimeProvider clock, CancellationToken ct) =>
         {
             await AccountLoginLimiter.ReserveAsync(db, "admin-recovery:" + ApiSupport.UserId(context), app.Environment.IsDevelopment() ? 1000 : 10, ct);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
@@ -53,17 +53,18 @@ public static class AdminEndpoints
             PasswordSecurity.VerifyCurrentPassword(admin, request.CurrentPassword, hasher);
             var owner = await db.Users.SingleOrDefaultAsync(x => x.Id == id && x.Role == UserRole.Owner, ct)
                 ?? throw new ApiException(404, "Owner was not found.");
+            var now = clock.GetUtcNow();
             var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
             owner.PasswordResetHash = PasswordSecurity.HashToken(token);
-            owner.PasswordResetExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
-            await PasswordSecurity.RevokeSessionsAsync(db, owner.Id, ct);
+            owner.PasswordResetExpiresAt = now.AddMinutes(30);
+            await PasswordSecurity.RevokeSessionsAsync(db, owner.Id, ct, now);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(new { token, expiresAt = owner.PasswordResetExpiresAt });
         }).RequireRateLimiting("auth");
 
-        routes.MapPost("/owners/{id:guid}/status", async (Guid id, OwnerStatusRequest request, AppDbContext db, CancellationToken cancellationToken) =>
+        routes.MapPost("/owners/{id:guid}/status", async (Guid id, OwnerStatusRequest request, AppDbContext db, TimeProvider clock, CancellationToken cancellationToken) =>
         {
             if (!Enum.TryParse<OwnerStatus>(request.Status, ignoreCase: false, out var nextStatus) || !Enum.IsDefined(nextStatus))
                 throw new ApiException(StatusCodes.Status400BadRequest, "Status must be Pending, Approved, Rejected, or Suspended.");
@@ -75,7 +76,7 @@ public static class AdminEndpoints
             owner.StatusReason = reason;
             if (nextStatus != OwnerStatus.Approved)
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = clock.GetUtcNow();
                 var sessions = await db.AuthSessions.Where(row => row.UserId == owner.Id && row.RevokedAt == null).ToListAsync(cancellationToken);
                 foreach (var session in sessions) session.RevokedAt = now;
             }
@@ -90,7 +91,7 @@ public static class AdminEndpoints
                 owner.IsPro, roomCount, owner.MaxRooms));
         });
 
-        routes.MapPost("/owners/{id:guid}/subscription", async (Guid id, AdminSubscriptionRequest request, AppDbContext db, CancellationToken cancellationToken) =>
+        routes.MapPost("/owners/{id:guid}/subscription", async (Guid id, AdminSubscriptionRequest request, AppDbContext db, TimeProvider clock, CancellationToken cancellationToken) =>
         {
             var owner = await db.Users.SingleOrDefaultAsync(row => row.Id == id && row.Role == UserRole.Owner, cancellationToken)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Owner was not found.");
@@ -98,6 +99,7 @@ public static class AdminEndpoints
             if (!Enum.TryParse<SubscriptionTier>(request.Tier, ignoreCase: true, out var nextTier) || !Enum.IsDefined(nextTier))
                 throw new ApiException(StatusCodes.Status400BadRequest, "Tier must be Free or Pro.");
 
+            var now = clock.GetUtcNow();
             owner.SubscriptionTier = nextTier;
             if (nextTier == SubscriptionTier.Pro)
             {
@@ -107,9 +109,9 @@ public static class AdminEndpoints
                 }
                 else if (request.Days is > 0)
                 {
-                    var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > DateTimeOffset.UtcNow)
+                    var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > now)
                         ? owner.SubscriptionExpiresAt.Value
-                        : DateTimeOffset.UtcNow;
+                        : now;
                     owner.SubscriptionExpiresAt = baseDate.AddDays(request.Days.Value);
                 }
                 else if (request.Days is 0)
@@ -118,9 +120,9 @@ public static class AdminEndpoints
                 }
                 else
                 {
-                    var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > DateTimeOffset.UtcNow)
+                    var baseDate = (owner.SubscriptionExpiresAt is not null && owner.SubscriptionExpiresAt > now)
                         ? owner.SubscriptionExpiresAt.Value
-                        : DateTimeOffset.UtcNow;
+                        : now;
                     owner.SubscriptionExpiresAt = baseDate.AddDays(30);
                 }
             }

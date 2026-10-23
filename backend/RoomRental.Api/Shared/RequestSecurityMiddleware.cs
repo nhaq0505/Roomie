@@ -24,7 +24,7 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
             OwnerStatus? persistedStatus = null;
             DateTimeOffset sessionCreatedAt = default;
             DateTimeOffset sessionExpiresAt = default;
-            var now = (context.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
+            var now = (context.RequestServices?.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow();
             var hasUserId = Guid.TryParse(userIdText, out var parsedUserId);
             if (hasUserId && !string.IsNullOrWhiteSpace(sessionId))
             {
@@ -47,7 +47,10 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
 
             if (!valid)
             {
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                if (!context.Response.HasStarted && context.RequestServices?.GetService<IAuthenticationService>() is not null)
+                {
+                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";
                 await context.Response.WriteAsJsonAsync(new { message = "Phiên đăng nhập đã hết hạn hoặc không còn hiệu lực." });
@@ -65,21 +68,30 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
                 }
             }
 
-            var isMutatingCrossOrigin = MutatingMethods.Contains(context.Request.Method) &&
+            if (MutatingMethods.Contains(context.Request.Method) &&
                 !context.Request.Path.StartsWithSegments("/api/payments/webhook") &&
-                !ApiSupport.IsSameOrigin(context.Request);
-            if (!isMutatingCrossOrigin)
+                !ApiSupport.IsSameOrigin(context.Request))
             {
-                var isRememberMe = context.User.FindFirstValue("rm") == "1" ||
-                                   (sessionExpiresAt - sessionCreatedAt) > TimeSpan.FromDays(1);
-                var lifetime = isRememberMe ? AuthEndpoints.RememberMeSessionLifetime : AuthEndpoints.DefaultSessionLifetime;
-                if ((sessionExpiresAt - now) <= TimeSpan.FromTicks(lifetime.Ticks / 2) &&
-                    !context.Request.Path.StartsWithSegments("/api/auth/logout"))
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new { message = "Nguồn gửi yêu cầu không hợp lệ." });
+                return;
+            }
+
+            var rmClaim = context.User.FindFirstValue("rm");
+            var isRememberMe = rmClaim is not null
+                ? rmClaim == "1"
+                : (sessionExpiresAt - sessionCreatedAt) > TimeSpan.FromDays(1);
+            var lifetime = isRememberMe ? AuthEndpoints.RememberMeSessionLifetime : AuthEndpoints.DefaultSessionLifetime;
+            if ((sessionExpiresAt - now) <= TimeSpan.FromTicks(lifetime.Ticks / 2) &&
+                ShouldSlideSession(context.Request.Path))
+            {
+                var refreshedExpiresAt = now.Add(lifetime);
+                await db.AuthSessions
+                    .Where(s => s.Id == sessionId && s.UserId == parsedUserId && s.RevokedAt == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, refreshedExpiresAt), context.RequestAborted);
+                if (!context.Response.HasStarted && context.RequestServices?.GetService<IAuthenticationService>() is not null)
                 {
-                    var refreshedExpiresAt = now.Add(lifetime);
-                    await db.AuthSessions
-                        .Where(s => s.Id == sessionId && s.UserId == parsedUserId && s.RevokedAt == null)
-                        .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, refreshedExpiresAt), context.RequestAborted);
                     await context.SignInAsync(
                         CookieAuthenticationDefaults.AuthenticationScheme,
                         context.User,
@@ -91,16 +103,6 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
                         });
                 }
             }
-
-            if (MutatingMethods.Contains(context.Request.Method) &&
-                !context.Request.Path.StartsWithSegments("/api/payments/webhook") &&
-                !ApiSupport.IsSameOrigin(context.Request))
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new { message = "Nguồn gửi yêu cầu không hợp lệ." });
-                return;
-            }
         }
 
         await next(context);
@@ -111,8 +113,12 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
             var userIdText = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (Guid.TryParse(userIdText, out var userId))
             {
-                context.RequestServices.GetService<IMemoryCache>()?.Remove($"dashboard:{userId}");
+                context.RequestServices?.GetService<IMemoryCache>()?.Remove($"dashboard:{userId}");
             }
         }
     }
+
+    private static bool ShouldSlideSession(PathString path) =>
+        !path.StartsWithSegments("/api/auth") ||
+        path.StartsWithSegments("/api/auth/me");
 }

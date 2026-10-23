@@ -725,7 +725,12 @@ export default function ContractDocumentsDrawer({
                                       </Form.Item>
                                     </Col>
                                     <Col xs={12} sm={5}>
-                                      <Form.Item {...restField} name={[name, 'citizenId']} label={t("Số CCCD")}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'citizenId']}
+                                        label={t("Số CCCD")}
+                                        rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                                      >
                                         <Input maxLength={12} placeholder="07909900xxxx" />
                                       </Form.Item>
                                     </Col>
@@ -758,6 +763,7 @@ export default function ContractDocumentsDrawer({
                                 type="dashed"
                                 block
                                 icon={<PlusOutlined />}
+                                disabled={fields.length >= 29}
                                 onClick={() => add({ fullName: '', relation: legalCt01Template.defaultRelation })}
                               >
                                 {t("Thêm thành viên ở cùng")}

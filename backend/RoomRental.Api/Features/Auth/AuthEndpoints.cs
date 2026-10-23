@@ -183,14 +183,15 @@ public static class AuthEndpoints
             var email = request.Email?.Trim().ToLowerInvariant();
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
             var user = await db.Users.SingleOrDefaultAsync(x => x.Email == email && x.Role == UserRole.Owner, ct);
+            var now = clock.GetUtcNow();
             if (user?.PasswordResetHash is null || user.PasswordResetExpiresAt is null ||
-                user.PasswordResetExpiresAt <= DateTimeOffset.UtcNow ||
+                user.PasswordResetExpiresAt <= now ||
                 !PasswordSecurity.MatchesToken(request.Token, user.PasswordResetHash))
                 throw new ApiException(400, "Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
             user.PasswordHash = hasher.HashPassword(user, request.NewPassword);
             user.PasswordResetHash = null;
             user.PasswordResetExpiresAt = null;
-            await PasswordSecurity.RevokeSessionsAsync(db, user.Id, ct);
+            await PasswordSecurity.RevokeSessionsAsync(db, user.Id, ct, now);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(new { success = true });
@@ -204,7 +205,7 @@ public static class AuthEndpoints
             return Results.Ok(ToDto(user));
         }).RequireAuthorization();
 
-        routes.MapPost("/logout", async (HttpContext context, AppDbContext db, CancellationToken cancellationToken) =>
+        routes.MapPost("/logout", async (HttpContext context, AppDbContext db, TimeProvider clock, CancellationToken cancellationToken) =>
         {
             var sessionId = context.User.FindFirst("sid")?.Value;
             if (!string.IsNullOrWhiteSpace(sessionId))
@@ -212,7 +213,7 @@ public static class AuthEndpoints
                 var session = await db.AuthSessions.SingleOrDefaultAsync(row => row.Id == sessionId, cancellationToken);
                 if (session is not null && session.RevokedAt is null)
                 {
-                    session.RevokedAt = DateTimeOffset.UtcNow;
+                    session.RevokedAt = clock.GetUtcNow();
                     await db.SaveChangesAsync(cancellationToken);
                 }
             }
