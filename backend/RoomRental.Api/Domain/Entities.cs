@@ -2,7 +2,7 @@ namespace RoomRental.Api.Domain;
 
 public enum PaymentConfirmationMode { Automatic, Manual }
 
-public enum UserRole { Admin, Owner }
+public enum UserRole { Admin, Owner, Marketer }
 public enum OwnerStatus { Pending, Approved, Rejected, Suspended }
 public enum SubscriptionTier { Free, Pro }
 public enum InvoiceStatus { Unpaid, Partial, Paid }
@@ -57,6 +57,7 @@ public sealed class RegistrationVerification
     public string? Phone { get; set; }
     public string PasswordHash { get; set; } = "";
     public string CodeHash { get; set; } = "";
+    public string? PendingPromoCode { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
     public DateTimeOffset CodeExpiresAt { get; set; }
     public DateTimeOffset LastSentAt { get; set; }

@@ -1707,13 +1707,118 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             dailyRevenue.Add(new DailyRevenuePointDto(d, subRev, spend));
         }
 
+        // 5. Campaign ROAS / ROI Breakdown
+        var allCampaignMetadata = await db.MarketingCampaigns.AsNoTracking().ToListAsync(ct);
+
+        var roasAttributions = await (from m in db.OwnerMilestones.AsNoTracking()
+                                      join a in db.RegistrationAttributions.AsNoTracking() on m.OwnerId equals a.OwnerId into attrJoin
+                                      from a in attrJoin.DefaultIfEmpty()
+                                      where (m.RegisteredAt >= startUtc && m.RegisteredAt < endUtc) ||
+                                            (m.ActivatedAt >= startUtc && m.ActivatedAt < endUtc)
+                                      select new
+                                      {
+                                          m.OwnerId,
+                                          m.RegisteredAt,
+                                          m.ActivatedAt,
+                                          Campaign = a != null ? (a.LastTouchCampaign ?? a.FirstTouchCampaign) : null,
+                                          Source = a != null ? (a.LastTouchSource ?? a.FirstTouchSource) : null
+                                      }).ToListAsync(ct);
+
+        var orderOwnerIds = attempts.Select(a => a.OwnerId).Distinct().ToList();
+        var orderOwnerAttributions = orderOwnerIds.Count > 0
+            ? await db.RegistrationAttributions.AsNoTracking()
+                .Where(a => orderOwnerIds.Contains(a.OwnerId))
+                .ToDictionaryAsync(
+                    a => a.OwnerId,
+                    a => a.LastTouchCampaign ?? a.FirstTouchCampaign,
+                    ct)
+            : new Dictionary<Guid, string?>();
+
+        var campaignKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var meta in allCampaignMetadata)
+        {
+            var key = !string.IsNullOrWhiteSpace(meta.UtmCampaign) ? meta.UtmCampaign! : meta.Code;
+            if (!string.IsNullOrWhiteSpace(key)) campaignKeys.Add(key);
+        }
+        foreach (var cost in campaignCosts)
+        {
+            if (!string.IsNullOrWhiteSpace(cost.Campaign)) campaignKeys.Add(cost.Campaign);
+        }
+        foreach (var row in roasAttributions)
+        {
+            if (!string.IsNullOrWhiteSpace(row.Campaign)) campaignKeys.Add(row.Campaign!);
+        }
+        foreach (var camp in orderOwnerAttributions.Values)
+        {
+            if (!string.IsNullOrWhiteSpace(camp)) campaignKeys.Add(camp!);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Campaign))
+        {
+            campaignKeys.RemoveWhere(k => !string.Equals(k, filter.Campaign, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var campaignRoas = new List<CampaignRoasRowDto>();
+        foreach (var campKey in campaignKeys)
+        {
+            var meta = allCampaignMetadata.FirstOrDefault(m =>
+                string.Equals(m.UtmCampaign, campKey, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(m.Code, campKey, StringComparison.OrdinalIgnoreCase));
+
+            var costItems = campaignCosts.Where(c => string.Equals(c.Campaign, campKey, StringComparison.OrdinalIgnoreCase)).ToList();
+            var channel = meta?.Channel ?? costItems.Select(c => c.Channel).FirstOrDefault(ch => !string.IsNullOrWhiteSpace(ch));
+            if (!string.IsNullOrWhiteSpace(filter.Channel) && !string.Equals(channel, filter.Channel, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var source = meta?.Source ?? meta?.UtmSource;
+            var spend = costItems.Sum(c => c.TotalCostVnd);
+            var regs = roasAttributions.Count(r =>
+                string.Equals(r.Campaign, campKey, StringComparison.OrdinalIgnoreCase) &&
+                r.RegisteredAt >= startUtc && r.RegisteredAt < endUtc);
+            var acts = roasAttributions.Count(r =>
+                string.Equals(r.Campaign, campKey, StringComparison.OrdinalIgnoreCase) &&
+                r.ActivatedAt >= startUtc && r.ActivatedAt < endUtc);
+
+            var campOrders = attempts.Where(a =>
+                orderOwnerAttributions.TryGetValue(a.OwnerId, out var c) &&
+                string.Equals(c, campKey, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var paidOrders = campOrders.Count;
+            var rev = campOrders.Sum(a => (decimal)a.Amount);
+            var cplVnd = regs > 0 && spend > 0 ? Math.Round(spend / regs, 2) : (decimal?)null;
+            var roasPercent = spend > 0 ? Math.Round((rev / spend) * 100m, 2) : (decimal?)null;
+
+            campaignRoas.Add(new CampaignRoasRowDto(
+                campKey,
+                meta?.Name ?? campKey,
+                channel,
+                source,
+                meta?.PromoCode,
+                spend,
+                null,
+                regs,
+                acts,
+                paidOrders,
+                rev,
+                cplVnd,
+                roasPercent));
+        }
+
+        campaignRoas = campaignRoas
+            .OrderByDescending(x => x.RevenueVnd)
+            .ThenByDescending(x => x.TotalCostVnd)
+            .ThenByDescending(x => x.Registrations)
+            .ThenBy(x => x.Campaign)
+            .ToList();
+
         return new AdminMonitoringRevenueResponse(
             summary,
             subscriptionOrders,
             campaignCosts,
             dailyRevenue,
             EffectiveFromDate: fromDate,
-            EffectiveToDate: toDate
+            EffectiveToDate: toDate,
+            CampaignRoas: campaignRoas
         );
     }
 
@@ -1723,7 +1828,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         string? medium,
         string? campaign,
         string? term = null,
-        string? content = null)
+        string? content = null,
+        string? promoCode = null)
     {
         if (string.IsNullOrWhiteSpace(targetUrl))
             return string.Empty;
@@ -1737,6 +1843,7 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         if (!string.IsNullOrWhiteSpace(campaign)) query["utm_campaign"] = campaign.Trim();
         if (!string.IsNullOrWhiteSpace(term)) query["utm_term"] = term.Trim();
         if (!string.IsNullOrWhiteSpace(content)) query["utm_content"] = content.Trim();
+        if (!string.IsNullOrWhiteSpace(promoCode)) query["promo"] = promoCode.Trim().ToUpperInvariant();
 
         var queryString = query.ToString();
         var queryPart = string.IsNullOrEmpty(queryString) ? "" : "?" + queryString;
@@ -1775,7 +1882,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             x.CreatedByName,
             x.CreatedAt,
             x.UpdatedAt,
-            BuildTrackingUrl(x.TargetUrl ?? "/dang-ky", x.UtmSource, x.UtmMedium, x.UtmCampaign)
+            BuildTrackingUrl(x.TargetUrl ?? "/dang-ky", x.UtmSource, x.UtmMedium, x.UtmCampaign, promoCode: x.PromoCode),
+            x.PromoCode
         )).ToList();
     }
 
@@ -1792,6 +1900,10 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         if (await db.MarketingCampaigns.AnyAsync(x => x.Code == code, ct))
             throw new ApiException(StatusCodes.Status409Conflict, "Campaign code already exists.");
 
+        var promoCode = string.IsNullOrWhiteSpace(request.PromoCode) ? null : request.PromoCode.Trim().ToUpperInvariant();
+        if (promoCode is { Length: > 32 })
+            throw new ApiException(StatusCodes.Status400BadRequest, "PromoCode must be 32 characters or fewer.");
+
         var now = clock.GetUtcNow();
         var campaign = new MarketingCampaign
         {
@@ -1803,6 +1915,7 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             UtmMedium = request.UtmMedium?.Trim(),
             UtmSource = request.UtmSource?.Trim(),
             TargetUrl = request.TargetUrl?.Trim(),
+            PromoCode = promoCode,
             IsActive = request.IsActive,
             CreatedBy = adminUserId,
             CreatedByName = adminUserName,
@@ -1826,7 +1939,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             campaign.CreatedByName,
             campaign.CreatedAt,
             campaign.UpdatedAt,
-            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign)
+            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign, promoCode: campaign.PromoCode),
+            campaign.PromoCode
         );
     }
 
@@ -1849,6 +1963,13 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
         if (request.UtmMedium != null) campaign.UtmMedium = request.UtmMedium.Trim();
         if (request.UtmSource != null) campaign.UtmSource = request.UtmSource.Trim();
         if (request.TargetUrl != null) campaign.TargetUrl = request.TargetUrl.Trim();
+        if (request.PromoCode != null)
+        {
+            var promoCode = string.IsNullOrWhiteSpace(request.PromoCode) ? null : request.PromoCode.Trim().ToUpperInvariant();
+            if (promoCode is { Length: > 32 })
+                throw new ApiException(StatusCodes.Status400BadRequest, "PromoCode must be 32 characters or fewer.");
+            campaign.PromoCode = promoCode;
+        }
         if (request.IsActive.HasValue) campaign.IsActive = request.IsActive.Value;
 
         campaign.UpdatedAt = clock.GetUtcNow();
@@ -1868,7 +1989,8 @@ public sealed class DefaultRevenueMonitoringQueryService(AppDbContext db, TimePr
             campaign.CreatedByName,
             campaign.CreatedAt,
             campaign.UpdatedAt,
-            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign)
+            BuildTrackingUrl(campaign.TargetUrl ?? "/dang-ky", campaign.UtmSource, campaign.UtmMedium, campaign.UtmCampaign, promoCode: campaign.PromoCode),
+            campaign.PromoCode
         );
     }
 

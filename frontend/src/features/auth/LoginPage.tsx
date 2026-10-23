@@ -11,7 +11,9 @@ import { authApi, type User } from './index';
 
 function destination(user: User) {
   if (user.status !== 'Approved') return '/account-status';
-  return user.role === 'Admin' ? '/admin/owners' : '/dashboard';
+  if (user.role === 'Admin') return '/admin/owners';
+  if (user.role === 'Marketer') return '/marketer/leads';
+  return '/dashboard';
 }
 
 export default function LoginPage() {
@@ -50,7 +52,7 @@ export default function LoginPage() {
         <Button className="auth-submit" type="primary" htmlType="submit" loading={busy} block>{t("Đăng nhập")} <ArrowRightOutlined /></Button>
       </Form>
           <Link to="/reset-password">{t("Quên mật khẩu")}</Link>
-      {import.meta.env.DEV && <div className="demo-access"><div className="demo-title">{t("Dùng tài khoản mẫu")}</div><div className="demo-buttons"><Button size="small" onClick={() => fillDemo('owner@phongtro.local', 'Owner123!')}>{t("Chủ trọ")}</Button><Button size="small" onClick={() => fillDemo('admin@phongtro.local', 'Admin123!')}>{t("Quản trị")}</Button></div></div>}
+      {import.meta.env.DEV && <div className="demo-access"><div className="demo-title">{t("Dùng tài khoản mẫu")}</div><div className="demo-buttons"><Button size="small" onClick={() => fillDemo('owner@phongtro.local', 'Owner123!')}>{t("Chủ trọ")}</Button><Button size="small" onClick={() => fillDemo('marketer@phongtro.local', 'Marketer123!')}>{t("Marketing")}</Button><Button size="small" onClick={() => fillDemo('admin@phongtro.local', 'Admin123!')}>{t("Quản trị")}</Button></div></div>}
       <div className="auth-switch">{t("Chưa có tài khoản?")} <Link to="/register">{t("Đăng ký làm chủ trọ")}</Link></div>
     </div></section>
   </main>;

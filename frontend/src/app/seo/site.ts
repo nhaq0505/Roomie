@@ -34,11 +34,20 @@ export const privatePageTitles: Record<string, string> = {
   '/invoices': 'Hóa đơn', '/reports': 'Báo cáo',
   '/settings/zalo': 'Nhắc hóa đơn qua Zalo', '/settings/payment': 'Cấu hình', '/admin/owners': 'Quản lý chủ trọ',
   '/admin/monitoring': 'Giám sát hệ thống', '/admin/promotions': 'Quản lý khuyến mãi',
+  '/marketer/leads': 'Chăm sóc chủ trọ', '/marketer/content': 'Cẩm nang & Banner', '/marketer/emails': 'Chiến dịch Email',
 };
 
 export function metadataFor(pathname: string) {
   const published = publicPages.find(page => page.path === pathname);
   if (published) return { ...published, canonical: `${site.origin}${published.path}`, public: true };
+  if (/^\/huong-dan\/[^/]+\/?$/.test(pathname)) {
+    return {
+      title: 'Cẩm nang quản lý nhà trọ | Roomie',
+      description: 'Hướng dẫn vận hành nhà trọ, chốt chỉ số điện nước và thu tiền qua VietQR trên Roomie.',
+      canonical: `${site.origin}${pathname.replace(/\/$/, '')}`,
+      public: true,
+    };
+  }
   const guest = /^\/(t|tenant)\/[^/]+(?:\/invoices\/[^/]+\/checkout)?\/?$/.test(pathname);
   const roomTenant = /^\/rooms\/[^/]+\/(tenant|documents)\/?$/.test(pathname);
   const title = guest ? (pathname.includes('/checkout') ? 'Thanh toán hóa đơn' : 'Thông tin phòng thuê')

@@ -139,6 +139,22 @@ export interface DailyRevenuePointDto {
   marketingSpendVnd: number;
 }
 
+export interface CampaignRoasRowDto {
+  campaign: string;
+  name?: string | null;
+  channel?: string | null;
+  source?: string | null;
+  promoCode?: string | null;
+  totalCostVnd: number;
+  sessions?: number | null;
+  registrations: number;
+  activatedOwners: number;
+  paidOrders: number;
+  revenueVnd: number;
+  cplVnd?: number | null;
+  roasPercent?: number | null;
+}
+
 export interface AdminMonitoringRevenueResponse {
   summary: RevenueSummaryDto;
   subscriptionOrders: SubscriptionOrderRevenueDto[];
@@ -146,6 +162,7 @@ export interface AdminMonitoringRevenueResponse {
   dailySeries: DailyRevenuePointDto[];
   effectiveFromDate?: string | null;
   effectiveToDate?: string | null;
+  campaignRoas?: CampaignRoasRowDto[] | null;
 }
 
 // 3. Operations Tab Types
@@ -249,6 +266,8 @@ export interface MarketingCampaignDto {
   createdByName: string;
   createdAt: string;
   updatedAt: string;
+  trackingUrl?: string | null;
+  promoCode?: string | null;
 }
 
 export interface CreateCampaignRequest {
@@ -261,6 +280,7 @@ export interface CreateCampaignRequest {
   utmSource?: string | null;
   targetUrl?: string | null;
   isActive?: boolean;
+  promoCode?: string | null;
 }
 
 export interface UpdateCampaignRequest {
@@ -272,6 +292,7 @@ export interface UpdateCampaignRequest {
   utmSource?: string | null;
   targetUrl?: string | null;
   isActive?: boolean | null;
+  promoCode?: string | null;
 }
 
 // 6. Campaign Cost Management Types

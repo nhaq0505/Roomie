@@ -1,7 +1,7 @@
-import { ArrowLeftOutlined, ArrowRightOutlined, LockOutlined, MailOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ArrowRightOutlined, GiftOutlined, LockOutlined, MailOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Button, Form, Input, Typography } from 'antd';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { errorText } from '../../shared/i18n/errors';
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
@@ -24,10 +24,17 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const promoParam = (searchParams.get('promo') ?? '').trim().toUpperCase();
   const [form] = Form.useForm();
   const [otpForm] = Form.useForm();
   const [challenge, setChallenge] = useState<StoredRegisterChallenge | null>(readChallenge);
   const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (promoParam) {
+      form.setFieldsValue({ promoCode: promoParam });
+    }
+  }, [promoParam, form]);
   useEffect(() => {
     if (!challenge) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -63,7 +70,7 @@ export default function RegisterPage() {
     finally { setBusy(false); }
   };
 
-  const submit = async (values: { name: string; email: string; password: string; phone: string }) => {
+  const submit = async (values: { name: string; email: string; password: string; phone: string; promoCode?: string }) => {
     if (busy) return;
     setBusy(true); setError('');
     try {
@@ -79,7 +86,12 @@ export default function RegisterPage() {
       } catch {
         // Fallback
       }
-      const registration = await authApi.register({ ...values, attribution });
+      const normalizedPromo = (values.promoCode ?? promoParam ?? '').trim().toUpperCase();
+      const registration = await authApi.register({
+        ...values,
+        promoCode: normalizedPromo ? normalizedPromo : undefined,
+        attribution,
+      });
       if ('verificationRequired' in registration && registration.verificationRequired) {
         form.resetFields(['password']);
         saveChallenge({ ...registration, name: values.name, phone: values.phone });
@@ -101,6 +113,15 @@ export default function RegisterPage() {
   return <main className="auth-page auth-page-register"><div className="public-language"><LanguageSelector /></div><div className="auth-decoration auth-decoration-one" /><div className="auth-decoration auth-decoration-two" />
     <div className="auth-aside"><div className="auth-brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div><div className="auth-message"><div className="auth-kicker">{t("BẮT ĐẦU THẬT DỄ")}</div><Typography.Title>{t("Quản lý phòng trọ")}<br /><span>{t("theo cách của bạn.")}</span></Typography.Title><Typography.Paragraph>{t("Đăng ký, xác nhận email và bắt đầu quản lý nhà trọ với gói Miễn phí.")}</Typography.Paragraph><div className="onboarding-steps"><div><span>01</span><div><strong>{t("Tạo tài khoản")}</strong><small>{t("Điền thông tin liên hệ của bạn")}</small></div></div><div><span>02</span><div><strong>{t("Xác nhận email")}</strong><small>{t("Nhập mã được gửi đến email của bạn")}</small></div></div><div><span>03</span><div><strong>{t("Quản lý nhà trọ")}</strong><small>{t("Thêm phòng và bắt đầu sử dụng")}</small></div></div></div></div><div className="auth-aside-foot">{t("Đơn giản hóa việc quản lý mỗi ngày")} <span>•</span> 2026</div></div>
     <section className="auth-main"><div className="auth-form-wrap"><div className="auth-small-brand"><div className="brand-mark"><RoomieMark /></div><strong>Roomie</strong></div><Link className="back-link" to="/"><ArrowLeftOutlined aria-hidden="true" /> {t("Về trang chính")}</Link><div className="form-intro"><div className="eyebrow">{t("DÀNH CHO CHỦ TRỌ")}</div><Typography.Title level={2}>{challenge ? t("Xác nhận email") : t("Tạo tài khoản")}</Typography.Title><Typography.Paragraph>{challenge ? t("Nhập mã 6 chữ số đã gửi đến {0}.", [challenge.email]) : t("Thông tin này giúp bạn quản lý tài khoản và nhận hỗ trợ khi cần.")}</Typography.Paragraph></div>
+      {promoParam && !challenge && (
+        <Alert
+          className="form-alert"
+          type="success"
+          showIcon
+          icon={<GiftOutlined />}
+          message={t("Đã áp dụng mã ưu đãi {0} — Tài khoản sẽ tự động được cộng gói Pro sau khi hoàn tất đăng ký.", [promoParam])}
+        />
+      )}
       {error && <Alert className="form-alert" type="error" showIcon message={errorText(error)} />}
       {challenge ? <>
         {codeExpired && <Alert className="form-alert" type="warning" showIcon message={t("Mã đã hết hạn. Vui lòng gửi lại mã.")} />}
@@ -130,11 +151,12 @@ export default function RegisterPage() {
         >
           {t("Sửa thông tin đăng ký")}
         </Button>
-      </> : <Form form={form} layout="vertical" size="large" onFinish={submit} requiredMark={false}>
+      </> : <Form form={form} layout="vertical" size="large" onFinish={submit} requiredMark={false} initialValues={{ promoCode: promoParam || undefined }}>
         <Form.Item label={t("Tên của bạn")} name="name" rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên.") }]}><Input prefix={<UserOutlined />} placeholder={t("Nguyễn Minh Anh")} autoComplete="name" /></Form.Item>
         <Form.Item label={t("Số điện thoại")} name="phone" rules={[{ required: true, message: t("Vui lòng nhập số điện thoại.") }]}><Input prefix={<PhoneOutlined />} placeholder="09xx xxx xxx" autoComplete="tel" /></Form.Item>
         <Form.Item label={t("Email")} name="email" rules={[{ required: true, message: t("Vui lòng nhập email.") }, { type: 'email', message: t("Email chưa đúng định dạng.") }]}><Input prefix={<MailOutlined />} placeholder="name@example.com" autoComplete="email" /></Form.Item>
         <Form.Item label={t("Mật khẩu")} name="password" rules={[{ required: true, whitespace: true, min: 9, max: 256, message: t("Mật khẩu mới cần từ 9 đến 256 ký tự.") }]}><Input.Password prefix={<LockOutlined />} placeholder={t("Mật khẩu mới")} autoComplete="new-password" /></Form.Item>
+        <Form.Item label={t("Mã ưu đãi (tùy chọn)")} name="promoCode"><Input prefix={<GiftOutlined />} placeholder="ROOMIE3M" style={{ textTransform: 'uppercase' }} /></Form.Item>
         <Button className="auth-submit" type="primary" htmlType="submit" loading={busy} block>{t("Gửi mã xác nhận")} <ArrowRightOutlined /></Button>
       </Form>}
       <div className="auth-switch">{t("Đã có tài khoản?")} <Link to="/login">{t("Đăng nhập")}</Link></div><div className="auth-legal">{t("Email cần được xác nhận trước khi đăng nhập.")}</div>

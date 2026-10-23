@@ -21,7 +21,7 @@ public static class AdminPromotionsEndpoints
     public static void MapPromotionsRoutes(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin/promotions")
-            .RequireAuthorization(policy => policy.RequireRole("Admin"));
+            .RequireAuthorization(policy => policy.RequireRole("Admin", "Marketer"));
 
         admin.MapGet("", async (AppDbContext db, IConfiguration config, CancellationToken ct) =>
         {
@@ -190,6 +190,32 @@ public static class AdminPromotionsEndpoints
             }
 
             return Results.NoContent();
+        });
+
+        admin.MapGet("/codes/{id:guid}/redemptions", async (Guid id, AppDbContext db, CancellationToken ct) =>
+        {
+            var promo = await db.PromotionCodes.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy mã khuyến mãi.");
+
+            var items = await (from r in db.PromotionRedemptions.AsNoTracking()
+                               join u in db.Users.AsNoTracking() on r.UserId equals u.Id
+                               join m in db.OwnerMilestones.AsNoTracking() on u.Id equals m.OwnerId into mGroup
+                               from m in mGroup.DefaultIfEmpty()
+                               where r.PromotionCodeId == promo.Id
+                               orderby r.RedeemedAt descending
+                               select new PromotionRedemptionItemDto(
+                                   r.Id,
+                                   u.Id,
+                                   u.Name,
+                                   u.Email,
+                                   u.Phone,
+                                   r.RedeemedAt,
+                                   u.SubscriptionTier.ToString(),
+                                   u.SubscriptionExpiresAt,
+                                   m != null && m.ActivatedAt != null))
+                .ToListAsync(ct);
+
+            return Results.Ok(items);
         });
 
         // User route to redeem promo code

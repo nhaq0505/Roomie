@@ -1,7 +1,15 @@
 import { json, listFrom, post, request } from '../../shared/http/client';
 import type { AccountStatus } from '../auth';
 import type { SubscriptionTier } from '../subscription';
-import type { AdminPromotionsOverview, OwnerRequest, PromotionCode, WelcomePromotion } from './types';
+import type {
+  AdminPromotionsOverview,
+  CreateMarketerRequest,
+  MarketerAccount,
+  OwnerRequest,
+  PromotionCode,
+  PromotionRedemptionItem,
+  WelcomePromotion,
+} from './types';
 
 export const ownersApi = {
     page: (page: number, status: string) => request<{items:OwnerRequest[]; total:number; pendingCount:number}>(`/api/admin/owners?page=${page}&pageSize=10${status === 'All' ? '' : `&status=${status}`}`),
@@ -10,6 +18,15 @@ export const ownersApi = {
     updateStatus: (id: string, body: { status: AccountStatus; reason?: string }) => request<OwnerRequest>(`/api/admin/owners/${encodeURIComponent(id)}/status`, post(body)),
     updateSubscription: (id: string, body: { tier: SubscriptionTier; days?: number; expiresAt?: string; reason?: string }) => request<OwnerRequest>(`/api/admin/owners/${encodeURIComponent(id)}/subscription`, post(body)),
   };
+
+export const marketersApi = {
+  list: () => request<MarketerAccount[]>('/api/admin/marketers'),
+  create: (body: CreateMarketerRequest) => request<MarketerAccount>('/api/admin/marketers', post(body)),
+  updateStatus: (id: string, body: { status: AccountStatus; reason?: string }) =>
+    request<MarketerAccount>(`/api/admin/marketers/${encodeURIComponent(id)}/status`, post(body)),
+  resetPassword: (id: string, currentPassword: string) =>
+    request<{ token: string; expiresAt: string }>(`/api/admin/marketers/${encodeURIComponent(id)}/reset-password`, post({ currentPassword })),
+};
 
 export const promotionsApi = {
   get: () => request<AdminPromotionsOverview>('/api/admin/promotions'),
@@ -21,4 +38,6 @@ export const promotionsApi = {
     request<PromotionCode>(`/api/admin/promotions/codes/${encodeURIComponent(id)}`, { method: 'PATCH', body: json(body) }),
   deleteCode: (id: string) =>
     request<void>(`/api/admin/promotions/codes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  redemptions: (id: string) =>
+    request<PromotionRedemptionItem[]>(`/api/admin/promotions/codes/${encodeURIComponent(id)}/redemptions`),
 };

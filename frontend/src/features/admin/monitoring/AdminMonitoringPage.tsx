@@ -5,20 +5,29 @@ import { useState } from 'react';
 import { ApiError } from '../../../shared/http/client';
 import { t } from '../../../shared/i18n/runtime';
 import { PageTitle } from '../../../shared/ui/Ui';
+import { useAuth } from '../../auth/session';
 import { GrowthTab } from './GrowthTab';
 import { MonitoringFiltersBar } from './MonitoringFiltersBar';
 import { OperationsTab } from './OperationsTab';
 import { RevenueTab } from './RevenueTab';
 import {
   useCampaignCosts,
+  useCampaignMetadata,
+  useCreateCampaignMetadata,
   useGrowthMonitoring,
   useMonitoringIncidents,
   useOperationsMonitoring,
   useRevenueMonitoring,
+  useUpdateCampaignMetadata,
   useUpdateIncident,
   useUpsertCampaignCost,
 } from './api';
-import type { MonitoringFilters, UpsertCampaignCostRequest } from './types';
+import type {
+  CreateCampaignRequest,
+  MonitoringFilters,
+  UpdateCampaignRequest,
+  UpsertCampaignCostRequest,
+} from './types';
 
 export function getInitialDates(now: Date = new Date()): [string, string] {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -40,6 +49,8 @@ export function getInitialDates(now: Date = new Date()): [string, string] {
 
 export default function AdminMonitoringPage() {
   const { message } = App.useApp();
+  const { user } = useAuth();
+  const isMarketer = user?.role === 'Marketer';
   const [activeTab, setActiveTab] = useState<'growth' | 'revenue' | 'operations'>('growth');
 
   const [dateFrom, dateTo] = getInitialDates();
@@ -72,20 +83,27 @@ export default function AdminMonitoringPage() {
   // Queries
   const growthQuery = useGrowthMonitoring(filterRequest, activeTab === 'growth');
   const revenueQuery = useRevenueMonitoring(filterRequest, activeTab === 'revenue');
-  const operationsQuery = useOperationsMonitoring(filters.opsWindow, activeTab === 'operations');
-  const incidentsQuery = useMonitoringIncidents(activeTab === 'operations');
+  const operationsQuery = useOperationsMonitoring(filters.opsWindow, !isMarketer && activeTab === 'operations');
+  const incidentsQuery = useMonitoringIncidents(!isMarketer && activeTab === 'operations');
   const campaignCostsQuery = useCampaignCosts(campaignCostsFilter, activeTab === 'revenue');
+  const campaignMetadataQuery = useCampaignMetadata(undefined, activeTab === 'revenue');
 
   // Mutations
   const upsertCostMutation = useUpsertCampaignCost();
+  const createCampaignMutation = useCreateCampaignMetadata();
+  const updateCampaignMutation = useUpdateCampaignMetadata();
   const updateIncidentMutation = useUpdateIncident();
 
   const handleRefresh = async () => {
     if (activeTab === 'growth') {
       await growthQuery.refetch();
     } else if (activeTab === 'revenue') {
-      await Promise.all([revenueQuery.refetch(), campaignCostsQuery.refetch()]);
-    } else if (activeTab === 'operations') {
+      await Promise.all([
+        revenueQuery.refetch(),
+        campaignCostsQuery.refetch(),
+        campaignMetadataQuery.refetch(),
+      ]);
+    } else if (!isMarketer && activeTab === 'operations') {
       await Promise.all([operationsQuery.refetch(), incidentsQuery.refetch()]);
     }
     setLastUpdatedAt(new Date());
@@ -99,6 +117,16 @@ export default function AdminMonitoringPage() {
       const msg = err instanceof Error ? err.message : t("Không thể lưu chi phí chiến dịch.");
       message.error(msg);
     }
+  };
+
+  const handleCreateCampaign = async (input: CreateCampaignRequest) => {
+    await createCampaignMutation.mutateAsync(input);
+    message.success(t("Đã tạo chiến dịch tiếp thị mới."));
+  };
+
+  const handleUpdateCampaign = async (id: string, input: UpdateCampaignRequest) => {
+    await updateCampaignMutation.mutateAsync({ id, body: input });
+    message.success(t("Đã cập nhật chiến dịch tiếp thị."));
   };
 
   const handleUpdateIncident = async (id: string, state: string) => {
@@ -146,57 +174,66 @@ export default function AdminMonitoringPage() {
         <RevenueTab
           data={revenueQuery.data}
           campaignCostsList={campaignCostsQuery.data}
+          campaignsList={campaignMetadataQuery.data}
           isLoading={revenueQuery.isLoading || campaignCostsQuery.isLoading}
           error={revenueQuery.error}
           is501={is501Error(revenueQuery.error)}
           onRetry={() => {
             void revenueQuery.refetch();
             void campaignCostsQuery.refetch();
+            void campaignMetadataQuery.refetch();
           }}
           onUpsertCampaignCost={handleAddCampaignCost}
           isSavingCost={upsertCostMutation.isPending}
+          onCreateCampaign={handleCreateCampaign}
+          onUpdateCampaign={handleUpdateCampaign}
+          isSavingCampaign={createCampaignMutation.isPending || updateCampaignMutation.isPending}
           requestedFromDate={filters.dateFrom}
           requestedToDate={filters.dateTo}
         />
       ),
     },
-    {
-      key: 'operations',
-      label: (
-        <span>
-          <SettingOutlined style={{ marginRight: 6 }} />
-          {t("Vận hành")}
-        </span>
-      ),
-      children: (
-        <OperationsTab
-          data={operationsQuery.data}
-          incidents={incidentsQuery.data?.incidents}
-          window={filters.opsWindow}
-          isLoading={operationsQuery.isLoading || incidentsQuery.isLoading}
-          error={operationsQuery.error}
-          is501={is501Error(operationsQuery.error)}
-          onRetry={() => {
-            void operationsQuery.refetch();
-            void incidentsQuery.refetch();
-          }}
-          onUpdateIncidentState={handleUpdateIncident}
-          isUpdatingIncident={updateIncidentMutation.isPending}
-        />
-      ),
-    },
+    ...(!isMarketer
+      ? [
+          {
+            key: 'operations',
+            label: (
+              <span>
+                <SettingOutlined style={{ marginRight: 6 }} />
+                {t("Vận hành")}
+              </span>
+            ),
+            children: (
+              <OperationsTab
+                data={operationsQuery.data}
+                incidents={incidentsQuery.data?.incidents}
+                window={filters.opsWindow}
+                isLoading={operationsQuery.isLoading || incidentsQuery.isLoading}
+                error={operationsQuery.error}
+                is501={is501Error(operationsQuery.error)}
+                onRetry={() => {
+                  void operationsQuery.refetch();
+                  void incidentsQuery.refetch();
+                }}
+                onUpdateIncidentState={handleUpdateIncident}
+                isUpdatingIncident={updateIncidentMutation.isPending}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   const isLoading =
     (activeTab === 'growth' && growthQuery.isFetching) ||
     (activeTab === 'revenue' && (revenueQuery.isFetching || campaignCostsQuery.isFetching)) ||
-    (activeTab === 'operations' && (operationsQuery.isFetching || incidentsQuery.isFetching));
+    (!isMarketer && activeTab === 'operations' && (operationsQuery.isFetching || incidentsQuery.isFetching));
 
   return (
     <div className="admin-monitoring-page">
       <PageTitle
-        eyebrow="Admin"
-        title={t("Giám sát hệ thống")}
+        eyebrow={isMarketer ? "Marketing" : "Admin"}
+        title={isMarketer ? t("Tăng trưởng & Doanh thu") : t("Giám sát hệ thống")}
         subtitle={t("Số liệu kinh doanh 30 ngày, vận hành theo lịch Việt Nam")}
       />
 

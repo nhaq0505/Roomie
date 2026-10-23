@@ -166,13 +166,30 @@ public sealed record DailyRevenuePointDto(
     decimal MarketingSpendVnd
 );
 
+public sealed record CampaignRoasRowDto(
+    string Campaign,
+    string? Name,
+    string? Channel,
+    string? Source,
+    string? PromoCode,
+    decimal TotalCostVnd,
+    int? Sessions,
+    int Registrations,
+    int ActivatedOwners,
+    int PaidOrders,
+    decimal RevenueVnd,
+    decimal? CplVnd,
+    decimal? RoasPercent
+);
+
 public sealed record AdminMonitoringRevenueResponse(
     RevenueSummaryDto Summary,
     IReadOnlyList<SubscriptionOrderRevenueDto> SubscriptionOrders,
     IReadOnlyList<CampaignCostSummaryDto> CampaignCosts,
     IReadOnlyList<DailyRevenuePointDto> DailySeries,
     DateOnly? EffectiveFromDate = null,
-    DateOnly? EffectiveToDate = null
+    DateOnly? EffectiveToDate = null,
+    IReadOnlyList<CampaignRoasRowDto>? CampaignRoas = null
 );
 
 // Admin Operations Tab DTOs
@@ -276,7 +293,8 @@ public sealed record MarketingCampaignDto(
     string CreatedByName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string? TrackingUrl = null
+    string? TrackingUrl = null,
+    string? PromoCode = null
 );
 
 public sealed record CreateCampaignRequest(
@@ -288,7 +306,8 @@ public sealed record CreateCampaignRequest(
     string? UtmMedium = null,
     string? UtmSource = null,
     string? TargetUrl = null,
-    bool IsActive = true
+    bool IsActive = true,
+    string? PromoCode = null
 );
 
 public sealed record UpdateCampaignRequest(
@@ -299,7 +318,8 @@ public sealed record UpdateCampaignRequest(
     string? UtmMedium = null,
     string? UtmSource = null,
     string? TargetUrl = null,
-    bool? IsActive = null
+    bool? IsActive = null,
+    string? PromoCode = null
 );
 
 // Campaign Costs Management DTOs

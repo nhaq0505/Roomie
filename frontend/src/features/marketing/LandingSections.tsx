@@ -11,8 +11,10 @@ import {
   SafetyCertificateOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
+import { request } from '../../shared/http/client';
 import { t } from '../../shared/i18n/runtime';
 
 export function HeroHighlightsStrip() {
@@ -265,10 +267,22 @@ export function FaqSection() {
   );
 }
 
+type PublicGuideSummaryItem = {
+  slug: string;
+  title: string;
+  category: string;
+  readTimeLabel?: string;
+  summary: string;
+  publishedAt?: string | null;
+};
+
 export function GuidesSection() {
+  const [cmsGuides, setCmsGuides] = useState<PublicGuideSummaryItem[]>([]);
+
   const guides = [
     {
       index: '01',
+      slug: 'quan-ly-phong-tien-coc-va-tra-phong',
       icon: <HomeOutlined />,
       category: t("Phòng & người thuê"),
       title: t("Quy trình quản lý phòng, tiền cọc và trả phòng"),
@@ -281,6 +295,7 @@ export function GuidesSection() {
     },
     {
       index: '02',
+      slug: 'cach-chot-chi-so-dien-va-lap-hoa-don',
       icon: <ThunderboltOutlined />,
       category: t("Lập hóa đơn"),
       title: t("Cách chốt chỉ số điện và lập hóa đơn hàng tháng"),
@@ -293,6 +308,7 @@ export function GuidesSection() {
     },
     {
       index: '03',
+      slug: 'quan-ly-cong-no-ghi-thu-va-xuat-excel',
       icon: <FileTextOutlined />,
       category: t("Báo cáo"),
       title: t("Quản lý công nợ, ghi thu và xuất báo cáo Excel"),
@@ -305,6 +321,7 @@ export function GuidesSection() {
     },
     {
       index: '04',
+      slug: 'thu-tien-phong-qua-ma-qr-va-nhac-zalo',
       icon: <QrcodeOutlined />,
       category: t("Cài đặt thanh toán"),
       title: t("Thu tiền phòng qua mã QR & nhắc lịch Zalo tự động"),
@@ -316,6 +333,22 @@ export function GuidesSection() {
       ],
     },
   ];
+
+  useEffect(() => {
+    let active = true;
+    request<PublicGuideSummaryItem[]>('/api/public/guides')
+      .then((items) => {
+        if (!active || !Array.isArray(items)) return;
+        const staticSlugs = new Set(guides.map((g) => g.slug));
+        setCmsGuides(items.filter((item) => item.slug && !staticSlugs.has(item.slug)));
+      })
+      .catch(() => {
+        // Keep static guides when offline or during static prerender
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section id="guides-list" className="landing-guides">
@@ -329,7 +362,11 @@ export function GuidesSection() {
           <article className="guide-card" key={guide.index}>
             <div className="guide-card-top">
               <span className="guide-index">{guide.index} / {guide.icon} {guide.category}</span>
-              <h3>{guide.title}</h3>
+              <h3>
+                <Link to={`/huong-dan/${guide.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                  {guide.title}
+                </Link>
+              </h3>
               <p>{guide.summary}</p>
             </div>
             <ol className="guide-steps">
@@ -340,9 +377,46 @@ export function GuidesSection() {
                 </li>
               ))}
             </ol>
+            <div style={{ marginTop: 16 }}>
+              <Link to={`/huong-dan/${guide.slug}`} className="landing-text-link">
+                {t("Đọc bài viết chi tiết")} <ArrowRightOutlined />
+              </Link>
+            </div>
           </article>
         ))}
       </div>
+
+      {cmsGuides.length > 0 && (
+        <div style={{ marginTop: 40 }}>
+          <div className="landing-section-heading" style={{ marginBottom: 20 }}>
+            <span className="section-eyebrow"><BookOutlined /> {t("BÀI VIẾT CHUYÊN SÂU")}</span>
+            <h3>{t("Kinh nghiệm quản lý & tối ưu vận hành nhà trọ")}</h3>
+          </div>
+          <div className="guides-grid">
+            {cmsGuides.map((article, idx) => (
+              <article className="guide-card" key={article.slug}>
+                <div className="guide-card-top">
+                  <span className="guide-index">
+                    {String(idx + 5).padStart(2, '0')} / <BookOutlined /> {article.category}
+                    {article.readTimeLabel ? ` · ${article.readTimeLabel}` : ''}
+                  </span>
+                  <h3>
+                    <Link to={`/huong-dan/${article.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {article.title}
+                    </Link>
+                  </h3>
+                  <p>{article.summary}</p>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <Link to={`/huong-dan/${article.slug}`} className="landing-text-link">
+                    {t("Đọc bài viết chi tiết")} <ArrowRightOutlined />
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -8,7 +8,8 @@ import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
-  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, UserOutlined,
+  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined,
+  MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -44,13 +45,26 @@ const ownerItems = [
   { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
   { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") },
 ];
+const marketerItems = [
+  { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Tăng trưởng & Doanh thu") },
+  { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi & Voucher") },
+  { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
+  { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
+  { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
+];
 const adminItems = [
-  { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ") },
+  { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ & Nhân sự") },
   { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Giám sát") },
   { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi") },
+  { type: 'divider' as const },
+  { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
+  { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
+  { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
 ];
   const isAdmin = user?.role === 'Admin';
-  const items = isAdmin ? adminItems : ownerItems;
+  const isMarketer = user?.role === 'Marketer';
+  const isStaff = isAdmin || isMarketer;
+  const items = isAdmin ? adminItems : isMarketer ? marketerItems : ownerItems;
   const activeMenuKey = location.pathname.startsWith('/rooms/') ? '/rooms' : location.pathname;
   const primaryMobileKeys = new Set(['/dashboard', '/rooms', '/readings', '/invoices', 'settings']);
   const title = settingsItems.find((item) => item.key === activeMenuKey)?.label ?? items.find((item) => item.key === activeMenuKey)?.label ?? 'Roomie';
@@ -58,7 +72,7 @@ const adminItems = [
   const userMenu: MenuProps['items'] = [
     { key: 'account', label: <div className="user-menu-info"><strong>{user?.name}</strong><span>{user?.email}</span></div>, disabled: true },
     { type: 'divider' },
-    ...(!isAdmin ? [{ key: 'subscription', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") }] : []),
+    ...(!isStaff ? [{ key: 'subscription', icon: <CrownOutlined />, label: t("Gói cước & tài khoản") }] : []),
     { key: 'password', label: t("Đổi mật khẩu") },
     { key: 'logout', icon: <LogoutOutlined />, label: t("Đăng xuất") },
   ];
@@ -81,9 +95,9 @@ const adminItems = [
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div><div className="sider-label">{t("MENU CHÍNH")}</div>{menu}
     </Drawer>
     <Layout className="main-layout">
-      <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}>{t("Menu")}</Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : t("Chủ trọ")}</small></span><Typography.Text type="secondary">⌄</Typography.Text></Button></Dropdown></Space></Header>
-      <nav className="compact-navigation" data-role={isAdmin ? 'admin' : 'owner'} aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => {
-        const isSecondary = !isAdmin && !primaryMobileKeys.has(String(item.key));
+      <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}>{t("Menu")}</Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : isMarketer ? t("Chuyên viên Marketing") : t("Chủ trọ")}</small></span><Typography.Text type="secondary">⌄</Typography.Text></Button></Dropdown></Space></Header>
+      <nav className="compact-navigation" data-role={isStaff ? 'admin' : 'owner'} aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => {
+        const isSecondary = !isStaff && !primaryMobileKeys.has(String(item.key));
         if (item.key === 'settings') {
           return (
             <Dropdown key={item.key} trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>

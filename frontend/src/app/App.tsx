@@ -28,19 +28,38 @@ const PaymentSettingsPage = lazy(() => import('../features/payments/PaymentSetti
 const AdminOwnersPage = lazy(() => import('../features/admin/AdminOwnersPage'));
 const AdminMonitoringPage = lazy(() => import('../features/admin/monitoring/AdminMonitoringPage'));
 const AdminPromotionsPage = lazy(() => import('../features/admin/AdminPromotionsPage'));
+const MarketerLeadsPage = lazy(() => import('../features/marketer/MarketerLeadsPage'));
+const MarketerContentPage = lazy(() => import('../features/marketer/MarketerContentPage'));
+const MarketerEmailsPage = lazy(() => import('../features/marketer/MarketerEmailsPage'));
+const GuideArticlePage = lazy(() => import('../features/marketing/GuideArticlePage'));
 const TenantPage = lazy(() => import('../features/tenant/TenantPage'));
 const TenantCheckoutPage = lazy(() => import('../features/tenant/TenantCheckoutPage'));
 const NotFoundPage = lazy(() => import('./NotFoundPage'));
 
+function defaultRouteForRole(role?: string) {
+  if (role === 'Admin') return '/admin/owners';
+  if (role === 'Marketer') return '/admin/monitoring';
+  return '/dashboard';
+}
 
-function Gate({ children, admin = false }: { children: React.ReactNode; admin?: boolean }) {
+function Gate({
+  children,
+  admin = false,
+  roles,
+}: {
+  children: React.ReactNode;
+  admin?: boolean;
+  roles?: Array<'Owner' | 'Admin' | 'Marketer'>;
+}) {
   const { user, ready, error, refresh } = useAuth();
   if (error) return <LoadError error={error} onRetry={() => void refresh()} />;
   if (!ready) return <div className="screen-center"><Spin size="large" /></div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.status && user.status !== 'Approved') return <Navigate to="/account-status" replace />;
-  if (admin && user.role !== 'Admin') return <Navigate to="/dashboard" replace />;
-  if (!admin && user.role === 'Admin') return <Navigate to="/admin/owners" replace />;
+  const allowedRoles = roles ?? (admin ? ['Admin'] : ['Owner']);
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to={defaultRouteForRole(user.role)} replace />;
+  }
   return children;
 }
 
@@ -49,7 +68,7 @@ function HomeRedirect() {
   if (error) return <LoadError error={error} onRetry={() => void refresh()} />;
   if (!ready || !user) return <LandingPage />;
   if (user.status && user.status !== 'Approved') return <Navigate to="/account-status" replace />;
-  return <Navigate to={user.role === 'Admin' ? '/admin/owners' : '/dashboard'} replace />;
+  return <Navigate to={defaultRouteForRole(user.role)} replace />;
 }
 
 function AppFallback() {
@@ -84,6 +103,7 @@ export default function App() {
     <Route path="/features" element={<LandingPage page="features" />} />
     <Route path="/pricing" element={<LandingPage page="pricing" />} />
     <Route path="/huong-dan" element={<LandingPage page="guides" />} />
+    <Route path="/huong-dan/:slug" element={<GuideArticlePage />} />
     <Route path="/dashboard" element={<Gate><AppShell><DashboardPage /></AppShell></Gate>} />
     <Route path="/buildings" element={<Gate><AppShell><BuildingsPage /></AppShell></Gate>} />
     <Route path="/rooms" element={<Gate><AppShell><RoomsPage /></AppShell></Gate>} />
@@ -95,8 +115,11 @@ export default function App() {
     <Route path="/settings/zalo" element={<Gate><AppShell><ZaloSettingsPage /></AppShell></Gate>} />
     <Route path="/settings/payment" element={<Gate><AppShell><PaymentSettingsPage /></AppShell></Gate>} />
     <Route path="/admin/owners" element={<Gate admin><AppShell><AdminOwnersPage /></AppShell></Gate>} />
-    <Route path="/admin/monitoring" element={<Gate admin><AppShell><AdminMonitoringPage /></AppShell></Gate>} />
-    <Route path="/admin/promotions" element={<Gate admin><AppShell><AdminPromotionsPage /></AppShell></Gate>} />
+    <Route path="/admin/monitoring" element={<Gate roles={['Admin', 'Marketer']}><AppShell><AdminMonitoringPage /></AppShell></Gate>} />
+    <Route path="/admin/promotions" element={<Gate roles={['Admin', 'Marketer']}><AppShell><AdminPromotionsPage /></AppShell></Gate>} />
+    <Route path="/marketer/leads" element={<Gate roles={['Admin', 'Marketer']}><AppShell><MarketerLeadsPage /></AppShell></Gate>} />
+    <Route path="/marketer/content" element={<Gate roles={['Admin', 'Marketer']}><AppShell><MarketerContentPage /></AppShell></Gate>} />
+    <Route path="/marketer/emails" element={<Gate roles={['Admin', 'Marketer']}><AppShell><MarketerEmailsPage /></AppShell></Gate>} />
     <Route path="*" element={<NotFoundPage />} />
   </Routes></Suspense></ErrorBoundary></>;
 }

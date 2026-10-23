@@ -122,7 +122,8 @@ public interface IRevenueMonitoringQueryService
         string? medium,
         string? campaign,
         string? term = null,
-        string? content = null);
+        string? content = null,
+        string? promoCode = null);
 }
 
 public interface IMonitoringMaintenanceService

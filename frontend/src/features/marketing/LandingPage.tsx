@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { recordAttribution, trackEvent } from '../../shared/analytics';
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
+import { ActiveBannerStrip } from '../../shared/ui/ActiveBannerStrip';
 import { useAuth } from '../auth/session';
 import { type User } from '../auth/index';
 import './LandingPage.css';
@@ -45,7 +46,12 @@ export function LandingContent({
   page?: LandingPageKind;
 }) {
   const rootRef = useLandingMotion(page);
-  const workspace = user?.role === 'Admin' ? '/admin/owners' : '/dashboard';
+  const workspace =
+    user?.role === 'Admin'
+      ? '/admin/owners'
+      : user?.role === 'Marketer'
+      ? '/admin/monitoring'
+      : '/dashboard';
   const destination = user ? workspace : '/register';
   const actionLabel = user ? t("Bảng điều khiển") : t("Đăng ký làm chủ trọ");
 
@@ -121,6 +127,9 @@ export function LandingContent({
       </nav>
 
       <main>
+        <div style={{ maxWidth: 1180, margin: '12px auto 0', padding: '0 20px' }}>
+          <ActiveBannerStrip placement="LandingTop" />
+        </div>
         {page === 'home' && (
           <>
             <section className="landing-hero" id="hero">

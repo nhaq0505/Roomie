@@ -30,6 +30,21 @@ public static class AuthEndpoints
                 throw new ApiException(StatusCodes.Status409Conflict, "Email này đã được đăng ký.");
 
             var now = clock.GetUtcNow();
+            string? normalizedPromoCode = null;
+            PromotionCode? promoEntity = null;
+            if (!string.IsNullOrWhiteSpace(request.PromoCode))
+            {
+                normalizedPromoCode = request.PromoCode.Trim().ToUpperInvariant();
+                promoEntity = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Code == normalizedPromoCode, cancellationToken)
+                    ?? throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi không tồn tại.");
+                if (!promoEntity.IsActive)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này hiện đang bị khóa hoặc ngừng áp dụng.");
+                if (promoEntity.ExpiresAt.HasValue && promoEntity.ExpiresAt.Value < now)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã hết hạn sử dụng.");
+                if (promoEntity.MaxRedemptions.HasValue && promoEntity.RedeemedCount >= promoEntity.MaxRedemptions.Value)
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi này đã đạt giới hạn lượt sử dụng.");
+            }
+
             var welcomePromo = await db.SystemPromotions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "welcome", cancellationToken);
             int promoMonths;
             if (welcomePromo is not null)
@@ -42,6 +57,11 @@ public static class AuthEndpoints
             else
             {
                 promoMonths = configuration.GetValue("Promotions:NewUserProMonths", 0);
+            }
+            var isVerificationEnabled = configuration.GetValue("EmailVerification:Enabled", true);
+            if (!isVerificationEnabled && promoEntity is not null)
+            {
+                promoMonths += promoEntity.RewardMonths;
             }
             var isPromo = promoMonths > 0;
             var user = new AppUser
@@ -57,15 +77,24 @@ public static class AuthEndpoints
                 CreatedAt = now
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password!);
-            var isVerificationEnabled = configuration.GetValue("EmailVerification:Enabled", true);
             if (milestoneTracker != null)
             {
                 try { await milestoneTracker.TrackRegistrationStartedAsync(user.Id, request.Attribution, isVerificationEnabled ? "Code" : "Bypass", cancellationToken); }
                 catch { /* Telemetry failure must not block registration */ }
             }
             if (isVerificationEnabled)
-                return Results.Json(await verification.StartAsync(user, cancellationToken), statusCode: 202);
+                return Results.Json(await verification.StartAsync(user, normalizedPromoCode, cancellationToken), statusCode: 202);
             db.Users.Add(user);
+            if (promoEntity is not null)
+            {
+                promoEntity.RedeemedCount++;
+                db.PromotionRedemptions.Add(new PromotionRedemption
+                {
+                    PromotionCodeId = promoEntity.Id,
+                    UserId = user.Id,
+                    RedeemedAt = now
+                });
+            }
             await db.SaveChangesAsync(cancellationToken);
             if (milestoneTracker != null)
             {
@@ -178,7 +207,7 @@ public static class AuthEndpoints
                 throw new ApiException(400, "Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
             var email = request.Email?.Trim().ToLowerInvariant();
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-            var user = await db.Users.SingleOrDefaultAsync(x => x.Email == email && x.Role == UserRole.Owner, ct);
+            var user = await db.Users.SingleOrDefaultAsync(x => x.Email == email && (x.Role == UserRole.Owner || x.Role == UserRole.Marketer), ct);
             if (user?.PasswordResetHash is null || user.PasswordResetExpiresAt is null ||
                 user.PasswordResetExpiresAt <= DateTimeOffset.UtcNow ||
                 !PasswordSecurity.MatchesToken(request.Token, user.PasswordResetHash))

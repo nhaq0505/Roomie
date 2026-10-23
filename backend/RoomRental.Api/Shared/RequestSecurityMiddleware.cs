@@ -32,6 +32,7 @@ public sealed class RequestSecurityMiddleware(RequestDelegate next)
                 persistedStatus = sessionUser?.Status;
                 valid = sessionUser is not null && sessionUser.Status is not (OwnerStatus.Rejected or OwnerStatus.Suspended) &&
                         ((sessionUser.Role == UserRole.Admin && sessionUser.Status == OwnerStatus.Approved && context.User.IsInRole("Admin")) ||
+                         (sessionUser.Role == UserRole.Marketer && sessionUser.Status == OwnerStatus.Approved && context.User.IsInRole("Marketer")) ||
                          (sessionUser.Role == UserRole.Owner && context.User.IsInRole("Owner")));
             }
 

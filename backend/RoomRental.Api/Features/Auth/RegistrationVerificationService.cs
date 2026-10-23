@@ -21,7 +21,10 @@ public sealed class RegistrationVerificationService(
     private static bool Matches(string value, string expected) => CryptographicOperations.FixedTimeEquals(
         Encoding.ASCII.GetBytes(Hash(value)), Encoding.ASCII.GetBytes(expected));
 
-    public async Task<RegistrationVerificationDto> StartAsync(AppUser proposedUser, CancellationToken ct)
+    public Task<RegistrationVerificationDto> StartAsync(AppUser proposedUser, CancellationToken ct) =>
+        StartAsync(proposedUser, null, ct);
+
+    public async Task<RegistrationVerificationDto> StartAsync(AppUser proposedUser, string? pendingPromoCode, CancellationToken ct)
     {
         sender.EnsureConfigured();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
@@ -42,6 +45,7 @@ public sealed class RegistrationVerificationService(
         pending.Name = proposedUser.Name;
         pending.Phone = proposedUser.Phone;
         pending.PasswordHash = proposedUser.PasswordHash;
+        pending.PendingPromoCode = pendingPromoCode;
         pending.ExpiresAt = now.AddMinutes(30);
         pending.ConsumedAt = null;
         var code = PrepareCode(pending, token, now);
@@ -106,6 +110,19 @@ public sealed class RegistrationVerificationService(
         {
             promoMonths = configuration?.GetValue("Promotions:NewUserProMonths", 0) ?? 0;
         }
+        PromotionCode? redeemedCode = null;
+        if (!string.IsNullOrWhiteSpace(pending.PendingPromoCode))
+        {
+            var candidate = await db.PromotionCodes.SingleOrDefaultAsync(x => x.Code == pending.PendingPromoCode, ct);
+            if (candidate is not null &&
+                candidate.IsActive &&
+                (!candidate.ExpiresAt.HasValue || candidate.ExpiresAt.Value >= now) &&
+                (!candidate.MaxRedemptions.HasValue || candidate.RedeemedCount < candidate.MaxRedemptions.Value))
+            {
+                redeemedCode = candidate;
+                promoMonths += candidate.RewardMonths;
+            }
+        }
         var isPromo = promoMonths > 0;
         var user = new AppUser
         {
@@ -116,9 +133,20 @@ public sealed class RegistrationVerificationService(
             CreatedAt = now
         };
         db.Users.Add(user);
+        if (redeemedCode is not null)
+        {
+            redeemedCode.RedeemedCount++;
+            db.PromotionRedemptions.Add(new PromotionRedemption
+            {
+                PromotionCodeId = redeemedCode.Id,
+                UserId = user.Id,
+                RedeemedAt = now
+            });
+        }
         pending.ConsumedAt = now;
         pending.PasswordHash = "";
         pending.CodeHash = "";
+        pending.PendingPromoCode = null;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return user;

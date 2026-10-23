@@ -1661,3 +1661,272 @@
 1660|Scan Landlord Citizen ID QR|扫描房东公民身份证二维码|집주인 시민 신분증 QR 스캔|मकान मालिक नागरिक आईडी क्यूआर स्कैन करें
 1661|Scan Tenant Citizen ID QR|扫描租客公民身份证二维码|세입자 시민 신분증 QR 스캔|किरायेदार नागरिक आईडी क्यूआर स्कैन करें
 1662|Scan Co-resident Citizen ID QR|扫描同住成员公民身份证二维码|동거인 시민 신분증 QR 스캔|सह-निवासी नागरिक आईडी क्यूआर स्कैन करें
+1663|Growth & Revenue|增长与收入|성장 및 매출|वृद्धि और राजस्व
+1664|Promotions & Vouchers|促销与优惠券|프로모션 및 바우처|प्रमोशन और वाउचर
+1665|Landlord CRM|房东客户管理 (CRM)|임대인 CRM|मकान मालिक CRM
+1666|Guides & Banners|指南与横幅|가이드 및 배너|गाइड और बैनर
+1667|Segmented Emails|分群邮件营销|세그먼트 이메일|सेगमेंटेड ईमेल
+1668|Landlords & Staff|房东与员工|임대인 및 직원|मकान मालिक और स्टाफ
+1669|Marketer|营销专员|마케터|मार्केटर
+1670|Created Marketing staff account.|已创建营销人员账户。|마케팅 직원 계정을 생성했습니다.|मार्केटिंग स्टाफ खाता बनाया गया।
+1671|MARKETING STAFF|营销人员|마케팅 직원|मार्केटिंग स्टाफ
+1672|ROLE|角色|역할|भूमिका
+1673|CREATED DATE|创建日期|생성일|निर्माण तिथि
+1674|Landlords (Owners)|房东 (Owners)|임대인 (Owners)|मकान मालिक (Owners)
+1675|Marketing Staff (Marketer)|营销人员 (Marketer)|마케팅 직원 (Marketer)|मार्केटिंग स्टाफ (Marketer)
+1676|Marketing Staff List|营销人员列表|마케팅 직원 목록|मार्केटिंग स्टाफ सूची
+1677|Add Marketing Staff|添加营销人员|마케팅 직원 추가|मार्केटिंग स्टाफ जोड़ें
+1678|No Marketing staff accounts yet|暂无营销人员账户|아직 마케팅 직원 계정이 없습니다|अभी तक कोई मार्केटिंग स्टाफ खाता नहीं है
+1679|Create a Marketer account to delegate campaign, content, and landlord CRM management.|创建营销账户以授权管理活动、内容和房东关怀。|캠페인, 콘텐츠 및 임대인 CRM 관리를 위임하려면 마케터 계정을 생성하세요.|अभियान, सामग्री और मकान मालिक CRM प्रबंधन सौंपने के लिए मार्केटर खाता बनाएं।
+1680|Marketing staff can access growth, campaigns, vouchers, guide CMS, and landlord CRM (no access to ID cards, contracts, or bank credentials).|营销人员可访问增长、活动、优惠券、指南CMS和房东CRM（无权查看身份证、合同或银行信息）。|마케팅 직원은 성장, 캠페인, 바우처, 가이드 CMS 및 임대인 CRM에 접근할 수 있습니다(신분증, 계약서, 은행 정보 열람 불가).|मार्केटिंग स्टाफ ग्रोथ, अभियान, वाउचर, गाइड CMS और मकान मालिक CRM तक पहुंच सकता है (आईडी, अनुबंध या बैंक विवरण देखने की अनुमति नहीं है)।
+1681|Nguyen Thi Mai|阮氏梅|응우옌 티 마이|गुयेन थी माई
+1682|Login Email|登录邮箱|로그인 이메일|लॉगिन ईमेल
+1683|Initial Password|初始密码|초기 비밀번호|प्रारंभिक पासवर्ड
+1684|Copied registration link with code {0}|已复制带代码 {0} 的注册链接|코드 {0} 포함 가입 링크 복사됨|कोड {0} के साथ पंजीकरण लिंक कॉपी किया गया
+1685|Copy auto-promo registration link|复制自动附带优惠码的注册链接|프로모션 코드 자동 적용 가입 링크 복사|ऑटो-प्रोमो पंजीकरण लिंक कॉपी करें
+1686|Copy registration link with code {0}|复制带代码 {0} 的注册链接|코드 {0} 포함 가입 링크 복사|कोड {0} के साथ पंजीकरण लिंक कॉपी करें
+1687|List|列表|목록|सूची
+1688|Landlords who redeemed code {0}|已使用代码 {0} 的房东列表|코드 {0} 사용 임대인 목록|कोड {0} रिडीम करने वाले मकान मालिक
+1689|Redemption List|激活列表|코드 활성화 목록|कोड रिडेम्पशन सूची
+1690|No landlords have redeemed this code yet.|尚无房东使用此优惠码。|아직 이 코드를 사용한 임대인이 없습니다.|अभी तक किसी मकान मालिक ने यह कोड रिडीम नहीं किया है।
+1691|Redeemed At|领取时间|수령 시간|प्राप्त समय
+1692|Channel / Source|渠道 / 来源|채널 / 소스|चैनल / स्रोत
+1693|Spend|花费|비용|लागत
+1694|Campaign Performance (ROAS & ROI)|活动效果 (ROAS & ROI)|캠페인 성과 (ROAS & ROI)|अभियान प्रदर्शन (ROAS और ROI)
+1695|Compare spend, activations, and Pro revenue by utm_campaign|按 utm_campaign 对比花费、激活数与 Pro 收入|utm_campaign별 비용, 활성화 및 Pro 매출 비교|utm_campaign द्वारा खर्च, सक्रियण और Pro राजस्व की तुलना करें
+1696|No campaign data in this period|本期暂无活动数据|기간 내 캠페인 데이터 없음|इस अवधि में कोई अभियान डेटा नहीं है
+1697|UTM Link & QR Code Builder|生成 UTM 链接与二维码|UTM 링크 및 QR 코드 생성|UTM लिंक और QR कोड बनाएं
+1698|Download QR SVG|下载 QR SVG|QR SVG 다운로드|QR SVG डाउनलोड करें
+1699|Auto Promo Code (promo)|自动优惠码 (promo)|자동 프로모션 코드 (promo)|ऑटो प्रोमो कोड (promo)
+1700|Promo code {0} applied — Your account will automatically receive Pro after registration.|已应用优惠码 {0} — 完成注册后账户将自动获得 Pro 套餐。|프로모션 코드 {0} 적용됨 — 가입 완료 후 Pro 플랜이 자동 부여됩니다.|प्रोमो कोड {0} लागू — पंजीकरण पूरा होने के बाद आपके खाते में स्वतः Pro जुड़ जाएगा।
+1701|Promo code (optional)|优惠码（可选）|프로모션 코드 (선택)|प्रोमो कोड (वैकल्पिक)
+1702|Đã cập nhật bài viết cẩm nang.|Đã cập nhật bài viết cẩm nang.|Đã cập nhật bài viết cẩm nang.|Đã cập nhật bài viết cẩm nang.
+1703|Đã xuất bản bài viết cẩm nang mới.|Đã xuất bản bài viết cẩm nang mới.|Đã xuất bản bài viết cẩm nang mới.|Đã xuất bản bài viết cẩm nang mới.
+1704|Đã xóa bài viết cẩm nang.|Đã xóa bài viết cẩm nang.|Đã xóa bài viết cẩm nang.|Đã xóa bài viết cẩm nang.
+1705|Đã cập nhật banner chiến dịch.|Đã cập nhật banner chiến dịch.|Đã cập nhật banner chiến dịch.|Đã cập nhật banner chiến dịch.
+1706|Đã tạo banner chiến dịch mới.|Đã tạo banner chiến dịch mới.|Đã tạo banner chiến dịch mới.|Đã tạo banner chiến dịch mới.
+1707|Đã xóa banner chiến dịch.|Đã xóa banner chiến dịch.|Đã xóa banner chiến dịch.|Đã xóa banner chiến dịch.
+1708|Vận hành nhà trọ|Vận hành nhà trọ|Vận hành nhà trọ|Vận hành nhà trọ
+1709|Dùng thử miễn phí cho 5 phòng|Dùng thử miễn phí cho 5 phòng|Dùng thử miễn phí cho 5 phòng|Dùng thử miễn phí cho 5 phòng
+1710|Nhận ưu đãi ngay|Nhận ưu đãi ngay|Nhận ưu đãi ngay|Nhận ưu đãi ngay
+1711|Cẩm nang SEO & Banner Chiến dịch|Cẩm nang SEO & Banner Chiến dịch|Cẩm nang SEO & Banner Chiến dịch|Cẩm nang SEO & Banner Chiến dịch
+1712|Xuất bản bài viết hướng dẫn tại /huong-dan/:slug và cấu hình thanh thông báo ưu đãi trên Trang chủ / Bảng điều khiển chủ trọ.|Xuất bản bài viết hướng dẫn tại /huong-dan/:slug và cấu hình thanh thông báo ưu đãi trên Trang chủ / Bảng điều khiển chủ trọ.|Xuất bản bài viết hướng dẫn tại /huong-dan/:slug và cấu hình thanh thông báo ưu đãi trên Trang chủ / Bảng điều khiển chủ trọ.|Xuất bản bài viết hướng dẫn tại /huong-dan/:slug và cấu hình thanh thông báo ưu đãi trên Trang chủ / Bảng điều khiển chủ trọ.
+1713|Bài viết Cẩm nang SEO|Bài viết Cẩm nang SEO|Bài viết Cẩm nang SEO|Bài viết Cẩm nang SEO
+1714|Danh sách Bài viết Cẩm nang (/huong-dan/:slug)|Danh sách Bài viết Cẩm nang (/huong-dan/:slug)|Danh sách Bài viết Cẩm nang (/huong-dan/:slug)|Danh sách Bài viết Cẩm nang (/huong-dan/:slug)
+1715|Viết bài cẩm nang mới|Viết bài cẩm nang mới|Viết bài cẩm nang mới|Viết bài cẩm nang mới
+1716|Tiêu đề & Đường dẫn|Tiêu đề & Đường dẫn|Tiêu đề & Đường dẫn|Tiêu đề & Đường dẫn
+1717|Chuyên mục|Chuyên mục|Chuyên mục|Chuyên mục
+1718|Đã xuất bản|Đã xuất bản|Đã xuất bản|Đã xuất bản
+1719|Lượt xem / Nhấn CTA|Lượt xem / Nhấn CTA|Lượt xem / Nhấn CTA|Lượt xem / Nhấn CTA
+1720|Cập nhật|Cập nhật|Cập nhật|Cập nhật
+1721|Xóa bài viết này?|Xóa bài viết này?|Xóa bài viết này?|Xóa bài viết này?
+1722|Banner Chiến dịch & In-App|Banner Chiến dịch & In-App|Banner Chiến dịch & In-App|Banner Chiến dịch & In-App
+1723|Quản lý Banner Ưu đãi (Landing Page & Dashboard Chủ trọ)|Quản lý Banner Ưu đãi (Landing Page & Dashboard Chủ trọ)|Quản lý Banner Ưu đãi (Landing Page & Dashboard Chủ trọ)|Quản lý Banner Ưu đãi (Landing Page & Dashboard Chủ trọ)
+1724|Tạo Banner mới|Tạo Banner mới|Tạo Banner mới|Tạo Banner mới
+1725|Tiêu đề & Nội dung|Tiêu đề & Nội dung|Tiêu đề & Nội dung|Tiêu đề & Nội dung
+1726|Vị trí hiển thị|Vị trí hiển thị|Vị trí hiển thị|Vị trí hiển thị
+1727|Đầu trang chủ|Đầu trang chủ|Đầu trang chủ|Đầu trang chủ
+1728|Bảng điều khiển Chủ trọ|Bảng điều khiển Chủ trọ|Bảng điều khiển Chủ trọ|Bảng điều khiển Chủ trọ
+1729|Cả hai nơi|Cả hai nơi|Cả hai nơi|Cả hai nơi
+1730|Tệp mục tiêu|Tệp mục tiêu|Tệp mục tiêu|Tệp mục tiêu
+1731|Hiển thị / Nhấn|Hiển thị / Nhấn|Hiển thị / Nhấn|Hiển thị / Nhấn
+1732|hiển thị|hiển thị|hiển thị|hiển thị
+1733|nhấn|nhấn|nhấn|nhấn
+1734|Xóa banner này?|Xóa banner này?|Xóa banner này?|Xóa banner này?
+1735|Chỉnh sửa bài viết cẩm nang|Chỉnh sửa bài viết cẩm nang|Chỉnh sửa bài viết cẩm nang|Chỉnh sửa bài viết cẩm nang
+1736|Viết bài cẩm nang SEO mới|Viết bài cẩm nang SEO mới|Viết bài cẩm nang SEO mới|Viết bài cẩm nang SEO mới
+1737|Xuất bản bài viết|Xuất bản bài viết|Xuất bản bài viết|Xuất bản bài viết
+1738|Tiêu đề bài viết|Tiêu đề bài viết|Tiêu đề bài viết|Tiêu đề bài viết
+1739|Vui lòng nhập tiêu đề bài viết.|Vui lòng nhập tiêu đề bài viết.|Vui lòng nhập tiêu đề bài viết.|Vui lòng nhập tiêu đề bài viết.
+1740|Ví dụ: Cách tính tiền điện nước phòng trọ minh bạch|Ví dụ: Cách tính tiền điện nước phòng trọ minh bạch|Ví dụ: Cách tính tiền điện nước phòng trọ minh bạch|Ví dụ: Cách tính tiền điện nước phòng trọ minh bạch
+1741|Đường dẫn tĩnh (Slug)|Đường dẫn tĩnh (Slug)|Đường dẫn tĩnh (Slug)|Đường dẫn tĩnh (Slug)
+1742|Vui lòng nhập slug.|Vui lòng nhập slug.|Vui lòng nhập slug.|Vui lòng nhập slug.
+1743|Vận hành nhà trọ, Tài chính & Công nợ...|Vận hành nhà trọ, Tài chính & Công nợ...|Vận hành nhà trọ, Tài chính & Công nợ...|Vận hành nhà trọ, Tài chính & Công nợ...
+1744|Thời lượng đọc (phút)|Thời lượng đọc (phút)|Thời lượng đọc (phút)|Thời lượng đọc (phút)
+1745|Xuất bản công khai|Xuất bản công khai|Xuất bản công khai|Xuất bản công khai
+1746|Công khai|Công khai|Công khai|Công khai
+1747|Nháp|Nháp|Nháp|Nháp
+1748|Tóm tắt ngắn (Hiển thị trên thẻ bài viết & Meta Description)|Tóm tắt ngắn (Hiển thị trên thẻ bài viết & Meta Description)|Tóm tắt ngắn (Hiển thị trên thẻ bài viết & Meta Description)|Tóm tắt ngắn (Hiển thị trên thẻ bài viết & Meta Description)
+1749|Vui lòng nhập tóm tắt bài viết.|Vui lòng nhập tóm tắt bài viết.|Vui lòng nhập tóm tắt bài viết.|Vui lòng nhập tóm tắt bài viết.
+1750|Nội dung bài viết (Hỗ trợ Markdown: ## Tiêu đề, - Danh sách)|Nội dung bài viết (Hỗ trợ Markdown: ## Tiêu đề, - Danh sách)|Nội dung bài viết (Hỗ trợ Markdown: ## Tiêu đề, - Danh sách)|Nội dung bài viết (Hỗ trợ Markdown: ## Tiêu đề, - Danh sách)
+1751|Vui lòng nhập nội dung bài viết.|Vui lòng nhập nội dung bài viết.|Vui lòng nhập nội dung bài viết.|Vui lòng nhập nội dung bài viết.
+1752|Nút kêu gọi hành động (CTA Text)|Nút kêu gọi hành động (CTA Text)|Nút kêu gọi hành động (CTA Text)|Nút kêu gọi hành động (CTA Text)
+1753|Đường dẫn đích CTA (CTA URL)|Đường dẫn đích CTA (CTA URL)|Đường dẫn đích CTA (CTA URL)|Đường dẫn đích CTA (CTA URL)
+1754|Chỉnh sửa Banner chiến dịch|Chỉnh sửa Banner chiến dịch|Chỉnh sửa Banner chiến dịch|Chỉnh sửa Banner chiến dịch
+1755|Tạo Banner chiến dịch mới|Tạo Banner chiến dịch mới|Tạo Banner chiến dịch mới|Tạo Banner chiến dịch mới
+1756|Tạo Banner|Tạo Banner|Tạo Banner|Tạo Banner
+1757|Tiêu đề ngắn|Tiêu đề ngắn|Tiêu đề ngắn|Tiêu đề ngắn
+1758|Vui lòng nhập tiêu đề banner.|Vui lòng nhập tiêu đề banner.|Vui lòng nhập tiêu đề banner.|Vui lòng nhập tiêu đề banner.
+1759|Ví dụ: Ưu đãi tháng 10: Tặng 2 tháng Roomie Pro|Ví dụ: Ưu đãi tháng 10: Tặng 2 tháng Roomie Pro|Ví dụ: Ưu đãi tháng 10: Tặng 2 tháng Roomie Pro|Ví dụ: Ưu đãi tháng 10: Tặng 2 tháng Roomie Pro
+1760|Thông điệp chi tiết|Thông điệp chi tiết|Thông điệp chi tiết|Thông điệp chi tiết
+1761|Vui lòng nhập thông điệp.|Vui lòng nhập thông điệp.|Vui lòng nhập thông điệp.|Vui lòng nhập thông điệp.
+1762|Nhập mã TET2026 hoặc nhấn vào đây để kích hoạt tự động.|Nhập mã TET2026 hoặc nhấn vào đây để kích hoạt tự động.|Nhập mã TET2026 hoặc nhấn vào đây để kích hoạt tự động.|Nhập mã TET2026 hoặc nhấn vào đây để kích hoạt tự động.
+1763|Phân khúc chủ trọ|Phân khúc chủ trọ|Phân khúc chủ trọ|Phân khúc chủ trọ
+1764|Tất cả|Tất cả|Tất cả|Tất cả
+1765|Chỉ chủ trọ Free|Chỉ chủ trọ Free|Chỉ chủ trọ Free|Chỉ chủ trọ Free
+1766|Sắp chạm trần 4-5 phòng|Sắp chạm trần 4-5 phòng|Sắp chạm trần 4-5 phòng|Sắp chạm trần 4-5 phòng
+1767|Pro sắp hết hạn|Pro sắp hết hạn|Pro sắp hết hạn|Pro sắp hết hạn
+1768|Tông màu|Tông màu|Tông màu|Tông màu
+1769|Xanh ngọc (Teal)|Xanh ngọc (Teal)|Xanh ngọc (Teal)|Xanh ngọc (Teal)
+1770|Vàng ấm (Gold)|Vàng ấm (Gold)|Vàng ấm (Gold)|Vàng ấm (Gold)
+1771|Xanh dương (Blue)|Xanh dương (Blue)|Xanh dương (Blue)|Xanh dương (Blue)
+1772|Nhãn nút bấm (CTA)|Nhãn nút bấm (CTA)|Nhãn nút bấm (CTA)|Nhãn nút bấm (CTA)
+1773|Đường dẫn CTA|Đường dẫn CTA|Đường dẫn CTA|Đường dẫn CTA
+1774|Mã ưu đãi đính kèm|Mã ưu đãi đính kèm|Mã ưu đãi đính kèm|Mã ưu đãi đính kèm
+1775|Thời gian hiển thị (Bỏ trống = Luôn hiển thị)|Thời gian hiển thị (Bỏ trống = Luôn hiển thị)|Thời gian hiển thị (Bỏ trống = Luôn hiển thị)|Thời gian hiển thị (Bỏ trống = Luôn hiển thị)
+1776|Đã cập nhật chiến dịch email.|Đã cập nhật chiến dịch email.|Đã cập nhật chiến dịch email.|Đã cập nhật chiến dịch email.
+1777|Đã lưu chiến dịch email nháp.|Đã lưu chiến dịch email nháp.|Đã lưu chiến dịch email nháp.|Đã lưu chiến dịch email nháp.
+1778|Đã gửi chiến dịch thành công tới {0}/{1} chủ trọ.|Đã gửi chiến dịch thành công tới {0}/{1} chủ trọ.|Đã gửi chiến dịch thành công tới {0}/{1} chủ trọ.|Đã gửi chiến dịch thành công tới {0}/{1} chủ trọ.
+1779|Chăm sóc chủ trọ mới chưa tạo phòng|Chăm sóc chủ trọ mới chưa tạo phòng|Chăm sóc chủ trọ mới chưa tạo phòng|Chăm sóc chủ trọ mới chưa tạo phòng
+1780|Chỉ mất 3 phút để lập hóa đơn tiền phòng đầu tiên trên Roomie|Chỉ mất 3 phút để lập hóa đơn tiền phòng đầu tiên trên Roomie|Chỉ mất 3 phút để lập hóa đơn tiền phòng đầu tiên trên Roomie|Chỉ mất 3 phút để lập hóa đơn tiền phòng đầu tiên trên Roomie
+1781|Chào {{OwnerName}},|Chào {{OwnerName}},|Chào {{OwnerName}},|Chào {{OwnerName}},
+1782|Roomie nhận thấy bạn đã đăng ký tài khoản nhưng chưa khởi tạo phòng trọ hoặc hóa đơn đầu tiên.|Roomie nhận thấy bạn đã đăng ký tài khoản nhưng chưa khởi tạo phòng trọ hoặc hóa đơn đầu tiên.|Roomie nhận thấy bạn đã đăng ký tài khoản nhưng chưa khởi tạo phòng trọ hoặc hóa đơn đầu tiên.|Roomie nhận thấy bạn đã đăng ký tài khoản nhưng chưa khởi tạo phòng trọ hoặc hóa đơn đầu tiên.
+1783|Chỉ cần nhập chỉ số điện nước, hệ thống sẽ tự tính tiền và tạo link hóa đơn VietQR gửi qua Zalo cho khách thuê.|Chỉ cần nhập chỉ số điện nước, hệ thống sẽ tự tính tiền và tạo link hóa đơn VietQR gửi qua Zalo cho khách thuê.|Chỉ cần nhập chỉ số điện nước, hệ thống sẽ tự tính tiền và tạo link hóa đơn VietQR gửi qua Zalo cho khách thuê.|Chỉ cần nhập chỉ số điện nước, hệ thống sẽ tự tính tiền và tạo link hóa đơn VietQR gửi qua Zalo cho khách thuê.
+1784|Tạo phòng trọ đầu tiên ngay|Tạo phòng trọ đầu tiên ngay|Tạo phòng trọ đầu tiên ngay|Tạo phòng trọ đầu tiên ngay
+1785|Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng|Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng|Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng|Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng
+1786|Tặng mã ưu đãi nâng cấp Roomie Pro không giới hạn số phòng|Tặng mã ưu đãi nâng cấp Roomie Pro không giới hạn số phòng|Tặng mã ưu đãi nâng cấp Roomie Pro không giới hạn số phòng|Tặng mã ưu đãi nâng cấp Roomie Pro không giới hạn số phòng
+1787|Nhà trọ của bạn hiện đã có {{RoomCount}}/5 phòng trên gói Miễn phí.|Nhà trọ của bạn hiện đã có {{RoomCount}}/5 phòng trên gói Miễn phí.|Nhà trọ của bạn hiện đã có {{RoomCount}}/5 phòng trên gói Miễn phí.|Nhà trọ của bạn hiện đã có {{RoomCount}}/5 phòng trên gói Miễn phí.
+1788|Sử dụng mã ưu đãi {{PromoCode}} để mở khóa không giới hạn số phòng, tự động nhắc nợ Zalo và đối soát thanh toán tự động.|Sử dụng mã ưu đãi {{PromoCode}} để mở khóa không giới hạn số phòng, tự động nhắc nợ Zalo và đối soát thanh toán tự động.|Sử dụng mã ưu đãi {{PromoCode}} để mở khóa không giới hạn số phòng, tự động nhắc nợ Zalo và đối soát thanh toán tự động.|Sử dụng mã ưu đãi {{PromoCode}} để mở khóa không giới hạn số phòng, tự động nhắc nợ Zalo và đối soát thanh toán tự động.
+1789|Nâng cấp gói Pro ngay|Nâng cấp gói Pro ngay|Nâng cấp gói Pro ngay|Nâng cấp gói Pro ngay
+1790|Nhắc gia hạn gói Pro sắp hết hạn|Nhắc gia hạn gói Pro sắp hết hạn|Nhắc gia hạn gói Pro sắp hết hạn|Nhắc gia hạn gói Pro sắp hết hạn
+1791|Gói Roomie Pro của bạn sắp hết hạn — Gia hạn để không gián đoạn nhắc Zalo|Gói Roomie Pro của bạn sắp hết hạn — Gia hạn để không gián đoạn nhắc Zalo|Gói Roomie Pro của bạn sắp hết hạn — Gia hạn để không gián đoạn nhắc Zalo|Gói Roomie Pro của bạn sắp hết hạn — Gia hạn để không gián đoạn nhắc Zalo
+1792|Gói Roomie Pro cho {{RoomCount}} phòng trọ của bạn sẽ hết hạn trong ít ngày tới.|Gói Roomie Pro cho {{RoomCount}} phòng trọ của bạn sẽ hết hạn trong ít ngày tới.|Gói Roomie Pro cho {{RoomCount}} phòng trọ của bạn sẽ hết hạn trong ít ngày tới.|Gói Roomie Pro cho {{RoomCount}} phòng trọ của bạn sẽ hết hạn trong ít ngày tới.
+1793|Hãy gia hạn sớm hoặc nhập mã ưu đãi {{PromoCode}} để duy trì tự động hóa đơn và nhắc tiền phòng qua Zalo.|Hãy gia hạn sớm hoặc nhập mã ưu đãi {{PromoCode}} để duy trì tự động hóa đơn và nhắc tiền phòng qua Zalo.|Hãy gia hạn sớm hoặc nhập mã ưu đãi {{PromoCode}} để duy trì tự động hóa đơn và nhắc tiền phòng qua Zalo.|Hãy gia hạn sớm hoặc nhập mã ưu đãi {{PromoCode}} để duy trì tự động hóa đơn và nhắc tiền phòng qua Zalo.
+1794|Gia hạn Roomie Pro|Gia hạn Roomie Pro|Gia hạn Roomie Pro|Gia hạn Roomie Pro
+1795|Mời chủ trọ quay lại trải nghiệm tính năng mới|Mời chủ trọ quay lại trải nghiệm tính năng mới|Mời chủ trọ quay lại trải nghiệm tính năng mới|Mời chủ trọ quay lại trải nghiệm tính năng mới
+1796|Roomie vừa cập nhật xuất hợp đồng Word & quét CCCD tự động|Roomie vừa cập nhật xuất hợp đồng Word & quét CCCD tự động|Roomie vừa cập nhật xuất hợp đồng Word & quét CCCD tự động|Roomie vừa cập nhật xuất hợp đồng Word & quét CCCD tự động
+1797|Roomie vừa bổ sung tính năng quét QR CCCD lập hợp đồng thuê trọ và mẫu khai báo lưu trú CT01 chỉ trong 30 giây.|Roomie vừa bổ sung tính năng quét QR CCCD lập hợp đồng thuê trọ và mẫu khai báo lưu trú CT01 chỉ trong 30 giây.|Roomie vừa bổ sung tính năng quét QR CCCD lập hợp đồng thuê trọ và mẫu khai báo lưu trú CT01 chỉ trong 30 giây.|Roomie vừa bổ sung tính năng quét QR CCCD lập hợp đồng thuê trọ và mẫu khai báo lưu trú CT01 chỉ trong 30 giây.
+1798|Đăng nhập lại ngay hôm nay để quản lý nhà trọ nhàn hơn mỗi kỳ thu tiền.|Đăng nhập lại ngay hôm nay để quản lý nhà trọ nhàn hơn mỗi kỳ thu tiền.|Đăng nhập lại ngay hôm nay để quản lý nhà trọ nhàn hơn mỗi kỳ thu tiền.|Đăng nhập lại ngay hôm nay để quản lý nhà trọ nhàn hơn mỗi kỳ thu tiền.
+1799|Đăng nhập Roomie|Đăng nhập Roomie|Đăng nhập Roomie|Đăng nhập Roomie
+1800|Chiến dịch Email theo Phân khúc|Chiến dịch Email theo Phân khúc|Chiến dịch Email theo Phân khúc|Chiến dịch Email theo Phân khúc
+1801|Gửi email chăm sóc cá nhân hóa tới từng nhóm chủ trọ (Kẹt kích hoạt, Sắp chạm trần 5 phòng, Pro sắp hết hạn).|Gửi email chăm sóc cá nhân hóa tới từng nhóm chủ trọ (Kẹt kích hoạt, Sắp chạm trần 5 phòng, Pro sắp hết hạn).|Gửi email chăm sóc cá nhân hóa tới từng nhóm chủ trọ (Kẹt kích hoạt, Sắp chạm trần 5 phòng, Pro sắp hết hạn).|Gửi email chăm sóc cá nhân hóa tới từng nhóm chủ trọ (Kẹt kích hoạt, Sắp chạm trần 5 phòng, Pro sắp hết hạn).
+1802|Danh sách Chiến dịch Email|Danh sách Chiến dịch Email|Danh sách Chiến dịch Email|Danh sách Chiến dịch Email
+1803|Tạo chiến dịch Email|Tạo chiến dịch Email|Tạo chiến dịch Email|Tạo chiến dịch Email
+1804|Tên chiến dịch & Tiêu đề|Tên chiến dịch & Tiêu đề|Tên chiến dịch & Tiêu đề|Tên chiến dịch & Tiêu đề
+1805|Phân khúc nhận|Phân khúc nhận|Phân khúc nhận|Phân khúc nhận
+1806|Mã KM đính kèm|Mã KM đính kèm|Mã KM đính kèm|Mã KM đính kèm
+1807|Đã gửi hoàn tất|Đã gửi hoàn tất|Đã gửi hoàn tất|Đã gửi hoàn tất
+1808|Gửi lỗi|Gửi lỗi|Gửi lỗi|Gửi lỗi
+1809|Kết quả gửi|Kết quả gửi|Kết quả gửi|Kết quả gửi
+1810|lỗi|lỗi|lỗi|lỗi
+1811|Thời gian gửi|Thời gian gửi|Thời gian gửi|Thời gian gửi
+1812|Gửi thử|Gửi thử|Gửi thử|Gửi thử
+1813|Gửi chiến dịch email này tới toàn bộ phân khúc đã chọn?|Gửi chiến dịch email này tới toàn bộ phân khúc đã chọn?|Gửi chiến dịch email này tới toàn bộ phân khúc đã chọn?|Gửi chiến dịch email này tới toàn bộ phân khúc đã chọn?
+1814|Hệ thống sẽ chống gửi trùng lặp cho từng chủ trọ trong cùng chiến dịch.|Hệ thống sẽ chống gửi trùng lặp cho từng chủ trọ trong cùng chiến dịch.|Hệ thống sẽ chống gửi trùng lặp cho từng chủ trọ trong cùng chiến dịch.|Hệ thống sẽ chống gửi trùng lặp cho từng chủ trọ trong cùng chiến dịch.
+1815|Gửi ngay|Gửi ngay|Gửi ngay|Gửi ngay
+1816|Chỉnh sửa Chiến dịch Email|Chỉnh sửa Chiến dịch Email|Chỉnh sửa Chiến dịch Email|Chỉnh sửa Chiến dịch Email
+1817|Tạo Chiến dịch Email theo Phân khúc|Tạo Chiến dịch Email theo Phân khúc|Tạo Chiến dịch Email theo Phân khúc|Tạo Chiến dịch Email theo Phân khúc
+1818|Lưu chiến dịch|Lưu chiến dịch|Lưu chiến dịch|Lưu chiến dịch
+1819|Mẫu kịch bản có sẵn|Mẫu kịch bản có sẵn|Mẫu kịch bản có sẵn|Mẫu kịch bản có sẵn
+1820|1. Hướng dẫn tạo phòng|1. Hướng dẫn tạo phòng|1. Hướng dẫn tạo phòng|1. Hướng dẫn tạo phòng
+1821|2. Chạm trần 5 phòng Free|2. Chạm trần 5 phòng Free|2. Chạm trần 5 phòng Free|2. Chạm trần 5 phòng Free
+1822|3. Nhắc gia hạn Pro|3. Nhắc gia hạn Pro|3. Nhắc gia hạn Pro|3. Nhắc gia hạn Pro
+1823|4. Mời quay lại|4. Mời quay lại|4. Mời quay lại|4. Mời quay lại
+1824|Biến cá nhân hóa tự động: {{OwnerName}} (Tên chủ trọ), {{RoomCount}} (Số phòng hiện có), {{PromoCode}} (Mã ưu đãi).|Biến cá nhân hóa tự động: {{OwnerName}} (Tên chủ trọ), {{RoomCount}} (Số phòng hiện có), {{PromoCode}} (Mã ưu đãi).|Biến cá nhân hóa tự động: {{OwnerName}} (Tên chủ trọ), {{RoomCount}} (Số phòng hiện có), {{PromoCode}} (Mã ưu đãi).|Biến cá nhân hóa tự động: {{OwnerName}} (Tên chủ trọ), {{RoomCount}} (Số phòng hiện có), {{PromoCode}} (Mã ưu đãi).
+1825|Tên chiến dịch nội bộ|Tên chiến dịch nội bộ|Tên chiến dịch nội bộ|Tên chiến dịch nội bộ
+1826|Phân khúc chủ trọ nhận|Phân khúc chủ trọ nhận|Phân khúc chủ trọ nhận|Phân khúc chủ trọ nhận
+1827|Kẹt kích hoạt (Chưa phát hành HĐ)|Kẹt kích hoạt (Chưa phát hành HĐ)|Kẹt kích hoạt (Chưa phát hành HĐ)|Kẹt kích hoạt (Chưa phát hành HĐ)
+1828|Sắp chạm trần Free (4-5 phòng)|Sắp chạm trần Free (4-5 phòng)|Sắp chạm trần Free (4-5 phòng)|Sắp chạm trần Free (4-5 phòng)
+1829|Pro sắp hết hạn (≤14 ngày)|Pro sắp hết hạn (≤14 ngày)|Pro sắp hết hạn (≤14 ngày)|Pro sắp hết hạn (≤14 ngày)
+1830|Không hoạt động (>14 ngày)|Không hoạt động (>14 ngày)|Không hoạt động (>14 ngày)|Không hoạt động (>14 ngày)
+1831|Tất cả chủ trọ gói Free|Tất cả chủ trọ gói Free|Tất cả chủ trọ gói Free|Tất cả chủ trọ gói Free
+1832|Tiêu đề Email (Subject)|Tiêu đề Email (Subject)|Tiêu đề Email (Subject)|Tiêu đề Email (Subject)
+1833|Vui lòng nhập tiêu đề email.|Vui lòng nhập tiêu đề email.|Vui lòng nhập tiêu đề email.|Vui lòng nhập tiêu đề email.
+1834|Nội dung Email (HTML cơ bản)|Nội dung Email (HTML cơ bản)|Nội dung Email (HTML cơ bản)|Nội dung Email (HTML cơ bản)
+1835|Vui lòng nhập nội dung email.|Vui lòng nhập nội dung email.|Vui lòng nhập nội dung email.|Vui lòng nhập nội dung email.
+1836|Nhãn nút CTA|Nhãn nút CTA|Nhãn nút CTA|Nhãn nút CTA
+1837|Mã ưu đãi ({{PromoCode}})|Mã ưu đãi ({{PromoCode}})|Mã ưu đãi ({{PromoCode}})|Mã ưu đãi ({{PromoCode}})
+1838|Gửi email thử nghiệm|Gửi email thử nghiệm|Gửi email thử nghiệm|Gửi email thử nghiệm
+1839|Nhập địa chỉ email của bạn để kiểm tra giao diện và biến cá nhân hóa trước khi gửi hàng loạt:|Nhập địa chỉ email của bạn để kiểm tra giao diện và biến cá nhân hóa trước khi gửi hàng loạt:|Nhập địa chỉ email của bạn để kiểm tra giao diện và biến cá nhân hóa trước khi gửi hàng loạt:|Nhập địa chỉ email của bạn để kiểm tra giao diện và biến cá nhân hóa trước khi gửi hàng loạt:
+1840|Đã cập nhật hồ sơ chăm sóc chủ trọ.|Đã cập nhật hồ sơ chăm sóc chủ trọ.|Đã cập nhật hồ sơ chăm sóc chủ trọ.|Đã cập nhật hồ sơ chăm sóc chủ trọ.
+1841|Đã lưu ghi chú chăm sóc.|Đã lưu ghi chú chăm sóc.|Đã lưu ghi chú chăm sóc.|Đã lưu ghi chú chăm sóc.
+1842|Tất cả chủ trọ|Tất cả chủ trọ|Tất cả chủ trọ|Tất cả chủ trọ
+1843|Kẹt kích hoạt|Kẹt kích hoạt|Kẹt kích hoạt|Kẹt kích hoạt
+1844|Đang dùng Pro|Đang dùng Pro|Đang dùng Pro|Đang dùng Pro
+1845|Đã liên hệ|Đã liên hệ|Đã liên hệ|Đã liên hệ
+1846|Quan tâm Pro|Quan tâm Pro|Quan tâm Pro|Quan tâm Pro
+1847|Đã lên Pro|Đã lên Pro|Đã lên Pro|Đã lên Pro
+1848|Ngừng dùng|Ngừng dùng|Ngừng dùng|Ngừng dùng
+1849|Mới|Mới|Mới|Mới
+1850|Đã sao chép {0}|Đã sao chép {0}|Đã sao chép {0}|Đã sao chép {0}
+1851|Chăm sóc & Phân khúc Chủ trọ|Chăm sóc & Phân khúc Chủ trọ|Chăm sóc & Phân khúc Chủ trọ|Chăm sóc & Phân khúc Chủ trọ
+1852|Theo dõi tiến độ kích hoạt, phân khúc tự động và ghi chú chăm sóc chuyển đổi lên gói Pro (ẩn dữ liệu nhạy cảm của khách thuê).|Theo dõi tiến độ kích hoạt, phân khúc tự động và ghi chú chăm sóc chuyển đổi lên gói Pro (ẩn dữ liệu nhạy cảm của khách thuê).|Theo dõi tiến độ kích hoạt, phân khúc tự động và ghi chú chăm sóc chuyển đổi lên gói Pro (ẩn dữ liệu nhạy cảm của khách thuê).|Theo dõi tiến độ kích hoạt, phân khúc tự động và ghi chú chăm sóc chuyển đổi lên gói Pro (ẩn dữ liệu nhạy cảm của khách thuê).
+1853|Danh sách Chủ trọ theo phân khúc|Danh sách Chủ trọ theo phân khúc|Danh sách Chủ trọ theo phân khúc|Danh sách Chủ trọ theo phân khúc
+1854|Tìm tên, email, SĐT, UTM...|Tìm tên, email, SĐT, UTM...|Tìm tên, email, SĐT, UTM...|Tìm tên, email, SĐT, UTM...
+1855|Trạng thái chăm sóc|Trạng thái chăm sóc|Trạng thái chăm sóc|Trạng thái chăm sóc
+1856|Sao chép email|Sao chép email|Sao chép email|Sao chép email
+1857|Tiến độ sử dụng|Tiến độ sử dụng|Tiến độ sử dụng|Tiến độ sử dụng
+1858|dãy|dãy|dãy|dãy
+1859|Đã phát hành HĐ|Đã phát hành HĐ|Đã phát hành HĐ|Đã phát hành HĐ
+1860|Chưa phát hành HĐ|Chưa phát hành HĐ|Chưa phát hành HĐ|Chưa phát hành HĐ
+1861|Gói & Ưu đãi|Gói & Ưu đãi|Gói & Ưu đãi|Gói & Ưu đãi
+1862|Hết hạn|Hết hạn|Hết hạn|Hết hạn
+1863|Nguồn tiếp cận|Nguồn tiếp cận|Nguồn tiếp cận|Nguồn tiếp cận
+1864|Trực tiếp / Tự nhiên|Trực tiếp / Tự nhiên|Trực tiếp / Tự nhiên|Trực tiếp / Tự nhiên
+1865|Chăm sóc CRM|Chăm sóc CRM|Chăm sóc CRM|Chăm sóc CRM
+1866|Hẹn gọi lại|Hẹn gọi lại|Hẹn gọi lại|Hẹn gọi lại
+1867|Chăm sóc|Chăm sóc|Chăm sóc|Chăm sóc
+1868|Hồ sơ chăm sóc|Hồ sơ chăm sóc|Hồ sơ chăm sóc|Hồ sơ chăm sóc
+1869|Đăng ký ngày|Đăng ký ngày|Đăng ký ngày|Đăng ký ngày
+1870|Hoạt động gần nhất|Hoạt động gần nhất|Hoạt động gần nhất|Hoạt động gần nhất
+1871|Trạng thái Lead|Trạng thái Lead|Trạng thái Lead|Trạng thái Lead
+1872|Ngày hẹn chăm sóc tiếp|Ngày hẹn chăm sóc tiếp|Ngày hẹn chăm sóc tiếp|Ngày hẹn chăm sóc tiếp
+1873|Thẻ phân loại (Tags)|Thẻ phân loại (Tags)|Thẻ phân loại (Tags)|Thẻ phân loại (Tags)
+1874|Ví dụ: chu-tro-20-phong, can-goi-zalo, quan-tam-vietqr|Ví dụ: chu-tro-20-phong, can-goi-zalo, quan-tam-vietqr|Ví dụ: chu-tro-20-phong, can-goi-zalo, quan-tam-vietqr|Ví dụ: chu-tro-20-phong, can-goi-zalo, quan-tam-vietqr
+1875|Cập nhật trạng thái chăm sóc|Cập nhật trạng thái chăm sóc|Cập nhật trạng thái chăm sóc|Cập nhật trạng thái chăm sóc
+1876|Nhật ký ghi chú chăm sóc|Nhật ký ghi chú chăm sóc|Nhật ký ghi chú chăm sóc|Nhật ký ghi chú chăm sóc
+1877|Nhập nội dung cuộc gọi / trao đổi Zalo với chủ trọ...|Nhập nội dung cuộc gọi / trao đổi Zalo với chủ trọ...|Nhập nội dung cuộc gọi / trao đổi Zalo với chủ trọ...|Nhập nội dung cuộc gọi / trao đổi Zalo với chủ trọ...
+1878|Lưu|Lưu|Lưu|Lưu
+1879|Chưa có ghi chú chăm sóc nào.|Chưa có ghi chú chăm sóc nào.|Chưa có ghi chú chăm sóc nào.|Chưa có ghi chú chăm sóc nào.
+1880|Quay lại Cẩm nang hướng dẫn|Quay lại Cẩm nang hướng dẫn|Quay lại Cẩm nang hướng dẫn|Quay lại Cẩm nang hướng dẫn
+1881|Không tìm thấy bài viết hướng dẫn|Không tìm thấy bài viết hướng dẫn|Không tìm thấy bài viết hướng dẫn|Không tìm thấy bài viết hướng dẫn
+1882|Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.|Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.|Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.|Bài viết này có thể đã được cập nhật hoặc chuyển sang đường dẫn khác.
+1883|Xem toàn bộ Cẩm nang|Xem toàn bộ Cẩm nang|Xem toàn bộ Cẩm nang|Xem toàn bộ Cẩm nang
+1884|phút đọc|phút đọc|phút đọc|phút đọc
+1885|Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?|Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?|Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?|Sẵn sàng tự động hóa quản lý nhà trọ cùng Roomie?
+1886|Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.|Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.|Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.|Miễn phí trọn đời cho tối đa 5 phòng đang sử dụng. Chốt điện, lập hóa đơn VietQR và nhắc lịch Zalo tự động.
+1887|Đọc bài viết chi tiết|Đọc bài viết chi tiết|Đọc bài viết chi tiết|Đọc bài viết chi tiết
+1888|Tặng thưởng & Trạng thái|Tặng thưởng & Trạng thái|Tặng thưởng & Trạng thái|Tặng thưởng & Trạng thái
+1889|Đã kích hoạt|Đã kích hoạt|Đã kích hoạt|Đã kích hoạt
+1890|Mới đăng ký|Mới đăng ký|Mới đăng ký|Mới đăng ký
+1891|Đã tạo chiến dịch tiếp thị mới.|Đã tạo chiến dịch tiếp thị mới.|Đã tạo chiến dịch tiếp thị mới.|Đã tạo chiến dịch tiếp thị mới.
+1892|Đã cập nhật chiến dịch tiếp thị.|Đã cập nhật chiến dịch tiếp thị.|Đã cập nhật chiến dịch tiếp thị.|Đã cập nhật chiến dịch tiếp thị.
+1893|Kênh / Nguồn / Medium|Kênh / Nguồn / Medium|Kênh / Nguồn / Medium|Kênh / Nguồn / Medium
+1894|Mã Auto-Promo|Mã Auto-Promo|Mã Auto-Promo|Mã Auto-Promo
+1895|Đang chạy|Đang chạy|Đang chạy|Đang chạy
+1896|Tạm dừng|Tạm dừng|Tạm dừng|Tạm dừng
+1897|Liên kết theo dõi & QR|Liên kết theo dõi & QR|Liên kết theo dõi & QR|Liên kết theo dõi & QR
+1898|Sao chép link|Sao chép link|Sao chép link|Sao chép link
+1899|Cập nhật chiến dịch tiếp thị|Cập nhật chiến dịch tiếp thị|Cập nhật chiến dịch tiếp thị|Cập nhật chiến dịch tiếp thị
+1900|Tạo chiến dịch tiếp thị mới|Tạo chiến dịch tiếp thị mới|Tạo chiến dịch tiếp thị mới|Tạo chiến dịch tiếp thị mới
+1901|Mã chiến dịch (utm_campaign)|Mã chiến dịch (utm_campaign)|Mã chiến dịch (utm_campaign)|Mã chiến dịch (utm_campaign)
+1902|Vui lòng nhập mã chiến dịch|Vui lòng nhập mã chiến dịch|Vui lòng nhập mã chiến dịch|Vui lòng nhập mã chiến dịch
+1903|Vui lòng nhập tên chiến dịch|Vui lòng nhập tên chiến dịch|Vui lòng nhập tên chiến dịch|Vui lòng nhập tên chiến dịch
+1904|vd: Hội chủ trọ Facebook T10|vd: Hội chủ trọ Facebook T10|vd: Hội chủ trọ Facebook T10|vd: Hội chủ trọ Facebook T10
+1905|Nguồn (utm_source)|Nguồn (utm_source)|Nguồn (utm_source)|Nguồn (utm_source)
+1906|Trang đích|Trang đích|Trang đích|Trang đích
+1907|Ghi chú chiến dịch|Ghi chú chiến dịch|Ghi chú chiến dịch|Ghi chú chiến dịch
+1908|Ghi chú mục tiêu hoặc đối tượng chiến dịch...|Ghi chú mục tiêu hoặc đối tượng chiến dịch...|Ghi chú mục tiêu hoặc đối tượng chiến dịch...|Ghi chú mục tiêu hoặc đối tượng chiến dịch...
+1909|Mã QR & Liên kết chiến dịch|Mã QR & Liên kết chiến dịch|Mã QR & Liên kết chiến dịch|Mã QR & Liên kết chiến dịch
+1910|Mã QR|Mã QR|Mã QR|Mã QR
+1911|Danh mục chiến dịch & Liên kết Auto-Promo / QR|Danh mục chiến dịch & Liên kết Auto-Promo / QR|Danh mục chiến dịch & Liên kết Auto-Promo / QR|Danh mục chiến dịch & Liên kết Auto-Promo / QR
+1912|Trình tạo UTM tự do|Trình tạo UTM tự do|Trình tạo UTM tự do|Trình tạo UTM tự do
+1913|Tạo chiến dịch mới|Tạo chiến dịch mới|Tạo chiến dịch mới|Tạo chiến dịch mới
+1914|Chưa có chiến dịch nào được lưu|Chưa có chiến dịch nào được lưu|Chưa có chiến dịch nào được lưu|Chưa có chiến dịch nào được lưu
+1915|Kiểm tra chuẩn SEO & xem trước|Kiểm tra chuẩn SEO & xem trước|Kiểm tra chuẩn SEO & xem trước|Kiểm tra chuẩn SEO & xem trước
+1916|Tiêu đề 20-120 ký tự|Tiêu đề 20-120 ký tự|Tiêu đề 20-120 ký tự|Tiêu đề 20-120 ký tự
+1917|Mô tả Meta 40-500 ký tự|Mô tả Meta 40-500 ký tự|Mô tả Meta 40-500 ký tự|Mô tả Meta 40-500 ký tự
+1918|Có thẻ tiêu đề phụ (##)|Có thẻ tiêu đề phụ (##)|Có thẻ tiêu đề phụ (##)|Có thẻ tiêu đề phụ (##)
+1919|Có liên kết chuyển đổi CTA|Có liên kết chuyển đổi CTA|Có liên kết chuyển đổi CTA|Có liên kết chuyển đổi CTA
+1920|Cam san hô (Coral)|Cam san hô (Coral)|Cam san hô (Coral)|Cam san hô (Coral)
+1921|Tiêu đề banner ưu đãi|Tiêu đề banner ưu đãi|Tiêu đề banner ưu đãi|Tiêu đề banner ưu đãi
+1922|Nội dung thông điệp chiến dịch|Nội dung thông điệp chiến dịch|Nội dung thông điệp chiến dịch|Nội dung thông điệp chiến dịch
+1923|Xem trước hiển thị Banner|Xem trước hiển thị Banner|Xem trước hiển thị Banner|Xem trước hiển thị Banner
+1924|Nguyễn Văn Chủ Trọ|Nguyễn Văn Chủ Trọ|Nguyễn Văn Chủ Trọ|Nguyễn Văn Chủ Trọ
+1925|Xem trước Email cá nhân hóa|Xem trước Email cá nhân hóa|Xem trước Email cá nhân hóa|Xem trước Email cá nhân hóa
+1926|Đã hướng dẫn|Đã hướng dẫn|Đã hướng dẫn|Đã hướng dẫn
+1927|Đang nuôi dưỡng|Đang nuôi dưỡng|Đang nuôi dưỡng|Đang nuôi dưỡng
+1928|Nhắn Zalo|Nhắn Zalo|Nhắn Zalo|Nhắn Zalo
+1929|Mục lục bài viết|Mục lục bài viết|Mục lục bài viết|Mục lục bài viết
+1930|BÀI VIẾT CHUYÊN SÂU|BÀI VIẾT CHUYÊN SÂU|BÀI VIẾT CHUYÊN SÂU|BÀI VIẾT CHUYÊN SÂU
+1931|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ|Kinh nghiệm quản lý & tối ưu vận hành nhà trọ

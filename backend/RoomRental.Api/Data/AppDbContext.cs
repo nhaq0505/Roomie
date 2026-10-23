@@ -48,6 +48,12 @@ public class AppDbContext : DbContext
     public DbSet<SystemPromotion> SystemPromotions => Set<SystemPromotion>();
     public DbSet<PromotionCode> PromotionCodes => Set<PromotionCode>();
     public DbSet<PromotionRedemption> PromotionRedemptions => Set<PromotionRedemption>();
+    public DbSet<OwnerMarketingProfile> OwnerMarketingProfiles => Set<OwnerMarketingProfile>();
+    public DbSet<OwnerMarketingNote> OwnerMarketingNotes => Set<OwnerMarketingNote>();
+    public DbSet<MarketingArticle> MarketingArticles => Set<MarketingArticle>();
+    public DbSet<MarketingBanner> MarketingBanners => Set<MarketingBanner>();
+    public DbSet<MarketingEmailCampaign> MarketingEmailCampaigns => Set<MarketingEmailCampaign>();
+    public DbSet<MarketingEmailRecipientLog> MarketingEmailRecipientLogs => Set<MarketingEmailRecipientLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -121,6 +127,7 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(x => x.Email);
             entity.Property(x => x.Email).HasMaxLength(320);
+            entity.Property(x => x.PendingPromoCode).HasMaxLength(32);
             entity.HasIndex(x => x.ChallengeHash).IsUnique();
             entity.Property(x => x.ChallengeHash).HasMaxLength(64).IsConcurrencyToken();
             entity.Property(x => x.SendCount).IsConcurrencyToken();
@@ -409,6 +416,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.UtmMedium).HasMaxLength(100);
             entity.Property(x => x.UtmSource).HasMaxLength(100);
             entity.Property(x => x.TargetUrl).HasMaxLength(256);
+            entity.Property(x => x.PromoCode).HasMaxLength(32);
             entity.Property(x => x.CreatedByName).HasMaxLength(160);
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasIndex(x => new { x.Channel, x.Source });
@@ -520,6 +528,85 @@ public class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => new { x.PromotionCodeId, x.UserId }).IsUnique();
             entity.HasIndex(x => x.UserId);
+        });
+
+        modelBuilder.Entity<OwnerMarketingProfile>(entity =>
+        {
+            entity.HasKey(x => x.OwnerId);
+            entity.Property(x => x.LeadStatus).HasConversion<string>().HasMaxLength(24);
+            entity.Property(x => x.Tags).HasMaxLength(500);
+            entity.HasIndex(x => x.LeadStatus);
+            entity.HasIndex(x => x.NextFollowUpAt);
+            entity.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.AssignedMarketer).WithMany().HasForeignKey(x => x.AssignedMarketerId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<OwnerMarketingNote>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.AuthorName).HasMaxLength(160);
+            entity.Property(x => x.Content).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+            entity.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.AuthorUser).WithMany().HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MarketingArticle>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Slug).HasMaxLength(160);
+            entity.Property(x => x.Title).HasMaxLength(250);
+            entity.Property(x => x.Category).HasMaxLength(100);
+            entity.Property(x => x.ReadTimeLabel).HasMaxLength(60);
+            entity.Property(x => x.Summary).HasMaxLength(600);
+            entity.Property(x => x.ContentMarkdown).HasColumnType("text");
+            entity.Property(x => x.SeoTitle).HasMaxLength(250);
+            entity.Property(x => x.SeoDescription).HasMaxLength(500);
+            entity.Property(x => x.CtaLabel).HasMaxLength(120);
+            entity.Property(x => x.CtaTargetUrl).HasMaxLength(500);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            entity.HasIndex(x => x.Slug).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.PublishedAt });
+        });
+
+        modelBuilder.Entity<MarketingBanner>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(200);
+            entity.Property(x => x.Message).HasMaxLength(600);
+            entity.Property(x => x.CtaLabel).HasMaxLength(120);
+            entity.Property(x => x.CtaUrl).HasMaxLength(500);
+            entity.Property(x => x.PromoCode).HasMaxLength(32);
+            entity.Property(x => x.Placement).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.TargetSegment).HasMaxLength(64);
+            entity.Property(x => x.Variant).HasMaxLength(32);
+            entity.HasIndex(x => new { x.Placement, x.IsActive });
+        });
+
+        modelBuilder.Entity<MarketingEmailCampaign>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.TargetSegment).HasMaxLength(64);
+            entity.Property(x => x.Subject).HasMaxLength(250);
+            entity.Property(x => x.BodyHtml).HasColumnType("text");
+            entity.Property(x => x.PromoCode).HasMaxLength(32);
+            entity.Property(x => x.CtaLabel).HasMaxLength(120);
+            entity.Property(x => x.CtaUrl).HasMaxLength(500);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(x => x.CreatedByName).HasMaxLength(160);
+            entity.HasIndex(x => new { x.Status, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<MarketingEmailRecipientLog>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).HasMaxLength(320);
+            entity.Property(x => x.Status).HasMaxLength(24);
+            entity.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.CampaignId, x.OwnerId }).IsUnique();
+            entity.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

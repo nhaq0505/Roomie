@@ -262,4 +262,255 @@ test.describe('Admin Workflows (Quản trị viên)', () => {
     await expect(ownerCard.locator('.ant-tag-gold')).toHaveText('PRO');
     await expect(ownerCard.getByText('5 / ∞')).toBeVisible();
   });
+
+  // Scenario A5: Marketer Login, Restricted Monitoring (no Operations tab), CRM Leads, CMS Content & Emails
+  test('Scenario A5: Marketer role workflows (/admin/monitoring, /marketer/leads, /marketer/content, /marketer/emails)', async ({ page }) => {
+    const marketerUser: User = {
+      id: 'fixture-marketer-01',
+      name: 'Marketer Roomie',
+      email: 'marketer@phongtro.local',
+      role: 'Marketer',
+      status: 'Approved',
+    };
+
+    const notes = [
+      {
+        id: 'note-01',
+        authorId: 'fixture-marketer-01',
+        authorName: 'Marketer Roomie',
+        content: 'Đã gọi điện tư vấn kích hoạt phòng đầu tiên.',
+        createdAt: '2026-10-20T09:00:00Z',
+      },
+    ];
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/login' && method === 'POST') {
+        return route.fulfill({ json: marketerUser });
+      }
+      if (path === '/api/auth/me') {
+        return route.fulfill({ json: marketerUser });
+      }
+      if (path === '/api/admin/monitoring/growth') {
+        return route.fulfill({
+          json: {
+            summary: {
+              totalSessions: 120,
+              uniqueVisitors: 100,
+              registrations: 20,
+              activatedOwners: 8,
+              currentWau: 12,
+              currentMau: 18,
+            },
+            sources: [],
+            topCtas: [],
+            retentionMatrix: [],
+            cohortMaturity: {
+              activationRate7Day: 40,
+              activationCohortMaturedCount: 20,
+              firstPaidRate30Day: 15,
+              paidCohortMaturedCount: 20,
+            },
+            dailySeries: [],
+            registrationFunnel: {
+              startedCount: 25,
+              codeResentCount: 2,
+              verifiedCount: 20,
+              bypassedCount: 0,
+              unknownAttemptCount: 0,
+            },
+          },
+        });
+      }
+      if (path === '/api/admin/monitoring/revenue') {
+        return route.fulfill({
+          json: {
+            summary: {
+              totalSubscriptionRevenueVnd: 1500000,
+              paidSubscriptionCount: 3,
+              totalMarketingSpendVnd: 500000,
+              totalMarketingHours: 2,
+              cac30: { isAvailable: true, valueVnd: 250000, nullReason: null },
+            },
+            subscriptionOrders: [],
+            campaignCosts: [],
+            campaignRoas: [
+              {
+                campaign: 'fb_tet_2026',
+                name: 'Chiến dịch Tết 2026',
+                channel: 'paid_social',
+                source: 'facebook',
+                promoCode: 'TET2026',
+                registrations: 15,
+                activatedOwners: 9,
+                paidOrders: 3,
+                revenueVnd: 1500000,
+                totalCostVnd: 500000,
+                cplVnd: 33333,
+                cacVnd: 166667,
+                roasPercent: 300,
+              },
+            ],
+            dailySeries: [],
+          },
+        });
+      }
+      if (path === '/api/admin/monitoring/campaigns/metadata') {
+        return route.fulfill({
+          json: [
+            {
+              id: 'mc-01',
+              code: 'fb_tet_2026',
+              name: 'Chiến dịch Tết 2026',
+              channel: 'paid_social',
+              source: 'facebook',
+              medium: 'cpc',
+              promoCode: 'TET2026',
+              targetLandingPath: '/register',
+              trackingUrl: 'https://roomie.io.vn/register?utm_source=facebook&utm_medium=cpc&utm_campaign=fb_tet_2026&promo=TET2026',
+              isActive: true,
+              createdAt: '2026-10-15T08:00:00Z',
+              updatedAt: '2026-10-15T08:00:00Z',
+            },
+          ],
+        });
+      }
+      if (path === '/api/marketer/leads' && method === 'GET') {
+        return route.fulfill({
+          json: {
+            items: [
+              {
+                ownerId: 'owner-lead-01',
+                name: 'Chủ Trọ Quận 7',
+                email: 'quan7@example.com',
+                phone: '0909111222',
+                status: 'Approved',
+                subscriptionTier: 'Free',
+                isPro: false,
+                maxRooms: 5,
+                buildingCount: 1,
+                roomCount: 4,
+                isActivated: true,
+                utmSource: 'facebook',
+                utmMedium: 'cpc',
+                utmCampaign: 'tet_2026',
+                redeemedPromoCodes: ['TET2026'],
+                createdAt: '2026-10-15T08:00:00Z',
+                leadStatus: 'Interested',
+                tags: 'vip-20-phong, quan-tam-pro',
+                notesCount: notes.length,
+              },
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 20,
+            segmentCounts: {
+              All: 1,
+              StuckOnboarding: 0,
+              FreeNearLimit: 1,
+              ProExpiringSoon: 0,
+              InactiveOwners: 0,
+              ActivePro: 0,
+            },
+          },
+        });
+      }
+      if (path === '/api/marketer/leads/owner-lead-01/notes' && method === 'GET') {
+        return route.fulfill({ json: notes });
+      }
+      if (path === '/api/marketer/articles' && method === 'GET') {
+        return route.fulfill({
+          json: [
+            {
+              id: 'art-01',
+              slug: 'cach-quan-ly-nha-tro-20-phong',
+              title: 'Cách quản lý nhà trọ 20 phòng nhàn hạ',
+              summary: 'Hướng dẫn tự động hóa tính điện nước và gửi hóa đơn Zalo.',
+              category: 'Vận hành nhà trọ',
+              readingTimeMinutes: 5,
+              contentMarkdown: '## Bước 1: Tạo dãy trọ',
+              ctaText: 'Dùng thử miễn phí',
+              ctaUrl: '/register?promo=TET2026',
+              isPublished: true,
+              viewCount: 42,
+              ctaClickCount: 7,
+              authorName: 'Roomie Marketing',
+              updatedAt: '2026-10-20T08:00:00Z',
+            },
+          ],
+        });
+      }
+      if (path === '/api/marketer/banners' && method === 'GET') {
+        return route.fulfill({ json: [] });
+      }
+      if (path === '/api/marketer/emails' && method === 'GET') {
+        return route.fulfill({
+          json: [
+            {
+              id: 'camp-01',
+              name: 'Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng',
+              segment: 'FreeNearLimit',
+              subject: 'Tặng mã TET2026 nâng cấp Roomie Pro',
+              bodyHtml: '<p>Chào {{OwnerName}}</p>',
+              promoCode: 'TET2026',
+              status: 'Completed',
+              recipientCount: 12,
+              sentCount: 12,
+              failedCount: 0,
+              createdByName: 'Marketer Roomie',
+              createdAt: '2026-10-20T08:00:00Z',
+              sentAt: '2026-10-20T08:05:00Z',
+            },
+          ],
+        });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    // 1. Login as Marketer -> redirects to /marketer/leads
+    await page.goto('/login');
+    await page.locator('#email').fill('marketer@phongtro.local');
+    await page.locator('#password').fill('Marketer123!');
+    await page.getByRole('button', { name: 'Đăng nhập' }).click();
+
+    await expect(page).toHaveURL(/marketer\/leads/);
+    await expect(page.getByRole('heading', { level: 2, name: 'Chăm sóc & Phân khúc Chủ trọ' })).toBeVisible();
+    await expect(page.getByText('Chủ Trọ Quận 7')).toBeVisible();
+    await expect(page.getByText('TET2026')).toBeVisible();
+
+    // Open CRM drawer and verify note history + Zalo quick link
+    await page.getByRole('button', { name: 'Chăm sóc' }).click();
+    await expect(page.getByText('Đã gọi điện tư vấn kích hoạt phòng đầu tiên.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Nhắn Zalo' })).toBeVisible();
+
+    // 2. Navigate to /admin/monitoring -> sees Growth & Revenue tabs, but NOT Operations tab
+    await page.goto('/admin/monitoring');
+    await expect(page.getByRole('tab', { name: 'Tăng trưởng & Sử dụng' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Doanh thu' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Vận hành' })).toHaveCount(0);
+
+    // Switch to Revenue tab and verify ROAS columns & Campaign Directory
+    await page.getByRole('tab', { name: 'Doanh thu' }).click();
+    await expect(page.getByText('Chiến dịch Tết 2026').first()).toBeVisible();
+    await expect(page.getByText('300%')).toBeVisible();
+    await expect(page.getByText('Danh mục chiến dịch & Liên kết Auto-Promo / QR')).toBeVisible();
+
+    // 3. Navigate to /marketer/content
+    await page.goto('/marketer/content');
+    await expect(page.getByRole('heading', { level: 2, name: 'Cẩm nang SEO & Banner Chiến dịch' })).toBeVisible();
+    await expect(page.getByText('Cách quản lý nhà trọ 20 phòng nhàn hạ')).toBeVisible();
+
+    // 4. Navigate to /marketer/emails
+    await page.goto('/marketer/emails');
+    await expect(page.getByRole('heading', { level: 2, name: 'Chiến dịch Email theo Phân khúc' })).toBeVisible();
+    await expect(page.getByText('Ưu đãi nâng cấp Pro cho chủ trọ 4-5 phòng')).toBeVisible();
+
+    // 5. Public /huong-dan/:slug guide renders article and Table of Contents
+    await page.goto('/huong-dan/quan-ly-phong-tien-coc-va-tra-phong');
+    await expect(page.getByRole('heading', { level: 1, name: /Quy trình quản lý phòng, tiền cọc và trả phòng/ })).toBeVisible();
+    await expect(page.getByText('Mục lục bài viết')).toBeVisible();
+  });
 });

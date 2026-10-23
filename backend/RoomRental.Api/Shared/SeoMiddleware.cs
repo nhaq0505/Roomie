@@ -17,7 +17,8 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     {
         "/login", "/register", "/reset-password", "/change-password", "/account-status",
         "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/reports",
-        "/settings/payment", "/settings/zalo", "/admin/owners", "/admin/monitoring", "/admin/promotions"
+        "/settings/payment", "/settings/zalo", "/admin/owners", "/admin/monitoring", "/admin/promotions",
+        "/marketer/leads", "/marketer/content", "/marketer/emails"
     };
 
     [GeneratedRegex(@"^/(t|tenant)/[^/]+(?:/invoices/[^/]+/checkout)?$", RegexOptions.IgnoreCase)]
@@ -25,6 +26,9 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
 
     [GeneratedRegex(@"^/rooms/[^/]+/(tenant|documents)$", RegexOptions.IgnoreCase)]
     private static partial Regex RoomTenantPath();
+
+    [GeneratedRegex(@"^/huong-dan/[a-z0-9]+(?:-[a-z0-9]+)*$", RegexOptions.IgnoreCase)]
+    private static partial Regex GuideArticlePath();
 
     private static string NormalizePath(string path)
     {
@@ -38,7 +42,7 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     public static bool IsPublicPath(string path) => PublicHtmlFiles.ContainsKey(NormalizePath(path));
 
     public static bool IsAppPath(string path) =>
-        AppPaths.Contains(path.TrimEnd('/')) || GuestPath().IsMatch(path.TrimEnd('/')) || RoomTenantPath().IsMatch(path.TrimEnd('/'));
+        AppPaths.Contains(path.TrimEnd('/')) || GuestPath().IsMatch(path.TrimEnd('/')) || RoomTenantPath().IsMatch(path.TrimEnd('/')) || GuideArticlePath().IsMatch(path.TrimEnd('/'));
 
     public async Task InvokeAsync(HttpContext context)
     {

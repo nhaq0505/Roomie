@@ -5,7 +5,8 @@ import { buildingsApi } from './features/buildings';
 import { roomsApi } from './features/rooms';
 import { readingsApi } from './features/readings';
 import { invoicesApi } from './features/invoices';
-import { ownersApi } from './features/admin';
+import { ownersApi, marketersApi } from './features/admin';
+import { marketerApi } from './features/marketer';
 import { subscriptionApi } from './features/subscription';
 import { paymentSettingsApi } from './features/payments';
 import { tenantApi } from './features/tenant';
@@ -19,6 +20,8 @@ export const api = {
   readings: readingsApi,
   invoices: invoicesApi,
   owners: ownersApi,
+  marketers: marketersApi,
+  marketer: marketerApi,
   subscription: subscriptionApi,
   paymentSettings: paymentSettingsApi,
   tenant: tenantApi,
@@ -34,6 +37,7 @@ export type * from './features/readings';
 export type * from './features/invoices';
 export type * from './features/reports';
 export type * from './features/admin';
+export type * from './features/marketer';
 export type * from './features/payments';
 export type * from './features/tenant';
 export { ApiError, listFrom } from './shared/http/client';

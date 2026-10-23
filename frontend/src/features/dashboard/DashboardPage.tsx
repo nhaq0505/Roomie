@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { getLocale, t } from '../../shared/i18n/runtime';
+import { ActiveBannerStrip } from '../../shared/ui/ActiveBannerStrip';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { invoicesApi } from '../invoices/index';
 import { roomsApi } from '../rooms/index';
@@ -24,6 +25,7 @@ export default function DashboardPage() {
 
   if (dashboardQuery.isError) return <><PageTitle eyebrow={t("TỔNG QUAN")} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} /><LoadError error={dashboardQuery.error} onRetry={() => void dashboardQuery.refetch()} /></>;
   return <>
+    <ActiveBannerStrip placement="OwnerDashboard" />
     <PageTitle eyebrow={todayLabel} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} extra={<Button type="primary" icon={<CalculatorOutlined />} onClick={() => navigate('/readings')}>{t("Nhập chỉ số tháng này")}</Button>} />
     <SectionCard title={t("Thao tác nhanh")} className="quick-actions-card" extra={<Button onClick={() => navigate('/settings/payment')}>{t("Cài đặt thanh toán")}</Button>}><div className="quick-actions"><Link to="/buildings?create=1"><BankOutlined /><strong>{t("Tạo dãy trọ")}</strong><span>{t("Thêm địa điểm cho thuê")}</span><PlusOutlined /></Link><Link to="/rooms?create=1"><HomeOutlined /><strong>{t("Tạo phòng trọ")}</strong><span>{t("Thiết lập giá thuê và phí")}</span><PlusOutlined /></Link><Link to="/rooms?links=1"><LinkOutlined /><strong>{t("Cấp link cho khách")}</strong><span>{t("Chọn phòng đang có người thuê")}</span><ArrowRightOutlined /></Link></div></SectionCard>
     {loading ? <div className="content-card"><Skeleton active paragraph={{ rows: 8 }} /></div> : <>

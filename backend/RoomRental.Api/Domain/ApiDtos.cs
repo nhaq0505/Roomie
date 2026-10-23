@@ -2,11 +2,13 @@ namespace RoomRental.Api.Domain;
 
 public sealed record UserDto(Guid Id, string Name, string Email, string Role, string Status, string SubscriptionTier = "Free", DateTimeOffset? SubscriptionExpiresAt = null, int MaxRooms = 5, bool MfaEnabled = false, bool MfaRequired = false);
 public sealed record OwnerAdminDto(Guid Id, string Name, string Email, string? Phone, string Status, string? Reason, DateTimeOffset CreatedAt, string SubscriptionTier = "Free", DateTimeOffset? SubscriptionExpiresAt = null, bool IsPro = false, int RoomCount = 0, int MaxRooms = 5);
+public sealed record MarketerAdminDto(Guid Id, string Name, string Email, string? Phone, string Status, string? Reason, DateTimeOffset CreatedAt);
+public sealed record CreateMarketerRequest(string Name, string Email, string Password, string? Phone = null);
 public sealed record AdminSubscriptionRequest(string Tier, int? Days = null, DateTimeOffset? ExpiresAt = null, string? Reason = null);
 public sealed record SubscriptionPackageDto(string Id, string Name, int Days, decimal Price, string Description);
 public sealed record SubscriptionStatusDto(string Tier, bool IsPro, DateTimeOffset? ExpiresAt, int RoomCount, int MaxRooms, IReadOnlyList<SubscriptionPackageDto> AvailablePackages);
 public sealed record CreateSubscriptionCheckoutRequest(string? PackageId = null);
-public sealed record RegisterRequest(string Name, string Email, string Password, string? Phone, RegistrationAttributionDto? Attribution = null);
+public sealed record RegisterRequest(string Name, string Email, string Password, string? Phone, RegistrationAttributionDto? Attribution = null, string? PromoCode = null);
 public sealed record RegistrationVerificationDto(bool VerificationRequired, string ChallengeToken, string Email, DateTimeOffset ExpiresAt, DateTimeOffset ResendAvailableAt);
 public sealed record VerifyRegistrationRequest(string ChallengeToken, string Code);
 public sealed record ResendRegistrationRequest(string ChallengeToken);

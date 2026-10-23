@@ -40,3 +40,32 @@ export interface AdminPromotionsOverview {
   welcome: WelcomePromotion;
   codes: PromotionCode[];
 }
+
+export interface MarketerAccount {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  status: AccountStatus;
+  reason?: string | null;
+  createdAt?: string;
+}
+
+export interface CreateMarketerRequest {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string | null;
+}
+
+export interface PromotionRedemptionItem {
+  id: string;
+  userId: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone?: string | null;
+  redeemedAt: string;
+  subscriptionTier: string;
+  subscriptionExpiresAt?: string | null;
+  isActivated: boolean;
+}

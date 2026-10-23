@@ -175,10 +175,14 @@ export function useUpdateIncident() {
   });
 }
 
-export function useCampaignMetadata(params?: { activeOnly?: boolean; channel?: string; source?: string }) {
+export function useCampaignMetadata(
+  params?: { activeOnly?: boolean; channel?: string; source?: string },
+  enabled = true
+) {
   return useQuery({
     queryKey: ['monitoring', 'campaigns-metadata', params],
     queryFn: () => monitoringApi.getCampaignMetadata(params),
+    enabled,
     staleTime: 60 * 1000,
   });
 }
@@ -189,6 +193,7 @@ export function useCreateCampaignMetadata() {
     mutationFn: (body: CreateCampaignRequest) => monitoringApi.createCampaignMetadata(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaigns-metadata'] });
+      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'revenue'] });
     },
   });
 }
@@ -200,6 +205,7 @@ export function useUpdateCampaignMetadata() {
       monitoringApi.updateCampaignMetadata(id, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['monitoring', 'campaigns-metadata'] });
+      void queryClient.invalidateQueries({ queryKey: ['monitoring', 'revenue'] });
     },
   });
 }

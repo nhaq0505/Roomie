@@ -162,6 +162,7 @@ public sealed class MarketingCampaign
     public string? UtmMedium { get; set; }
     public string? UtmSource { get; set; }
     public string? TargetUrl { get; set; }
+    public string? PromoCode { get; set; }
     public bool IsActive { get; set; } = true;
     public Guid CreatedBy { get; set; }
     public required string CreatedByName { get; set; }

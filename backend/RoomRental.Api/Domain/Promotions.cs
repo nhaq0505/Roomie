@@ -93,3 +93,15 @@ public sealed record RedeemPromotionResultDto(
     DateTimeOffset? SubscriptionExpiresAt,
     int AddedMonths
 );
+
+public sealed record PromotionRedemptionItemDto(
+    Guid Id,
+    Guid UserId,
+    string OwnerName,
+    string OwnerEmail,
+    string? OwnerPhone,
+    DateTimeOffset RedeemedAt,
+    string SubscriptionTier,
+    DateTimeOffset? SubscriptionExpiresAt,
+    bool IsActivated
+);

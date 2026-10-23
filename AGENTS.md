@@ -6,9 +6,9 @@ Baseline rà soát: `7be139d`, ngày 21/10/2026. Mô tả dưới đây dựa tr
 
 ## 1. Sản phẩm và các quyết định đang áp dụng
 
-Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ và dashboard growth/revenue/operations. Camera/OCR/AI chưa triển khai.
+Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ, nhân sự Marketer và dashboard growth/revenue/operations. Marketer quản lý phễu tăng trưởng/doanh thu/chi phí chiến dịch (`/admin/monitoring`), mã khuyến mãi & link Auto-Promo (`/admin/promotions`), CRM & phân khúc chủ trọ (`/marketer/leads`), CMS Cẩm nang SEO & Banner (`/marketer/content`, `/huong-dan/:slug`) và chiến dịch Email theo phân khúc (`/marketer/emails`), nhưng bị chặn (`403 Forbidden`) khỏi toàn bộ dữ liệu vận hành hạ tầng (`Operations`, `Incidents`, `Maintenance`), duyệt/khóa chủ trọ và dữ liệu nhạy cảm của khách thuê/ngân hàng. Camera/OCR/AI chưa triển khai.
 
-- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free (hoặc Pro có thời hạn nếu cấu hình `Promotions:NewUserProMonths > 0`). Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
+- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free (hoặc Pro có thời hạn nếu cấu hình `Promotions:NewUserProMonths > 0` hoặc đăng ký qua link Auto-Promo `/register?promo=CODE`). Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
 - Free tối đa 5 phòng đang sử dụng; Pro có thời hạn hoặc vô thời hạn. Kiểm tra `AppUser.IsPro/MaxRooms` và endpoint subscription trước khi sửa quota.
 - Đăng nhập chỉ dùng mật khẩu. Các cột MFA cũ vẫn tồn tại để tương thích schema, không phải tính năng cần bật lại.
 - Mật khẩu mới 9–256 ký tự, không toàn khoảng trắng, không ép ký tự đặc biệt.
@@ -16,7 +16,7 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 - Khoản thu thủ công mới phải bằng **toàn bộ dư nợ**; dữ liệu thanh toán một phần cũ vẫn hợp lệ. Không phục hồi UI nhập khoản thu một phần từ test/doc lịch sử.
 - Tin Zalo dẫn về **`/t/{token}`**, để khách xem hóa đơn rồi tự chọn thanh toán. Không gửi thẳng checkout, số tài khoản hay ảnh QR trong tin.
 - `frontend/public/robots.txt` cố ý chặn mọi bot (`User-agent: *`, `Disallow: /`) theo yêu cầu người dùng. Không tự mở crawl, gửi sitemap hay yêu cầu index.
-- Backlog SEO chưa xuất bản: bốn bài quản lý phòng, tính điện, quản lý công nợ và thu tiền qua QR trong kế hoạch 8 tuần cũ. Chỉ triển khai khi có yêu cầu tiếp tục, nghiên cứu nguồn trước khi viết; route `/huong-dan/` chưa phải tính năng đã có. Đo bằng Search Console, không tự thêm GA4 hay hứa traffic/thứ hạng.
+- Cẩm nang hướng dẫn (`/huong-dan` và `/huong-dan/:slug`) kết hợp danh mục hướng dẫn tĩnh với bài viết CMS xuất bản từ `MarketingArticle` (`/api/public/guides`). Đo bằng Search Console và telemetry nội bộ, không tự thêm GA4 hay hứa traffic/thứ hạng.
 - Logo đang dùng trong app: `frontend/src/shared/ui/RoomieMark.tsx`, `frontend/public/roomie-logo.svg`, `favicon.svg`; ảnh social `roomie-social.png/.svg`; email `backend/RoomRental.Api/Assets/roomie-email-logo.png`. Bản logo/cover Facebook mới nằm trong `output/facebook/`, chưa tự thay vào app.
 
 ## 2. Bản đồ repository
@@ -24,11 +24,11 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 | Đường dẫn | Vai trò / điểm bắt đầu |
 | --- | --- |
 | `backend/RoomRental.Api/Program.cs` | DI, provider DB, workers, cookie, limiter, middleware, đăng ký routes, SPA fallback |
-| `backend/RoomRental.Api/Domain/` | Entities và DTO; monitoring, Zalo, manual payments, recovery có file riêng |
+| `backend/RoomRental.Api/Domain/` | Entities và DTO; monitoring, Zalo, manual payments, recovery, marketer CRM/content/emails có file riêng |
 | `backend/RoomRental.Api/Data/AppDbContext.cs` | Toàn bộ mapping, indexes, concurrency tokens, DbSets |
 | `backend/RoomRental.Api/Data/ProviderDbContexts.cs` | Context/factory PostgreSQL |
 | `backend/RoomRental.Api/Data/Migrations/Postgres/` | Migration, designer và snapshot cho PostgreSQL |
-| `backend/RoomRental.Api/Features/` | Endpoint/service chia theo Auth, Admin, Properties, Billing, Payments, Reports, Zalo, Monitoring |
+| `backend/RoomRental.Api/Features/` | Endpoint/service chia theo Auth, Admin, Marketer, Properties, Billing, Payments, Reports, Zalo, Monitoring |
 | `backend/RoomRental.Api/Shared/` | Security, SEO, calendar, lookup owner/property, pagination, fingerprint, cleanup |
 | `compose.postgres-dev.yaml` | Compose PostgreSQL dev local (container `rehouse-pg-migration-db`, port 15432) |
 | `frontend/src/app/` | Entry React, routing, layout, CSS assembly, metadata và prerender entry |
@@ -61,7 +61,8 @@ Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/reho
 | Nâng cấp Pro | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs` | `features/subscription`, `test_billing_upgrade.py` |
 | Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
 | Nhắc Zalo | `Features/Zalo/`, `Domain/Zalo.cs` | `features/zalo`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test` |
-| Theo dõi growth/revenue | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests` |
+| Theo dõi growth/revenue & ROAS | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests`, `MarketerSuiteHttpTests` |
+| Marketer CRM, CMS SEO/Banner & Email | `Features/Marketer/`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Marketer*.cs` | `features/marketer`, `features/marketing/GuideArticlePage.tsx`, `shared/ui/ActiveBannerStrip.tsx`, `MarketerSuiteHttpTests`, `admin.spec.ts` |
 | Host/API/worker monitoring | `Features/Monitoring/Operations/`, `deploy/monitoring/` | `OperationsTab.tsx`, `OperationsMonitoringTests`, `test_host_collector.py` |
 | Landing/SEO | `Shared/SeoMiddleware.cs` | `features/marketing`, `app/seo`, `scripts/prerender.mjs`, `test_seo_http.py` |
 
@@ -169,7 +170,7 @@ dotnet run --no-launch-profile --project backend/RoomRental.Api --urls http://lo
 npm --prefix frontend run dev
 ```
 
-Mở `http://localhost:5173` (Vite proxy `/api` → `localhost:5080`). Fixture demo: `admin@phongtro.local` / `Admin123!`, `owner@phongtro.local` / `Owner123!`. Đây chỉ là credentials seed dùng thử. Để thử OTP dùng harness SMTP bên dưới, không gỡ guard rồi gọi SMTP thật.
+Mở `http://localhost:5173` (Vite proxy `/api` → `localhost:5080`). Fixture demo: `admin@phongtro.local` / `Admin123!`, `marketer@phongtro.local` / `Marketer123!`, `owner@phongtro.local` / `Owner123!`. Đây chỉ là credentials seed dùng thử. Để thử OTP dùng harness SMTP bên dưới, không gỡ guard rồi gọi SMTP thật.
 
 Cấu hình quan trọng: `DatabaseProvider`, `ConnectionStrings__DefaultConnection`, `DataProtection__KeysPath`, `PublicBaseUrl`, `WebhookBaseUrl`, `TrustedProxies`, `Email__*`, `Zalo__*`, `Monitoring__*`. Xem `.env.example` và runbooks; không thêm giá trị thật vào Git.
 

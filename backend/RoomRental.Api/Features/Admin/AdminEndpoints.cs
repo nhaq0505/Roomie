@@ -144,5 +144,119 @@ public static class AdminEndpoints
                 owner.CreatedAt, owner.SubscriptionTier.ToString(), owner.SubscriptionExpiresAt,
                 owner.IsPro, count, owner.MaxRooms));
         });
+
+        routes.MapGet("/marketers", async (AppDbContext db, CancellationToken cancellationToken) =>
+        {
+            var marketers = await db.Users.AsNoTracking()
+                .Where(row => row.Role == UserRole.Marketer)
+                .OrderByDescending(row => row.CreatedAt)
+                .ThenBy(row => row.Id)
+                .Select(row => new MarketerAdminDto(
+                    row.Id,
+                    row.Name,
+                    row.Email,
+                    row.Phone,
+                    row.Status.ToString(),
+                    row.StatusReason,
+                    row.CreatedAt))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(marketers);
+        });
+
+        routes.MapPost("/marketers", async (CreateMarketerRequest request, AppDbContext db, Microsoft.AspNetCore.Identity.IPasswordHasher<AppUser> hasher, CancellationToken cancellationToken) =>
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 160)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Tên nhân sự không hợp lệ (1-160 ký tự).");
+
+            var email = request.Email?.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(email) || !email.Contains('@') || email.Length > 320)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Email nhân sự không hợp lệ.");
+
+            if (!PasswordSecurity.IsValidNewPassword(request.Password))
+                throw new ApiException(StatusCodes.Status400BadRequest, "Mật khẩu mới cần từ 9 đến 256 ký tự.");
+
+            var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+            if (phone is { Length: > 60 })
+                throw new ApiException(StatusCodes.Status400BadRequest, "Số điện thoại tối đa 60 ký tự.");
+
+            if (await db.Users.AnyAsync(x => x.Email == email, cancellationToken))
+                throw new ApiException(StatusCodes.Status409Conflict, "Email này đã tồn tại trong hệ thống.");
+
+            var marketer = new AppUser
+            {
+                Name = name,
+                Email = email,
+                Phone = phone,
+                Role = UserRole.Marketer,
+                Status = OwnerStatus.Approved,
+                PasswordHash = string.Empty
+            };
+            marketer.PasswordHash = hasher.HashPassword(marketer, request.Password);
+            db.Users.Add(marketer);
+            await db.SaveChangesAsync(cancellationToken);
+
+            return Results.Created($"/api/admin/marketers/{marketer.Id}", new MarketerAdminDto(
+                marketer.Id,
+                marketer.Name,
+                marketer.Email,
+                marketer.Phone,
+                marketer.Status.ToString(),
+                marketer.StatusReason,
+                marketer.CreatedAt));
+        });
+
+        routes.MapPost("/marketers/{id:guid}/status", async (Guid id, OwnerStatusRequest request, AppDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (!Enum.TryParse<OwnerStatus>(request.Status, ignoreCase: false, out var nextStatus) ||
+                nextStatus is not (OwnerStatus.Approved or OwnerStatus.Suspended))
+            {
+                throw new ApiException(StatusCodes.Status400BadRequest, "Status must be Approved or Suspended.");
+            }
+
+            var marketer = await db.Users.SingleOrDefaultAsync(row => row.Id == id && row.Role == UserRole.Marketer, cancellationToken)
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Marketer was not found.");
+
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+            if (reason is { Length: > 1000 })
+                throw new ApiException(StatusCodes.Status400BadRequest, "Reason must be 1000 characters or fewer.");
+
+            marketer.Status = nextStatus;
+            marketer.StatusReason = reason;
+            if (nextStatus != OwnerStatus.Approved)
+            {
+                await PasswordSecurity.RevokeSessionsAsync(db, marketer.Id, cancellationToken);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new MarketerAdminDto(
+                marketer.Id,
+                marketer.Name,
+                marketer.Email,
+                marketer.Phone,
+                marketer.Status.ToString(),
+                marketer.StatusReason,
+                marketer.CreatedAt));
+        });
+
+        routes.MapPost("/marketers/{id:guid}/reset-password", async (Guid id, AdminResetPasswordRequest request,
+            HttpContext context, AppDbContext db, Microsoft.AspNetCore.Identity.IPasswordHasher<AppUser> hasher, CancellationToken ct) =>
+        {
+            await AccountLoginLimiter.ReserveAsync(db, "admin-recovery:" + ApiSupport.UserId(context), app.Environment.IsDevelopment() ? 1000 : 10, ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+            var admin = await db.Users.SingleAsync(x => x.Id == ApiSupport.UserId(context), ct);
+            PasswordSecurity.VerifyCurrentPassword(admin, request.CurrentPassword, hasher);
+            var marketer = await db.Users.SingleOrDefaultAsync(x => x.Id == id && x.Role == UserRole.Marketer, ct)
+                ?? throw new ApiException(404, "Marketer was not found.");
+            var token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+            marketer.PasswordResetHash = PasswordSecurity.HashToken(token);
+            marketer.PasswordResetExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
+            await PasswordSecurity.RevokeSessionsAsync(db, marketer.Id, ct);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(new { token, expiresAt = marketer.PasswordResetExpiresAt });
+        }).RequireRateLimiting("auth");
     }
 }

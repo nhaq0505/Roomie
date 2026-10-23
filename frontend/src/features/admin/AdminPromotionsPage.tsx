@@ -3,8 +3,10 @@ import {
   DeleteOutlined,
   EditOutlined,
   GiftOutlined,
+  LinkOutlined,
   PlusOutlined,
   TagOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,6 +14,7 @@ import {
   Button,
   Col,
   DatePicker,
+  Drawer,
   Form,
   Input,
   InputNumber,
@@ -22,13 +25,14 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
-import { promotionsApi, type PromotionCode } from './index';
+import { promotionsApi, type PromotionCode, type PromotionRedemptionItem } from './index';
 
 export default function AdminPromotionsPage() {
   const { message } = App.useApp();
@@ -69,7 +73,14 @@ export default function AdminPromotionsPage() {
   // Voucher Code Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<PromotionCode | null>(null);
+  const [viewingRedemptionsCode, setViewingRedemptionsCode] = useState<PromotionCode | null>(null);
   const [codeForm] = Form.useForm();
+
+  const redemptionsQuery = useQuery({
+    queryKey: ['admin-promotion-redemptions', viewingRedemptionsCode?.id],
+    queryFn: () => promotionsApi.redemptions(viewingRedemptionsCode!.id),
+    enabled: Boolean(viewingRedemptionsCode?.id),
+  });
 
   const openCreateModal = () => {
     setEditingCode(null);
@@ -156,6 +167,17 @@ export default function AdminPromotionsPage() {
     return <LoadError error={query.error} onRetry={() => void query.refetch()} />;
   }
 
+  const copyRegisterPromoLink = async (code: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://roomie.io.vn';
+    const link = `${origin}/register?promo=${encodeURIComponent(code)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      message.success(t("Đã sao chép link đăng ký kèm mã {0}", [code]));
+    } catch {
+      message.info(link);
+    }
+  };
+
   const columns = [
     {
       title: t("Mã voucher"),
@@ -167,20 +189,31 @@ export default function AdminPromotionsPage() {
             <TagOutlined style={{ marginRight: 4 }} />
             {code}
           </Tag>
-          <Button
-            type="text"
-            size="small"
-            icon={<CopyOutlined />}
-            aria-label={t("Sao chép mã {0}", [code])}
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(code);
-                message.success(t("Đã sao chép mã {0}", [code]));
-              } catch {
-                message.info(code);
-              }
-            }}
-          />
+          <Tooltip title={t("Sao chép mã {0}", [code])}>
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              aria-label={t("Sao chép mã {0}", [code])}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(code);
+                  message.success(t("Đã sao chép mã {0}", [code]));
+                } catch {
+                  message.info(code);
+                }
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={t("Sao chép link đăng ký tự gắn mã")}>
+            <Button
+              type="text"
+              size="small"
+              icon={<LinkOutlined />}
+              aria-label={t("Sao chép link đăng ký kèm mã {0}", [code])}
+              onClick={() => void copyRegisterPromoLink(code)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -204,9 +237,19 @@ export default function AdminPromotionsPage() {
       title: t("Lượt sử dụng"),
       key: 'usage',
       render: (_: unknown, record: PromotionCode) => (
-        <span>
-          <strong>{record.redeemedCount}</strong> / {record.maxRedemptions ? record.maxRedemptions : '∞'}
-        </span>
+        <Space size={6}>
+          <span>
+            <strong>{record.redeemedCount}</strong> / {record.maxRedemptions ? record.maxRedemptions : '∞'}
+          </span>
+          <Button
+            type="link"
+            size="small"
+            icon={<TeamOutlined />}
+            onClick={() => setViewingRedemptionsCode(record)}
+          >
+            {t("Danh sách")}
+          </Button>
+        </Space>
       ),
     },
     {
@@ -422,6 +465,64 @@ export default function AdminPromotionsPage() {
           </Row>
         </Form>
       </Modal>
+
+      <Drawer
+        open={Boolean(viewingRedemptionsCode)}
+        title={
+          viewingRedemptionsCode
+            ? t("Danh sách chủ trọ đã nhận mã {0}", [viewingRedemptionsCode.code])
+            : t("Danh sách kích hoạt mã")
+        }
+        onClose={() => setViewingRedemptionsCode(null)}
+        width={680}
+        destroyOnClose
+      >
+        <Table<PromotionRedemptionItem>
+          rowKey="id"
+          loading={redemptionsQuery.isLoading}
+          dataSource={redemptionsQuery.data ?? []}
+          pagination={{ pageSize: 15 }}
+          locale={{ emptyText: t("Chưa có chủ trọ nào kích hoạt mã này.") }}
+          columns={[
+            {
+              title: t("Chủ trọ"),
+              key: 'owner',
+              render: (_: unknown, r: PromotionRedemptionItem) => (
+                <div>
+                  <div style={{ fontWeight: 600 }}>{r.ownerName}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>{r.ownerEmail}</div>
+                </div>
+              ),
+            },
+            {
+              title: t("Số điện thoại"),
+              dataIndex: 'ownerPhone',
+              key: 'ownerPhone',
+              render: (phone?: string | null) => phone || '—',
+            },
+            {
+              title: t("Tặng thưởng & Trạng thái"),
+              key: 'rewardStatus',
+              render: (_: unknown, r: PromotionRedemptionItem) => (
+                <Space size={4} wrap>
+                  <Tag color="gold">
+                    <strong>{t("+{0} tháng Pro", [viewingRedemptionsCode?.rewardMonths ?? 1])}</strong>
+                  </Tag>
+                  <Tag color={r.isActivated ? 'green' : 'default'}>
+                    {r.isActivated ? t("Đã kích hoạt") : t("Mới đăng ký")}
+                  </Tag>
+                </Space>
+              ),
+            },
+            {
+              title: t("Thời gian nhận"),
+              dataIndex: 'redeemedAt',
+              key: 'redeemedAt',
+              render: (val: string) => dayjs(val).format(`${dateFormat()} HH:mm`),
+            },
+          ]}
+        />
+      </Drawer>
     </>
   );
 }

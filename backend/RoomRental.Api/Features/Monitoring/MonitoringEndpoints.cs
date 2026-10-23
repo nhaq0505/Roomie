@@ -35,11 +35,15 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         }).RequireRateLimiting("analytics");
 
-        // Admin-only monitoring endpoints
+        // Growth, Revenue & Campaign endpoints (Admin + Marketer)
+        var marketingGroup = app.MapGroup("/api/admin/monitoring")
+            .RequireAuthorization(policy => policy.RequireRole("Admin", "Marketer"));
+
+        // Operations, Incidents & Maintenance endpoints (Admin-only)
         var adminGroup = app.MapGroup("/api/admin/monitoring")
             .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
-        adminGroup.MapGet("/growth", async (
+        marketingGroup.MapGet("/growth", async (
             [AsParameters] MonitoringFilterRequest filter,
             IGrowthMonitoringQueryService growthService,
             CancellationToken ct) =>
@@ -55,7 +59,7 @@ public static class MonitoringEndpoints
             }
         });
 
-        adminGroup.MapGet("/revenue", async (
+        marketingGroup.MapGet("/revenue", async (
             [AsParameters] MonitoringFilterRequest filter,
             IRevenueMonitoringQueryService revenueService,
             CancellationToken ct) =>
@@ -120,7 +124,7 @@ public static class MonitoringEndpoints
         });
 
         // Campaign Metadata CRUD
-        adminGroup.MapGet("/campaigns/metadata", async (
+        marketingGroup.MapGet("/campaigns/metadata", async (
             bool? activeOnly,
             string? channel,
             string? source,
@@ -131,7 +135,7 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         });
 
-        adminGroup.MapPost("/campaigns/metadata", async (
+        marketingGroup.MapPost("/campaigns/metadata", async (
             CreateCampaignRequest request,
             HttpContext context,
             IRevenueMonitoringQueryService revenueService,
@@ -143,7 +147,7 @@ public static class MonitoringEndpoints
             return Results.Created($"/api/admin/monitoring/campaigns/metadata/{response.Id}", response);
         });
 
-        adminGroup.MapPut("/campaigns/metadata/{id:guid}", async (
+        marketingGroup.MapPut("/campaigns/metadata/{id:guid}", async (
             Guid id,
             UpdateCampaignRequest request,
             HttpContext context,
@@ -157,7 +161,7 @@ public static class MonitoringEndpoints
         });
 
         // Campaign Costs CRUD
-        adminGroup.MapGet("/campaigns", async (
+        marketingGroup.MapGet("/campaigns", async (
             DateOnly? fromDate,
             DateOnly? toDate,
             string? campaign,
@@ -168,7 +172,7 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         });
 
-        adminGroup.MapGet("/campaigns/costs", async (
+        marketingGroup.MapGet("/campaigns/costs", async (
             DateOnly? fromDate,
             DateOnly? toDate,
             string? campaign,
@@ -179,7 +183,7 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         });
 
-        adminGroup.MapPost("/campaigns", async (
+        marketingGroup.MapPost("/campaigns", async (
             UpsertCampaignCostRequest request,
             HttpContext context,
             IRevenueMonitoringQueryService revenueService,
@@ -191,7 +195,7 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         });
 
-        adminGroup.MapPost("/campaigns/costs", async (
+        marketingGroup.MapPost("/campaigns/costs", async (
             UpsertCampaignCostRequest request,
             HttpContext context,
             IRevenueMonitoringQueryService revenueService,
@@ -203,18 +207,19 @@ public static class MonitoringEndpoints
             return Results.Ok(response);
         });
 
-        adminGroup.MapGet("/campaigns/generate-url", (
+        marketingGroup.MapGet("/campaigns/generate-url", (
             [FromQuery] string targetUrl,
             [FromQuery] string? source,
             [FromQuery] string? medium,
             [FromQuery] string? campaign,
             [FromQuery] string? term,
             [FromQuery] string? content,
+            [FromQuery] string? promo,
             IRevenueMonitoringQueryService revenueService) =>
         {
             if (string.IsNullOrWhiteSpace(targetUrl))
                 return Results.BadRequest(new { message = "targetUrl is required" });
-            var trackingUrl = revenueService.BuildTrackingUrl(targetUrl, source, medium, campaign, term, content);
+            var trackingUrl = revenueService.BuildTrackingUrl(targetUrl, source, medium, campaign, term, content, promo);
             return Results.Ok(new { url = trackingUrl });
         });
 

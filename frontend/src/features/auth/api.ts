@@ -13,5 +13,5 @@ export const authApi = {
     changePassword: (body: { currentPassword: string; newPassword: string; confirmPassword?: string }) => request<{ success: boolean }>('/api/auth/change-password', post(body)),
     resetPassword: (body: { email: string; token: string; newPassword: string; confirmPassword: string }) => request<{ success: boolean }>('/api/auth/reset-password', post(body)),
     logout: () => request<void>('/api/auth/logout', post()),
-    register: (body: { name: string; email: string; password: string; phone: string; attribution?: import('../../shared/analytics').RegistrationAttributionDto }) => request<User | RegistrationVerification>('/api/auth/register', post(body)),
+    register: (body: { name: string; email: string; password: string; phone: string; promoCode?: string | null; attribution?: import('../../shared/analytics').RegistrationAttributionDto }) => request<User | RegistrationVerification>('/api/auth/register', post(body)),
   };

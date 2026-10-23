@@ -197,6 +197,9 @@ app.MapZaloEndpoints();
 app.MapPaymentPreferencesEndpoints();
 app.MapManualPaymentEndpoints();
 app.MapMonitoringEndpoints();
+app.MapMarketerLeadsEndpoints();
+app.MapMarketerContentEndpoints();
+app.MapMarketerEmailEndpoints();
 
 app.MapFallback("{*path:nonfile}", async context =>
 {
