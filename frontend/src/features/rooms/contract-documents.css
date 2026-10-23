@@ -72,12 +72,14 @@
   padding: 8px 4px 16px;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
 }
 
 .contract-a4-sheet {
   width: 100%;
   max-width: 794px;
   min-height: 1020px;
+  height: fit-content;
   background: #ffffff;
   color: #111111;
   box-shadow: 0 8px 28px rgba(18, 38, 42, 0.12);
