@@ -19,6 +19,7 @@
 @import "../features/invoices/corrections.css";
 @import "../features/buildings/archive.css";
 @import "../features/reports/reports.css";
+@import "../features/expenses/expenses.css";
 @import "../features/rooms/lifecycle.css";
 @import "../features/rooms/contract-documents.css";
 @import "../shared/styles/responsive-states.css";

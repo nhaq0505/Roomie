@@ -69,6 +69,9 @@ if (!bool.TryParse(builder.Configuration["EnableInvoiceSweep"], out var enableIn
     builder.Services.AddHostedService<InvoiceSweepService>();
 if (!bool.TryParse(builder.Configuration["EnablePaymentReconciliation"], out var enablePaymentReconciliation) || enablePaymentReconciliation)
     builder.Services.AddHostedService<PaymentReconciliationHostedService>();
+builder.Services.AddScoped<RecurringExpenseGenerator>();
+if (!bool.TryParse(builder.Configuration["EnableRecurringExpenses"], out var enableRecurringExpenses) || enableRecurringExpenses)
+    builder.Services.AddHostedService<RecurringExpenseWorker>();
 builder.Services.AddHttpClient("payOS", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddMonitoringCore(builder.Configuration);
 builder.Services.AddMonitoringOperations(builder.Configuration);
@@ -188,6 +191,7 @@ app.MapAdminEndpoints();
 app.MapPromotionsRoutes();
 app.MapOwnerManagementEndpoints();
 app.MapReportsEndpoints();
+app.MapExpenseEndpoints();
 app.MapBillingEndpoints();
 app.MapDepositEndpoints();
 app.MapMoveoutEndpoints();

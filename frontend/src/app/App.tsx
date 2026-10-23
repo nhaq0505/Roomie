@@ -23,6 +23,7 @@ const RoomDocumentsPage = lazy(() => import('../features/rooms/RoomDocumentsPage
 const ReadingsPage = lazy(() => import('../features/readings/ReadingsPage'));
 const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage'));
+const ExpensesPage = lazy(() => import('../features/expenses/ExpensesPage'));
 const ZaloSettingsPage = lazy(() => import('../features/zalo/ZaloSettingsPage'));
 const PaymentSettingsPage = lazy(() => import('../features/payments/PaymentSettingsPage'));
 const AdminOwnersPage = lazy(() => import('../features/admin/AdminOwnersPage'));
@@ -111,6 +112,7 @@ export default function App() {
     <Route path="/rooms/:id/documents" element={<Gate><AppShell><RoomDocumentsPage /></AppShell></Gate>} />
     <Route path="/readings" element={<Gate><AppShell><ReadingsPage /></AppShell></Gate>} />
     <Route path="/invoices" element={<Gate><AppShell><InvoicesPage /></AppShell></Gate>} />
+    <Route path="/expenses" element={<Gate><AppShell><ExpensesPage /></AppShell></Gate>} />
     <Route path="/reports" element={<Gate><AppShell><ReportsPage /></AppShell></Gate>} />
     <Route path="/settings/zalo" element={<Gate><AppShell><ZaloSettingsPage /></AppShell></Gate>} />
     <Route path="/settings/payment" element={<Gate><AppShell><PaymentSettingsPage /></AppShell></Gate>} />

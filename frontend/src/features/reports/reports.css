@@ -27,3 +27,7 @@
 .report-mobile-row > div:not(.report-mobile-row-head) { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 12px; }
 .report-mobile-row > div:not(.report-mobile-row-head) > span { color: #63777c; }
 .report-mobile-row > div:not(.report-mobile-row-head) > strong { min-width: 0; color: #29484e; text-align: right; overflow-wrap: anywhere; }
+.report-muted { color: #7b8d90; font-size: 12px; }
+.profit-section-title { margin: 22px 0 10px; color: #25484d; font-size: 15px; font-weight: 700; }
+.reports-tab-label { display: inline-flex; align-items: center; gap: 6px; }
+.reports-tab-label .ant-tag { margin-inline-end: 0; }

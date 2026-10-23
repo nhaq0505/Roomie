@@ -54,6 +54,9 @@ public class AppDbContext : DbContext
     public DbSet<MarketingBanner> MarketingBanners => Set<MarketingBanner>();
     public DbSet<MarketingEmailCampaign> MarketingEmailCampaigns => Set<MarketingEmailCampaign>();
     public DbSet<MarketingEmailRecipientLog> MarketingEmailRecipientLogs => Set<MarketingEmailRecipientLog>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
+    public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -521,6 +524,57 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Description).HasMaxLength(255);
             entity.HasIndex(x => x.Code).IsUnique();
             entity.HasIndex(x => x.IsActive);
+        });
+
+        modelBuilder.Entity<Expense>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Category).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.Description).HasMaxLength(ExpenseLimits.MaxDescriptionLength);
+            entity.Property(x => x.UtilityPeriod).HasMaxLength(7);
+            entity.Property(x => x.UtilityKwh).HasPrecision(18, 2);
+            entity.Property(x => x.RecurrencePeriod).HasMaxLength(7);
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(100);
+            entity.Property(x => x.RequestFingerprint).HasMaxLength(64);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.OwnerId, x.ExpenseDate });
+            entity.HasIndex(x => new { x.OwnerId, x.BuildingId, x.ExpenseDate });
+            entity.HasIndex(x => new { x.OwnerId, x.BuildingId, x.UtilityPeriod })
+                .HasFilter("\"UtilityPeriod\" IS NOT NULL");
+            entity.HasIndex(x => new { x.OwnerId, x.IdempotencyKey }).IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            // Includes soft-deleted rows: deleting a generated expense must not let the worker recreate it.
+            entity.HasIndex(x => new { x.RecurringExpenseId, x.RecurrencePeriod }).IsUnique()
+                .HasFilter("\"RecurringExpenseId\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<RecurringExpense>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Category).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.Description).HasMaxLength(ExpenseLimits.MaxDescriptionLength);
+            entity.Property(x => x.StartPeriod).HasMaxLength(7).IsRequired();
+            entity.Property(x => x.EndPeriod).HasMaxLength(7);
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(100);
+            entity.Property(x => x.RequestFingerprint).HasMaxLength(64);
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => x.OwnerId);
+            entity.HasIndex(x => new { x.OwnerId, x.IdempotencyKey }).IsUnique()
+                .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<ExpenseAttachment>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FileName).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.ContentType).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Content).IsRequired();
+            entity.HasOne<Expense>().WithMany().HasForeignKey(x => x.ExpenseId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OwnerId);
+            entity.HasIndex(x => x.ExpenseId);
         });
 
         modelBuilder.Entity<PromotionRedemption>(entity =>

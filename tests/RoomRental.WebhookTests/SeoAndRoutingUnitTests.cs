@@ -49,7 +49,7 @@ internal static class SeoAndRoutingUnitTests
         string[] validAppPaths =
         [
             "/login", "/login/", "/register", "/reset-password", "/change-password", "/account-status",
-            "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/reports",
+            "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/expenses", "/reports",
             "/settings/payment", "/settings/zalo",
             "/admin/owners", "/admin/monitoring", "/admin/promotions", "/admin/promotions/",
             "/rooms/room-123/tenant", "/rooms/room-123/tenant/",

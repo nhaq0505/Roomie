@@ -148,6 +148,7 @@ export function PricingSection({ destination, actionLabel, isAuthenticated, onCt
             <li><CheckCircleFilled /><span>{t("Cấp liên kết hóa đơn riêng tư, người thuê xem không cần cài app")}</span></li>
             <li><CheckCircleFilled /><span>{t("Nhận thanh toán qua VietQR thủ công hoặc cổng tự động payOS")}</span></li>
             <li><CheckCircleFilled /><span>{t("Nhắc lịch hóa đơn qua Zalo và xuất báo cáo Excel (.xlsx)")}</span></li>
+            <li><CheckCircleFilled /><span>{t("Sổ chi phí: ghi điện nước tổng, sửa chữa, lương và các khoản chi khác")}</span></li>
           </ul>
           <Link
             to={destination}
@@ -198,6 +199,8 @@ export function PricingSection({ destination, actionLabel, isAuthenticated, onCt
           <ul className="pricing-features">
             <li><CheckCircleFilled /><span>{t("Bao gồm toàn bộ tính năng của gói Miễn phí")}</span></li>
             <li><CheckCircleFilled /><span>{t("Thêm không giới hạn số lượng dãy trọ và phòng đang thuê")}</span></li>
+            <li><CheckCircleFilled /><span>{t("Báo cáo lãi/lỗ theo tháng, chi định kỳ tự động và lưu ảnh chứng từ")}</span></li>
+            <li><CheckCircleFilled /><span>{t("Đối chiếu điện tổng EVN với điện đã lập cho phòng để phát hiện thất thoát")}</span></li>
             <li><CheckCircleFilled /><span>{t("Hỗ trợ người thuê thanh toán gộp nhiều hóa đơn cùng lúc")}</span></li>
             <li><CheckCircleFilled /><span>{t("Hỗ trợ kỹ thuật ưu tiên trong suốt thời gian đăng ký")}</span></li>
           </ul>
@@ -227,7 +230,7 @@ export function FaqSection() {
     },
     {
       q: t("Gói Miễn phí giới hạn như thế nào và khi nào tôi cần nâng cấp lên gói Pro?"),
-      a: t("Sau khi đăng ký và xác thực OTP qua email, tài khoản chủ trọ được kích hoạt ngay gói Miễn phí với đầy đủ tính năng cho tối đa 5 phòng đang sử dụng. Khi bạn quản lý từ phòng thứ 6 trở lên, bạn có thể nâng cấp gói Pro theo kỳ hạn 1 tháng, 3 tháng hoặc 1 năm."),
+      a: t("Sau khi đăng ký và xác thực OTP qua email, tài khoản chủ trọ được kích hoạt ngay gói Miễn phí với các tính năng vận hành cốt lõi (gồm sổ chi phí) cho tối đa 5 phòng đang sử dụng. Gói Pro theo kỳ hạn 1 tháng, 3 tháng hoặc 1 năm mở khóa không giới hạn phòng cùng báo cáo lãi/lỗ, chi định kỳ, lưu chứng từ và đối chiếu điện EVN."),
     },
     {
       q: t("Roomie quản lý tiền cọc và quy trình trả phòng ra sao?"),

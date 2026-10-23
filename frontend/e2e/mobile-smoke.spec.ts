@@ -194,7 +194,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
   });
 
   test('Zero horizontal overflow across all primary landlord pages on 375px viewport', async ({ page }) => {
-    const pages = ['/dashboard', '/buildings', '/rooms', '/readings', '/invoices', '/reports', '/settings/payment'];
+    const pages = ['/dashboard', '/buildings', '/rooms', '/readings', '/invoices', '/expenses', '/reports', '/settings/payment'];
 
     for (const p of pages) {
       await page.goto(p);
