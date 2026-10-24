@@ -17,7 +17,7 @@ function nullReasonText(reason: ElectricityReconciliationRow['lossNullReason']) 
 }
 
 function LossCell({ row }: { row: ElectricityReconciliationRow }) {
-  if (row.lossPercent === null) return <Tooltip title={nullReasonText(row.lossNullReason)}><span className="report-muted">{t("Chưa có dữ liệu")}</span></Tooltip>;
+  if (row.lossPercent === null) return <Tooltip trigger={['hover', 'click', 'focus']} title={nullReasonText(row.lossNullReason)}><span className="report-muted" tabIndex={0}>{t("Chưa có dữ liệu")}</span></Tooltip>;
   return <span className={row.lossPercent > 10 ? 'reconcile-loss-high' : undefined}>{row.lossPercent.toFixed(2)}% · {kwh(row.lossKwh ?? 0)}</span>;
 }
 
@@ -39,7 +39,7 @@ export default function ElectricityReconciliationPanel({ filters, isPro }: { fil
     { title: t("ĐÃ LẬP CHO PHÒNG"), key: 'billed', align: 'right', render: (_, row) => <div className="report-room-cell"><strong>{kwh(row.billedKwh)}</strong><span>{formatVnd(row.billedAmount)}</span></div> },
     { title: t("THẤT THOÁT"), key: 'loss', align: 'right', render: (_, row) => <LossCell row={row} /> },
     { title: t("CHÊNH LỆCH TIỀN"), dataIndex: 'margin', key: 'margin', align: 'right', render: (value: number, row) => row.evnKwh === null ? '—' : <strong className={value < 0 ? 'profit-negative' : undefined}>{formatVnd(value)}</strong> },
-    { title: '', key: 'drafts', render: (_, row) => row.draftInvoiceCount > 0 ? <Tooltip title={t("Còn hóa đơn nháp chưa phát hành trong kỳ này nên số đã lập có thể thiếu.")}><Tag color="orange" icon={<WarningOutlined />}>{t("{0} nháp", [row.draftInvoiceCount])}</Tag></Tooltip> : null },
+    { title: '', key: 'drafts', render: (_, row) => row.draftInvoiceCount > 0 ? <Tooltip trigger={['hover', 'click', 'focus']} title={t("Còn hóa đơn nháp chưa phát hành trong kỳ này nên số đã lập có thể thiếu.")}><Tag color="orange" icon={<WarningOutlined />} tabIndex={0}>{t("{0} nháp", [row.draftInvoiceCount])}</Tag></Tooltip> : null },
   ];
   return <div className="electricity-panel">
     <p className="reports-scope-note">{t("Kỳ đối chiếu lấy theo tháng của khoảng ngày đã chọn. Chỉ tính hóa đơn phòng đã phát hành; nhập số kWh EVN khi ghi khoản chi \"Điện tổng\" có chọn dãy trọ.")}</p>
@@ -47,10 +47,14 @@ export default function ElectricityReconciliationPanel({ filters, isPro }: { fil
       : <ResponsiveTable<ElectricityReconciliationRow> className="reports-table" rowKey={(row) => `${row.buildingId}-${row.period}`} columns={columns} dataSource={rows} pagination={false} scroll={{ x: 900 }}
         renderCompact={(row) => <div className="report-mobile-row">
           <div className="report-mobile-row-head"><div><strong>{periodLabel(row.period)}</strong><span>{row.buildingName}</span></div><strong className="report-mobile-amount"><LossCell row={row} /></strong></div>
+          {row.lossPercent === null && <div className="report-muted" style={{ fontSize: 12 }}>{nullReasonText(row.lossNullReason)}</div>}
           <div><span>{t("EVN")}</span><strong>{row.evnKwh === null ? t("Chưa nhập") : `${kwh(row.evnKwh)} · ${formatVnd(row.evnAmount)}`}</strong></div>
           <div><span>{t("Đã lập cho phòng")}</span><strong>{kwh(row.billedKwh)} · {formatVnd(row.billedAmount)}</strong></div>
           {row.evnKwh !== null && <div><span>{t("Chênh lệch tiền")}</span><strong className={row.margin < 0 ? 'profit-negative' : undefined}>{formatVnd(row.margin)}</strong></div>}
-          {row.draftInvoiceCount > 0 && <div><span>{t("Hóa đơn nháp")}</span><strong>{row.draftInvoiceCount}</strong></div>}
+          {row.draftInvoiceCount > 0 && <>
+            <div><span>{t("Hóa đơn nháp")}</span><strong>{row.draftInvoiceCount}</strong></div>
+            <div className="report-muted" style={{ fontSize: 12 }}>{t("Còn hóa đơn nháp chưa phát hành trong kỳ này nên số đã lập có thể thiếu.")}</div>
+          </>}
         </div>} />}
   </div>;
 }

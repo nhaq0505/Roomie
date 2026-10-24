@@ -21,13 +21,13 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tabs,
   Tag,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { dateFormat, t } from '../../shared/i18n/runtime';
+import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { marketerApi } from './api';
 import type {
@@ -240,7 +240,7 @@ export default function MarketerContentPage() {
                   </Button>
                 }
               >
-                <Table<MarketerArticleItem>
+                <ResponsiveTable<MarketerArticleItem>
                   rowKey="id"
                   loading={articlesQuery.isLoading}
                   dataSource={articlesQuery.data ?? []}
@@ -347,7 +347,7 @@ export default function MarketerContentPage() {
                   </Button>
                 }
               >
-                <Table<MarketerBannerItem>
+                <ResponsiveTable<MarketerBannerItem>
                   rowKey="id"
                   loading={bannersQuery.isLoading}
                   dataSource={bannersQuery.data ?? []}
@@ -479,12 +479,12 @@ export default function MarketerContentPage() {
                 <Input placeholder={t("Vận hành nhà trọ, Tài chính & Công nợ...")} />
               </Form.Item>
             </Col>
-            <Col xs={12} sm={7}>
+            <Col xs={24} sm={7}>
               <Form.Item label={t("Thời lượng đọc (phút)")} name="readingTimeMinutes" required>
                 <InputNumber min={1} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col xs={12} sm={7}>
+            <Col xs={24} sm={7}>
               <Form.Item label={t("Xuất bản công khai")} name="isPublished" valuePropName="checked">
                 <Switch checkedChildren={t("Công khai")} unCheckedChildren={t("Nháp")} />
               </Form.Item>

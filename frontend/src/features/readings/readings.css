@@ -35,8 +35,9 @@
 .reading-mobile-stat > span { color: #647b80; font-size: 11px; font-weight: 700; letter-spacing: .4px; }
 .reading-mobile-usage { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
 .reading-mobile-cost { color: #6c8085; font-size: 11.5px; }
-.reading-mobile-saved { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.reading-mobile-saved, .reading-mobile-card-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
 .reading-mobile-saved > div > span { display: block; color: #647b80; font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+.reading-mobile-saved .ant-btn, .reading-mobile-card-actions .ant-btn { min-height: 38px; padding: 4px 12px; }
 .reading-mobile-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
 .reading-mobile-input.ant-input-number-group-wrapper { width: 100%; }
 .reading-mobile-input .ant-input-number, .reading-mobile-input .ant-input-number-input { min-height: 42px; font-size: 16px; }

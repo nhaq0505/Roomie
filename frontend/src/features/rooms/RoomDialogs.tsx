@@ -35,7 +35,7 @@ function CoResidentsFormSection({ form }: { form: FormInstance }) {
       <Form.List name="coResidents">
         {(fields, { add, remove }) => (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: fields.length > 0 ? 10 : 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: fields.length > 0 ? 10 : 4 }}>
               <Typography.Text strong style={{ fontSize: 13 }}>
                 {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
               </Typography.Text>
@@ -69,7 +69,7 @@ function CoResidentsFormSection({ form }: { form: FormInstance }) {
                       <Input placeholder={t("Họ và tên")} maxLength={160} />
                     </Form.Item>
                   </Col>
-                  <Col xs={14} sm={8}>
+                  <Col xs={24} sm={8}>
                     <Form.Item
                       name={[field.name, 'citizenId']}
                       style={{ marginBottom: 6 }}
@@ -78,7 +78,7 @@ function CoResidentsFormSection({ form }: { form: FormInstance }) {
                       <Input placeholder={t("Số CCCD")} maxLength={12} />
                     </Form.Item>
                   </Col>
-                  <Col xs={10} sm={5}>
+                  <Col xs={24} sm={5}>
                     <Form.Item name={[field.name, 'gender']} style={{ marginBottom: 6 }}>
                       <Select
                         allowClear
@@ -103,12 +103,12 @@ function CoResidentsFormSection({ form }: { form: FormInstance }) {
                       aria-label={t("Xóa thành viên")}
                     />
                   </Col>
-                  <Col xs={12} sm={11}>
-                    <Form.Item name={[field.name, 'dateOfBirth']} style={{ marginBottom: 0 }}>
+                  <Col xs={24} sm={11}>
+                    <Form.Item name={[field.name, 'dateOfBirth']} style={{ marginBottom: 6 }}>
                       <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Ngày sinh")} />
                     </Form.Item>
                   </Col>
-                  <Col xs={12} sm={13}>
+                  <Col xs={24} sm={13}>
                     <Form.Item name={[field.name, 'relation']} style={{ marginBottom: 0 }}>
                       <Input placeholder={t("Mối quan hệ với chủ hộ")} maxLength={100} />
                     </Form.Item>

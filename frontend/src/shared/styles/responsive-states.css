@@ -12,8 +12,6 @@
   .moveout-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 @media (max-width: 480px) {
-  .reports-filter-toolbar { grid-template-columns: 1fr; }
-  .reports-filter-toolbar > label:first-child { grid-column: auto; }
   .report-total-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .report-total-tile { min-height: 86px; padding: 11px; }
   .report-total-tile > strong { font-size: 16px; }
@@ -21,11 +19,27 @@
   .moveout-invoice-row { align-items: flex-start; }
   .moveout-invoice-row > .ant-btn { flex: 0 0 auto; }
 }
+@media (max-width: 359px) {
+  .reports-filter-toolbar { grid-template-columns: 1fr; }
+  .reports-filter-toolbar > label:first-child { grid-column: auto; }
+}
 @media (max-width: 767px) {
   .invoice-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .invoice-filter-search { grid-column: 1 / -1; }
   .invoice-list-actions { width: 100%; justify-content: space-between; }
-  .ant-input, .ant-input-number-input, .ant-select-selection-item, .ant-picker-input > input { font-size: 16px; }
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-affix-wrapper > input.ant-input,
+  .ant-input-number-input,
+  .ant-select-selector,
+  .ant-select-selection-item,
+  .ant-select-selection-search-input,
+  .ant-picker-input > input,
+  .auth-form-wrap .ant-input,
+  .auth-form-wrap .ant-input-affix-wrapper,
+  .webhook-setting .ant-input {
+    font-size: 16px !important;
+  }
 }
 @media (max-width: 340px) {
   .invoice-filter-toolbar { grid-template-columns: minmax(0, 1fr); }

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { Spin, Table } from 'antd';
+import { Spin } from 'antd';
 import { formatVnd, periodLabel } from '../../shared/format';
 import { ApiError } from '../../shared/http/client';
 import { t } from '../../shared/i18n/runtime';
@@ -37,7 +37,7 @@ export default function ProfitLossPanel({ filters, isPro }: { filters: ReportFil
       <div className="report-total-tile report-total-accent"><span>{t("Lãi ròng")}</span><strong className={report.totals.net < 0 ? 'profit-negative' : undefined}>{formatVnd(report.totals.net)}</strong></div>
     </div>
     {report.sharedExpensesExcluded > 0 && <p className="reports-scope-note">{t("Có {0} chi chung (không gắn dãy) không được tính khi lọc theo dãy.", [formatVnd(report.sharedExpensesExcluded)])}</p>}
-    <div className="profit-chart" aria-label={t("Biểu đồ thu chi theo tháng")} role="img">
+    <div className="profit-chart profit-loss-chart" aria-label={t("Biểu đồ thu chi theo tháng")} role="img">
       <div className="profit-chart-legend"><span><i className="profit-chart-income" />{t("Thực thu")}</span><span><i className="profit-chart-expense" />{t("Chi phí")}</span></div>
       <div className="profit-chart-bars">{report.months.map((month) => <div className="profit-chart-month" key={month.month} title={`${periodLabel(month.month)}: ${formatVnd(month.income)} / ${formatVnd(month.expenses)}`}>
         <div className="profit-chart-pair">
@@ -55,11 +55,15 @@ export default function ProfitLossPanel({ filters, isPro }: { filters: ReportFil
       </div>} />
     {report.expensesByCategory.length > 0 && <>
       <h3 className="profit-section-title">{t("Chi phí theo danh mục")}</h3>
-      <Table size="small" rowKey="category" pagination={false} dataSource={report.expensesByCategory} columns={[
+      <ResponsiveTable size="small" className="reports-table" rowKey="category" pagination={false} scroll={{ x: 480 }} dataSource={report.expensesByCategory} columns={[
         { title: t("DANH MỤC"), dataIndex: 'category', key: 'category', render: (value: string) => expenseCategoryLabel(value) },
         { title: t("SỐ KHOẢN"), dataIndex: 'count', key: 'count', align: 'right' },
         { title: t("SỐ TIỀN"), dataIndex: 'amount', key: 'amount', align: 'right', render: (value: number) => formatVnd(value) },
-      ]} />
+      ]}
+      renderCompact={(row) => <div className="report-mobile-row">
+        <div className="report-mobile-row-head"><div><strong>{expenseCategoryLabel(row.category)}</strong></div><strong className="report-mobile-amount">{formatVnd(row.amount)}</strong></div>
+        <div><span>{t("SỐ KHOẢN")}</span><strong>{row.count}</strong></div>
+      </div>} />
     </>}
   </div>;
 }

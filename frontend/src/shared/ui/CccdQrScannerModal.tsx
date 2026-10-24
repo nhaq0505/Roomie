@@ -251,7 +251,7 @@ export default function CccdQrScannerModal({
       footer={null}
       destroyOnClose
       width={520}
-      className="room-editor cccd-qr-modal"
+      className="room-editor cccd-qr-modal cccd-scanner-modal"
     >
       <input
         ref={fileInputRef}

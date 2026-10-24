@@ -18,12 +18,12 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { dateFormat, t } from '../../shared/i18n/runtime';
+import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { marketerApi } from './api';
 import type { MarketerEmailCampaignItem, UpsertMarketerEmailCampaignRequest } from './types';
@@ -169,7 +169,7 @@ export default function MarketerEmailsPage() {
           </Button>
         }
       >
-        <Table<MarketerEmailCampaignItem>
+        <ResponsiveTable<MarketerEmailCampaignItem>
           rowKey="id"
           loading={emailsQuery.isLoading}
           dataSource={emailsQuery.data ?? []}

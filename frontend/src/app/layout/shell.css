@@ -87,3 +87,9 @@
 .app-sider .ant-menu-submenu-title:hover, .mobile-menu-drawer .ant-menu-submenu-title:hover { color: #fff; background: rgba(255,255,255,.06); }
 .app-sider .ant-menu-submenu-title .ant-menu-item-icon { font-size: 17px; }
 .app-sider .ant-menu-submenu-selected > .ant-menu-submenu-title, .mobile-menu-drawer .ant-menu-submenu-selected > .ant-menu-submenu-title { color: #67d7bf; }
+.mobile-drawer-account { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(237, 248, 245, .12); display: flex; flex-direction: column; gap: 12px; }
+.mobile-drawer-user { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mobile-drawer-user strong { color: #fff; font-size: 14px; overflow-wrap: anywhere; }
+.mobile-drawer-user span { color: #afc4c1; font-size: 12px; overflow-wrap: anywhere; }
+.mobile-drawer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mobile-drawer-actions .ant-btn { min-height: 36px; border-radius: 8px; }

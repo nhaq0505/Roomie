@@ -46,6 +46,8 @@ export function ActiveBannerStrip({
       ? 'theme-gold'
       : banner.themeColor === 'blue'
       ? 'theme-blue'
+      : banner.themeColor === 'coral'
+      ? 'theme-coral'
       : 'theme-teal';
 
   const handleClick = () => {
@@ -90,11 +92,13 @@ export function ActiveBannerStrip({
       {(banner.ctaText || banner.ctaUrl || banner.promoCode) && (
         <button
           type="button"
+          className="banner-cta-btn"
           onClick={handleClick}
           style={{
             fontWeight: 600,
             borderRadius: 8,
-            padding: '6px 14px',
+            minHeight: 38,
+            padding: '8px 14px',
             background: '#ffffff',
             color: '#0f292d',
             border: 'none',

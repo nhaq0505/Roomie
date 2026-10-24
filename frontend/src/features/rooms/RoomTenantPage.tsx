@@ -453,12 +453,12 @@ function RoomTenantWorkspace() {
               </Row>
 
               <Row gutter={16}>
-                <Col xs={12} md={12}>
+                <Col xs={24} sm={12} md={12}>
                   <Form.Item label={t("Ngày sinh")} name="tenantDateOfBirth">
                     <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={12}>
+                <Col xs={24} sm={12} md={12}>
                   <Form.Item label={t("Ngày cấp CCCD")} name="tenantCitizenIdIssuedDate">
                     <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                   </Form.Item>
@@ -502,28 +502,30 @@ function RoomTenantWorkspace() {
                           {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
                         </Typography.Title>
                       </div>
-                      <Space wrap>
-                        <Button
-                          icon={<QrcodeOutlined />}
-                          disabled={fields.length >= 29}
-                          onClick={() => setQrTarget({ kind: 'coResident-add' })}
-                        >
-                          {t("Quét CCCD thêm thành viên")}
-                        </Button>
-                        <Button
-                          type="primary"
-                          ghost
-                          icon={<PlusOutlined />}
-                          disabled={fields.length >= 29}
-                          onClick={() => {
-                            const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
-                            add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
-                            form.setFieldValue('people', nextCount);
-                          }}
-                        >
-                          {t("Thêm thành viên ở cùng")}
-                        </Button>
-                      </Space>
+                      {fields.length > 0 && (
+                        <Space wrap>
+                          <Button
+                            icon={<QrcodeOutlined />}
+                            disabled={fields.length >= 29}
+                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
+                          >
+                            {t("Quét CCCD thêm thành viên")}
+                          </Button>
+                          <Button
+                            type="primary"
+                            ghost
+                            icon={<PlusOutlined />}
+                            disabled={fields.length >= 29}
+                            onClick={() => {
+                              const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
+                              add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
+                              form.setFieldValue('people', nextCount);
+                            }}
+                          >
+                            {t("Thêm thành viên ở cùng")}
+                          </Button>
+                        </Space>
+                      )}
                     </div>
 
                     {fields.length === 0 ? (
@@ -553,9 +555,9 @@ function RoomTenantWorkspace() {
                       <div className="room-tenant-coresidents-list">
                         {fields.map((field, index) => (
                           <div key={field.key} className="room-tenant-coresident-row">
-                            <div className="room-tenant-coresident-row-head">
+                            <div className="room-tenant-coresident-row-head" style={{ flexWrap: 'wrap', gap: 8 }}>
                               <Tag color="cyan">#{index + 1}</Tag>
-                              <Space size={4}>
+                              <Space size={4} wrap>
                                 <Button
                                   type="text"
                                   size="small"
@@ -601,12 +603,12 @@ function RoomTenantWorkspace() {
                               </Col>
                             </Row>
                             <Row gutter={12}>
-                              <Col xs={12} md={8}>
+                              <Col xs={24} sm={12} md={8}>
                                 <Form.Item label={t("Ngày sinh")} name={[field.name, 'dateOfBirth']}>
                                   <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                                 </Form.Item>
                               </Col>
-                              <Col xs={12} md={6}>
+                              <Col xs={24} sm={12} md={6}>
                                 <Form.Item label={t("Giới tính")} name={[field.name, 'gender']}>
                                   <Select
                                     allowClear
@@ -640,12 +642,12 @@ function RoomTenantWorkspace() {
                 </Typography.Title>
               </div>
               <Row gutter={16}>
-                <Col xs={12} md={9}>
+                <Col xs={24} sm={12} md={9}>
                   <Form.Item label={t("Ngày kết thúc hợp đồng")} name="contractEndDate">
                     <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item label={t("Hạn đóng tiền (ngày)")} name="paymentDueDay">
                     <InputNumber size="large" min={1} max={28} precision={0} style={{ width: '100%' }} />
                   </Form.Item>

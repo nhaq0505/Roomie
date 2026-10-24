@@ -322,10 +322,16 @@ export function NativeMultiLineChart({
                   if (val === null || val === undefined) return null;
                   const x = paddingLeft + idx * stepX;
                   const y = paddingTop + innerHeight - ((val - minVal) / range) * innerHeight;
+                  const label = `${s.name} (${dates[idx]}): ${val.toLocaleString()}`;
                   return (
-                    <circle key={idx} cx={x} cy={y} r="3" fill="#fff" stroke={s.color} strokeWidth="2">
-                      <title>{`${dates[idx]}: ${val.toLocaleString()}`}</title>
-                    </circle>
+                    <g key={idx}>
+                      <circle cx={x} cy={y} r="10" fill="transparent">
+                        <title>{label}</title>
+                      </circle>
+                      <circle cx={x} cy={y} r="3.5" fill="#fff" stroke={s.color} strokeWidth="2">
+                        <title>{label}</title>
+                      </circle>
+                    </g>
                   );
                 })}
               </g>

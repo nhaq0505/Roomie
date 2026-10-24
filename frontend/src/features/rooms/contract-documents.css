@@ -282,8 +282,16 @@
     grid-template-columns: 1fr;
   }
   .contract-form-pane,
-  .contract-preview-pane {
+  .room-documents-page .contract-form-pane,
+  .contract-preview-pane,
+  .room-documents-page .contract-preview-pane {
+    position: static;
     max-height: none;
+    overflow: visible;
+  }
+  .contract-a4-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
   }
   .contract-a4-sheet {
     padding: 20px 18px;

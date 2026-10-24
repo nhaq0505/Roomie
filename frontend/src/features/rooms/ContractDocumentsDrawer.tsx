@@ -555,12 +555,12 @@ export default function ContractDocumentsDrawer({
                           </Col>
                         </Row>
                         <Row gutter={12}>
-                          <Col xs={12} sm={12}>
+                          <Col xs={24} sm={12}>
                             <Form.Item name="tenantDateOfBirth" label={t("Ngày sinh")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={12}>
+                          <Col xs={24} sm={12}>
                             <Form.Item name="tenantCitizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
@@ -618,12 +618,12 @@ export default function ContractDocumentsDrawer({
                           <Input maxLength={12} placeholder="07908800xxxx" />
                         </Form.Item>
                         <Row gutter={12}>
-                          <Col xs={12} sm={12}>
+                          <Col xs={24} sm={12}>
                             <Form.Item name="ownerDateOfBirth" label={t("Ngày sinh")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={12}>
+                          <Col xs={24} sm={12}>
                             <Form.Item name="ownerCitizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
@@ -647,12 +647,12 @@ export default function ContractDocumentsDrawer({
                           <Input maxLength={500} placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")} />
                         </Form.Item>
                         <Row gutter={8}>
-                          <Col xs={12} sm={9}>
+                          <Col xs={24} sm={9}>
                             <Form.Item name="contractEndDate" label={t("Ngày kết thúc hợp đồng")}>
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
-                          <Col xs={12} sm={8}>
+                          <Col xs={24} sm={8}>
                             <Form.Item name="paymentDueDay" label={t("Hạn đóng tiền (ngày)")}>
                               <InputNumber min={1} max={28} precision={0} style={{ width: '100%' }} />
                             </Form.Item>
@@ -755,12 +755,12 @@ export default function ContractDocumentsDrawer({
                                     </Col>
                                   </Row>
                                   <Row gutter={10}>
-                                    <Col xs={12} sm={8}>
+                                    <Col xs={24} sm={8}>
                                       <Form.Item {...restField} name={[name, 'dateOfBirth']} label={t("Ngày sinh")}>
                                         <DatePicker format={dateFormat()} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={12} sm={6}>
+                                    <Col xs={24} sm={6}>
                                       <Form.Item {...restField} name={[name, 'gender']} label={t("Giới tính")}>
                                         <Select
                                           allowClear

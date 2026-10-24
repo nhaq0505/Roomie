@@ -79,15 +79,21 @@ const state = useInvoicesPage();
         <div>
           <span>{t("TỔNG TIỀN")}</span>
           {item.lifecycleState === 'Draft' ? (
-            <span title={t("Bản nháp chưa phát hành")}>{formatVnd(item.total)}</span>
+            <strong className="invoice-draft-amount" title={t("Bản nháp chưa phát hành")}>{formatVnd(item.total)}</strong>
           ) : (
             <strong>{formatVnd(item.total)}</strong>
           )}
         </div>
+        {item.lifecycleState !== 'Draft' && item.paid > 0 && (
+          <div>
+            <span>{t("ĐÃ THU")}</span>
+            <strong>{formatVnd(item.paid)}</strong>
+          </div>
+        )}
         <div>
           <span>{t("CÒN LẠI")}</span>
           {item.lifecycleState === 'Draft' ? (
-            <span>—</span>
+            <strong className="invoice-draft-amount">—</strong>
           ) : (
             <strong className={item.outstanding > 0 ? 'balance-due' : 'balance-clear'}>{formatVnd(item.outstanding)}</strong>
           )}

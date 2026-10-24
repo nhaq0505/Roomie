@@ -22,7 +22,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography,
@@ -30,6 +29,7 @@ import {
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { dateFormat, t } from '../../shared/i18n/runtime';
+import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { marketerApi } from './api';
 import type { MarketerLeadItem, MarketerLeadNoteItem } from './types';
@@ -193,7 +193,7 @@ export default function MarketerLeadsPage() {
       <SectionCard
         title={t("Danh sách Chủ trọ theo phân khúc")}
         extra={
-          <Space wrap>
+          <Space wrap style={{ width: '100%' }}>
             <Input
               allowClear
               prefix={<SearchOutlined />}
@@ -203,7 +203,7 @@ export default function MarketerLeadsPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              style={{ width: 240 }}
+              style={{ width: 220, maxWidth: '100%' }}
             />
             <Select
               allowClear
@@ -213,7 +213,7 @@ export default function MarketerLeadsPage() {
                 setLeadStatus(val || '');
                 setPage(1);
               }}
-              style={{ width: 170 }}
+              style={{ width: 170, maxWidth: '100%' }}
               options={[
                 { value: 'New', label: t("Mới") },
                 { value: 'Contacted', label: t("Đã liên hệ") },
@@ -227,7 +227,7 @@ export default function MarketerLeadsPage() {
           </Space>
         }
       >
-        <Table<MarketerLeadItem>
+        <ResponsiveTable<MarketerLeadItem>
           rowKey="ownerId"
           loading={leadsQuery.isLoading}
           dataSource={leadsQuery.data?.items ?? []}
@@ -456,7 +456,7 @@ export default function MarketerLeadsPage() {
               onFinish={(values) => updateProfileMutation.mutate(values)}
             >
               <Row gutter={12}>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item label={t("Trạng thái Lead")} name="leadStatus" required>
                     <Select
                       options={[
@@ -471,7 +471,7 @@ export default function MarketerLeadsPage() {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item label={t("Ngày hẹn chăm sóc tiếp")} name="nextFollowUpAt">
                     <DatePicker format={dateFormat()} style={{ width: '100%' }} />
                   </Form.Item>

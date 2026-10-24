@@ -19,7 +19,7 @@
 .tenant-page .tenant-checkout-no-qr { border-radius: 11px; }
 .tenant-page .tenant-checkout-no-qr .ant-alert-message, .tenant-page .tenant-checkout-no-qr .ant-alert-description { font-size: 12px; line-height: 1.55; }
 .tenant-page .tenant-checkout-details { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid #e6edeb; border-radius: 11px; background: #fbfdfc; }
-.tenant-page .tenant-checkout-details > div, .tenant-page .tenant-checkout-order { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tenant-page .tenant-checkout-details > div, .tenant-page .tenant-checkout-order { display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 4px 12px; }
 .tenant-page .tenant-checkout-details span, .tenant-page .tenant-checkout-order span, .tenant-page .tenant-checkout-expiry { color: #718588; font-size: 12px; }
 .tenant-page .tenant-checkout-details strong, .tenant-page .tenant-checkout-order strong { min-width: 0; color: #38565b; font-size: 12px; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
 .tenant-page .tenant-checkout-transfer { min-width: 0; padding: 11px 13px; border: 1px solid #e6edeb; border-radius: 11px; background: #fbfdfc; }

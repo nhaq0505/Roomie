@@ -86,7 +86,7 @@
 .hero-atmosphere { position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 15% 36%, #14635299 0%, transparent 44%), radial-gradient(ellipse at 85% 66%, #149b7a88 0%, transparent 48%), radial-gradient(ellipse at 50% 100%, #389a9277 0%, transparent 55%); pointer-events: none; }
 .hero-content { max-width: 880px; margin: 0 auto 48px; text-align: center; }
 .hero-kicker { display: flex; align-items: center; justify-content: center; gap: 8px; color: #d1e7de; font-size: 12px; letter-spacing: 1.6px; font-weight: 500; margin-bottom: 24px; }
-.hero-kicker > span { width: 6px; height: 6px; background: var(--landing-mint); border-radius: 50%; }
+.hero-kicker > span:first-child:empty { width: 6px; height: 6px; flex-shrink: 0; background: var(--landing-mint); border-radius: 50%; }
 .hero-content h1 { font-family: 'SVN-Gilroy Light', 'Be Vietnam Pro', sans-serif; font-size: clamp(40px, 5.1vw, 72px); line-height: 1.14; font-weight: 300; letter-spacing: -1.5px; }
 .hero-content h1 > span { display: block; }
 .hero-content h1 > span:last-child { color: var(--landing-mint); }
@@ -895,7 +895,8 @@
 
 /* Guide article detail page (/huong-dan/:slug) */
 .landing-hero--article .hero-content { max-width: 880px; text-align: left; }
-.landing-hero--article .hero-kicker { justify-content: flex-start; flex-wrap: wrap; }
+.landing-hero--article .hero-kicker { justify-content: flex-start; flex-wrap: wrap; letter-spacing: 0.3px; font-size: 13px; }
+.landing-hero--article .hero-kicker .anticon { color: var(--landing-mint); }
 .landing-hero--article .hero-content h1 {
   font-family: 'Be Vietnam Pro', sans-serif;
   font-size: clamp(28px, 3.6vw, 44px);
@@ -1088,7 +1089,10 @@
 }
 @media (max-width: 960px) {
   .landing-nav { display: none; }
-  .landing-subnav { display: flex; justify-content: center; }
+  .landing-subnav { display: flex; justify-content: safe center; }
+}
+@media (max-width: 640px) {
+  .landing-subnav { justify-content: flex-start; padding-inline: 12px; }
 }
 @media (max-width: 800px) {
   .landing-header-inner { min-height: 72px; padding: 12px 20px; gap: 16px; }
@@ -1119,9 +1123,9 @@
   .landing-brand { gap: 8px; }
   .landing-brand strong { font-size: 20px; }
   .landing-brand .brand-mark { width: 28px; height: 28px; flex-basis: 28px; border-radius: 8px; }
-  .landing-header-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; width: 100%; margin-left: 0; gap: 8px; }
-  .landing-header-actions .language-selector { width: min(120px, 100%); min-width: 0; height: 44px; }
-  .landing-header-actions .landing-btn { min-height: 44px; }
+  .landing-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; width: 100%; margin-left: 0; gap: 8px; }
+  .landing-header-actions .language-selector { flex: 1 1 108px; width: auto; max-width: 136px; min-width: 0; height: 44px; }
+  .landing-header-actions .landing-btn { flex: 1 1 auto; min-height: 44px; }
   .landing-header .landing-btn { padding: 10px 12px; }
   .landing-hero { padding: 36px 16px 32px; }
   .hero-kicker { font-size: 12px; letter-spacing: 1px; margin-bottom: 20px; }
@@ -1169,7 +1173,8 @@
   .guide-article-section { padding: 36px 16px 56px; }
   .guide-article-toc { padding: 16px; }
   .guide-article-cta { padding: 20px; }
-  .guide-article-cta .landing-btn { width: 100%; }
+  .guide-article-cta-copy { min-width: 0; }
+  .guide-article-cta .landing-btn { width: 100%; max-width: 100%; white-space: normal; text-align: center; height: auto; min-height: 44px; padding: 10px 14px; }
   .pricing-cta { padding-left: 16px; padding-right: 16px; }
   .faq-question { padding: 16px 18px; font-size: 15px; }
   .faq-answer { padding: 0 18px 16px; }
@@ -1178,7 +1183,7 @@
   .landing-security { padding: 40px 20px 56px; }
   .landing-cta { padding: 48px 20px 32px; }
   .cta-content h2 { font-size: 36px; letter-spacing: -.5px; }
-  .cta-content .landing-btn { width: 100%; padding-left: 16px; padding-right: 16px; }
+  .cta-content .landing-btn { width: 100%; max-width: 100%; white-space: normal; text-align: center; height: auto; padding-left: 16px; padding-right: 16px; }
   .setup-steps { grid-template-columns: 1fr; gap: 20px; margin-top: 32px; padding-top: 24px; }
   .setup-steps li { gap: 4px; }
   .landing-footer { padding: 36px 20px 24px; }

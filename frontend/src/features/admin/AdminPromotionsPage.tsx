@@ -23,7 +23,6 @@ import {
   Row,
   Space,
   Switch,
-  Table,
   Tag,
   Tooltip,
   Typography,
@@ -31,6 +30,7 @@ import {
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { dateFormat, t } from '../../shared/i18n/runtime';
+import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { promotionsApi, type PromotionCode, type PromotionRedemptionItem } from './index';
 
@@ -385,7 +385,7 @@ export default function AdminPromotionsPage() {
           </Button>
         }
       >
-        <Table<PromotionCode>
+        <ResponsiveTable<PromotionCode>
           rowKey="id"
           columns={columns}
           dataSource={query.data?.codes ?? []}
@@ -433,7 +433,7 @@ export default function AdminPromotionsPage() {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 label={t("Số tháng Pro tặng kèm")}
                 name="rewardMonths"
@@ -442,7 +442,7 @@ export default function AdminPromotionsPage() {
                 <InputNumber min={1} max={120} addonAfter={t("tháng")} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item label={t("Giới hạn lượt dùng")} name="maxRedemptions">
                 <InputNumber min={1} placeholder={t("Không giới hạn")} style={{ width: '100%' }} />
               </Form.Item>
@@ -450,7 +450,7 @@ export default function AdminPromotionsPage() {
           </Row>
 
           <Row gutter={16}>
-            <Col span={16}>
+            <Col xs={24} sm={16}>
               <Form.Item label={t("Ngày hết hạn")} name="expiresAt">
                 <DatePicker
                   format={dateFormat()}
@@ -459,7 +459,7 @@ export default function AdminPromotionsPage() {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item label={t("Kích hoạt")} name="isActive" valuePropName="checked">
                 <Switch />
               </Form.Item>
@@ -479,7 +479,7 @@ export default function AdminPromotionsPage() {
         width={680}
         destroyOnClose
       >
-        <Table<PromotionRedemptionItem>
+        <ResponsiveTable<PromotionRedemptionItem>
           rowKey="id"
           loading={redemptionsQuery.isLoading}
           dataSource={redemptionsQuery.data ?? []}

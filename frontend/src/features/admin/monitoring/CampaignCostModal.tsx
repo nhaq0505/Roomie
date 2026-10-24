@@ -1,4 +1,4 @@
-import { DatePicker, Form, Input, InputNumber, Modal, Space, Tag, Typography } from 'antd';
+import { Col, DatePicker, Form, Input, InputNumber, Modal, Row, Space, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { formatVnd } from '../../../shared/format';
@@ -120,15 +120,19 @@ export function CampaignCostModal({
           <Input placeholder="vd: Facebook Ads Q4" />
         </Form.Item>
 
-        <Space style={{ display: 'flex', width: '100%' }} size={12}>
-          <Form.Item name="channel" label={t("Kênh")} style={{ flex: 1 }}>
-            <Input placeholder="social, search, email..." />
-          </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} sm={12}>
+            <Form.Item name="channel" label={t("Kênh")}>
+              <Input placeholder="social, search, email..." />
+            </Form.Item>
+          </Col>
 
-          <Form.Item name="source" label={t("Nguồn")} style={{ flex: 1 }}>
-            <Input placeholder="facebook, google, zalo..." />
-          </Form.Item>
-        </Space>
+          <Col xs={24} sm={12}>
+            <Form.Item name="source" label={t("Nguồn")}>
+              <Input placeholder="facebook, google, zalo..." />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.Item
           name="date"
@@ -138,33 +142,35 @@ export function CampaignCostModal({
           <DatePicker format={dateFormat()} style={{ width: '100%' }} />
         </Form.Item>
 
-        <Space style={{ display: 'flex', width: '100%' }} size={12}>
-          <Form.Item
-            name="cashVnd"
-            label={t("Chi phí tiền mặt (VND)")}
-            style={{ flex: 1 }}
-          >
-            <MoneyInput
-              style={{ width: '100%' }}
-              min={0}
-              step={50000}
-              onChange={(val) => setCashExpense(Number(val) || 0)}
-            />
-          </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="cashVnd"
+              label={t("Chi phí tiền mặt (VND)")}
+            >
+              <MoneyInput
+                style={{ width: '100%' }}
+                min={0}
+                step={50000}
+                onChange={(val) => setCashExpense(Number(val) || 0)}
+              />
+            </Form.Item>
+          </Col>
 
-          <Form.Item
-            name="personHours"
-            label={t("Số giờ công")}
-            style={{ flex: 1 }}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              min={0}
-              step={0.5}
-              onChange={(val) => setPersonHours(Number(val) || 0)}
-            />
-          </Form.Item>
-        </Space>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="personHours"
+              label={t("Số giờ công")}
+            >
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0}
+                step={0.5}
+                onChange={(val) => setPersonHours(Number(val) || 0)}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.Item name="hourlyRate" label={t("Đơn giá giờ công (VND/giờ)")}>
           <MoneyInput

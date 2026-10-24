@@ -21,7 +21,7 @@ export default function SubscriptionCheckoutModal({ state }: { state: ReturnType
       footer={paymentSuccess ? (
         <Button type="primary" onClick={() => setCheckout(null)}>{t("Hoàn tất")}</Button>
       ) : (
-        <Space>
+        <Space wrap>
           <Button onClick={() => setCheckout(null)}>{t("Đóng")}</Button>
           {checkout?.checkoutUrl && (
             <Button href={checkout.checkoutUrl} target="_blank" rel="noopener noreferrer">
@@ -59,21 +59,21 @@ export default function SubscriptionCheckoutModal({ state }: { state: ReturnType
 
           <Card size="small" style={{ textAlign: 'left', marginTop: 12, background: '#fafafa' }}>
             <Row gutter={[8, 8]}>
-              <Col span={9}><Typography.Text type="secondary">{t("Số tiền:")}</Typography.Text></Col>
-              <Col span={15}><Typography.Text strong style={{ color: '#1890ff', fontSize: 16 }}>{formatVnd(checkout.amount)}</Typography.Text></Col>
+              <Col xs={24} sm={9}><Typography.Text type="secondary">{t("Số tiền:")}</Typography.Text></Col>
+              <Col xs={24} sm={15}><Typography.Text strong style={{ color: '#1890ff', fontSize: 16 }}>{formatVnd(checkout.amount)}</Typography.Text></Col>
 
               {checkout.accountName && (
                 <>
-                  <Col span={9}><Typography.Text type="secondary">{t("Chủ tài khoản:")}</Typography.Text></Col>
-                  <Col span={15}><Typography.Text strong>{checkout.accountName}</Typography.Text></Col>
+                  <Col xs={24} sm={9}><Typography.Text type="secondary">{t("Chủ tài khoản:")}</Typography.Text></Col>
+                  <Col xs={24} sm={15}><Typography.Text strong>{checkout.accountName}</Typography.Text></Col>
                 </>
               )}
 
               {checkout.accountNumber && (
                 <>
-                  <Col span={9}><Typography.Text type="secondary">{t("Số tài khoản:")}</Typography.Text></Col>
-                  <Col span={15}>
-                    <Space>
+                  <Col xs={24} sm={9}><Typography.Text type="secondary">{t("Số tài khoản:")}</Typography.Text></Col>
+                  <Col xs={24} sm={15}>
+                    <Space wrap>
                       <Typography.Text code>{checkout.accountNumber}</Typography.Text>
                       <Button
                         type="text"
@@ -88,9 +88,9 @@ export default function SubscriptionCheckoutModal({ state }: { state: ReturnType
 
               {checkout.description && (
                 <>
-                  <Col span={9}><Typography.Text type="secondary">{t("Nội dung:")}</Typography.Text></Col>
-                  <Col span={15}>
-                    <Space>
+                  <Col xs={24} sm={9}><Typography.Text type="secondary">{t("Nội dung:")}</Typography.Text></Col>
+                  <Col xs={24} sm={15}>
+                    <Space wrap>
                       <Typography.Text code>{checkout.description}</Typography.Text>
                       <Button
                         type="text"

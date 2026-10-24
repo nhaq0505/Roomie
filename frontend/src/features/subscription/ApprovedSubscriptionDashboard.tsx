@@ -44,7 +44,7 @@ export default function ApprovedSubscriptionDashboard() {
       <Col xs={24} md={12}>
         <SectionCard title={t("Thông tin gói hiện tại")}>
           <Space direction="vertical" size={14} style={{ width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <Typography.Text type="secondary">{t("Gói dịch vụ:")}</Typography.Text>
               {isPro ? (
                 <Tag color="gold" icon={<CrownOutlined />} style={{ fontSize: 14, padding: '4px 10px' }}>
@@ -57,7 +57,7 @@ export default function ApprovedSubscriptionDashboard() {
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <Typography.Text type="secondary">{t("Thời hạn sử dụng:")}</Typography.Text>
               <Typography.Text strong>
                 {isPro
@@ -67,7 +67,7 @@ export default function ApprovedSubscriptionDashboard() {
             </div>
 
             <div style={{ marginTop: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
                 <Typography.Text type="secondary">{t("Số phòng đang quản lý:")}</Typography.Text>
                 <Typography.Text strong>
                   {isPro ? t("{0} phòng (Không giới hạn)", [currentRooms]) : t("{0} / {1} phòng", [currentRooms, maxRooms])}

@@ -487,7 +487,7 @@ export function RevenueTab({
       >
         <Form form={campaignForm} layout="vertical" style={{ marginTop: 12 }}>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="code"
                 label={t("Mã chiến dịch (utm_campaign)")}
@@ -496,7 +496,7 @@ export function RevenueTab({
                 <Input disabled={Boolean(editingCampaign)} placeholder="vd: fb_group_t10" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="name"
                 label={t("Tên chiến dịch")}
@@ -507,29 +507,29 @@ export function RevenueTab({
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="channel" label={t("Kênh")}>
                 <Input placeholder="vd: paid_social" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="source" label={t("Nguồn (utm_source)")}>
                 <Input placeholder="vd: facebook" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="utmMedium" label={t("Medium (utm_medium)")}>
                 <Input placeholder="vd: cpc" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="promoCode" label={t("Mã ưu đãi tự động (promo)")}>
                 <Input placeholder="vd: TET2026" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="targetUrl" label={t("Trang đích")}>
                 <Input placeholder="/register" />
               </Form.Item>

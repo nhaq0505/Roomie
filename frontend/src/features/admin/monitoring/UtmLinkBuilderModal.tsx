@@ -1,5 +1,5 @@
 import { CopyOutlined, DownloadOutlined, LinkOutlined } from '@ant-design/icons';
-import { App, Button, Form, Input, Modal, QRCode, Radio, Space, Tag, Typography } from 'antd';
+import { App, Button, Col, Form, Input, Modal, QRCode, Radio, Row, Space, Tag, Typography } from 'antd';
 import { useMemo, useRef, useState } from 'react';
 import { t } from '../../../shared/i18n/runtime';
 
@@ -178,41 +178,49 @@ export function UtmLinkBuilderModal({ open, onClose }: UtmLinkBuilderModalProps)
           </div>
         </Form.Item>
 
-        <Space style={{ display: 'flex', width: '100%' }} size={12}>
-          <Form.Item label={t("Chiến dịch")} style={{ flex: 1 }}>
-            <Input
-              value={campaign}
-              onChange={(e) => setCampaign(e.target.value)}
-              placeholder="vd: phong_tro_t10_2026, khuyen_mai_tet"
-            />
-          </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} sm={12}>
+            <Form.Item label={t("Chiến dịch")}>
+              <Input
+                value={campaign}
+                onChange={(e) => setCampaign(e.target.value)}
+                placeholder="vd: phong_tro_t10_2026, khuyen_mai_tet"
+              />
+            </Form.Item>
+          </Col>
 
-          <Form.Item label={t("Mã ưu đãi tự động (promo)")} style={{ flex: 1 }}>
-            <Input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value.toUpperCase())}
-              placeholder="vd: TET2026"
-            />
-          </Form.Item>
-        </Space>
+          <Col xs={24} sm={12}>
+            <Form.Item label={t("Mã ưu đãi tự động (promo)")}>
+              <Input
+                value={promo}
+                onChange={(e) => setPromo(e.target.value.toUpperCase())}
+                placeholder="vd: TET2026"
+              />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Space style={{ display: 'flex', width: '100%' }} size={12}>
-          <Form.Item label={t("Nội dung")} style={{ flex: 1 }}>
-            <Input
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="vd: banner_hero_a, textlink"
-            />
-          </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} sm={12}>
+            <Form.Item label={t("Nội dung")}>
+              <Input
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="vd: banner_hero_a, textlink"
+              />
+            </Form.Item>
+          </Col>
 
-          <Form.Item label={t("Từ khóa")} style={{ flex: 1 }}>
-            <Input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder="vd: phong_tro_gia_re"
-            />
-          </Form.Item>
-        </Space>
+          <Col xs={24} sm={12}>
+            <Form.Item label={t("Từ khóa")}>
+              <Input
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="vd: phong_tro_gia_re"
+              />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <div
           style={{

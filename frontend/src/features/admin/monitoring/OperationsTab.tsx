@@ -372,7 +372,7 @@ export function OperationsTab({
         <Col xs={24} lg={12}>
           <SectionCard title={t("Dịch vụ tích hợp & Hàng đợi")}>
             <Row gutter={[12, 12]}>
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Card size="small" bordered={false} style={{ background: '#f8faf9', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: '#7a8c91', marginBottom: 4 }}>
                     <MailOutlined style={{ marginRight: 4 }} />
@@ -389,7 +389,7 @@ export function OperationsTab({
                 </Card>
               </Col>
 
-              <Col span={12}>
+              <Col xs={24} sm={12}>
                 <Card size="small" bordered={false} style={{ background: '#f8faf9', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: '#7a8c91', marginBottom: 4 }}>
                     <CloudServerOutlined style={{ marginRight: 4 }} />
@@ -408,7 +408,7 @@ export function OperationsTab({
 
               <Col span={24}>
                 <Card size="small" bordered={false} style={{ background: '#f8faf9', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <div>
                       <div style={{ fontSize: 12, color: '#7a8c91', marginBottom: 4 }}>
                         {t("Hàng đợi Zalo (Khung giờ 07:00-21:00)")}

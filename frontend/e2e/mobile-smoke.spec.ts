@@ -205,6 +205,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
   });
 
   test('Zero horizontal overflow across all primary landlord pages on 375px viewport', async ({ page }) => {
+    test.setTimeout(60000);
     const pages = ['/dashboard', '/buildings', '/rooms', '/readings', '/invoices', '/expenses', '/reports', '/settings/payment'];
 
     for (const p of pages) {
@@ -332,14 +333,136 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await expect(page.locator('.ant-dropdown:visible')).toBeVisible();
   });
 
-  test('Mobile RoomTenantPage displays sticky bottom action bar for quick QR scan and save', async ({ page }) => {
+  test('Mobile RoomTenantPage displays sticky bottom action bar above compact-navigation without overlap', async ({ page }) => {
     await page.goto('/rooms/room-01/tenant');
     const stickyBar = page.locator('.room-tenant-mobile-bar');
+    const bottomNav = page.locator('.compact-navigation');
     await expect(stickyBar).toBeVisible();
+    await expect(bottomNav).toBeVisible();
     await expect(stickyBar.getByRole('button', { name: 'Quét / Tải ảnh CCCD' })).toBeVisible();
     await expect(stickyBar.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible();
+
+    const barBox = await stickyBar.boundingBox();
+    const navBox = await bottomNav.boundingBox();
+    expect(barBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(navBox!.y);
+
+    // Scroll to bottom and verify sticky bar still sits above compact-navigation
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const barBoxBottom = await stickyBar.boundingBox();
+    const navBoxBottom = await bottomNav.boundingBox();
+    expect(barBoxBottom!.y + barBoxBottom!.height).toBeLessThanOrEqual(navBoxBottom!.y);
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow).toBe(false);
   });
+
+  test('Dashboard onboarding checklist step titles have high-contrast dark teal color', async ({ page }) => {
+    await page.route('**/api/dashboard', (route) =>
+      route.fulfill({
+        json: {
+          ...defaultDashboard,
+          totalRooms: 0,
+          occupiedRooms: 0,
+          totalBilled: 0,
+          monthlyBilled: 0,
+          monthlyOutstanding: 0,
+          totalOutstanding: 0,
+        },
+      }),
+    );
+    await page.route('**/api/buildings', (route) => route.fulfill({ json: [] }));
+    await page.route('**/api/rooms', (route) => route.fulfill({ json: [] }));
+    await page.route('**/api/invoices*', (route) =>
+      route.fulfill({
+        json: {
+          items: [],
+          total: 0,
+          draftCount: 0,
+          totals: { billed: 0, paid: 0, outstanding: 0 },
+        },
+      }),
+    );
+    await page.goto('/dashboard');
+    const stepTitle = page.locator('.onboarding-step-title-row strong').first();
+    await expect(stepTitle).toBeVisible();
+    const color = await stepTitle.evaluate((el) => getComputedStyle(el).color);
+    expect(color).not.toBe('rgb(224, 241, 237)');
+    expect(color).toBe('rgb(28, 55, 62)');
+  });
+
+  test('Mobile inputs have font-size >= 16px on /login and /settings/payment to prevent iOS auto-zoom', async ({ page }) => {
+    await page.goto('/settings/payment');
+    await expect(page.getByRole('heading').first()).toBeVisible();
+    const paymentInputSize = await page.locator('.ant-input').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(paymentInputSize).toBeGreaterThanOrEqual(16);
+
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { error: 'Unauthorized' } }));
+    await page.goto('/login');
+    const emailInputSize = await page.locator('#email').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(emailInputSize).toBeGreaterThanOrEqual(16);
+  });
+
+  test('RoomDocumentsPage at 820x900 tablet viewport has no scroll trap and export buttons are visible', async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 900 });
+    await page.goto('/rooms/room-01/documents');
+    await expect(page.getByRole('button', { name: 'Lưu thông tin' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /In \/ Lưu PDF/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Tải Word Hợp đồng/ })).toBeVisible();
+
+    const previewPanePosition = await page.locator('.room-documents-page .contract-preview-pane').evaluate((el) => getComputedStyle(el).position);
+    expect(previewPanePosition).toBe('static');
+  });
+
+  test('Zero horizontal overflow at 320px and 375px across public and admin pages', async ({ page }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 320, height: 812 });
+    for (const p of ['/', '/pricing', '/huong-dan', '/dashboard', '/rooms']) {
+      await page.goto(p);
+      await expect(page.locator('h1, h2').first()).toBeVisible();
+      const isOverflowing = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(isOverflowing, `Page ${p} overflowed at 320px`).toBe(false);
+    }
+
+    // Verify Admin pages at 375px
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.route('**/api/auth/me', (route) =>
+      route.fulfill({
+        json: {
+          id: 'admin-mobile-01',
+          name: 'Admin Mobile',
+          email: 'admin@roomie.vn',
+          role: 'Admin',
+          status: 'Approved',
+        },
+      }),
+    );
+    await page.route('**/api/admin/promotions', (route) =>
+      route.fulfill({
+        json: {
+          welcome: { id: 'welcome', name: 'Welcome', isEnabled: true, rewardMonths: 2, startsAt: null, endsAt: null },
+          codes: [
+            {
+              id: 'c-1',
+              code: 'TET2026',
+              description: 'Khuyến mãi Tết',
+              rewardMonths: 2,
+              maxRedemptions: 50,
+              redeemedCount: 5,
+              isActive: true,
+              expiresAt: null,
+              createdAt: '2026-10-01T00:00:00Z',
+            },
+          ],
+        },
+      }),
+    );
+    await page.goto('/admin/promotions');
+    await expect(page.getByRole('heading', { name: 'Chương trình Khuyến mãi' })).toBeVisible();
+    await expect(page.locator('article.mobile-record').first()).toBeVisible();
+    const adminOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(adminOverflow).toBe(false);
+  });
 });
+

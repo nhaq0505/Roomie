@@ -120,7 +120,7 @@ export default function OwnerProfilePage() {
           }}
         >
           <Row gutter={16}>
-            <Col xs={24} md={8}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="name"
                 label={t("Họ và tên chủ trọ")}
@@ -129,12 +129,12 @@ export default function OwnerProfilePage() {
                 <Input maxLength={160} placeholder={t("Họ và tên")} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="phone" label={t("Số điện thoại chủ trọ")}>
                 <Input maxLength={60} placeholder="09xx xxx xxx" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="citizenId"
                 label={t("Số CCCD / Định danh chủ hộ (12 số)")}
@@ -145,17 +145,17 @@ export default function OwnerProfilePage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col xs={12} md={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item name="dateOfBirth" label={t("Ngày sinh")}>
                 <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
               </Form.Item>
             </Col>
-            <Col xs={12} md={6}>
+            <Col xs={24} sm={12} md={6}>
               <Form.Item name="citizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
                 <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12}>
+            <Col xs={24} sm={24} md={12}>
               <Form.Item name="citizenIdIssuedPlace" label={t("Nơi cấp CCCD")}>
                 <Input maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
               </Form.Item>

@@ -12,11 +12,11 @@
 .room-link-guide { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; margin-bottom: 18px; background: #eaf5f1; border: 1px solid #cee7dd; border-radius: 12px; color: #395b60; font-size: 14px; line-height: 1.6; }
 .mobile-records { display: grid; gap: 14px; }
 .mobile-record { min-width: 0; padding: 16px; border: 1px solid #dce7e3; border-radius: 12px; background: white; }
-.mobile-record-heading { padding-bottom: 13px; margin-bottom: 5px; border-bottom: 1px solid #e5edeb; }
+.mobile-record-heading, .mobile-record-head { padding-bottom: 13px; margin-bottom: 5px; border-bottom: 1px solid #e5edeb; }
 .mobile-record-field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 9px 0; }
 .mobile-field-label { color: #526970; font-size: 12px; flex: 0 0 auto; }
-.mobile-field-value { min-width: 0; overflow-wrap: anywhere; }
-.mobile-record-field .mobile-field-value { text-align: right; }
+.mobile-field-value, .mobile-record-value { min-width: 0; overflow-wrap: anywhere; }
+.mobile-record-field .mobile-field-value, .mobile-record-field .mobile-record-value { text-align: right; }
 .mobile-record-actions { padding-top: 12px; margin-top: 7px; border-top: 1px solid #e5edeb; }
 .mobile-record-actions .ant-space { width: 100%; }
 .mobile-record-actions .ant-btn { min-height: 40px; }
@@ -49,6 +49,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .compact-navigation > :is(a, button):not([aria-current="page"]) > .compact-nav-text { display: none; }
   .compact-navigation > :is(a, button)[aria-current="page"] { flex: 1.85 0 auto; padding: 0 16px; color: #fff; background: #087c69; box-shadow: 0 4px 12px rgba(8, 124, 105, 0.24); }
   .compact-navigation > :is(a, button)[aria-current="page"] > .compact-nav-text { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .compact-navigation[data-role="admin"] > :is(a, button) { min-width: 36px; padding: 0 6px; }
+  .compact-navigation[data-role="admin"] > :is(a, button)[aria-current="page"] { flex: 1 1 auto; min-width: 0; max-width: 150px; padding: 0 10px; }
+  .compact-navigation[data-role="admin"] > :is(a, button)[aria-current="page"] > .compact-nav-text { overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block; }
   .page-content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
   .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .quick-actions > a { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 12px 10px; min-height: 82px; }
@@ -62,6 +65,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .stat-icon { right: 10px; top: 12px; width: 25px; height: 25px; font-size: 13px; }
   .stat-foot { font-size: 12px; }
   .stat-unit { display: none; }
+  .section-card-header, .section-card .ant-card-head-wrapper { flex-wrap: wrap; gap: 8px; }
+  .section-card .ant-card-extra { margin-inline-start: 0; width: 100%; }
   .section-card-header > .ant-space { flex-wrap: wrap; }
   .invoice-totals-row { row-gap: 10px; }
   .ant-drawer-content-wrapper { max-width: 100vw; }

@@ -81,8 +81,8 @@
 .onboarding-step-check { color: #16a34a; font-size: 24px; }
 .onboarding-step-body { display: flex; flex: 1 1 200px; min-width: 0; flex-direction: column; gap: 3px; }
 .onboarding-step-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.onboarding-step-title-row strong { color: #1c373e; font-size: 14px; font-weight: 650; }
-.onboarding-step.is-done .onboarding-step-title-row strong { color: #546d73; text-decoration: line-through; }
+.onboarding-step-title-row strong, .onboarding-card .onboarding-step-title-row strong, .onboarding-checklist-card .onboarding-step-title-row strong { color: #1c373e; font-size: 14px; font-weight: 650; }
+.onboarding-step.is-done .onboarding-step-title-row strong, .onboarding-card .onboarding-step.is-done .onboarding-step-title-row strong { color: #546d73; text-decoration: line-through; }
 .onboarding-step-body > span { color: #6c8085; font-size: 13px; line-height: 1.45; }
 .onboarding-step-status { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .onboarding-step-status.is-current { background: #e3f7f2; color: #0b7e69; }
