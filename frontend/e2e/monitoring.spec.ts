@@ -210,7 +210,7 @@ const mockIncidentsData: AdminMonitoringIncidentsResponse = {
   incidents: [],
 };
 
-const SCREENSHOT_DIR = '/Users/nguyenhoanhquan/.gemini/antigravity-cli/brain/985a5e76-afbf-4cc3-aa89-40c9fa28441e/screenshots';
+const SCREENSHOT_DIR = 'test-results/screenshots';
 
 test.describe('Admin Monitoring Dashboard (/admin/monitoring)', () => {
   test.beforeEach(async ({ page }) => {

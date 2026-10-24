@@ -57,6 +57,7 @@ public class AppDbContext : DbContext
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
+    public DbSet<TenantMeterSubmission> TenantMeterSubmissions => Set<TenantMeterSubmission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -575,6 +576,24 @@ public class AppDbContext : DbContext
             entity.HasOne<Expense>().WithMany().HasForeignKey(x => x.ExpenseId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => x.OwnerId);
             entity.HasIndex(x => x.ExpenseId);
+        });
+
+        modelBuilder.Entity<TenantMeterSubmission>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.OccupancyId, x.Period }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.Period });
+            entity.Property(x => x.Period).HasMaxLength(7).IsRequired();
+            entity.Property(x => x.PreviousReading).HasPrecision(18, 3);
+            entity.Property(x => x.SubmittedReading).HasPrecision(18, 3);
+            entity.Property(x => x.ApprovedReading).HasPrecision(18, 3);
+            entity.Property(x => x.TenantNote).HasMaxLength(500);
+            entity.Property(x => x.RejectReason).HasMaxLength(500);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
+            entity.Property(x => x.PhotoFileName).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.PhotoContentType).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PhotoSha256).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PhotoContent).IsRequired();
         });
 
         modelBuilder.Entity<PromotionRedemption>(entity =>

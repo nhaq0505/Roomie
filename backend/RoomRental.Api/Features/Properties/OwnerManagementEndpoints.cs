@@ -117,7 +117,8 @@ public static partial class OwnerManagementEndpoints
                 occupancy.RoomAreaSqm,
                 occupancy.HandoverAssets,
                 occupancy.AdditionalTerms,
-                occupancy.HouseholdHeadRelation);
+                occupancy.HouseholdHeadRelation,
+                occupancy.TenantSelfCheckinAt);
         }
         return new RoomDto(room.Id, room.BuildingId, building.Name, room.Name, room.Rent, room.ElectricityRate, room.WaterFee,
             room.WaterPerPerson, room.ServiceFee, room.InitialReading, previousReading, occupancyDto);

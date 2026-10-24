@@ -1618,6 +1618,9 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTimeOffset?>("TenantSelfCheckinAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("TenantTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
@@ -2669,6 +2672,99 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasKey("Id");
 
                     b.ToTable("SystemPromotions");
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.TenantMeterSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ApprovedReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OccupancyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<byte[]>("PhotoContent")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("PhotoContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PhotoFileName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("PhotoSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("PhotoSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("PreviousReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<Guid?>("ReadingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("SubmittedReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("TenantNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccupancyId", "Period")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "Period");
+
+                    b.ToTable("TenantMeterSubmissions");
                 });
 
             modelBuilder.Entity("RoomRental.Api.Domain.WorkerHeartbeatState", b =>

@@ -111,7 +111,8 @@ public sealed record OccupancyDto(
     decimal? RoomAreaSqm = null,
     string? HandoverAssets = null,
     string? AdditionalTerms = null,
-    string? HouseholdHeadRelation = null);
+    string? HouseholdHeadRelation = null,
+    DateTimeOffset? TenantSelfCheckinAt = null);
 public sealed record RoomDto(Guid Id, Guid BuildingId, string BuildingName, string Name, decimal Rent, decimal ElectricityRate, decimal WaterFee, bool WaterPerPerson, decimal ServiceFee, decimal InitialReading, decimal PreviousReading, OccupancyDto? Occupancy);
 public sealed record RotateLinkDto(string Token, string Url);
 public sealed record ReadingRequest(Guid RoomId, string Period, decimal CurrentReading);

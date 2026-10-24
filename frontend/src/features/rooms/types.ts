@@ -25,6 +25,7 @@ export interface Occupancy {
   handoverAssets?: string | null;
   additionalTerms?: string | null;
   householdHeadRelation?: string | null;
+  tenantSelfCheckinAt?: string | null;
 }
 
 export interface Room {
@@ -150,6 +151,7 @@ export interface OccupancyDocumentData {
   additionalTerms?: string | null;
   householdHeadRelation: string;
   coResidents: CoResident[];
+  tenantSelfCheckinAt?: string | null;
 }
 
 export interface UpdateOccupancyDocumentRequest {

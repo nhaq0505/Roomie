@@ -10,6 +10,8 @@ import { formatDate, t } from '../../shared/i18n/runtime';
 import RoomieMark from '../../shared/ui/RoomieMark';
 import { type Invoice } from '../invoices/index';
 import { tenantApi } from './index';
+import TenantMeterSubmissionCard from './TenantMeterSubmissionCard';
+import TenantSelfCheckinCard from './TenantSelfCheckinCard';
 
 function statusLabel(status: string) {
   if (status === 'Paid') return t("Đã thanh toán");
@@ -103,6 +105,23 @@ function TenantPageContent({ token }: { token: string }) {
       {searchParams.get('payment') === 'returned' && <Alert className="tenant-payment-error" type="info" showIcon message={t("Đang xác minh thanh toán")} description={t("Khoản thanh toán sẽ được cập nhật sau khi payOS xác nhận giao dịch. Làm mới hóa đơn để kiểm tra trạng thái mới nhất.")} action={<Button size="small" onClick={() => void query.refetch()}>{t("Làm mới")}</Button>} />}
       {searchParams.get('payment') === 'cancelled' && <Alert className="tenant-payment-error" type="info" showIcon message={t("Bạn đã quay lại từ trang thanh toán")} description={t("Hóa đơn vẫn hiển thị số dư hiện tại. Bạn có thể thử thanh toán lại khi sẵn sàng.")} />}
       {showPayAll && <Button className="tenant-pay-all" type="primary" block onClick={() => openCheckout('all')}>{t("Thanh toán tất cả")}</Button>}
+      {overview?.room && (
+        <TenantMeterSubmissionCard
+          token={token}
+          room={overview.room}
+          currentPeriod={overview.currentPeriod}
+          currentPeriodHasReading={overview.currentPeriodHasReading}
+          meterSubmission={overview.meterSubmission}
+          onSubmitted={() => query.refetch()}
+        />
+      )}
+      {overview?.occupancy && (
+        <TenantSelfCheckinCard
+          token={token}
+          occupancy={overview.occupancy}
+          onUpdated={() => query.refetch()}
+        />
+      )}
       <div className="tenant-section-heading"><div><Typography.Title level={4}>{t("Hóa đơn của bạn")}</Typography.Title><span>{t("Tiền cọc, hóa đơn tháng và khoản thu bổ sung được theo dõi riêng.")}</span></div><span className="tenant-count">{overview?.total ?? 0}  {t("hóa đơn")}</span></div>
       <Pagination current={page} total={overview?.total ?? 0} pageSize={10} onChange={setPage} showSizeChanger={false} hideOnSinglePage />
       {invoices.length ? <div className="tenant-invoice-list">{invoices.map((invoice) => <TenantInvoice key={invoice.id} invoice={invoice} busy={openingInvoiceId === invoice.id} paymentDisabled={false} reconciling={reconcileMutation.isPending && reconcileMutation.variables === invoice.id} onPay={() => openCheckout(invoice.id)} onReconcile={() => reconcileMutation.mutate(invoice.id)} />)}</div> : <Card className="tenant-empty" bordered={false}><FileTextOutlined /><strong>{t("Chưa có hóa đơn")}</strong><span>{t("Hóa đơn mới sẽ xuất hiện ở đây sau khi chủ trọ hoàn tất chốt kỳ.")}</span></Card>}

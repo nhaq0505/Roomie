@@ -132,6 +132,7 @@ public sealed class Occupancy
     public bool IsActive { get; set; } = true;
     public string? TenantTokenHash { get; set; }
     public string? ProtectedTenantToken { get; set; }
+    public DateTimeOffset? TenantSelfCheckinAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 

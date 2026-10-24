@@ -1,2 +1,3 @@
 export { tenantApi } from './api';
-export type * from './types';
+export type { TenantOverview, TenantSelfCheckinRequest } from './types';
+export type { TenantMeterSubmission } from '../readings';

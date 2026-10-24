@@ -1,7 +1,7 @@
-import { CheckCircleFilled, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { CameraOutlined, CheckCircleFilled, ClockCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { Alert, App, Button, DatePicker, Form, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
@@ -11,9 +11,9 @@ import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import { invoicesApi, type Invoice } from '../invoices/index';
 import { roomsApi, type Room } from '../rooms/index';
-import { readingsApi, type Reading } from './index';
+import { readingsApi, type Reading, type TenantMeterSubmission } from './index';
 
-interface ReadingRow { room: Room; saved?: Reading; draftInvoice?: Invoice; }
+interface ReadingRow { room: Room; saved?: Reading; draftInvoice?: Invoice; submission?: TenantMeterSubmission; }
 interface DraftSession { room: Room; currentReading: number; invoice: Invoice; }
 interface DraftAmounts { rent: number; electricityAmount: number; waterAmount: number; serviceAmount: number; }
 
@@ -29,17 +29,29 @@ export default function ReadingsPage() {
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
   const [isBatchSaving, setIsBatchSaving] = useState(false);
+  const [reviewRow, setReviewRow] = useState<ReadingRow | null>(null);
+  const [approveReadingValue, setApproveReadingValue] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
   const publishKeys = useRef(new Map<string, string>());
+  const userEditedRoomsRef = useRef(new Set<string>());
+
   const roomsQuery = useQuery({ queryKey: ['rooms', period], queryFn: () => roomsApi.list(period) });
   const readingsQuery = useQuery({ queryKey: ['readings', period], queryFn: () => readingsApi.list(period) });
   const invoicesQuery = useQuery({ queryKey: ['invoices', 'period', period], queryFn: () => invoicesApi.list(period) });
+  const submissionsQuery = useQuery({ queryKey: ['readings', 'submissions', period], queryFn: () => readingsApi.listSubmissions(period) });
+  const submissionsList = useMemo(
+    () => (Array.isArray(submissionsQuery.data) ? submissionsQuery.data : []),
+    [submissionsQuery.data],
+  );
+
   const rows = useMemo<ReadingRow[]>(() => (roomsQuery.data ?? [])
     .filter((room) => room.occupancy && room.occupancy.startDate <= lastDay(period))
     .map((room) => ({
       room,
       saved: (readingsQuery.data ?? []).find((reading) => reading.roomId === room.id && reading.occupancyId === room.occupancy?.id),
       draftInvoice: (invoicesQuery.data ?? []).find((invoice) => invoice.kind === 'Monthly' && invoice.roomId === room.id && invoice.period === period && invoice.lifecycleState === 'Draft' && invoice.occupancyId === room.occupancy?.id),
-    })), [roomsQuery.data, readingsQuery.data, invoicesQuery.data, period]);
+      submission: submissionsList.find((sub) => sub.roomId === room.id && sub.occupancyId === room.occupancy?.id),
+    })), [roomsQuery.data, readingsQuery.data, invoicesQuery.data, submissionsList, period]);
 
   const buildingOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -72,18 +84,27 @@ export default function ReadingsPage() {
       return draftVal !== undefined && draftVal !== null && draftVal >= initialValue && !r.saved?.invoiceId && r.saved?.currentReading === undefined && !r.draftInvoice;
     });
   }, [buildingRows, drafts]);
+
   const prevPeriodRef = useRef(period);
   useEffect(() => {
     if (prevPeriodRef.current !== period) {
       prevPeriodRef.current = period;
-      setDrafts(Object.fromEntries(rows.map(({ room, saved }) => [room.id, saved?.currentReading ?? null])));
+      userEditedRoomsRef.current.clear();
+      setDrafts(Object.fromEntries(rows.map(({ room, saved, submission }) => [
+        room.id,
+        saved?.currentReading ?? (submission?.status === 'Pending' ? submission.submittedReading : null),
+      ])));
       return;
     }
     setDrafts((prev) => {
       const next: Record<string, number | null> = {};
-      for (const { room, saved } of rows) {
+      for (const { room, saved, submission } of rows) {
         if (saved?.currentReading !== undefined) {
           next[room.id] = saved.currentReading;
+        } else if (userEditedRoomsRef.current.has(room.id) && prev[room.id] !== undefined) {
+          next[room.id] = prev[room.id];
+        } else if (submission?.status === 'Pending') {
+          next[room.id] = submission.submittedReading;
         } else if (prev[room.id] !== undefined) {
           next[room.id] = prev[room.id];
         } else {
@@ -95,9 +116,13 @@ export default function ReadingsPage() {
   }, [rows, period]);
 
   const refresh = async () => Promise.all([
-    client.invalidateQueries({ queryKey: ['readings', period] }), client.invalidateQueries({ queryKey: ['invoices'] }),
-    client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['dashboard'] }),
+    client.invalidateQueries({ queryKey: ['readings', period] }),
+    client.invalidateQueries({ queryKey: ['readings', 'submissions', period] }),
+    client.invalidateQueries({ queryKey: ['invoices'] }),
+    client.invalidateQueries({ queryKey: ['rooms'] }),
+    client.invalidateQueries({ queryKey: ['dashboard'] }),
   ]);
+
   const readingMutation = useMutation({
     mutationFn: (body: { roomId: string; period: string; currentReading: number }) => readingsApi.save(body),
     onSuccess: async () => {
@@ -106,11 +131,80 @@ export default function ReadingsPage() {
     },
     onError: (error: Error) => message.error(error.message),
   });
+
   const publishMutation = useMutation({
     mutationFn: ({ invoice, values, requestId }: { invoice: Invoice; values: DraftAmounts; requestId: string; key: string }) => invoicesApi.publishDraft(invoice.id, { ...values, expectedVersion: invoice.version ?? 0, requestId }),
     onSuccess: async (_, variables) => { await refresh(); setDraftSession(null); publishKeys.current.delete(variables.key); message.success(t("Đã phát hành hóa đơn nháp.")); },
     onError: (error: Error) => message.error(error.message),
   });
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, currentReading }: { id: string; currentReading?: number }) => readingsApi.approveSubmission(id, currentReading),
+    onSuccess: async () => {
+      await refresh();
+      setReviewRow(null);
+      message.success(t("Đã chốt chỉ số và lập hóa đơn."));
+    },
+    onError: (error: Error) => message.error(error.message),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => readingsApi.rejectSubmission(id, reason),
+    onSuccess: async () => {
+      await refresh();
+      setReviewRow(null);
+      message.success(`${''}Đã yêu cầu khách chụp và gửi lại ảnh đồng hồ điện.`);
+    },
+    onError: (error: Error) => message.error(error.message),
+  });
+
+  const openSubmissionModal = (row: ReadingRow) => {
+    if (!row.submission) return;
+    setReviewRow(row);
+    setApproveReadingValue(row.submission.approvedReading ?? row.submission.submittedReading);
+    setRejectReason(row.submission.rejectReason ?? '');
+  };
+
+  const renderSubmissionBadge = (row: ReadingRow) => {
+    const submission = row.submission;
+    if (!submission) return null;
+    if (submission.status === 'Pending') {
+      return (
+        <Button
+          size="small"
+          type="primary"
+          ghost
+          icon={<CameraOutlined />}
+          style={{ marginTop: 6 }}
+          onClick={() => openSubmissionModal(row)}
+        >
+          {`Khách gửi: ${submission.submittedReading} kWh · Xem ảnh & Duyệt`}
+        </Button>
+      );
+    }
+    if (submission.status === 'Approved') {
+      return (
+        <Tag
+          color="success"
+          icon={<CheckCircleFilled />}
+          style={{ marginTop: 6, cursor: 'pointer' }}
+          onClick={() => openSubmissionModal(row)}
+        >
+          {`${''}Đã duyệt ảnh khách gửi`}
+        </Tag>
+      );
+    }
+    return (
+      <Tag
+        color="warning"
+        icon={<CloseCircleOutlined />}
+        style={{ marginTop: 6, cursor: 'pointer' }}
+        onClick={() => openSubmissionModal(row)}
+      >
+        {`${''}Đã yêu cầu chụp lại`}
+      </Tag>
+    );
+  };
 
   const openDraft = (row: ReadingRow) => {
     if (row.saved?.currentReading == null || !row.draftInvoice) return;
@@ -138,10 +232,28 @@ export default function ReadingsPage() {
     });
   };
 
+  const handleDraftChange = (roomId: string, value: number | null) => {
+    userEditedRoomsRef.current.add(roomId);
+    setDrafts((current) => ({ ...current, [roomId]: value }));
+  };
+
   const columns: TableProps<ReadingRow>['columns'] = [
-    { title: t("PHÒNG / NGƯỜI THUÊ"), key: 'room', render: (_, row) => <div className="room-name-cell"><div className="room-avatar"><span>⚡</span></div><div><strong>{row.room.name}</strong><span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span></div></div> },
+    {
+      title: t("PHÒNG / NGƯỜI THUÊ"),
+      key: 'room',
+      render: (_, row) => (
+        <div className="room-name-cell">
+          <div className="room-avatar"><span>⚡</span></div>
+          <div>
+            <strong>{row.room.name}</strong>
+            <span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span>
+            {renderSubmissionBadge(row)}
+          </div>
+        </div>
+      ),
+    },
     { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
-    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="decimal" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={3} step={0.001} value={drafts[row.room.id] ?? undefined} onChange={(value) => setDrafts((current) => ({ ...current, [row.room.id]: value }))} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
+    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="decimal" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={3} step={0.001} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
     { title: t("SỬ DỤNG"), key: 'consumption', render: (_, row) => {
       const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
       const current = row.saved?.currentReading ?? drafts[row.room.id];
@@ -198,6 +310,7 @@ export default function ReadingsPage() {
             <div>
               <strong>{row.room.name}</strong>
               <span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span>
+              {renderSubmissionBadge(row)}
             </div>
           </div>
           {row.draftInvoice ? (
@@ -243,7 +356,7 @@ export default function ReadingsPage() {
               precision={3}
               step={0.001}
               value={drafts[row.room.id] ?? undefined}
-              onChange={(value) => setDrafts((curr) => ({ ...curr, [row.room.id]: value }))}
+              onChange={(value) => handleDraftChange(row.room.id, value)}
               addonAfter="kWh"
               placeholder={t("Nhập chỉ số")}
             />
@@ -281,6 +394,7 @@ export default function ReadingsPage() {
           }
           await Promise.all([
             client.invalidateQueries({ queryKey: ['readings', period] }),
+            client.invalidateQueries({ queryKey: ['readings', 'submissions', period] }),
             client.invalidateQueries({ queryKey: ['invoices'] }),
             client.invalidateQueries({ queryKey: ['dashboard'] }),
             client.invalidateQueries({ queryKey: ['rooms'] }),
@@ -289,6 +403,7 @@ export default function ReadingsPage() {
         } catch (error: unknown) {
           await Promise.all([
             client.invalidateQueries({ queryKey: ['readings', period] }),
+            client.invalidateQueries({ queryKey: ['readings', 'submissions', period] }),
             client.invalidateQueries({ queryKey: ['invoices'] }),
             client.invalidateQueries({ queryKey: ['dashboard'] }),
           ]);
@@ -309,6 +424,13 @@ export default function ReadingsPage() {
     (draftSessionAmounts?.electricityAmount ?? draftSession?.invoice.electricityAmount ?? 0) +
     (draftSessionAmounts?.waterAmount ?? draftSession?.invoice.waterAmount ?? 0) +
     (draftSessionAmounts?.serviceAmount ?? draftSession?.invoice.serviceAmount ?? 0);
+
+  const reviewSubmission = reviewRow?.submission ?? null;
+  const reviewPrevious = reviewSubmission?.previousReading ?? reviewRow?.room.previousReading ?? reviewRow?.room.initialReading ?? 0;
+  const reviewUsage = approveReadingValue == null ? null : Math.round(Math.max(0, approveReadingValue - reviewPrevious) * 1000) / 1000;
+  const reviewRate = reviewRow?.room.electricityRate ?? 0;
+  const reviewEstimatedCost = reviewUsage == null ? null : Math.round(reviewUsage * reviewRate);
+  const reviewInvalid = approveReadingValue == null || approveReadingValue < reviewPrevious;
 
   return <>
     <PageTitle
@@ -383,6 +505,132 @@ export default function ReadingsPage() {
         <Typography.Paragraph className="draft-version-note">{t("Phiên bản bản nháp")} {draftSession.invoice.version ?? 0}</Typography.Paragraph>
         <Button type="primary" block loading={publishMutation.isPending} onClick={() => draftForm.submit()}>{t("Phát hành hóa đơn")}</Button>
       </>}
+    </Modal>
+    <Modal
+      title={`${''}Kiểm tra & duyệt chỉ số điện khách gửi`}
+      open={!!reviewRow && !!reviewSubmission}
+      onCancel={() => {
+        if (!approveMutation.isPending && !rejectMutation.isPending) {
+          setReviewRow(null);
+        }
+      }}
+      footer={null}
+      width={600}
+      destroyOnClose
+    >
+      {reviewRow && reviewSubmission && (
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <strong>{reviewRow.room.name}</strong> · {reviewRow.room.occupancy?.tenantName}
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {t("Kỳ hóa đơn")}: {periodLabel(reviewSubmission.period)}
+              </div>
+            </div>
+            {reviewSubmission.status === 'Pending' ? (
+              <Tag color="processing">{`${''}Chờ duyệt`}</Tag>
+            ) : reviewSubmission.status === 'Approved' ? (
+              <Tag color="success">{`${''}Đã duyệt ảnh khách gửi`}</Tag>
+            ) : (
+              <Tag color="warning">{`${''}Đã yêu cầu chụp lại`}</Tag>
+            )}
+          </div>
+
+          <div style={{ textAlign: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 8 }}>
+            <img
+              src={readingsApi.submissionPhotoUrl(reviewSubmission.id)}
+              alt={reviewSubmission.photoFileName}
+              style={{ maxWidth: '100%', maxHeight: 340, objectFit: 'contain', borderRadius: 6 }}
+            />
+          </div>
+
+          {reviewSubmission.tenantNote && (
+            <Alert
+              type="info"
+              showIcon
+              message={`${''}Ghi chú từ khách thuê: ${reviewSubmission.tenantNote}`}
+            />
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: '#f8fafc', padding: 12, borderRadius: 8 }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{t("CHỈ SỐ TRƯỚC")}</div>
+              <strong>{reviewPrevious} kWh</strong>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{`${''}Chỉ số khách báo`}</div>
+              <strong>{reviewSubmission.submittedReading} kWh</strong>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{`${''}Chỉ số duyệt chốt`}</div>
+              <InputNumber
+                inputMode="decimal"
+                aria-label={`${''}Chỉ số duyệt chốt`}
+                min={reviewPrevious}
+                precision={3}
+                step={0.001}
+                value={approveReadingValue ?? undefined}
+                onChange={(val) => setApproveReadingValue(val)}
+                disabled={reviewSubmission.status === 'Approved'}
+                addonAfter="kWh"
+                style={{ width: '100%', marginTop: 4 }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{t("SỬ DỤNG")}</div>
+              <strong>{reviewUsage === null ? '—' : `${reviewUsage} kWh`}</strong>
+              {reviewEstimatedCost != null && reviewUsage !== null && (
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  ≈ {formatVnd(reviewEstimatedCost)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {reviewSubmission.status !== 'Approved' && (
+            <>
+              <Button
+                type="primary"
+                block
+                loading={approveMutation.isPending}
+                disabled={reviewInvalid || rejectMutation.isPending}
+                onClick={() => approveMutation.mutate({
+                  id: reviewSubmission.id,
+                  currentReading: approveReadingValue ?? reviewSubmission.submittedReading,
+                })}
+              >
+                {`${''}Duyệt chỉ số & phát hành hóa đơn`}
+              </Button>
+
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+                <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
+                  {`${''}Từ chối / Yêu cầu chụp lại`}
+                </Typography.Text>
+                <Input.TextArea
+                  rows={2}
+                  maxLength={500}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder={`${''}Lý do từ chối (ví dụ: Ảnh mờ, không rõ số trên đồng hồ...)`}
+                  style={{ marginBottom: 8 }}
+                />
+                <Button
+                  danger
+                  block
+                  loading={rejectMutation.isPending}
+                  disabled={approveMutation.isPending}
+                  onClick={() => rejectMutation.mutate({
+                    id: reviewSubmission.id,
+                    reason: rejectReason.trim() || undefined,
+                  })}
+                >
+                  {`${''}Yêu cầu khách chụp lại`}
+                </Button>
+              </div>
+            </>
+          )}
+        </Space>
+      )}
     </Modal>
   </>;
 }

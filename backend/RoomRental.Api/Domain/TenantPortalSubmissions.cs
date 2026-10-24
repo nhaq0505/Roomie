@@ -1,0 +1,64 @@
+namespace RoomRental.Api.Domain;
+
+public enum TenantMeterSubmissionStatus { Pending, Approved, Rejected }
+
+public sealed class TenantMeterSubmission
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OwnerId { get; set; }
+    public Guid BuildingId { get; set; }
+    public Guid RoomId { get; set; }
+    public Guid OccupancyId { get; set; }
+    public required string Period { get; set; }
+    public decimal PreviousReading { get; set; }
+    public decimal SubmittedReading { get; set; }
+    public decimal? ApprovedReading { get; set; }
+    public string? TenantNote { get; set; }
+    public string? RejectReason { get; set; }
+    public TenantMeterSubmissionStatus Status { get; set; } = TenantMeterSubmissionStatus.Pending;
+    public required string PhotoFileName { get; set; }
+    public required string PhotoContentType { get; set; }
+    public long PhotoSizeBytes { get; set; }
+    public required string PhotoSha256 { get; set; }
+    public required byte[] PhotoContent { get; set; }
+    public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ReviewedAt { get; set; }
+    public Guid? ReadingId { get; set; }
+    public Guid? InvoiceId { get; set; }
+}
+
+public sealed record TenantSelfCheckinRequest(
+    string? Target,
+    string FullName,
+    string CitizenId,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    DateOnly? CitizenIdIssuedDate = null,
+    string? CitizenIdIssuedPlace = null,
+    string? PermanentAddress = null,
+    string? Phone = null,
+    string? Email = null,
+    string? Relation = null);
+
+public sealed record TenantMeterSubmissionDto(
+    Guid Id,
+    Guid RoomId,
+    Guid OccupancyId,
+    string Period,
+    decimal PreviousReading,
+    decimal SubmittedReading,
+    decimal? ApprovedReading,
+    string? TenantNote,
+    string? RejectReason,
+    string Status,
+    string PhotoFileName,
+    string PhotoContentType,
+    long PhotoSizeBytes,
+    DateTimeOffset SubmittedAt,
+    DateTimeOffset? ReviewedAt,
+    Guid? ReadingId,
+    Guid? InvoiceId);
+
+public sealed record ApproveMeterSubmissionRequest(decimal? CurrentReading = null);
+
+public sealed record RejectMeterSubmissionRequest(string? Reason = null);

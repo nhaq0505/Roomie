@@ -37,6 +37,7 @@ internal static class RoomTenantLifecycleHttpTests
         await MoveoutSettlementAndMeterBaselineAdvancementAsync();
         await OccupancyInitialMeterReadingAdvancementAsync();
         await ContractAndCt01DocumentsExportAsync();
+        await TenantSelfCheckinAndMeterSubmissionWorkflowAsync();
     }
 
     private static async Task BuildingArchiveCascadeAndRestoreAsync()
@@ -712,6 +713,223 @@ internal static class RoomTenantLifecycleHttpTests
         var clampedDto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
         Assert(clampedDto!.RoomAreaSqm is null && clampedDto.PaymentDueDay == 5 && clampedDto.HouseholdHeadRelation == "Người thuê trọ",
             "GET /documents clamps legacy negative RoomAreaSqm to null, PaymentDueDay 0 to 5, and blank HouseholdHeadRelation to default");
+    }
+
+    private static async Task TenantSelfCheckinAndMeterSubmissionWorkflowAsync()
+    {
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerAId.ToString());
+
+        var bldgResp = await client.PostAsJsonAsync("/api/buildings", new BuildingRequest("Nha Tro Thong Minh", "88 Dien Bien Phu, Binh Thanh"));
+        var bldg = await bldgResp.Content.ReadFromJsonAsync<BuildingDto>();
+
+        var roomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg!.Id, "Phong 301", 3_200_000, 3_500, 100_000, true, 50_000, 100));
+        var roomId = (await roomResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Khach Tam Thoi", "0901000111", 1, VietnamCalendar.TodayVietnam().AddDays(-10), 3_200_000, 100));
+        Assert(occResp.StatusCode == HttpStatusCode.OK, "occupancy created for self-checkin & meter submission test");
+        var occRoot = await occResp.Content.ReadFromJsonAsync<JsonElement>();
+        var occElement = occRoot.GetProperty("occupancy");
+        var occId = occElement.GetProperty("id").GetGuid();
+        var token = occElement.GetProperty("token").GetString()!;
+        Assert(!string.IsNullOrWhiteSpace(token), "tenant token issued on occupancy creation");
+
+        // 1. Primary tenant self check-in via POST /api/tenant/{token}/self-checkin
+        var primaryCheckinReq = new TenantSelfCheckinRequest(
+            Target: "tenant",
+            FullName: "Nguyen Thi Thue",
+            CitizenId: "079199001234",
+            DateOfBirth: new DateOnly(1999, 4, 15),
+            Gender: "Nữ",
+            CitizenIdIssuedDate: new DateOnly(2022, 8, 10),
+            CitizenIdIssuedPlace: "Cục Cảnh sát QLHC về TTXH",
+            PermanentAddress: "100 Tran Hung Dao, Quan 1, TP.HCM",
+            Phone: "0908889999",
+            Email: "thue@example.com");
+        var primaryResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", primaryCheckinReq);
+        Assert(primaryResp.StatusCode == HttpStatusCode.OK, "primary tenant self-checkin returns 200 OK");
+        var primaryJson = await primaryResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(primaryJson.GetProperty("tenantName").GetString() == "Nguyen Thi Thue" &&
+               primaryJson.GetProperty("tenantCitizenId").GetString() == "079199001234" &&
+               primaryJson.GetProperty("people").GetInt32() == 1,
+            "primary tenant self-checkin updates tenantName, tenantCitizenId, and preserves people = 1");
+
+        // 2. Co-resident self check-in via POST /api/tenant/{token}/self-checkin (target = coResident)
+        var coResidentCheckinReq = new TenantSelfCheckinRequest(
+            Target: "coResident",
+            FullName: "Tran Van Cung O",
+            CitizenId: "079200005678",
+            DateOfBirth: new DateOnly(2000, 1, 20),
+            Gender: "Nam",
+            Relation: "Em ruột");
+        var coResResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", coResidentCheckinReq);
+        Assert(coResResp.StatusCode == HttpStatusCode.OK, "co-resident self-checkin returns 200 OK");
+        var coResJson = await coResResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(coResJson.GetProperty("people").GetInt32() == 2 &&
+               coResJson.GetProperty("coResidents").GetArrayLength() == 1,
+            "co-resident self-checkin increments people to 2 and appends co-resident");
+
+        // Verify GET /api/rooms/{id}/documents reflects self check-in and TenantSelfCheckinAt
+        var docDto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
+        Assert(docDto != null &&
+               docDto.TenantName == "Nguyen Thi Thue" &&
+               docDto.TenantCitizenId == "079199001234" &&
+               docDto.TenantPhone == "0908889999" &&
+               docDto.TenantEmail == "thue@example.com" &&
+               docDto.People == 2 &&
+               docDto.CoResidents.Count == 1 &&
+               docDto.CoResidents[0].CitizenId == "079200005678" &&
+               docDto.TenantSelfCheckinAt != null,
+            "GET /api/rooms/{id}/documents reflects primary tenant, co-resident, People=2, and non-null TenantSelfCheckinAt");
+
+        // 3. DELETE /api/tenant/{token}/co-residents/{citizenId} removes co-resident and updates People
+        var delCoResResp = await client.DeleteAsync($"/api/tenant/{token}/co-residents/079200005678");
+        Assert(delCoResResp.StatusCode == HttpStatusCode.OK, "DELETE /api/tenant/{token}/co-residents/{citizenId} returns 200 OK");
+        var afterDelJson = await delCoResResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(afterDelJson.GetProperty("people").GetInt32() == 1 &&
+               afterDelJson.GetProperty("coResidents").GetArrayLength() == 0,
+            "removing co-resident updates People back to 1 and empties coResidents");
+
+        // 4. POST /api/tenant/{token}/meter-submission validation & happy path
+        byte[] validPng = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 1, 2, 3, 4];
+        byte[] validJpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01];
+        byte[] validWebp = System.Text.Encoding.ASCII.GetBytes("RIFF\0\0\0\0WEBPVP8 ");
+        byte[] invalidMagic = System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 not an image");
+        byte[] oversizedPng = new byte[2 * 1024 * 1024 + 128];
+        Array.Copy(validPng, oversizedPng, validPng.Length);
+
+        static MultipartFormDataContent BuildMeterForm(byte[] fileBytes, string fileName, string reading, string? note = null)
+        {
+            var form = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(fileBytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            form.Add(fileContent, "photo", fileName);
+            form.Add(new StringContent(reading), "submittedReading");
+            if (note is not null) form.Add(new StringContent(note), "note");
+            return form;
+        }
+
+        using (var badMagicForm = BuildMeterForm(invalidMagic, "meter.pdf", "145"))
+        {
+            var badMagicResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", badMagicForm);
+            Assert(badMagicResp.StatusCode == HttpStatusCode.BadRequest, "meter-submission rejects non-image magic bytes with 400 BadRequest");
+        }
+
+        using (var oversizedForm = BuildMeterForm(oversizedPng, "huge.png", "145"))
+        {
+            var oversizedResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", oversizedForm);
+            Assert(oversizedResp.StatusCode == HttpStatusCode.RequestEntityTooLarge, "meter-submission rejects >2MB photo with 413 PayloadTooLarge");
+        }
+
+        using (var rollbackForm = BuildMeterForm(validPng, "meter.png", "95"))
+        {
+            var rollbackResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", rollbackForm);
+            Assert(rollbackResp.StatusCode == HttpStatusCode.BadRequest, "meter-submission rejects reading < previousReading (95 < 100) with 400 BadRequest");
+        }
+
+        TenantMeterSubmissionDto? submittedDto;
+        using (var validForm = BuildMeterForm(validPng, "meter.png", "145", "Chi so dien thang nay"))
+        {
+            var validResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", validForm);
+            Assert(validResp.StatusCode == HttpStatusCode.OK, "valid PNG meter-submission returns 200 OK");
+            submittedDto = await validResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
+            Assert(submittedDto != null &&
+                   submittedDto.Status == "Pending" &&
+                   submittedDto.PreviousReading == 100m &&
+                   submittedDto.SubmittedReading == 145m &&
+                   submittedDto.TenantNote == "Chi so dien thang nay" &&
+                   submittedDto.PhotoContentType == "image/png",
+                "meter-submission DTO has Pending status, PreviousReading=100, SubmittedReading=145, and image/png content type");
+        }
+
+        var submissionId = submittedDto!.Id;
+
+        // Verify GET /api/tenant/{token} includes meterSubmission with Pending status
+        var portalJson = await client.GetFromJsonAsync<JsonElement>($"/api/tenant/{token}");
+        Assert(portalJson.GetProperty("meterSubmission").GetProperty("status").GetString() == "Pending" &&
+               portalJson.GetProperty("meterSubmission").GetProperty("submittedReading").GetDecimal() == 145m,
+            "GET /api/tenant/{token} returns Pending meterSubmission");
+
+        // Verify GET /api/readings/submissions returns Pending submission for OwnerA
+        var ownerSubmissions = await client.GetFromJsonAsync<List<TenantMeterSubmissionDto>>("/api/readings/submissions");
+        Assert(ownerSubmissions != null && ownerSubmissions.Count == 1 &&
+               ownerSubmissions[0].Id == submissionId && ownerSubmissions[0].Status == "Pending",
+            "GET /api/readings/submissions returns Pending submission for landlord");
+
+        // Verify photo endpoint returns exact bytes
+        var photoBytes = await client.GetByteArrayAsync($"/api/readings/submissions/{submissionId}/photo");
+        Assert(photoBytes.SequenceEqual(validPng), "GET /api/readings/submissions/{id}/photo returns uploaded image bytes");
+
+        // 5. POST /api/readings/submissions/{id}/reject marks Rejected with reason and allows tenant to resubmit (JPEG & WebP)
+        var rejectResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/reject",
+            new RejectMeterSubmissionRequest("Anh bi loa sang, vui long chup lai"));
+        Assert(rejectResp.StatusCode == HttpStatusCode.OK, "POST /api/readings/submissions/{id}/reject returns 200 OK");
+        var rejectedDto = await rejectResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
+        Assert(rejectedDto!.Status == "Rejected" && rejectedDto.RejectReason == "Anh bi loa sang, vui long chup lai",
+            "submission marked Rejected with landlord reason");
+
+        using (var resubmitJpeg = BuildMeterForm(validJpeg, "retake.jpg", "147", "Chup lai JPEG"))
+        {
+            var resubmitJpegResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", resubmitJpeg);
+            Assert(resubmitJpegResp.StatusCode == HttpStatusCode.OK, "resubmit with valid JPEG succeeds");
+        }
+
+        using (var resubmitWebp = BuildMeterForm(validWebp, "retake.webp", "148", "Chup lai WebP ro net"))
+        {
+            var resubmitWebpResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", resubmitWebp);
+            Assert(resubmitWebpResp.StatusCode == HttpStatusCode.OK, "resubmit with valid WebP succeeds");
+            var resubmittedDto = await resubmitWebpResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
+            Assert(resubmittedDto!.Id == submissionId &&
+                   resubmittedDto.Status == "Pending" &&
+                   resubmittedDto.SubmittedReading == 148m &&
+                   resubmittedDto.RejectReason == null &&
+                   resubmittedDto.PhotoContentType == "image/webp",
+                "resubmission resets status to Pending, updates reading to 148, clears RejectReason, and stores image/webp");
+        }
+
+        // 6. Cross-owner isolation: OwnerB cannot approve, reject, or view photo of OwnerA's submission
+        using (var crossOwnerApprove = new HttpRequestMessage(HttpMethod.Post, $"/api/readings/submissions/{submissionId}/approve")
+        {
+            Content = JsonContent.Create(new ApproveMeterSubmissionRequest(148m))
+        })
+        {
+            crossOwnerApprove.Headers.Add("X-Fixture-Owner", OwnerBId.ToString());
+            using var crossResp = await client.SendAsync(crossOwnerApprove);
+            Assert(crossResp.StatusCode == HttpStatusCode.NotFound, "cross-owner approve is blocked with 404 NotFound");
+        }
+
+        // 7. POST /api/readings/submissions/{id}/approve creates MonthlyReading + Issued Monthly Invoice atomically
+        var approveResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/approve",
+            new ApproveMeterSubmissionRequest(150m));
+        Assert(approveResp.StatusCode == HttpStatusCode.OK, "POST /api/readings/submissions/{id}/approve returns 200 OK");
+        var approvedDto = await approveResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
+        Assert(approvedDto!.Status == "Approved" &&
+               approvedDto.ApprovedReading == 150m &&
+               approvedDto.ReadingId != null &&
+               approvedDto.InvoiceId != null,
+            "approved submission records Approved status, ApprovedReading=150, ReadingId, and InvoiceId");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var reading = await db.Readings.FindAsync(approvedDto.ReadingId);
+            var invoice = await db.Invoices.FindAsync(approvedDto.InvoiceId);
+            Assert(reading != null && reading.PreviousReading == 100m && reading.CurrentReading == 150m && reading.Consumption == 50m,
+                "MonthlyReading created with PreviousReading=100, CurrentReading=150, Consumption=50");
+            Assert(invoice != null && invoice.Kind == "Monthly" && invoice.LifecycleState == InvoiceLifecycleState.Issued &&
+                   invoice.ElectricityAmount == 50m * 3_500m,
+                "Issued Monthly Invoice created atomically with accurate electricity amount");
+        }
+
+        // Re-approving or tenant resubmitting after approval returns 409 Conflict
+        var doubleApproveResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/approve",
+            new ApproveMeterSubmissionRequest(150m));
+        Assert(doubleApproveResp.StatusCode == HttpStatusCode.Conflict, "approving an already-approved submission returns 409 Conflict");
     }
 
     private static WebApplication CreateTestApp(string connectionString)

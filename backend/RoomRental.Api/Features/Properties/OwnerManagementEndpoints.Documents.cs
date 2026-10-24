@@ -160,7 +160,8 @@ public static partial class OwnerManagementEndpoints
             HandoverAssets: occupancy.HandoverAssets,
             AdditionalTerms: occupancy.AdditionalTerms,
             HouseholdHeadRelation: householdRelation,
-            CoResidents: coResidents);
+            CoResidents: coResidents,
+            TenantSelfCheckinAt: occupancy.TenantSelfCheckinAt);
     }
 
     internal static void ValidateAndApplyOwnerProfileUpdates(
@@ -374,7 +375,7 @@ public static partial class OwnerManagementEndpoints
             occupancy.HouseholdHeadRelation = CleanOptional(householdHeadRelation, 100, "Mối quan hệ với chủ hộ") ?? "Người thuê trọ";
     }
 
-    private static string? CleanOptional(string? value, int maxLength, string fieldLabel)
+    internal static string? CleanOptional(string? value, int maxLength, string fieldLabel)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();

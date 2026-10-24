@@ -55,7 +55,8 @@ public sealed record OccupancyDocumentDto(
     string? HandoverAssets,
     string? AdditionalTerms,
     string HouseholdHeadRelation,
-    IReadOnlyList<CoResidentDto> CoResidents);
+    IReadOnlyList<CoResidentDto> CoResidents,
+    DateTimeOffset? TenantSelfCheckinAt = null);
 
 public sealed record UpdateOccupancyDocumentRequest(
     Guid OccupancyId,

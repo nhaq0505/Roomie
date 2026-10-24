@@ -110,7 +110,7 @@ export default function ContractDocumentsDrawer({
     refetchIntervalInBackground: false,
   });
 
-  const data = query.data;
+  const data = query.data as (OccupancyDocumentData & { tenantSelfCheckinAt?: string | null }) | undefined;
   const displayRoomName = data?.roomName ?? room?.name ?? '';
 
   useEffect(() => {
@@ -488,6 +488,15 @@ export default function ContractDocumentsDrawer({
   ) : (
     <div className="contract-workspace-grid">
       <div className="contract-form-pane">
+        {data.tenantSelfCheckinAt && (
+          <Alert
+            type="success"
+            showIcon
+            style={{ marginBottom: 14 }}
+            message={`${''}Khách thuê đã gửi ảnh CCCD qua link phòng (${dayjs(data.tenantSelfCheckinAt).format('DD/MM/YYYY HH:mm')})`}
+            description={`${''}Hệ thống đã tự động nhận diện và lưu thông tin Hợp đồng / Tờ khai CT01 của khách thuê. Bạn có thể kiểm tra lại và tải ngay file Word (.docx) hoặc in PDF.`}
+          />
+        )}
         <Alert
           type="info"
           showIcon
