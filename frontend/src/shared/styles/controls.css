@@ -39,36 +39,37 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .mobile-menu-button { margin-right: 12px; }
 }
 @media (max-width: 767px) {
-  .compact-navigation { position: fixed; inset: auto 0 0 0; z-index: 95; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px); border-top: 1px solid #dce7e3; border-bottom: 0; box-shadow: 0 -4px 18px rgba(19, 48, 55, 0.06); overflow: visible; }
+  .compact-navigation { position: fixed; inset: auto 0 0 0; z-index: 95; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(16px); border-top: 1px solid #e2ece9; border-bottom: 0; box-shadow: 0 -2px 14px rgba(19, 48, 55, 0.04); overflow: visible; }
+  .compact-navigation[data-role="admin"] { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding-left: 6px; padding-right: 6px; }
+  .compact-navigation[data-role="admin"] > :is(a, button) { font-size: 10px; }
   .compact-nav-dropdown.ant-dropdown { position: fixed; }
   .compact-navigation > [data-mobile-secondary="true"] { display: none !important; }
-  .compact-navigation .compact-nav-label-full { display: none; }
+  .compact-navigation .compact-nav-label-full,
+  .compact-navigation .compact-nav-caret { display: none; }
   .compact-navigation .compact-nav-label-short { display: inline; }
-  .compact-navigation > :is(a, button) { flex: 1 1 44px; min-width: 44px; min-height: 44px; height: 44px; flex-direction: row; align-items: center; justify-content: center; gap: 8px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: #526b72; font-size: 13px; font-weight: 600; line-height: 1; transition: background-color 180ms ease, color 180ms ease, flex-grow 180ms ease; }
-  .compact-navigation > :is(a, button) > .anticon { font-size: 20px; }
-  .compact-navigation > :is(a, button):not([aria-current="page"]) > .compact-nav-text { display: none; }
-  .compact-navigation > :is(a, button)[aria-current="page"] { flex: 1.85 0 auto; padding: 0 16px; color: #fff; background: #087c69; box-shadow: 0 4px 12px rgba(8, 124, 105, 0.24); }
-  .compact-navigation > :is(a, button)[aria-current="page"] > .compact-nav-text { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-  .compact-navigation[data-role="admin"] > :is(a, button) { min-width: 36px; padding: 0 6px; }
-  .compact-navigation[data-role="admin"] > :is(a, button)[aria-current="page"] { flex: 1 1 auto; min-width: 0; max-width: 150px; padding: 0 10px; }
-  .compact-navigation[data-role="admin"] > :is(a, button)[aria-current="page"] > .compact-nav-text { overflow: hidden; text-overflow: ellipsis; max-width: 100%; display: block; }
-  .page-content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
-  .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .quick-actions > a { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 12px 10px; min-height: 82px; }
-  .quick-actions > a > .anticon:first-child { font-size: 20px; }
-  .quick-actions strong { font-size: 12.5px; line-height: 1.3; }
+  .compact-navigation > :is(a, button) { min-width: 0; min-height: 48px; height: 48px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; border: 0; border-radius: 12px; background: transparent; color: #526970; font-size: 11px; font-weight: 600; line-height: 1.15; transition: background-color 150ms ease, color 150ms ease; }
+  .compact-navigation > :is(a, button) > .anticon { font-size: 19px; line-height: 1; }
+  .compact-navigation > :is(a, button) > .compact-nav-text { display: block !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .compact-navigation > :is(a, button)[aria-current="page"],
+  .compact-navigation > :is(a, button)[data-mobile-more-active="true"] { color: #066958; background: #eaf6f2; font-weight: 700; box-shadow: none; }
+  .mobile-menu-button-text,
+  .profile-caret { display: none; }
+  .mobile-menu-button.ant-btn { width: 36px; min-width: 36px; height: 36px; padding: 0; margin-right: 8px; border: 1px solid #e2ebe8; border-radius: 10px; background: #f6faf8; color: #254149; }
+  .page-content { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+  .quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .quick-actions > a { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 9px 10px; min-height: 56px; border-radius: 11px; background: #f3faf7; border-color: #d6ebe3; }
+  .quick-actions > a > .anticon:first-child { font-size: 17px; }
+  .quick-actions strong { font-size: 12px; line-height: 1.2; font-weight: 600; }
   .quick-actions span:not(.anticon), .quick-actions > a > .anticon:last-child { display: none; }
-  .stat-card { min-height: 120px; }
-  .stat-card .ant-card-body { padding: 14px 12px; }
-  .stat-card .ant-statistic-title { padding-right: 22px; font-size: 12.5px; margin-bottom: 10px; }
-  .stat-card .ant-statistic-content { font-size: 18px; letter-spacing: -.5px; }
-  .stat-icon { right: 10px; top: 12px; width: 25px; height: 25px; font-size: 13px; }
-  .stat-foot { font-size: 12px; }
-  .stat-unit { display: none; }
+  .stat-card { min-height: 66px; border-radius: 12px; box-shadow: none; }
+  .stat-card .ant-card-body { padding: 11px 13px; }
+  .stat-card .ant-statistic-title { padding-right: 0; font-size: 11.5px; margin-bottom: 4px; line-height: 1.25; }
+  .stat-card .ant-statistic-content { font-size: 17px; letter-spacing: -.4px; }
+  .stat-icon, .stat-foot, .stat-unit { display: none !important; }
   .section-card-header, .section-card .ant-card-head-wrapper { flex-wrap: wrap; gap: 8px; }
   .section-card .ant-card-extra { margin-inline-start: 0; width: 100%; }
   .section-card-header > .ant-space { flex-wrap: wrap; }
-  .invoice-totals-row { row-gap: 10px; }
+  .invoice-totals-row { row-gap: 8px; }
   .ant-drawer-content-wrapper { max-width: 100vw; }
   .empty-building-content { flex-wrap: wrap; }
   .empty-building-content > .ant-btn { width: 100%; }
@@ -78,10 +79,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .tenant-invoice-top { gap: 12px; flex-wrap: wrap; }
 }
 @media (max-width: 480px) {
-  .compact-navigation { gap: 4px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); }
-  .compact-navigation > :is(a, button) { flex-direction: row; gap: 7px; font-size: 12.5px; }
-  .stat-card .ant-statistic-content { font-size: 17px; }
-  .quick-actions > a { padding: 11px 9px; }
+  .compact-navigation { gap: 3px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .compact-navigation > :is(a, button) { flex-direction: column; gap: 2px; font-size: 10.5px; padding: 4px 1px; }
+  .stat-card .ant-statistic-content { font-size: 16px; }
+  .quick-actions > a { padding: 8px 8px; min-height: 54px; }
   .room-overview-strip > div span:last-child { font-size: 12px; }
   .building-summary-strip > a { font-size: 13px; }
   .tenant-header-secure, .tenant-summary-lock { font-size: 12px; }
@@ -92,9 +93,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 @media (max-width: 767px) {
   .ant-modal { top: 16px; padding-bottom: 16px; margin: 0 auto; }
   .ant-modal .ant-modal-body { max-height: calc(100dvh - 190px); overflow-y: auto; padding-right: 6px; }
-  .mobile-record-field { flex-wrap: wrap; gap: 8px; }
+  .mobile-record-heading, .mobile-record-head { padding-bottom: 9px; margin-bottom: 4px; }
+  .mobile-record-field { flex-wrap: wrap; gap: 6px 10px; padding: 6px 0; }
   .mobile-field-label { flex: 1 1 100px; }
   .mobile-record-field .mobile-field-value { max-width: 100%; }
+  .mobile-record-actions { padding-top: 9px; margin-top: 5px; }
   .ant-popover { max-width: calc(100vw - 24px); }
   .ant-popconfirm-description { max-width: 290px; }
   .tenant-breakdown > div, .invoice-breakdown > div { align-items: flex-start; flex-wrap: wrap; }
@@ -105,10 +108,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .auth-small-brand { display: flex; }
 }
 @media (max-width: 767px) {
-  .page-heading-extra > .ant-space { width: 100%; gap: 10px !important; }
-  .page-heading-extra > .ant-space > .ant-space-item { flex: 1 1 140px; }
-  .page-heading-extra > .ant-space > .ant-space-item:last-child { flex-basis: 200px; }
-  .page-heading-extra > .ant-space .ant-picker, .page-heading-extra > .ant-space .ant-btn { width: 100%; }
+  .page-heading-extra > .ant-space { width: 100%; gap: 6px !important; }
+  .page-heading-extra > .ant-space > .ant-space-item { flex: 1 1 125px; min-width: 0; }
+  .page-heading-extra > .ant-space > .ant-space-item:nth-child(2) { flex: 0 1 125px; }
+  .page-heading-extra > .ant-space > .ant-space-item:nth-child(n+3) { flex: 1 1 100%; }
+  .page-heading-extra > .ant-space .ant-picker, .page-heading-extra > .ant-space .ant-btn, .page-heading-extra > .ant-space .ant-select { width: 100%; min-width: 0 !important; }
   .invoice-detail-head { flex-wrap: wrap; }
   .tenant-header-secure { max-width: 110px; line-height: 1.4; }
 }
@@ -140,12 +144,16 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'Be Vietnam Pro', system-ui, sans-serif; }
 @media (max-width: 600px) {
   .public-language { right: 16px; top: 16px; }
-  .language-selector { width: 116px; }
+  .language-selector { width: 102px; }
   .tenant-header { flex-wrap: wrap; gap: 10px; }
   .tenant-header-secure { display: none; }
-  .topbar .ant-space { gap: 8px !important; }
+  .topbar .ant-space { gap: 6px !important; }
   .topbar .profile-button { padding-left: 0; padding-right: 0; }
   .status-page { padding-top: 80px; }
+}
+@media (max-width: 359px) {
+  .language-selector { width: 92px; }
+  .mobile-menu-button.ant-btn { width: 34px; min-width: 34px; height: 34px; margin-right: 6px; }
 }
 .tenant-header .language-selector .ant-select-selection-item { font-size: 13px; color: var(--ink); }
 .tenant-header .language-selector .anticon { font-size: 14px; }

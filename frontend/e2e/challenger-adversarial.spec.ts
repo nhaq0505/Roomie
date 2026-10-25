@@ -167,7 +167,7 @@ test.describe('Adversarial Boundary & Edge Condition Suite', () => {
       await expect(linkInput).toHaveValue(new RegExp(tokens[i]));
 
       // Verify QR code is rendered and visible
-      await expect(linkModal.locator('.ant-qrcode')).toBeVisible();
+      await expect(linkModal.locator('.ant-qrcode')).toHaveCount(0);
 
       // Notice about revocation should appear
       await expect(linkModal.getByText('Đã tạo link mới và thu hồi link cũ.')).toBeVisible();

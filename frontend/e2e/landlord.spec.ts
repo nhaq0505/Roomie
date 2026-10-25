@@ -440,7 +440,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     expect(initialUrl).toContain('/t/fixture-token-abc');
 
     // Verify QR code and copy button
-    await expect(linkModal.locator('.ant-qrcode')).toBeVisible();
+    await expect(linkModal.locator('.ant-qrcode')).toHaveCount(0);
     await expect(linkModal.getByRole('button', { name: 'Sao chép liên kết' })).toBeVisible();
 
     // 4. Test link rotation
@@ -520,7 +520,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(linkModal).toBeVisible();
     const linkInput = linkModal.locator('input[aria-label="Link hóa đơn của người thuê"]');
     await expect(linkInput).toHaveValue(/newly-created-token-999/);
-    await expect(linkModal.locator('.ant-qrcode')).toBeVisible();
+    await expect(linkModal.locator('.ant-qrcode')).toHaveCount(0);
     expect(rotateCalled).toBe(true);
     await linkModal.getByRole('button', { name: 'Đóng' }).click();
   });

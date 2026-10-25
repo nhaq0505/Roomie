@@ -215,6 +215,7 @@ export default function TenantMeterSubmissionCard({
                     min={previousReading}
                     max={1000000000}
                     step={1}
+                    precision={0}
                     value={submittedReading}
                     onChange={(val) => setSubmittedReading(typeof val === 'number' ? val : null)}
                   />

@@ -103,3 +103,16 @@
 .empty-building-content .ant-typography { margin: 0; }
 .empty-building-content .ant-typography:first-child { font-size: 14px; }
 .empty-building-content .ant-typography:last-child { margin-top: 4px; color: #819094; font-size: 13px; }
+@media (max-width: 767px) {
+  .building-card { border-radius: 14px; border-color: #dde8e4; background: #ffffff; box-shadow: 0 1px 3px rgba(19, 48, 55, 0.03); }
+  .building-card::before { height: 3px; }
+  .building-card-header { padding: 14px 15px 0; }
+  .building-card-icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; font-size: 16px; box-shadow: none; }
+  .building-room-count { padding: 3px 10px; box-shadow: none; }
+  .building-room-count strong { font-size: 16px; }
+  .building-card-body { padding: 12px 15px 14px; }
+  .building-card-title { min-height: 0; }
+  .building-card-title h4.ant-typography { font-size: 16px; margin-bottom: 3px; }
+  .building-card-footer { padding-top: 10px; margin-top: 10px; border-top-color: #ecf2f0; }
+  .building-card-footer .ant-btn, .building-view-rooms { min-height: 38px; padding-inline: 12px; font-size: 13px; box-shadow: none; }
+}

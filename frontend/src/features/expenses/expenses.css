@@ -53,9 +53,14 @@
   .expenses-filter-toolbar > .ant-btn { justify-self: start; }
 }
 @media (max-width: 767px) {
-  .expenses-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .expenses-workspace .ant-tabs-nav { margin-bottom: 10px; }
+  .expenses-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .expenses-filter-toolbar > label { gap: 0; }
+  .expenses-filter-toolbar > label > span:first-child:not([class*="ant-"]) { display: none !important; }
   .expenses-filter-toolbar > label:first-child { grid-column: 1 / -1; }
-  .expenses-filter-toolbar > .ant-btn { grid-column: 1 / -1; width: 100%; }
+  .expenses-filter-toolbar > .ant-btn { width: 100%; min-height: 36px; height: 100%; }
+  .expenses-workspace .mobile-records { gap: 10px; }
+  .expenses-workspace .mobile-record { padding: 14px 15px; border-radius: 14px; border-color: #e1ebe8; }
 }
 @media (max-width: 640px) {
   .expense-form-grid, .expense-form-grid-3 { grid-template-columns: 1fr; }

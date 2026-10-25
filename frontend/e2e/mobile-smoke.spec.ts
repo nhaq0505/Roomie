@@ -322,15 +322,45 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     expect(navBox!.y).toBeGreaterThan(700);
     expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(375);
 
-    // Navigate via bottom tab bar to Readings and verify status filter pills
+    // Verify all 5 primary bottom nav items display their text labels simultaneously (no mystery icons)
+    const visibleLabels = await bottomNav
+      .locator('> :is(a, button):not([data-mobile-secondary="true"]) .compact-nav-text')
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).display));
+    expect(visibleLabels).toHaveLength(5);
+    for (const display of visibleLabels) {
+      expect(display).not.toBe('none');
+    }
+
+    // Navigate via bottom tab bar to Readings and verify status filter pills & side-by-side kWh entry
+    await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
     await bottomNav.getByRole('link', { name: 'Lập hóa đơn' }).click();
     await expect(page).toHaveURL(/\/readings$/);
-    await expect(page.locator('.reading-filter-pills')).toBeVisible();
-    await expect(page.locator('.reading-mobile-card').first()).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
+    const firstReadingCard = page.locator('.reading-mobile-card').first();
+    await expect(firstReadingCard).toBeVisible();
 
-    // Open Settings dropdown from bottom tab bar "Cấu hình" button
-    await bottomNav.getByRole('button', { name: /Cấu hình/ }).click();
-    await expect(page.locator('.ant-dropdown:visible')).toBeVisible();
+    const entryRow = firstReadingCard.locator('.reading-mobile-entry');
+    await expect(entryRow).toBeVisible();
+    const inputBox = await entryRow.locator('.reading-mobile-input').boundingBox();
+    const submitBox = await entryRow.locator('.reading-mobile-submit').boundingBox();
+    expect(inputBox).not.toBeNull();
+    expect(submitBox).not.toBeNull();
+    expect(Math.abs(inputBox!.y - submitBox!.y)).toBeLessThan(12);
+
+    // Open Settings dropdown from bottom tab bar "Cấu hình" button and navigate to Sổ chi phí
+    const moreBtn = bottomNav.getByRole('button', { name: /Cấu hình/ });
+    await moreBtn.click();
+    const dropdown = page.locator('.ant-dropdown:visible');
+    await expect(dropdown).toBeVisible();
+    await expect(bottomNav.getByRole('link', { name: 'Dãy trọ' })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Tổng quan' })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Chi phí' })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Báo cáo' })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Hồ sơ' })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Gói cước' })).toBeVisible();
+    await dropdown.getByRole('menuitem', { name: 'Chi phí' }).click();
+    await expect(page).toHaveURL(/\/expenses$/);
+    await expect(moreBtn).toHaveAttribute('data-mobile-more-active', 'true');
   });
 
   test('Mobile RoomTenantPage displays sticky bottom action bar above compact-navigation without overlap', async ({ page }) => {
@@ -339,8 +369,9 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     const bottomNav = page.locator('.compact-navigation');
     await expect(stickyBar).toBeVisible();
     await expect(bottomNav).toBeVisible();
-    await expect(stickyBar.getByRole('button', { name: 'Xuất hợp đồng & CT01' })).toBeVisible();
+    await expect(stickyBar.getByRole('button', { name: 'Xuất hợp đồng & CT01' })).toContainText('Xuất hợp đồng & CT01');
     await expect(stickyBar.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible();
+    await expect(page.locator('.room-tenant-summary-actions')).toBeHidden();
 
     const barBox = await stickyBar.boundingBox();
     const navBox = await bottomNav.boundingBox();
@@ -404,7 +435,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     expect(emailInputSize).toBeGreaterThanOrEqual(16);
   });
 
-  test('RoomDocumentsPage at 820x900 tablet viewport has no scroll trap and export buttons are visible', async ({ page }) => {
+  test('RoomDocumentsPage at 820x900 tablet and 320px/375px phone viewports has no scroll trap or horizontal overflow', async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 900 });
     await page.goto('/rooms/room-01/documents');
     await expect(page.getByRole('button', { name: 'Lưu thông tin' })).toBeVisible();
@@ -413,6 +444,90 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
 
     const previewPanePosition = await page.locator('.room-documents-page .contract-preview-pane').evaluate((el) => getComputedStyle(el).position);
     expect(previewPanePosition).toBe('static');
+
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      await page.goto('/rooms/room-01/documents');
+      await expect(page.getByRole('button', { name: 'Lưu thông tin' })).toBeVisible();
+      const sheetBox = await page.locator('.contract-a4-sheet').boundingBox();
+      expect(sheetBox).not.toBeNull();
+      expect(sheetBox!.x).toBeGreaterThanOrEqual(0);
+      const isOverflowing = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(isOverflowing, `RoomDocumentsPage overflowed at ${width}px`).toBe(false);
+    }
+  });
+
+  test('Pending meter submission badge, Pending AccountStatus, and Tenant Portal meter card fit at 320px and 375px', async ({ page }) => {
+    await page.route('**/api/readings/submissions*', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 'sub-01',
+            roomId: 'room-01',
+            occupancyId: 'occ-01',
+            period: currentVietnamPeriod,
+            previousReading: 120,
+            submittedReading: 155,
+            approvedReading: null,
+            status: 'Pending',
+            photoFileName: 'meter.jpg',
+            tenantNote: 'Em chụp đồng hồ tháng 10',
+            rejectReason: null,
+            submittedAt: '2026-10-20T08:00:00Z',
+          },
+        ],
+      }),
+    );
+    await page.route('**/api/tenant/demo-token*', (route) =>
+      route.fulfill({
+        json: {
+          room: sampleRooms[0],
+          invoices: [sampleInvoice],
+          total: 1,
+          totals: { billed: 3325000, paid: 0, outstanding: 3325000 },
+          currentPeriod: currentVietnamPeriod,
+          currentPeriodHasReading: false,
+          meterSubmission: null,
+        },
+      }),
+    );
+
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      await page.goto('/readings');
+      const badgeBtn = page.locator('.reading-mobile-card .reading-submission-btn').first();
+      await expect(badgeBtn).toBeVisible();
+      const cardBox = await page.locator('.reading-mobile-card').first().boundingBox();
+      const btnBox = await badgeBtn.boundingBox();
+      expect(cardBox).not.toBeNull();
+      expect(btnBox).not.toBeNull();
+      expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+      const readingOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(readingOverflow, `/readings with pending submission overflowed at ${width}px`).toBe(false);
+
+      // Tenant Portal with meter submission card enabled
+      await page.goto('/t/demo-token');
+      await expect(page.locator('.tenant-meter-submission-card')).toBeVisible();
+      const tenantOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(tenantOverflow, `/t/demo-token overflowed at ${width}px`).toBe(false);
+    }
+
+    // Pending AccountStatus page at 320px and 375px
+    await page.route('**/api/auth/me', (route) =>
+      route.fulfill({
+        json: {
+          ...landlordUser,
+          status: 'Pending',
+        },
+      }),
+    );
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      await page.goto('/account-status');
+      await expect(page.locator('.status-card')).toBeVisible();
+      const statusOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(statusOverflow, `/account-status (Pending) overflowed at ${width}px`).toBe(false);
+    }
   });
 
   test('Zero horizontal overflow at 320px and 375px across public and admin pages', async ({ page }) => {
@@ -420,49 +535,184 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await page.setViewportSize({ width: 320, height: 812 });
     for (const p of ['/', '/pricing', '/huong-dan', '/dashboard', '/rooms']) {
       await page.goto(p);
-      await expect(page.locator('h1, h2').first()).toBeVisible();
+      await expect(page.getByRole('heading').first()).toBeVisible();
       const isOverflowing = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
       expect(isOverflowing, `Page ${p} overflowed at 320px`).toBe(false);
     }
 
-    // Verify Admin pages at 375px
+    // Verify Admin pages at 320px and 375px
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      await page.route('**/api/auth/me', (route) =>
+        route.fulfill({
+          json: {
+            id: 'admin-mobile-01',
+            name: 'Admin Mobile',
+            email: 'admin@roomie.vn',
+            role: 'Admin',
+            status: 'Approved',
+          },
+        }),
+      );
+      await page.route('**/api/admin/promotions', (route) =>
+        route.fulfill({
+          json: {
+            welcome: { id: 'welcome', name: 'Welcome', isEnabled: true, rewardMonths: 2, startsAt: null, endsAt: null },
+            codes: [
+              {
+                id: 'c-1',
+                code: 'TET2026',
+                description: 'Khuyến mãi Tết',
+                rewardMonths: 2,
+                maxRedemptions: 50,
+                redeemedCount: 5,
+                isActive: true,
+                expiresAt: null,
+                createdAt: '2026-10-01T00:00:00Z',
+              },
+            ],
+          },
+        }),
+      );
+      await page.goto('/admin/promotions');
+      await expect(page.getByRole('heading', { name: 'Chương trình Khuyến mãi' })).toBeVisible();
+      await expect(page.locator('article.mobile-record').first()).toBeVisible();
+      const adminOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+      expect(adminOverflow, `Admin promotions overflowed at ${width}px`).toBe(false);
+    }
+  });
+
+  test('Minimalist mobile UI/UX eliminates redundant headers, multi-banner clutter, triple-nested boxes, and filter label rows at 375px', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.route('**/api/auth/me', (route) =>
+
+    // 1. Rooms page: redundant header copy & filter labels hidden, directory wrapper unboxed, tenant sub-row unboxed
+    await page.goto('/rooms');
+    await expect(page.getByRole('heading', { name: 'Phòng & người thuê' })).toBeVisible();
+    await expect(page.locator('.page-heading .page-subtitle')).toBeHidden();
+    await expect(page.locator('.room-filter > span').first()).toBeHidden();
+    // Filter controls remain accessible via aria-label
+    await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
+
+    const roomDirectoryStyle = await page.locator('.room-directory.section-card').evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { borderTopWidth: s.borderTopWidth, paddingLeft: s.paddingLeft, backgroundColor: s.backgroundColor };
+    });
+    expect(roomDirectoryStyle.borderTopWidth).toBe('0px');
+    expect(roomDirectoryStyle.paddingLeft).toBe('0px');
+
+    const tenantSubBoxBorder = await page.locator('.room-card-tenant').first().evaluate((el) => getComputedStyle(el).borderLeftWidth);
+    expect(tenantSubBoxBorder).toBe('0px');
+
+    // 2. Readings page: progress card & notice banner hidden, reading section unboxed, mobile stats unboxed
+    await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
+    await page.goto('/readings');
+    await expect(page.getByRole('heading', { name: 'Lập hóa đơn' })).toBeVisible();
+    await expect(page.locator('.page-heading .eyebrow')).toBeHidden();
+    await expect(page.locator('.reading-progress-card')).toBeHidden();
+    await expect(page.locator('.reading-notice')).toBeHidden();
+    const readingStatsBorder = await page.locator('.reading-mobile-stats').first().evaluate((el) => getComputedStyle(el).borderLeftWidth);
+    expect(readingStatsBorder).toBe('0px');
+
+    // 3. Invoices page: scope note & filter labels hidden, list wrapper & mobile amounts unboxed
+    await page.goto('/invoices');
+    await expect(page.getByRole('heading', { name: 'Hóa đơn' }).first()).toBeVisible();
+    await expect(page.locator('.invoice-summary-scope')).toBeHidden();
+    await expect(page.locator('.invoice-filter > span').first()).toBeHidden();
+    await expect(page.getByLabel('Tìm hóa đơn')).toBeVisible();
+    const invoiceAmountsBorder = await page.locator('.invoice-mobile-amounts').first().evaluate((el) => getComputedStyle(el).borderLeftWidth);
+    expect(invoiceAmountsBorder).toBe('0px');
+
+    // 4. Buildings page: tip card hidden
+    await page.goto('/buildings');
+    await expect(page.getByRole('heading', { name: 'Dãy trọ' })).toBeVisible();
+    await expect(page.locator('.building-tip-card')).toBeHidden();
+  });
+
+  test('Mobile sharedExpensesExcluded warning visibility, compact filter rows, 320px header/pill alignment, and multi-locale safety', async ({ page }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    // 1. /invoices hides unfiltered result count header on mobile, shows it when filtered
+    await page.goto('/invoices');
+    await expect(page.locator('.invoice-list-card > .section-card-header')).toBeHidden();
+    await page.getByLabel('Tìm hóa đơn').fill('101');
+    await expect(page.locator('.invoice-list-card > .section-card-header')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Xóa lọc' })).toBeVisible();
+
+    // 2. /expenses places Category select and Reset button on the same row on mobile and shows building filter scope warning
+    await page.goto('/expenses');
+    const categorySelect = page.getByRole('combobox', { name: 'Lọc theo danh mục' });
+    const resetBtn = page.locator('.expenses-filter-toolbar > .ant-btn');
+    const catBox = await categorySelect.boundingBox();
+    const resetBox = await resetBtn.boundingBox();
+    expect(catBox).not.toBeNull();
+    expect(resetBox).not.toBeNull();
+    expect(Math.abs(catBox!.y - resetBox!.y)).toBeLessThan(12);
+
+    await page.getByRole('combobox', { name: 'Lọc theo dãy trọ' }).click();
+    await page.locator('.ant-select-item-option').filter({ hasText: 'Nhà trọ Bình An' }).click();
+    await expect(page.locator('.reports-scope-warning')).toBeVisible();
+    await expect(page.locator('.reports-scope-warning')).toContainText('Khi lọc theo dãy, các khoản chi chung không gắn dãy sẽ không được tính.');
+
+    // 3. /reports hides static .reports-scope-note on mobile, but shows dynamic sharedExpensesExcluded .reports-scope-warning on Profit/Loss tab
+    await page.route('**/api/reports/profit-loss*', (route) =>
       route.fulfill({
         json: {
-          id: 'admin-mobile-01',
-          name: 'Admin Mobile',
-          email: 'admin@roomie.vn',
-          role: 'Admin',
-          status: 'Approved',
+          dateFrom: `${currentVietnamPeriod}-01`,
+          dateTo: `${currentVietnamPeriod}-28`,
+          buildingId: 'bld-01',
+          sharedExpensesExcluded: 500000,
+          totals: { income: 3325000, expenses: 1200000, net: 2125000 },
+          months: [{ month: currentVietnamPeriod, income: 3325000, expenses: 1200000, net: 2125000 }],
+          expensesByCategory: [],
         },
       }),
     );
-    await page.route('**/api/admin/promotions', (route) =>
-      route.fulfill({
-        json: {
-          welcome: { id: 'welcome', name: 'Welcome', isEnabled: true, rewardMonths: 2, startsAt: null, endsAt: null },
-          codes: [
-            {
-              id: 'c-1',
-              code: 'TET2026',
-              description: 'Khuyến mãi Tết',
-              rewardMonths: 2,
-              maxRedemptions: 50,
-              redeemedCount: 5,
-              isActive: true,
-              expiresAt: null,
-              createdAt: '2026-10-01T00:00:00Z',
-            },
-          ],
-        },
-      }),
-    );
-    await page.goto('/admin/promotions');
-    await expect(page.getByRole('heading', { name: 'Chương trình Khuyến mãi' })).toBeVisible();
-    await expect(page.locator('article.mobile-record').first()).toBeVisible();
-    const adminOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-    expect(adminOverflow).toBe(false);
+    await page.goto('/reports');
+    await expect(page.locator('.reports-scope-note:not(.reports-scope-warning)').first()).toBeHidden();
+    await page.getByRole('tab', { name: /Lãi\/lỗ/ }).click();
+    await expect(page.locator('.reports-scope-warning')).toBeVisible();
+    await expect(page.locator('.reports-scope-warning')).toContainText('500.000');
+
+    // 4. At 320px, /rooms keeps quota Tag and Create Room button on 1 row, and /readings keeps Building Select + Month DatePicker on 1 row and 3 filter pills on 1 row
+    await page.setViewportSize({ width: 320, height: 812 });
+    await page.goto('/rooms');
+    await expect(page.getByRole('button', { name: 'Tạo phòng trọ' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Lọc trạng thái lưu trữ' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Lọc theo tình trạng' })).toHaveCount(0);
+
+
+
+    await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
+    await page.goto('/readings');
+    await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
+    await expect(page.locator('.page-heading-extra .ant-picker')).toHaveCount(0);
+    await expect(page.locator('.reading-filter-pills')).toHaveCount(0);
+
+
+
+
+
+
+
+
+
+
+
+    // 5. Multi-locale check (?lang=en, ko, zh, hi) on /readings at 375px and 320px has zero horizontal overflow
+    for (const lang of ['en', 'ko', 'zh', 'hi']) {
+      for (const width of [375, 320]) {
+        await page.setViewportSize({ width, height: 812 });
+        await page.goto(`/readings?lang=${lang}`);
+        await expect(page.locator('.reading-mobile-card').first()).toBeVisible();
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+        expect(overflow, `/readings?lang=${lang} overflowed at ${width}px`).toBe(false);
+      }
+    }
   });
 });
+
+
+
 

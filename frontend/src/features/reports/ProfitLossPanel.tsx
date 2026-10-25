@@ -36,7 +36,7 @@ export default function ProfitLossPanel({ filters, isPro }: { filters: ReportFil
       <div className="report-total-tile"><span>{t("Chi phí")}</span><strong>{formatVnd(report.totals.expenses)}</strong></div>
       <div className="report-total-tile report-total-accent"><span>{t("Lãi ròng")}</span><strong className={report.totals.net < 0 ? 'profit-negative' : undefined}>{formatVnd(report.totals.net)}</strong></div>
     </div>
-    {report.sharedExpensesExcluded > 0 && <p className="reports-scope-note">{t("Có {0} chi chung (không gắn dãy) không được tính khi lọc theo dãy.", [formatVnd(report.sharedExpensesExcluded)])}</p>}
+    {report.sharedExpensesExcluded > 0 && <p className="reports-scope-note reports-scope-warning">{t("Có {0} chi chung (không gắn dãy) không được tính khi lọc theo dãy.", [formatVnd(report.sharedExpensesExcluded)])}</p>}
     <div className="profit-chart profit-loss-chart" aria-label={t("Biểu đồ thu chi theo tháng")} role="img">
       <div className="profit-chart-legend"><span><i className="profit-chart-income" />{t("Thực thu")}</span><span><i className="profit-chart-expense" />{t("Chi phí")}</span></div>
       <div className="profit-chart-bars">{report.months.map((month) => <div className="profit-chart-month" key={month.month} title={`${periodLabel(month.month)}: ${formatVnd(month.income)} / ${formatVnd(month.expenses)}`}>

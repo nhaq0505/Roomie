@@ -76,25 +76,43 @@
 .manual-payment-amount { margin: 3px 0; color: var(--teal-dark); font-size: 21px; font-weight: 750; }
 .manual-payment-amount > span { color: var(--muted); font-size: 13px; font-weight: 400; }
 @media (max-width: 767px) {
-  .manual-payment-confirmations .ant-card-body { padding: 18px; }
+  .invoice-totals-row { margin-bottom: 10px; }
+  .invoice-total-tile { min-height: 56px; padding: 10px 12px; gap: 3px; border-radius: 12px; }
+  .invoice-total-tile span { font-size: 11.5px; line-height: 1.25; }
+  .invoice-total-tile strong { font-size: 15px; }
+  .invoice-summary-scope { display: none !important; }
+  .invoice-list-card > .section-card-header { margin-bottom: 6px; }
+  .invoice-list-card > .section-card-header:has(.invoice-list-actions[data-filtered='false']) { display: none !important; }
+  .invoice-list-card > .section-card-header > h4.ant-typography { display: none !important; }
+  .invoice-filter-toolbar { gap: 6px; padding: 0; margin-bottom: 10px; border-bottom: 0; }
+  .invoice-filter { gap: 0; }
+  .invoice-filter > span:first-child:not([class*="ant-"]) { display: none !important; }
+  .invoice-filter-search { order: -1; }
+  .invoice-list-card .mobile-records { gap: 10px; }
+  .invoice-list-card .mobile-record { padding: 14px 15px; border-radius: 14px; border-color: #e1ebe8; }
+  .invoice-mobile-head .room-avatar { display: none !important; }
+  .invoice-mobile-amounts { padding: 8px 0; border-radius: 0; background: transparent; border: 0; border-top: 1px solid #eef3f1; border-bottom: 1px solid #eef3f1; }
+  .manual-payment-confirmations.ant-card { margin-bottom: 12px; border-radius: 14px; }
+  .manual-payment-confirmations .ant-card-body { padding: 12px 14px; }
   .manual-payment-title { flex-basis: 100%; }
-  .manual-payment-title h4.ant-typography { font-size: 17px; }
+  .manual-payment-title h4.ant-typography { font-size: 16px; }
   .manual-payment-heading > .ant-btn { margin-left: auto; }
-  .manual-payment-request { padding: 16px; }
+  .manual-payment-request { padding: 12px 14px; gap: 10px; }
   .manual-payment-request > div:last-child, .manual-payment-request-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
   .manual-payment-request > .ant-btn, .manual-payment-request-right > .ant-btn { width: 100%; }
 }
 
-.invoice-mobile-card { display: flex; flex-direction: column; gap: 12px; }
+.invoice-mobile-card { display: flex; flex-direction: column; gap: 8px; }
 .invoice-mobile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .invoice-mobile-head .room-name-cell { min-width: 0; flex: 1; }
 .invoice-mobile-head .ant-tag { margin-inline-end: 0; flex-shrink: 0; }
 .invoice-mobile-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #5b7177; font-size: 12.5px; }
-.invoice-mobile-amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f6faf8; border: 1px solid #e6efec; }
-.invoice-mobile-amounts > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.invoice-mobile-amounts > div > span:first-child { color: #647b80; font-size: 11px; font-weight: 700; letter-spacing: .4px; }
-.invoice-mobile-amounts > div > strong { font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.invoice-mobile-amounts > div > strong.invoice-draft-amount { color: #5b7177; font-size: 14px; font-weight: 600; }
+.invoice-mobile-amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; padding: 8px 0; border-radius: 0; background: transparent; border: 0; border-top: 1px solid #eef3f1; border-bottom: 1px solid #eef3f1; }
+.invoice-mobile-amounts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.invoice-mobile-amounts > div > span:first-child { color: #526970; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; }
+.invoice-mobile-amounts > div > strong { font-size: 13.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.invoice-mobile-amounts > div > strong.invoice-draft-amount { color: #5b7177; font-size: 13.5px; font-weight: 600; }
 .invoice-mobile-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 2px; }
-.invoice-mobile-actions > .ant-btn { min-height: 40px; }
+.invoice-mobile-actions > .ant-btn { min-height: 40px; border-radius: 10px; }
 .invoice-mobile-detail-btn.ant-btn { flex: 1; font-weight: 600; color: #19333b; border-color: #c8d7d1; }
+

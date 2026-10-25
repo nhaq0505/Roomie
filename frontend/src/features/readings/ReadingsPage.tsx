@@ -1,8 +1,7 @@
 import { CameraOutlined, CheckCircleFilled, ClockCircleOutlined, CloseCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { Alert, App, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
-import dayjs, { type Dayjs } from 'dayjs';
+import { Alert, App, Button, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
@@ -22,13 +21,11 @@ function lastDay(period: string) { const [year, month] = period.split('-').map(N
 export default function ReadingsPage() {
   const { message, modal } = App.useApp();
   const client = useQueryClient();
-  const [period, setPeriod] = useState(currentPeriod());
+  const period = currentPeriod();
   const [drafts, setDrafts] = useState<Record<string, number | null>>({});
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [draftForm] = Form.useForm<DraftAmounts>();
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'done'>('all');
-  const [isBatchSaving, setIsBatchSaving] = useState(false);
   const [reviewRow, setReviewRow] = useState<ReadingRow | null>(null);
   const [approveReadingValue, setApproveReadingValue] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
@@ -71,19 +68,7 @@ export default function ReadingsPage() {
     return rows.filter((r) => r.room.buildingId === selectedBuilding);
   }, [rows, selectedBuilding]);
 
-  const filteredRows = useMemo(() => {
-    if (statusFilter === 'pending') return buildingRows.filter((r) => r.saved?.currentReading === undefined);
-    if (statusFilter === 'done') return buildingRows.filter((r) => r.saved?.currentReading !== undefined);
-    return buildingRows;
-  }, [buildingRows, statusFilter]);
-
-  const validBatchRooms = useMemo(() => {
-    return buildingRows.filter((r) => {
-      const initialValue = r.room.previousReading ?? r.room.initialReading ?? 0;
-      const draftVal = drafts[r.room.id];
-      return draftVal !== undefined && draftVal !== null && draftVal >= initialValue && !r.saved?.invoiceId && r.saved?.currentReading === undefined && !r.draftInvoice;
-    });
-  }, [buildingRows, drafts]);
+  const filteredRows = buildingRows;
 
   const prevPeriodRef = useRef(period);
   useEffect(() => {
@@ -174,6 +159,7 @@ export default function ReadingsPage() {
           size="small"
           type="primary"
           ghost
+          className="reading-submission-btn"
           icon={<CameraOutlined />}
           style={{ marginTop: 6 }}
           onClick={() => openSubmissionModal(row)}
@@ -253,7 +239,7 @@ export default function ReadingsPage() {
       ),
     },
     { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
-    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="decimal" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={3} step={0.001} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
+    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="numeric" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={0} step={1} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
     { title: t("SỬ DỤNG"), key: 'consumption', render: (_, row) => {
       const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
       const current = row.saved?.currentReading ?? drafts[row.room.id];
@@ -353,8 +339,8 @@ export default function ReadingsPage() {
               inputMode="decimal"
               aria-label={t("Chỉ số mới {0}", [row.room.name])}
               min={previous}
-              precision={3}
-              step={0.001}
+              precision={0}
+              step={1}
               value={drafts[row.room.id] ?? undefined}
               onChange={(value) => handleDraftChange(row.room.id, value)}
               addonAfter="kWh"
@@ -376,49 +362,8 @@ export default function ReadingsPage() {
       </div>
     );
   };
-  const handleBatchSave = () => {
-    if (validBatchRooms.length === 0) return;
-    modal.confirm({
-      title: t("Chốt chỉ số cho {0} phòng?", [validBatchRooms.length]),
-      content: t("Hệ thống sẽ lần lượt chốt chỉ số điện và lập hóa đơn cho các phòng đã nhập."),
-      okText: t("Chốt các phòng đã nhập"),
-      cancelText: t("Kiểm tra lại"),
-      onOk: async () => {
-        setIsBatchSaving(true);
-        let successCount = 0;
-        try {
-          for (const r of validBatchRooms) {
-            const currentReading = drafts[r.room.id]!;
-            await readingsApi.save({ roomId: r.room.id, period, currentReading });
-            successCount++;
-          }
-          await Promise.all([
-            client.invalidateQueries({ queryKey: ['readings', period] }),
-            client.invalidateQueries({ queryKey: ['readings', 'submissions', period] }),
-            client.invalidateQueries({ queryKey: ['invoices'] }),
-            client.invalidateQueries({ queryKey: ['dashboard'] }),
-            client.invalidateQueries({ queryKey: ['rooms'] }),
-          ]);
-          message.success(t("Đã chốt chỉ số và lập hóa đơn cho {0} phòng.", [successCount]));
-        } catch (error: unknown) {
-          await Promise.all([
-            client.invalidateQueries({ queryKey: ['readings', period] }),
-            client.invalidateQueries({ queryKey: ['readings', 'submissions', period] }),
-            client.invalidateQueries({ queryKey: ['invoices'] }),
-            client.invalidateQueries({ queryKey: ['dashboard'] }),
-          ]);
-          message.error(error instanceof Error ? error.message : t("Có lỗi khi chốt chỉ số các phòng."));
-        } finally {
-          setIsBatchSaving(false);
-        }
-      },
-    });
-  };
-
-  const setMonth = (value: Dayjs | null) => { if (value) setPeriod(value.format('YYYY-MM')); };
   const occupied = buildingRows.length;
   const done = buildingRows.filter((row) => row.saved?.currentReading !== undefined).length;
-  const pendingCount = Math.max(0, occupied - done);
   const draftSessionAmounts = Form.useWatch([], draftForm) as DraftAmounts | undefined;
   const draftTotal = (draftSessionAmounts?.rent ?? draftSession?.invoice.rent ?? 0) +
     (draftSessionAmounts?.electricityAmount ?? draftSession?.invoice.electricityAmount ?? 0) +
@@ -438,33 +383,13 @@ export default function ReadingsPage() {
       title={t("Lập hóa đơn")}
       subtitle={t("Ghi nhận chỉ số cuối kỳ. Hóa đơn sẽ được lập ngay sau khi bạn chốt.")}
       extra={
-        <Space wrap>
-          <Select
-            aria-label={t("Lọc theo dãy trọ")}
-            style={{ minWidth: 160 }}
-            value={selectedBuilding}
-            onChange={setSelectedBuilding}
-            options={buildingOptions}
-          />
-          <DatePicker
-            aria-label={t("Tháng ghi chỉ số")}
-            picker="month"
-            value={dayjs(`${period}-01`)}
-            onChange={setMonth}
-            format="MM/YYYY"
-            maxDate={dayjs(`${currentPeriod()}-01`)}
-            allowClear={false}
-          />
-          {validBatchRooms.length > 0 && (
-            <Button
-              type="primary"
-              loading={isBatchSaving}
-              onClick={handleBatchSave}
-            >
-              {t("Chốt các phòng đã nhập")}
-            </Button>
-          )}
-        </Space>
+        <Select
+          aria-label={t("Lọc theo dãy trọ")}
+          style={{ minWidth: 160 }}
+          value={selectedBuilding}
+          onChange={setSelectedBuilding}
+          options={buildingOptions}
+        />
       }
     />
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : readingsQuery.isError ? <LoadError error={readingsQuery.error} onRetry={() => void readingsQuery.refetch()} /> : invoicesQuery.isError ? <LoadError error={invoicesQuery.error} onRetry={() => void invoicesQuery.refetch()} /> : roomsQuery.isPending || readingsQuery.isPending || invoicesQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
@@ -472,19 +397,6 @@ export default function ReadingsPage() {
       <SectionCard
         className="reading-section"
         title={t("Danh sách phòng đang thuê")}
-        extra={
-          <div className="reading-filter-pills" role="group" aria-label={t("Trạng thái phát hành")}>
-            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'all' ? 'true' : undefined} onClick={() => setStatusFilter('all')}>
-              {t("Tất cả ({0})", [occupied])}
-            </button>
-            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'pending' ? 'true' : undefined} onClick={() => setStatusFilter('pending')}>
-              {t("Nhập chỉ số")} ({pendingCount})
-            </button>
-            <button type="button" className="reading-filter-pill" data-active={statusFilter === 'done' ? 'true' : undefined} onClick={() => setStatusFilter('done')}>
-              {t("Đã chốt")} ({done})
-            </button>
-          </div>
-        }
       >
         <div className="reading-notice"><InfoCircleOutlined /><span><strong>{t("Tiền thuê tính đủ theo tháng")}</strong> {t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê.")}</span></div>
         {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} renderCompact={renderCompactReading} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
@@ -552,7 +464,7 @@ export default function ReadingsPage() {
             />
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: '#f8fafc', padding: 12, borderRadius: 8 }}>
+          <div className="reading-submission-review-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, background: '#f8fafc', padding: 12, borderRadius: 8 }}>
             <div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{t("CHỈ SỐ TRƯỚC")}</div>
               <strong>{reviewPrevious} kWh</strong>
@@ -567,8 +479,8 @@ export default function ReadingsPage() {
                 inputMode="decimal"
                 aria-label={`${''}Chỉ số duyệt chốt`}
                 min={reviewPrevious}
-                precision={3}
-                step={0.001}
+                precision={0}
+                step={1}
                 value={approveReadingValue ?? undefined}
                 onChange={(val) => setApproveReadingValue(val)}
                 disabled={reviewSubmission.status === 'Approved'}
