@@ -12,6 +12,15 @@ async function setup(page: Page, status = 'Disconnected') {
   await page.route('**/api/zalo/disconnect', route => { state = 'Disconnected'; settings.scheduleEnabled = false; return route.fulfill({ json: { status: state } }); });
   await page.route('**/api/zalo/history?*', route => route.fulfill({ json: { items: [{ invoiceId: 'invoice-fixture', roomName: 'P101', period: '2026-10', status: 'Unknown', detail: 'DeliveryUnknown', queuedAtMs: 1792458000000, lastAttemptAtMs: 1792458000000 }], total: 1, page: 1, pageSize: 20 } }));
   await page.route('**/api/zalo/queue', route => route.fulfill({ json: { queued: 1 } }));
+  await page.route('**/api/whatsapp/settings', route => {
+    if (route.request().method() === 'PUT') { settings = { ...settings, ...route.request().postDataJSON() }; return route.fulfill({ status: 204 }); }
+    return route.fulfill({ json: settings });
+  });
+  await page.route('**/api/whatsapp/connection', route => route.fulfill({ json: { status: state, qrImage: state === 'QrReady' ? 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6n1cAAAAASUVORK5CYII=' : null } }));
+  await page.route('**/api/whatsapp/connect', route => { state = 'QrReady'; return route.fulfill({ json: { status: state } }); });
+  await page.route('**/api/whatsapp/disconnect', route => { state = 'Disconnected'; settings.scheduleEnabled = false; return route.fulfill({ json: { status: state } }); });
+  await page.route('**/api/whatsapp/history?*', route => route.fulfill({ json: { items: [{ invoiceId: 'invoice-fixture', roomName: 'P101', period: '2026-10', status: 'Unknown', detail: 'DeliveryUnknown', queuedAtMs: 1792458000000, lastAttemptAtMs: 1792458000000 }], total: 1, page: 1, pageSize: 20 } }));
+  await page.route('**/api/whatsapp/queue', route => route.fulfill({ json: { queued: 1 } }));
   return { getSettings: () => settings, setState: (value: string) => { state = value; } };
 }
 for (const width of [375, 1280]) test(`Zalo connect, queue and guide at ${width}px`, async ({ page }) => {
@@ -83,4 +92,20 @@ for (const width of [375, 1280]) test(`settings menu groups payment and Zalo at 
   await expect(page.locator('.breadcrumb-label strong')).toHaveText('Zalo');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   await page.screenshot({ path: `test-results/settings-menu-${width}.png`, fullPage: true });
+});
+
+test('WhatsApp connect, queue and guide work alongside Zalo', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const fixture = await setup(page);
+  await page.goto('/settings/whatsapp');
+  await expect(page.getByRole('heading', { name: 'Nhắc hóa đơn qua WhatsApp', exact: true })).toBeVisible();
+  await expect(page.locator('.breadcrumb-label strong')).toHaveText('WhatsApp');
+  await page.getByRole('button', { name: /Tạo QR kết nối$/ }).click();
+  await expect(page.getByRole('img', { name: 'QR đăng nhập WhatsApp', exact: true })).toBeVisible();
+  fixture.setState('Connected');
+  await expect(page.getByText('Đã kết nối WhatsApp', { exact: true })).toBeVisible({ timeout: 7000 });
+  await page.getByRole('button', { name: /Nhắc hóa đơn còn nợ$/ }).click();
+  await page.getByRole('button', { name: 'Thêm vào hàng đợi', exact: true }).click();
+  await expect(page.getByText('Đã thêm 1 hóa đơn vào hàng đợi.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Có thể tin đã gửi. Kiểm tra WhatsApp trước khi thêm lại sau 20 giờ.', { exact: true })).toBeVisible();
 });

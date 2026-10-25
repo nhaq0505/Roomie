@@ -258,8 +258,25 @@ await using (var migrationDb = await PostgresTestDb.CreateAsync(migrate: false, 
     migrated.Users.Add(new() { Name = "Keep", Email = "keep@example.invalid", PasswordHash = "fixture" });
     await migrated.SaveChangesAsync();
     await migrated.Database.MigrateAsync();
-    Assert(await migrated.Users.CountAsync() == 1 && await migrated.ZaloReminders.CountAsync() == 0, "PostgreSQL migrations and rerun preserve data");
+    Assert(await migrated.Users.CountAsync() == 1 && await migrated.ZaloReminders.CountAsync() == 0 && await migrated.WhatsAppReminders.CountAsync() == 0, "PostgreSQL migrations and rerun preserve data");
 }
+await db.Invoices.ExecuteUpdateAsync(s => s.SetProperty(x => x.Paid, x => x.Total));
+db.ChangeTracker.Clear();
+var waInvoice = AddInvoice("WhatsAppOnly", owner.Id);
+await db.SaveChangesAsync();
+var waGateway = new FakeWhatsAppGateway();
+var waService = new WhatsAppReminderService(db, waGateway, clock, tokens, payments);
+Assert(await waService.QueueAsync(owner.Id, default) == 1, "WhatsApp queue stages eligible invoices independently of Zalo");
+await waService.DispatchAsync(owner.Id, default);
+Assert(waGateway.Sends.Count == 1 && (await db.WhatsAppReminders.SingleAsync()).Status == "Sent", "WhatsApp dispatch sends and records Sent independently of Zalo");
+Assert(waGateway.Sends[0].Message.Contains("Roomie • Invoice") && waGateway.Sends[0].Message.Contains("Total: 100,000 VND;") && waGateway.Sends[0].Message.Contains("Pay here: https://roomie.example/t/"), "WhatsApp message uses English template and tenant link");
+var waDepositMsg = WhatsAppReminderService.BuildMessage(depositInvoice, "https://roomie.example/t/sample");
+Assert(waDepositMsg.Contains("Description: Security deposit") && waDepositMsg.Contains("Total: 2,000,000 VND;") && !waDepositMsg.Contains("Rent: 0 VND;"), "WhatsApp deposit message uses English description and omits zero breakdown");
+var dualBilling = new InvoiceService(db, service, whatsApp: waService);
+var dualInvoice = AddInvoice("DualChannel", owner.Id);
+await dualBilling.StageZaloReminderAsync(dualInvoice, default);
+await db.SaveChangesAsync();
+Assert(await db.ZaloReminders.AnyAsync(x => x.InvoiceId == dualInvoice.Id) && await db.WhatsAppReminders.AnyAsync(x => x.InvoiceId == dualInvoice.Id), "invoice publication stages both Zalo and WhatsApp reminders in parallel");
 Console.WriteLine($"PASS: {checks} Zalo assertions; no external provider calls.");
 
 sealed class FakeClock(DateTimeOffset initial) : TimeProvider
@@ -282,6 +299,20 @@ sealed class FakeGateway : IZaloGateway
         Sends.Add(request);
         if (ThrowOnSend) throw new HttpRequestException("fixture timeout");
         return Task.FromResult(new ZaloSendResult(Result));
+    }
+}
+
+sealed class FakeWhatsAppGateway : IWhatsAppGateway
+{
+    public bool Enabled { get; set; } = true;
+    public string Connection = "Connected";
+    public string Result = "Sent";
+    public List<WhatsAppSendRequest> Sends = [];
+    public Task<WhatsAppConnection> ConnectionAsync(Guid ownerId, string action, CancellationToken ct) => Task.FromResult(new WhatsAppConnection(Connection));
+    public Task<WhatsAppSendResult> SendAsync(Guid ownerId, WhatsAppSendRequest request, CancellationToken ct)
+    {
+        Sends.Add(request);
+        return Task.FromResult(new WhatsAppSendResult(Result));
     }
 }
 

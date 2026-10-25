@@ -58,6 +58,12 @@ jobs:
           --volume "$GITHUB_WORKSPACE/zalo-gateway:/workspace" --workdir /workspace
           node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
           sh -ec 'npm ci && npm test'
+      - name: Test WhatsApp gateway encrypted sessions and delivery replay
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE/whatsapp-gateway:/workspace" --workdir /workspace
+          node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+          sh -ec 'npm test'
 
   test-backend:
     name: Backend tests and migration checks

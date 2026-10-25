@@ -42,6 +42,27 @@ const zaloMessages: Record<string, readonly string[]> = {
     "알림을 추가하기 전에 입금 계좌를 저장하세요.",
     "अनुस्मारक कतार में जोड़ने से पहले प्राप्तकर्ता खाता सहेजें।"
   ],
+  "WhatsApp gateway is not configured.": [
+    "Dịch vụ WhatsApp chưa được bật. Liên hệ quản trị viên để cấu hình.",
+    "WhatsApp is not enabled. Contact your administrator.",
+    "WhatsApp 尚未启用，请联系管理员。",
+    "WhatsApp이 활성화되지 않았습니다. 관리자에게 문의하세요.",
+    "WhatsApp चालू नहीं है। व्यवस्थापक से संपर्क करें।"
+  ],
+  "WhatsApp gateway is unavailable. Try again shortly.": [
+    "Chưa kết nối được dịch vụ WhatsApp. Vui lòng thử lại sau.",
+    "WhatsApp service is unavailable. Try again shortly.",
+    "WhatsApp 服务不可用，请稍后重试。",
+    "WhatsApp 서비스에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
+    "WhatsApp सेवा उपलब्ध नहीं है। कुछ देर बाद फिर प्रयास करें।"
+  ],
+  "Connect WhatsApp before queuing reminders.": [
+    "Kết nối WhatsApp trước khi thêm hóa đơn vào hàng đợi.",
+    "Connect WhatsApp before queuing reminders.",
+    "请先连接 WhatsApp，再加入提醒队列。",
+    "알림을 추가하기 전에 WhatsApp을 연결하세요.",
+    "अनुस्मारक कतार में जोड़ने से पहले WhatsApp जोड़ें।"
+  ],
   "Connect Zalo before queuing reminders.": [
     "Kết nối Zalo trước khi thêm hóa đơn vào hàng đợi.",
     "Connect Zalo before queuing reminders.",

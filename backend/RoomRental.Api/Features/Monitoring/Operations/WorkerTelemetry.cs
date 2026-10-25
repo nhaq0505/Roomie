@@ -41,6 +41,7 @@ public sealed class WorkerTelemetryTracker : IWorkerTelemetryTracker, IWorkerSta
     {
         "recovery-email" => TimeSpan.FromMinutes(5),
         "zalo" => TimeSpan.FromMinutes(5),
+        "whatsapp" => TimeSpan.FromMinutes(5),
         "reconcile" => TimeSpan.FromMinutes(10),
         "cleanup" => TimeSpan.FromMinutes(20),
         "ops-aggregation" => TimeSpan.FromHours(2),

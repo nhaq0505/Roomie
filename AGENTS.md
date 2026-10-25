@@ -38,6 +38,7 @@ Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: d
 | `frontend/scripts/` | Build/check i18n, architecture, prerender và các test Node |
 | `frontend/e2e/` | Playwright với API giả lập; không phụ thuộc API vận hành |
 | `zalo-gateway/` | Node 24 + zca-js, đăng nhập Zalo QR, lưu phiên và ledger mã hóa |
+| `whatsapp-gateway/` | Node 24 + `@whiskeysockets/baileys`, đăng nhập WhatsApp QR (Linked Devices), lưu phiên và ledger mã hóa |
 | `tests/` | Console C# suites, HTTP Python harness, SMTP sink, tests backup/host collector |
 | `.github/workflows/ci-cd.yml` | Các cổng CI, image đã kiểm thử, GHCR và deploy theo digest |
 | `deploy/` | Production Compose, migration overlay, backup/restore, role DB, Caddy, firewall, host collector |
@@ -62,7 +63,7 @@ Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/reho
 | Nâng cấp Pro & Khuyến mãi | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Promotions.cs`, `Features/Auth/RegistrationVerificationService.cs` | `features/subscription`, `features/admin/AdminPromotionsPage.tsx`, `PromotionsTests.cs`, `test_billing_upgrade.py`, `admin.spec.ts`, `landlord.spec.ts` |
 | Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
 | Sổ chi phí, chi định kỳ, chứng từ, lãi/lỗ, đối chiếu điện EVN | `Features/Expenses/` (`ExpenseEndpoints*.cs`, `RecurringExpenseEndpoints.cs`, `RecurringExpenseGenerator.cs`, `ExpenseSupport.cs`), `Domain/Expenses.cs`, `Features/Reports/ReportsEndpoints.ProfitLoss.cs` | `features/expenses`, `features/reports/ProfitLossPanel.tsx`, `ElectricityReconciliationPanel.tsx`, `shared/ui/ProUpsell.tsx`, `ExpenseLedgerHttpTests.cs`, `e2e/expenses.spec.ts` |
-| Nhắc Zalo | `Features/Zalo/`, `Domain/Zalo.cs` | `features/zalo`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test` |
+| Nhắc Zalo & WhatsApp | `Features/Zalo/`, `Features/WhatsApp/`, `Domain/Zalo.cs`, `Domain/WhatsApp.cs` | `features/zalo`, `features/whatsapp`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test`, `whatsapp-gateway/test` |
 | Theo dõi growth/revenue & ROAS | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests`, `MarketerSuiteHttpTests` |
 | Marketer CRM, CMS SEO/Banner & Email | `Features/Marketer/`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Marketer*.cs` | `features/marketer`, `features/marketing/GuideArticlePage.tsx`, `shared/ui/ActiveBannerStrip.tsx`, `MarketerSuiteHttpTests`, `admin.spec.ts` |
 | Host/API/worker monitoring | `Features/Monitoring/Operations/`, `deploy/monitoring/` | `OperationsTab.tsx`, `OperationsMonitoringTests`, `test_host_collector.py` |
@@ -137,13 +138,13 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Chứng từ lưu `bytea` trong PostgreSQL để backup `pg_dump` hiện có bao gồm luôn; không chuyển sang file system/volume nếu chưa sửa backup/restore. Chỉ nhận JPEG/PNG/WebP/PDF theo magic bytes, ≤2 MB/tệp, ≤5 tệp/khoản, ≤200 MB/owner; tải về có `nosniff`, `private, no-store`, CSP sandbox, PDF luôn `attachment`. List không bao giờ select cột `Content`.
 - Đối chiếu điện: kWh/tiền EVN lấy từ khoản chi `Electricity` có `UtilityPeriod`; kWh/tiền đã lập lấy từ snapshot `Invoice.Consumption/ElectricityAmount` của hóa đơn Issued không phải cọc. Thiếu hóa đơn EVN → `lossPercent = null` + `lossNullReason`, không hiển thị 0%; cảnh báo số hóa đơn nháp.
 
-### Zalo
+### Zalo & WhatsApp
 
 - Invoice mới/phát hành Draft stage reminder **cùng transaction** với hóa đơn; không gọi Zalo trong request lưu hóa đơn và không sweep lịch sử để tự nhắc hóa đơn cũ khi nâng cấp.
 - Một slot DB/InvoiceId, lease dispatch theo owner, attempt id và ledger gateway chống gửi lặp qua restart. Có thể queue khi mất kết nối, nhưng dispatch phải kiểm lại tenant/payment/phone/owner/invoice.
 - Giờ gửi 07:00 đến trước 21:00 Việt Nam; cách ít nhất 5 giây/owner; cooldown 20 giờ kể cả kết quả Unknown. Không tự retry Unknown vì tin có thể đã gửi.
 - Gateway session + ledger AES-256-GCM, ghi nguyên tử/fsync. Một process gateway/một volume; không chia volume cho nhiều process. Khôi phục backup cũ có thể mất receipt mới: đối chiếu Zalo trước khi bật gửi lại.
-- Gateway là Zalo cá nhân qua zca-js, không phải ZNS/OA chính thức; không coi test fake là nghiệm thu gửi Zalo thật.
+- Gateway Zalo (`zalo-gateway/` qua `zca-js`) và Gateway WhatsApp (`whatsapp-gateway/` qua `@whiskeysockets/baileys`) đều dùng kết nối QR cá nhân chạy song song độc lập (`/settings/zalo` và `/settings/whatsapp`), không phải ZNS/OA hay WhatsApp Cloud API trả phí; không coi test fake là nghiệm thu gửi thật.
 
 ### Monitoring
 
@@ -197,6 +198,7 @@ dotnet build backend/RoomRental.Api
 dotnet run --project tests/RoomRental.WebhookTests
 dotnet run --project tests/RoomRental.ZaloTests
 npm --prefix zalo-gateway test
+npm --prefix whatsapp-gateway test
 npm --prefix frontend run build
 npm --prefix frontend run i18n:check
 npm --prefix frontend run check:architecture
@@ -358,6 +360,7 @@ CI lần đầu của bản sửa VietQR: backend/integration đạt, Playwright
   - `dotnet run --project tests/RoomRental.ZaloTests`: **57 assertions (`58` dòng `PASS:`)**, mã thoát 0.
   - `python tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider postgres`: **90/90 tests PASS, 0 skip**.
   - `python tests/run_disposable.py --app "$ROOMIE_QA_APP" --provider otp-postgres`: **15/15 tests PASS, 0 skip**.
-  - `npm --prefix zalo-gateway test`: **13/13 tests PASS**.
+  - `npm --prefix zalo-gateway test
+npm --prefix whatsapp-gateway test`: **13/13 tests PASS**.
   - `npm --prefix frontend run test:e2e -- --workers=4`: **81/81 tests PASS**.
   - Frontend build, `i18n:check` (`1664 keys × 4 catalogs`), `check:architecture` (`118 source modules`), `test:api`, `test:http`, `test:analytics`, `test:dates`, `test:cccd` / `test:cccd-qr`, `dotnet ef migrations has-pending-model-changes` và `git diff --check` đều đạt 100%. (Lưu ý: `test_backup_restore.py` và 2 ca `os.statvfs`/POSIX mode trong `test_host_collector.py` phụ thuộc môi trường Linux/POSIX nên chạy trên runner Ubuntu CI; 32/34 ca logic của `test_host_collector.py` đạt trên Windows). Container QA tạm và thư mục publish tạm đã được dọn sạch sau kiểm thử.

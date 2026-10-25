@@ -9,7 +9,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
   SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined,
-  MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined,
+  MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
@@ -31,6 +31,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const settingsItems = [
     { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
     { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
+    { key: '/settings/whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp' },
   ];
   useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [location.pathname]);
 const ownerItems = [

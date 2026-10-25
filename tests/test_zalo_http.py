@@ -28,6 +28,7 @@ class ZaloHttpTests(unittest.TestCase):
         self.assertEqual(pending.request('GET', '/api/zalo/settings')[0], 403)
         self.admin.ok('POST', f"/api/admin/owners/{self.user['id']}/status", {'status': 'Suspended', 'reason': 'Disposable test'})
         self.assertEqual(self.owner.request('GET', '/api/zalo/connection')[0], 401)
+        self.assertEqual(self.owner.request('GET', '/api/whatsapp/connection')[0], 401)
 
     def test_settings_persist_without_cross_owner_leak(self):
         self.owner.ok('PUT', '/api/zalo/settings', BANK)
@@ -53,3 +54,12 @@ class ZaloHttpTests(unittest.TestCase):
         self.owner.ok('PUT', '/api/zalo/settings', BANK)
         self.assertEqual(self.owner.request('POST', '/api/zalo/queue')[0], 409)
         self.assertEqual(self.owner.ok('GET', '/api/zalo/history')['total'], 0)
+        self.assertEqual(self.owner.ok('GET', '/api/whatsapp/connection'), {'status': 'Unavailable', 'qrImage': None})
+        self.assertEqual(self.owner.request('POST', '/api/whatsapp/connect')[0], 503)
+        self.assertEqual(self.owner.request('POST', '/api/whatsapp/queue')[0], 409)
+        self.owner.ok('PUT', '/api/whatsapp/settings', BANK)
+        wa_settings = self.owner.ok('GET', '/api/whatsapp/settings')
+        for key in ('scheduleEnabled', 'dayOfMonth', 'hour', 'minute'): self.assertEqual(wa_settings[key], BANK[key])
+        self.assertFalse(wa_settings['gatewayEnabled'])
+        self.assertEqual(self.owner.request('POST', '/api/whatsapp/queue')[0], 409)
+        self.assertEqual(self.owner.ok('GET', '/api/whatsapp/history')['total'], 0)

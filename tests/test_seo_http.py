@@ -103,7 +103,7 @@ class SeoHttpTests(unittest.TestCase):
     def test_private_shell_never_inherits_landing_or_canonical(self):
         paths = ["/login", "/register", "/reset-password", "/change-password", "/account-status", "/profile",
                  "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/expenses", "/reports",
-                 "/settings/payment", "/settings/zalo", "/admin/owners", "/admin/monitoring", "/admin/promotions",
+                 "/settings/payment", "/settings/zalo", "/settings/whatsapp", "/admin/owners", "/admin/monitoring", "/admin/promotions",
                  "/rooms/", "/rooms/fixture-room/tenant", "/rooms/fixture-room/documents",
                  "/t/synthetic-seo-token",
                  "/tenant/synthetic-seo-token", "/t/synthetic-seo-token/invoices/fixture/checkout",

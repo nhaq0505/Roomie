@@ -26,6 +26,7 @@ const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage'));
 const ExpensesPage = lazy(() => import('../features/expenses/ExpensesPage'));
 const ZaloSettingsPage = lazy(() => import('../features/zalo/ZaloSettingsPage'));
+const WhatsAppSettingsPage = lazy(() => import('../features/whatsapp/WhatsAppSettingsPage'));
 const PaymentSettingsPage = lazy(() => import('../features/payments/PaymentSettingsPage'));
 const AdminOwnersPage = lazy(() => import('../features/admin/AdminOwnersPage'));
 const AdminMonitoringPage = lazy(() => import('../features/admin/monitoring/AdminMonitoringPage'));
@@ -117,6 +118,7 @@ export default function App() {
     <Route path="/reports" element={<Gate><AppShell><ReportsPage /></AppShell></Gate>} />
     <Route path="/profile" element={<Gate><AppShell><OwnerProfilePage /></AppShell></Gate>} />
     <Route path="/settings/zalo" element={<Gate><AppShell><ZaloSettingsPage /></AppShell></Gate>} />
+    <Route path="/settings/whatsapp" element={<Gate><AppShell><WhatsAppSettingsPage /></AppShell></Gate>} />
     <Route path="/settings/payment" element={<Gate><AppShell><PaymentSettingsPage /></AppShell></Gate>} />
     <Route path="/admin/owners" element={<Gate admin><AppShell><AdminOwnersPage /></AppShell></Gate>} />
     <Route path="/admin/monitoring" element={<Gate roles={['Admin', 'Marketer']}><AppShell><AdminMonitoringPage /></AppShell></Gate>} />

@@ -17,7 +17,7 @@ public sealed partial class SeoMiddleware(RequestDelegate next, IConfiguration c
     {
         "/login", "/register", "/reset-password", "/change-password", "/account-status", "/profile",
         "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/expenses", "/reports",
-        "/settings/payment", "/settings/zalo", "/admin/owners", "/admin/monitoring", "/admin/promotions",
+        "/settings/payment", "/settings/zalo", "/settings/whatsapp", "/admin/owners", "/admin/monitoring", "/admin/promotions",
         "/marketer/leads", "/marketer/content", "/marketer/emails"
     };
 

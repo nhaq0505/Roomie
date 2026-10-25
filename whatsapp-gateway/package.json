@@ -1,0 +1,1 @@
+{"name":"roomie-whatsapp-gateway","private":true,"version":"1.0.0","type":"module","scripts":{"start":"node src/server.mjs","test":"node --test test/*.test.mjs"},"dependencies":{"@whiskeysockets/baileys":"6.7.16","qrcode":"1.5.4"}}

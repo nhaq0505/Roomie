@@ -2135,3 +2135,23 @@
 2134|Landlord information updated.|已更新房东信息。|임대인 정보가 업데이트되었습니다.|मकान मालिक की जानकारी अपडेट की गई।
 2135|Profile|个人资料|프로필|प्रोफ़ाइल
 2136|LANDLORD PROFILE|房东资料|임대인 프로필|मकान मालिक की प्रोफ़ाइल
+2137|Connected to WhatsApp|已连接 WhatsApp|WhatsApp 연결됨|WhatsApp से जुड़ा है
+2138|Scan the QR code with the WhatsApp app|请使用 WhatsApp 扫描二维码|WhatsApp 앱으로 QR 코드를 스캔하세요|WhatsApp ऐप से QR कोड स्कैन करें
+2139|Connecting to WhatsApp…|正在连接 WhatsApp…|WhatsApp 연결 중…|WhatsApp से जुड़ रहा है…
+2140|This WhatsApp account is already connected to another landlord.|此 WhatsApp 已与另一位房东绑定。|이 WhatsApp 계정은 이미 다른 임대인과 연결되어 있습니다.|यह WhatsApp पहले से किसी अन्य मकान मालिक से जुड़ा है।
+2141|WhatsApp service is not ready|WhatsApp 服务尚未就绪|WhatsApp 서비스가 준비되지 않았습니다|WhatsApp सेवा तैयार नहीं है
+2142|WhatsApp not connected|尚未连接 WhatsApp|WhatsApp 연결 안 됨|WhatsApp जुड़ा नहीं है
+2143|The message may have been sent. Check WhatsApp before re-queuing after 20 hours.|消息可能已发送。请在 20 小时后重新加入队列前先检查 WhatsApp。|메시지가 발송되었을 수 있습니다. 20시간 후 다시 추가하기 전에 WhatsApp을 확인하세요.|हो सकता है संदेश भेजा जा चुका हो। 20 घंटे बाद फिर से जोड़ने से पहले WhatsApp जाँचें।
+2144|Invoice reminders via WhatsApp|通过 WhatsApp 提醒账单|WhatsApp 청구서 알림|WhatsApp से बिल अनुस्मारक
+2145|Send invoice details and payment links from your own WhatsApp account.|从您的 WhatsApp 发送账单信息和付款链接。|본인 WhatsApp에서 청구서 정보와 결제 링크를 발송합니다.|अपने WhatsApp से बिल जानकारी और भुगतान लिंक भेजें।
+2146|Connect WhatsApp|连接 WhatsApp|WhatsApp 연결|WhatsApp जोड़ें
+2147|The server has not enabled WhatsApp yet. Contact the administrator to configure it.|服务器尚未启用 WhatsApp 服务，请联系管理员配置。|서버에서 WhatsApp 서비스가 아직 활성화되지 않았습니다. 관리자에게 문의하세요.|सर्वर पर अभी WhatsApp सेवा चालू नहीं है। कॉन्फ़िगर करने के लिए व्यवस्थापक से संपर्क करें।
+2148|WhatsApp login QR code|WhatsApp 登录二维码|WhatsApp 로그인 QR|WhatsApp लॉगिन QR
+2149|The connection appears under “Linked Devices” on your phone. Logging out that device stops Roomie from sending; scan the QR code again to reconnect.|连接会在手机的“已关联设备”中显示。退出该设备会使 Roomie 停止发送；请重新扫描二维码以恢复连接。|연결은 휴대폰의 “연결된 기기”에 표시됩니다. 해당 기기에서 로그아웃하면 Roomie 발송이 중단되므로 QR을 다시 스캔해 연결하세요.|यह कनेक्शन फ़ोन पर “लिंक किए गए डिवाइस” में दिखाई देता है। उस डिवाइस से लॉग आउट करने पर Roomie भेजना बंद कर देगा; दोबारा जुड़ने के लिए फिर से QR स्कैन करें।
+2150|When tenants reply, read and respond in your normal WhatsApp app.|租客回复时，请在普通 WhatsApp 应用中查看并回复。|세입자가 답장하면 평소처럼 WhatsApp 앱에서 읽고 답장하세요.|जब किरायेदार जवाब दें, तो सामान्य WhatsApp ऐप में पढ़ें और उत्तर दें।
+2151|Automatically scan unpaid invoices and send reminder messages via WhatsApp on a recurring schedule.|按定期计划自动扫描未付账单并通过 WhatsApp 发送提醒消息。|미납 청구서를 자동으로 확인하여 정해진 일정에 따라 WhatsApp 알림 메시지를 보냅니다.|निर्धारित समय-सारणी के अनुसार बकाया चालानों को स्वतः स्कैन करें और WhatsApp के माध्यम से अनुस्मारक संदेश भेजें।
+2152|How to send invoice reminders via WhatsApp|WhatsApp 账单提醒使用说明|WhatsApp 청구서 알림 안내|WhatsApp से बिल अनुस्मारक भेजने की मार्गदर्शिका
+2153|Generate the QR code, open WhatsApp → Linked Devices to scan and confirm login on your phone.|生成二维码，打开 WhatsApp → 已关联设备进行扫描并在手机上确认登录。|QR을 생성한 뒤 WhatsApp → 연결된 기기를 열어 스캔하고 휴대폰에서 로그인을 확인하세요.|QR बनाएँ, स्कैन करने के लिए WhatsApp → लिंक किए गए डिवाइस खोलें और फ़ोन पर लॉगिन की पुष्टि करें।
+2154|Keep the linked WhatsApp device signed in. If the session is logged out, return here and scan a new QR code.|请保持 WhatsApp 已关联设备处于登录状态。如果会话退出，请返回此处重新扫描新的二维码。|연결된 WhatsApp 기기의 로그인을 유지하세요. 세션이 로그아웃되면 여기로 돌아와 새 QR을 스캔하세요.|लिंक किए गए WhatsApp डिवाइस को लॉग इन रखें। यदि सत्र लॉग आउट हो जाए, तो यहाँ लौटें और नया QR स्कैन करें।
+2155|Personal WhatsApp connection uses an unofficial library; service may be interrupted or WhatsApp may restrict the account.|个人 WhatsApp 连接使用非官方库，服务可能中断或账户可能受到 WhatsApp 限制。|개인 WhatsApp 연결은 비공식 라이브러리를 사용하므로 중단되거나 WhatsApp에서 계정을 제한할 수 있습니다.|व्यक्तिगत WhatsApp कनेक्शन अनौपचारिक लाइब्रेरी का उपयोग करता है; सेवा बाधित हो सकती है या WhatsApp खाते को प्रतिबंधित कर सकता है।
+2156|Disconnecting here deletes the saved session on Roomie and turns off the schedule; you can also remove the linked device on your phone.|在此断开连接会删除 Roomie 上保存的会话并关闭计划；您也可以在手机上移除已关联设备。|여기서 연결을 끊으면 Roomie에 저장된 세션이 삭제되고 일정이 꺼집니다. 휴대폰에서 연결된 기기를 제거할 수도 있습니다.|यहाँ डिस्कनेक्ट करने से Roomie पर सहेजा गया सत्र हट जाता है और शेड्यूल बंद हो जाता है; आप फ़ोन पर भी लिंक किए गए डिवाइस को हटा सकते हैं।

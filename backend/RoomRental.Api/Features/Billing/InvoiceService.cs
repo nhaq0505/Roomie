@@ -5,9 +5,14 @@ using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, IMemoryCache? cache = null)
+public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = null, RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, IMemoryCache? cache = null, WhatsAppReminderService? whatsApp = null)
 {
-    public Task StageZaloReminderAsync(Invoice invoice, CancellationToken ct) => zalo?.StageIssuedAsync(invoice, ct) ?? Task.CompletedTask;
+    public async Task StageZaloReminderAsync(Invoice invoice, CancellationToken ct)
+    {
+        if (zalo is not null) await zalo.StageIssuedAsync(invoice, ct);
+        if (whatsApp is not null) await whatsApp.StageIssuedAsync(invoice, ct);
+    }
+    public Task StageWhatsAppReminderAsync(Invoice invoice, CancellationToken ct) => whatsApp?.StageIssuedAsync(invoice, ct) ?? Task.CompletedTask;
 
     public async Task<(int Created, int Skipped)> GenerateForOwnerAsync(
         Guid ownerId,

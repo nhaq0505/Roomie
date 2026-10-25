@@ -50,7 +50,7 @@ internal static class SeoAndRoutingUnitTests
         [
             "/login", "/login/", "/register", "/reset-password", "/change-password", "/account-status", "/profile",
             "/dashboard", "/buildings", "/rooms", "/readings", "/invoices", "/expenses", "/reports",
-            "/settings/payment", "/settings/zalo",
+            "/settings/payment", "/settings/zalo", "/settings/whatsapp",
             "/admin/owners", "/admin/monitoring", "/admin/promotions", "/admin/promotions/",
             "/rooms/room-123/tenant", "/rooms/room-123/tenant/",
             "/rooms/00000000-0000-0000-0000-000000000001/documents",
@@ -135,7 +135,7 @@ internal static class SeoAndRoutingUnitTests
         foreach (var privatePath in new[]
         {
             "/login", "/dashboard", "/rooms/", "/rooms/r1/tenant", "/rooms/r1/documents",
-            "/admin/promotions", "/admin/monitoring", "/settings/zalo",
+            "/admin/promotions", "/admin/monitoring", "/settings/zalo", "/settings/whatsapp",
             "/t/synthetic-seo-token", "/t/synthetic-seo-token/invoices/inv1/checkout"
         })
         {

@@ -1908,6 +1908,54 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("PaymentSettings");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerWhatsAppSettings", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BankAccount")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("BankAccountName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("BankBin")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("DispatchLeaseUntilMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Hour")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastScheduledPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<int>("Minute")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("NextSendAtMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("ScheduleEnabled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("OwnerId");
+
+                    b.ToTable("WhatsAppSettings");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
                 {
                     b.Property<Guid>("OwnerId")
@@ -2825,6 +2873,42 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("TenantMeterSubmissions");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.WhatsAppReminder", b =>
+                {
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("LastAttemptAtMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("QueuedAtMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SentAtMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("InvoiceId");
+
+                    b.HasIndex("OwnerId", "Status", "QueuedAtMs");
+
+                    b.ToTable("WhatsAppReminders");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.WorkerHeartbeatState", b =>
                 {
                     b.Property<string>("WorkerName")
@@ -3018,6 +3102,15 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.OwnerWhatsAppSettings", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.OwnerZaloSettings", b =>
                 {
                     b.HasOne("RoomRental.Api.Domain.AppUser", null)
@@ -3032,6 +3125,15 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.HasOne("RoomRental.Api.Domain.AppUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RoomRental.Api.Domain.WhatsAppReminder", b =>
+                {
+                    b.HasOne("RoomRental.Api.Domain.Invoice", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
