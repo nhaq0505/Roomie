@@ -73,6 +73,7 @@ export interface OccupancyRequest {
 
 export interface OccupancyUpdatePayload {
   occupancyId: string;
+  initialReading?: number;
   tenantName: string;
   phone?: string;
   people: number;
@@ -160,6 +161,7 @@ export interface OccupancyDocumentData {
 
 export interface UpdateOccupancyDocumentRequest {
   occupancyId: string;
+  initialReading?: number;
   ownerName?: string | null;
   ownerPhone?: string | null;
   ownerCitizenId?: string | null;

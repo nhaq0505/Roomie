@@ -3,7 +3,7 @@ import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
 import { useEffect, useState, type ReactNode } from 'react';
-import { App, Avatar, Button, Drawer, Dropdown, Layout, Menu, Space, Typography } from 'antd';
+import { App, Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -22,6 +22,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const screens = Grid.useBreakpoint();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [openKeys, setOpenKeys] = useState<string[]>(location.pathname.startsWith('/settings/') ? ['settings'] : []);
@@ -32,6 +33,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
     { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
     { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
     { key: '/settings/whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp' },
+
+  ];
+  const compactSettingsItems: MenuProps['items'] = [
+    { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
+    { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
+    { key: '/settings/whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp' },
+    { type: 'divider' as const },
+    { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
+    { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
+    { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
+    { type: 'divider' as const },
+    { key: '/profile', icon: <UserOutlined />, label: t("Hồ sơ") },
+    { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước") },
   ];
   useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [location.pathname]);
 const ownerItems = [
@@ -69,7 +83,8 @@ const adminItems = [
   const isStaff = isAdmin || isMarketer;
   const items = isAdmin ? adminItems : isMarketer ? marketerItems : ownerItems;
   const activeMenuKey = location.pathname.startsWith('/rooms/') ? '/rooms' : location.pathname;
-  const primaryMobileKeys = new Set(['/dashboard', '/rooms', '/readings', '/invoices', 'settings']);
+  const primaryMobileKeys = new Set(['/buildings', '/rooms', '/readings', '/invoices', 'settings']);
+  const isMobileMoreActive = ['/dashboard', '/expenses', '/reports', '/profile', '/account-status'].includes(location.pathname);
   const title = settingsItems.find((item) => item.key === activeMenuKey)?.label ?? items.find((item) => item.key === activeMenuKey)?.label ?? 'Roomie';
 
   const userMenu: MenuProps['items'] = [
@@ -117,24 +132,34 @@ const adminItems = [
         </div>
       </div>
     </Drawer>
-    <Layout className="main-layout">
-      <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}>{t("Menu")}</Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : isMarketer ? t("Chuyên viên Marketing") : t("Chủ trọ")}</small></span><Typography.Text type="secondary">⌄</Typography.Text></Button></Dropdown></Space></Header>
+    <Layout className="main-layout" data-path={location.pathname}>
+      <Header className="topbar"><div className="topbar-left"><Button className="mobile-menu-button" type="text" icon={<MenuOutlined />} aria-label={t("Mở menu")} onClick={() => setMobileOpen(true)}><span className="mobile-menu-button-text">{t("Menu")}</span></Button><div className="breadcrumb-label">{t("Khu vực làm việc")} <span>/</span> <strong role={!screens.md ? 'heading' : undefined} aria-level={!screens.md ? 2 : undefined}>{title}</strong></div></div><Space size={12}><LanguageSelector /><Dropdown menu={{ items: userMenu, onClick: handleMenu }} trigger={['click']} placement="bottomRight"><Button className="profile-button" type="text"><Avatar size={36} className="profile-avatar">{user?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}</Avatar><span className="profile-text"><strong>{user?.name}</strong><small>{isAdmin ? t("Quản trị viên") : isMarketer ? t("Chuyên viên Marketing") : t("Chủ trọ")}</small></span><Typography.Text type="secondary" className="profile-caret">⌄</Typography.Text></Button></Dropdown></Space></Header>
       <nav className="compact-navigation" data-role={isStaff ? 'admin' : 'owner'} aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => {
         const isSecondary = !isStaff && !primaryMobileKeys.has(String(item.key));
+        const shortLabelMap: Record<string, string> = {
+          '/rooms': t("Phòng"),
+          '/admin/owners': t("Chủ trọ"),
+          '/admin/monitoring': t("Giám sát"),
+          '/admin/promotions': t("Khuyến mãi"),
+          '/marketer/leads': 'CRM',
+          '/marketer/content': 'CMS',
+          '/marketer/emails': 'Email',
+        };
+        const shortLabel = shortLabelMap[String(item.key)];
         if (item.key === 'settings') {
           return (
-            <Dropdown key={item.key} overlayClassName="compact-nav-dropdown" trigger={['click']} placement="topRight" menu={{ items: settingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
-              <button type="button" aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span className="compact-nav-text">{item.label} <DownOutlined className="compact-nav-caret" /></span></button>
+            <Dropdown key={item.key} overlayClassName="compact-nav-dropdown" trigger={['click']} placement="topRight" menu={{ items: compactSettingsItems, selectedKeys: [location.pathname], onClick: ({ key }) => navigate(key) }}>
+              <button type="button" aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} data-mobile-more-active={isMobileMoreActive ? 'true' : undefined} aria-current={location.pathname.startsWith('/settings/') ? 'page' : undefined}>{item.icon}<span className="compact-nav-text">{item.label} <DownOutlined className="compact-nav-caret" /></span></button>
             </Dropdown>
           );
         }
         return (
           <Link key={item.key} to={item.key!} aria-label={String(item.label)} data-mobile-secondary={isSecondary ? 'true' : undefined} aria-current={activeMenuKey === item.key ? 'page' : undefined}>
             {item.icon}
-            {item.key === '/rooms' ? (
+            {shortLabel ? (
               <span className="compact-nav-text">
                 <span className="compact-nav-label-full">{item.label}</span>
-                <span className="compact-nav-label-short">{t("Phòng")}</span>
+                <span className="compact-nav-label-short">{shortLabel}</span>
               </span>
             ) : (
               <span className="compact-nav-text">{item.label}</span>

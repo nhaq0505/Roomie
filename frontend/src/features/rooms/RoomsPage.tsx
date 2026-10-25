@@ -1,5 +1,5 @@
 import { CrownOutlined, HomeOutlined, PlusOutlined } from '@ant-design/icons';
-import { Alert, App, Button, Card, ConfigProvider, Grid, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, ConfigProvider, Grid, Select, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import { t } from '../../shared/i18n/runtime';
 import ResponsiveTable from '../../shared/ui/ResponsiveTable';
@@ -15,32 +15,21 @@ export default function RoomsPage() {
 }
 
 function RoomsContent() {
-const state = useRoomsPage();
-  const { navigate, setSearchParams, archiveFilter, setArchiveFilter, buildingFilter, statusFilter, setStatusFilter, buildingsQuery, roomsQuery, isPro, maxRooms, activeRoomCount, isQuotaReached, buildingRooms, rooms, occupiedCount, vacancyCount, activeBuildings, openCreate, compactRoom, columns, clearFilters } = state;
+  const state = useRoomsPage();
+  const { navigate, setSearchParams, archiveFilter, buildingFilter, statusFilter, buildingsQuery, roomsQuery, maxRooms, isQuotaReached, rooms, activeBuildings, openCreate, compactRoom, columns, clearFilters } = state;
   return <div className="rooms-workspace">
     <PageTitle
       title={t("Phòng & người thuê")}
       subtitle={t("Quản lý phòng, người thuê và link hóa đơn.")}
       extra={archiveFilter === 'Active' ? (
-        <Space wrap>
-          {isPro ? (
-            <Tag color="gold" icon={<CrownOutlined />} style={{ padding: '4px 8px' }}>
-              PRO ({activeRoomCount} {t("phòng")})
-            </Tag>
-          ) : (
-            <Tag color={isQuotaReached ? 'error' : 'default'} style={{ padding: '4px 8px' }}>
-              {activeRoomCount} / {maxRooms} {t("phòng (Gói Miễn phí)")}
-            </Tag>
-          )}
-          <Button
-            type="primary"
-            icon={isQuotaReached ? <CrownOutlined /> : <PlusOutlined />}
-            onClick={isQuotaReached ? () => navigate('/account-status') : openCreate}
-            disabled={!activeBuildings.length && !isQuotaReached}
-          >
-            {isQuotaReached ? t("Nâng cấp tài khoản") : t("Tạo phòng trọ")}
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          icon={isQuotaReached ? <CrownOutlined /> : <PlusOutlined />}
+          onClick={isQuotaReached ? () => navigate('/account-status') : openCreate}
+          disabled={!activeBuildings.length && !isQuotaReached}
+        >
+          {isQuotaReached ? t("Nâng cấp tài khoản") : t("Tạo phòng trọ")}
+        </Button>
       ) : undefined}
     />
     {isQuotaReached && archiveFilter === 'Active' && (
@@ -61,8 +50,6 @@ const state = useRoomsPage();
     {buildingsQuery.isError && <LoadError error={buildingsQuery.error} onRetry={() => void buildingsQuery.refetch()} />}
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : <SectionCard className="room-directory">
       <div className="room-directory-toolbar">
-        <label className="room-filter"><span>{t("Trạng thái lưu trữ")}</span><Select aria-label={t("Lọc trạng thái lưu trữ")} value={archiveFilter} onChange={(value) => setArchiveFilter(value)} options={[{ value: 'Active', label: t("Đang hoạt động ({0})", [(roomsQuery.data ?? []).filter((room) => !room.isArchived).length]) }, { value: 'Archived', label: t("Đã lưu trữ ({0})", [(roomsQuery.data ?? []).filter((room) => room.isArchived).length]) }]} /></label>
-        <label className="room-filter"><span>{t("Trạng thái")}</span><Select aria-label={t("Lọc theo tình trạng")} value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: t("Tất cả ({0})", [buildingRooms.length]) }, { value: 'occupied', label: t("Đang thuê ({0})", [occupiedCount]) }, { value: 'vacant', label: t("Còn trống ({0})", [vacancyCount]) }]} /></label>
         <label className="room-filter"><span>{t("Dãy trọ")}</span><Select aria-label={t("Lọc theo dãy trọ")} allowClear placeholder={t("Tất cả dãy trọ")} value={buildingFilter} onChange={(value) => { setSearchParams(value ? { building: value } : {}); }} options={[...(buildingsQuery.data ?? []).map((building) => ({ value: building.id, label: building.name })), ...(buildingFilter && buildingsQuery.isSuccess && !buildingsQuery.data.some((building) => building.id === buildingFilter) ? [{ value: buildingFilter, label: t("Dãy không còn tồn tại") }] : [])]} /></label>
         <div className="room-filter-result" data-filtered={!!buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active'}><span aria-live="polite">{roomsQuery.isPending ? t("Đang tải phòng…") : t("{0} phòng", [rooms.length])}</span>{rooms.length > 0 && (buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active') && <Button type="text" onClick={clearFilters}>{t("Xóa lọc")}</Button>}</div>
       </div>

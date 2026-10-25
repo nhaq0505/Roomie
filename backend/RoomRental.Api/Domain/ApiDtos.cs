@@ -59,7 +59,8 @@ public sealed record OccupancyUpdateRequest(
     decimal? RoomAreaSqm = null,
     string? HandoverAssets = null,
     string? AdditionalTerms = null,
-    string? HouseholdHeadRelation = null);
+    string? HouseholdHeadRelation = null,
+    decimal? InitialReading = null);
 public sealed record OwnerStatusRequest(string Status, string? Reason);
 public sealed record BuildingRequest(string Name, string? Address);
 public sealed record BuildingDto(Guid Id, string Name, string? Address);

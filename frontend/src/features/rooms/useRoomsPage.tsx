@@ -205,9 +205,9 @@ export function useRoomsPage() {
     </>}
   </div>;
   const compactRoom = (room: Room) => <>
-    <div className="room-card-head"><div><strong>{room.name}</strong><span>{room.buildingName || buildingsQuery.data?.find((building) => building.id === room.buildingId)?.name || t("Dãy trọ")}</span></div>{roomStatus(room)}</div>
-    <div className="room-card-tenant"><span className="room-field-label">{t("Người thuê")}</span>{room.occupancy ? <div><strong>{room.occupancy.tenantName}</strong>{room.occupancy.coResidents && room.occupancy.coResidents.length > 0 && <span>+ {room.occupancy.coResidents.map((m) => m.fullName).join(', ')}</span>}<span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span><span>{t("Cọc yêu cầu")} {formatVnd(room.occupancy.depositRequired)}  {t("· Đang giữ")} {formatVnd(room.occupancy.depositHeld)}</span></div> : <span>{t("Chưa có người thuê")}</span>}</div>
-    <div className="room-card-rent"><span className="room-field-label">{t("Giá thuê / tháng")}</span><strong>{formatVnd(room.rent)}</strong></div>
+    <div className="room-card-head"><div className="room-card-title-inline"><strong>{room.name}</strong><span>{room.buildingName || buildingsQuery.data?.find((building) => building.id === room.buildingId)?.name || t("Dãy trọ")}</span></div>{roomStatus(room)}</div>
+    <div className="room-card-summary-row"><div className="room-card-tenant"><span className="room-field-label">{t("Người thuê")}</span>{room.occupancy ? <div><strong>{room.occupancy.tenantName}</strong>{room.occupancy.coResidents && room.occupancy.coResidents.length > 0 && <span>+ {room.occupancy.coResidents.map((m) => m.fullName).join(', ')}</span>}<span>{room.occupancy.people}  {t("người")}{room.occupancy.phone ? ` · ${room.occupancy.phone}` : ''}</span></div> : <span>{t("Chưa có người thuê")}</span>}</div><div className="room-card-rent"><strong>{formatVnd(room.rent)}</strong><span className="room-field-label">/{t("tháng")}</span></div></div>
+
     {roomActions(room)}
   </>;
   const columns: TableProps<Room>['columns'] = [

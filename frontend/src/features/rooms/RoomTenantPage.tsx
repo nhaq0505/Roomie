@@ -74,6 +74,7 @@ function RoomTenantWorkspace() {
         tenantName: room.occupancy.tenantName,
         phone: room.occupancy.phone ?? '',
         people: room.occupancy.people,
+        initialReading: room.initialReading ?? room.previousReading ?? 0,
       });
       if (hadPreviousInit && isServerUpdated) {
         message.info(t("Đã tự động đồng bộ thông tin người thuê mới nhất."));
@@ -150,6 +151,7 @@ function RoomTenantWorkspace() {
           tenantName: values.tenantName,
           phone: values.phone,
           people,
+          ...(values.initialReading != null && values.initialReading !== room.initialReading ? { initialReading: values.initialReading } : {}),
         },
       });
     } else {
@@ -271,7 +273,30 @@ function RoomTenantWorkspace() {
                 </Col>
               </Row>
 
-              {!isEditing && (
+              {isEditing ? (
+                <Row gutter={16}>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item
+                      label={t("Chỉ số điện ban đầu")}
+                      name="initialReading"
+                      rules={[
+                        { required: true, message: t("Vui lòng nhập giá trị.") },
+                        { type: 'number', min: 0, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [0]) },
+                      ]}
+                    >
+                      <InputNumber
+                        size="large"
+                        min={0}
+                        max={1000000000}
+                        step={1}
+                        precision={0}
+                        addonAfter="kWh"
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              ) : (
                 <Row gutter={16}>
                   <Col xs={24} sm={12} md={8}>
                     <Form.Item
@@ -300,8 +325,8 @@ function RoomTenantWorkspace() {
                         size="large"
                         min={minReading}
                         max={1000000000}
-                        step={0.001}
-                        precision={3}
+                        step={1}
+                        precision={0}
                         addonAfter="kWh"
                         style={{ width: '100%' }}
                       />
@@ -366,7 +391,7 @@ function RoomTenantWorkspace() {
                 </div>
               </div>
 
-              <Space direction="vertical" size={10} style={{ width: '100%', marginTop: 18 }}>
+              <Space className="room-tenant-summary-actions" direction="vertical" size={10} style={{ width: '100%', marginTop: 18 }}>
                 <Button
                   type="primary"
                   size="large"
@@ -403,12 +428,15 @@ function RoomTenantWorkspace() {
             icon={<FileTextOutlined />}
             aria-label={t("Xuất hợp đồng & CT01")}
             title={t("Xuất hợp đồng & CT01")}
+            loading={isSaving && openContractAfterSaveRef.current}
             disabled={isSaving}
             onClick={() => {
               openContractAfterSaveRef.current = true;
               form.submit();
             }}
-          />
+          >
+            {t("Xuất hợp đồng & CT01")}
+          </Button>
           <Button
             type="primary"
             className="room-tenant-mobile-save-btn"

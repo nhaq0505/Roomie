@@ -69,6 +69,69 @@ public static partial class OwnerManagementEndpoints
                         "Cập nhật số người ở cho hóa đơn nháp.", ownerId, before, BillingEndpoints.SerializeSnapshot(draft), ct);
                 }
             }
+            if (request.InitialReading is decimal newInitialReading)
+            {
+                if (newInitialReading < 0 || newInitialReading > 1_000_000_000)
+                    throw new ApiException(400, "Chỉ số điện phải là số không âm trong giới hạn cho phép.");
+                if (decimal.Round(newInitialReading, 3) != newInitialReading)
+                    throw new ApiException(400, "Chỉ số điện tối đa 3 chữ số thập phân.");
+                if (newInitialReading != room.InitialReading)
+                {
+                    if (await db.Invoices.AnyAsync(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id &&
+                        x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Issued, ct))
+                        throw new ApiException(409, "Phòng đã phát hành hóa đơn điện tháng nên không thể sửa chỉ số điện ban đầu. Hãy điều chỉnh trực tiếp trên hóa đơn.");
+                    var priorMaxReading = await QueryAggregates.MaxReadingAsync(db,
+                        db.Readings.AsNoTracking().Where(x => x.RoomId == id && x.OccupancyId != occupancy.Id).Select(x => x.CurrentReading), ct);
+                    var priorMaxFinal = await QueryAggregates.MaxReadingAsync(db,
+                        db.Invoices.AsNoTracking().Where(x => x.RoomId == id && x.OccupancyId != occupancy.Id && x.IsFinalMeterReading).Select(x => x.CurrentReading), ct);
+                    var priorFloor = Math.Max(priorMaxReading, priorMaxFinal);
+                    if (priorFloor > 0 && newInitialReading < priorFloor)
+                        throw new ApiException(400, $"Chỉ số điện ban đầu không thể thấp hơn chỉ số đã chốt của lượt thuê trước ({priorFloor} kWh).");
+
+                    var occupancyReadings = await db.Readings.Where(x => x.RoomId == id && x.OccupancyId == occupancy.Id).ToListAsync(ct);
+                    foreach (var reading in occupancyReadings)
+                    {
+                        if (reading.CurrentReading < newInitialReading)
+                            throw new ApiException(400, $"Chỉ số điện ban đầu ({newInitialReading} kWh) không thể lớn hơn chỉ số cuối kỳ đã ghi ({reading.CurrentReading} kWh).");
+                        reading.PreviousReading = newInitialReading;
+                        reading.Consumption = reading.CurrentReading - newInitialReading;
+                    }
+
+                    var draftMonthly = await db.Invoices.Where(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id &&
+                        x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Draft).ToListAsync(ct);
+                    foreach (var draft in draftMonthly)
+                    {
+                        if (draft.Paid != 0 || draft.Status == InvoiceStatus.Paid ||
+                            await db.Receipts.AnyAsync(x => x.InvoiceId == draft.Id, ct) ||
+                            await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == draft.Id || db.Invoices.Any(i => i.Id == draft.Id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct))
+                            throw new ApiException(409, "Hóa đơn nháp có thanh toán hoặc giao dịch đang chờ. Cần xử lý trước khi đổi chỉ số điện ban đầu.");
+                        if (draft.CurrentReading is decimal cur && cur < newInitialReading)
+                            throw new ApiException(400, $"Chỉ số điện ban đầu ({newInitialReading} kWh) không thể lớn hơn chỉ số cuối kỳ trong bản nháp ({cur} kWh).");
+                        var before = BillingEndpoints.SerializeSnapshot(draft);
+                        draft.PreviousReading = newInitialReading;
+                        if (draft.CurrentReading is decimal currentVal)
+                        {
+                            draft.Consumption = currentVal - newInitialReading;
+                            draft.ElectricityAmount = ApiSupport.RoundVnd(draft.Consumption * (draft.ElectricityRate ?? room.ElectricityRate));
+                            draft.Total = InvoiceService.ValidateTotal(draft.Rent, draft.ElectricityAmount, draft.WaterAmount, draft.ServiceAmount);
+                        }
+                        draft.Version++;
+                        InvoiceService.RecalculateStatus(draft);
+                        await BillingEndpoints.AddRevisionAsync(db, draft, Guid.NewGuid(), RequestFingerprint.Fingerprint(request),
+                            "Cập nhật chỉ số điện ban đầu cho hóa đơn nháp.", ownerId, before, BillingEndpoints.SerializeSnapshot(draft), ct);
+                    }
+
+                    var pendingSubmissions = await db.TenantMeterSubmissions
+                        .Where(x => x.OccupancyId == occupancy.Id && x.Status == TenantMeterSubmissionStatus.Pending)
+                        .ToListAsync(ct);
+                    foreach (var sub in pendingSubmissions)
+                    {
+                        sub.PreviousReading = newInitialReading;
+                    }
+
+                    room.InitialReading = newInitialReading;
+                }
+            }
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, VietnamCalendar.CurrentVietnamPeriod(), ct));

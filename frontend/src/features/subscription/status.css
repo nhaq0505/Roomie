@@ -8,6 +8,13 @@
 .status-card .ant-result-title { color: #233d44; font-family: 'Be Vietnam Pro', sans-serif; font-size: 21px; font-weight: 700; }
 .status-card .ant-result-subtitle { color: #76878b; font-size: 13px; line-height: 1.7; }
 .status-email { display: inline-block; margin-top: 9px; color: #3b6065; font-weight: 600; }
-.status-actions { display: flex; justify-content: center; gap: 9px; }
+.status-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
 .status-actions .ant-btn { font-size: 13px; }
-.status-foot { margin-top: 17px; color: #9aa6a6; font-size: 12px; }
+.status-foot { margin-top: 17px; color: #9aa6a6; font-size: 12px; text-align: center; }
+@media (max-width: 767px) {
+  .status-card { padding: 14px 16px; border-radius: 14px; box-shadow: none; }
+  .status-card .ant-result { padding: 18px 6px; }
+  .status-card .ant-result-title { font-size: 18px; }
+  .status-actions { flex-direction: column; align-items: stretch; }
+  .status-actions .ant-btn { width: 100%; min-height: 40px; }
+}

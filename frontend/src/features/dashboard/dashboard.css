@@ -88,7 +88,34 @@
 .onboarding-step-status.is-current { background: #e3f7f2; color: #0b7e69; }
 .onboarding-step-status.is-done { background: #e9f6ee; color: #217a58; }
 .onboarding-step-action { margin-left: auto; }
+@media (max-width: 767px) {
+  .quick-actions-card.section-card { padding: 11px 12px; margin-bottom: 10px; }
+  .quick-actions-card > .section-card-header { margin-bottom: 8px; }
+  .stat-grid,
+  .dashboard-main-grid { margin-bottom: 10px; row-gap: 8px !important; }
+  .section-card > .ant-typography:last-child { margin-bottom: 0 !important; }
+  .task-item { min-height: 44px; padding: 8px 2px; gap: 10px; }
+  .task-item:not(:first-child) .task-copy span { display: none !important; }
+  .task-symbol { flex: 0 0 32px; height: 32px; border-radius: 9px; font-size: 14px; }
+  .task-copy { gap: 1px; }
+  .task-copy strong { font-size: 13.5px; }
+  .task-copy span { font-size: 12px; line-height: 1.35; }
+  .occupancy-summary { padding: 2px 2px 10px; }
+  .occupancy-percent { margin-top: 2px; font-size: 26px; }
+  .occupancy-stats { padding: 8px 0 2px; border-bottom: 0; }
+  .mini-room-note { display: none !important; }
+  .onboarding-card,
+  .onboarding-checklist-card { margin-bottom: 10px; border-radius: 14px; box-shadow: none; }
+  .onboarding-card .ant-card-body,
+  .onboarding-checklist-card .ant-card-body { padding: 12px 14px; }
+  .onboarding-title.ant-typography { font-size: 15.5px; }
+  .onboarding-subtitle.ant-typography { display: none !important; }
+  .onboarding-progress-bar { margin: 6px 0 8px; }
+  .onboarding-steps { gap: 6px; }
+  .onboarding-step { padding: 9px 11px; gap: 8px; border-radius: 10px; }
+  .onboarding-step.is-done .onboarding-step-body > span { display: none; }
+}
 @media (max-width: 575px) {
-  .onboarding-card .ant-card-body { padding: 16px; }
-  .onboarding-step-action { width: 100%; margin-left: 0; padding-left: 42px; }
+  .onboarding-step-action { width: 100%; margin-left: 0; padding-left: 38px; }
+  .onboarding-step-action .ant-btn { width: 100%; }
 }

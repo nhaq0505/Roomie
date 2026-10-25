@@ -73,7 +73,7 @@ export default function ExpensesPage() {
           <label><span>{t("Danh mục")}</span><Select aria-label={t("Lọc theo danh mục")} value={filters.category} allowClear placeholder={t("Tất cả danh mục")} options={expenseCategoryOptions()} onChange={page.setCategory} /></label>
           <Button icon={<ReloadOutlined />} onClick={page.clearFilters}>{t("Đặt lại")}</Button>
         </div>
-        {filters.buildingId && <p className="reports-scope-note">{t("Khi lọc theo dãy, các khoản chi chung không gắn dãy sẽ không được tính.")}</p>}
+        {filters.buildingId && <p className="reports-scope-note reports-scope-warning">{t("Khi lọc theo dãy, các khoản chi chung không gắn dãy sẽ không được tính.")}</p>}
         <div className="report-total-grid">
           {totals ? <>
             <div className="report-total-tile report-total-accent"><span>{t("Tổng chi")}</span><strong>{formatVnd(totals.total)}</strong></div>

@@ -27,8 +27,9 @@
 .room-list-name strong { color: var(--room-ink); font-size: 15px; font-weight: 600; }
 .room-list-tenant strong { color: var(--room-ink); font-size: 14px; font-weight: 500; }
 .room-list-name > span, .room-list-tenant > span { color: var(--room-muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.room-state { margin: 0; padding: 4px 8px; border: 0; border-radius: 8px; font-size: 12px; line-height: 20px; white-space: nowrap; }
-.room-state-occupied { color: #226747; background: #eaf6ef; }
+.room-state { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 10px; border: 0; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+.room-state-occupied { color: #ffffff !important; background: #087c69 !important; font-weight: 700; box-shadow: 0 2px 6px rgba(8, 124, 105, 0.24); }
+.room-state-occupied::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #6ee7b7; flex-shrink: 0; }
 .room-state-vacant { color: var(--room-muted); background: #f0f4f2; }
 .room-price { color: var(--room-ink); font-size: 14px; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .room-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -58,6 +59,9 @@
 .room-editor .link-info { padding: 0; text-align: left; }
 .room-editor .link-info-icon { display: none; }
 .room-editor .link-info > .ant-btn { margin-top: 16px; }
+.room-link-copy-row { display: flex; align-items: stretch; gap: 8px; }
+.room-link-copy-row > .ant-input { flex: 1 1 auto; min-width: 0; }
+.room-link-copy-row > .ant-btn { flex: 0 0 auto; font-weight: 600; }
 .room-link-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .room-link-footer > .ant-btn-dangerous { margin-right: auto; color: var(--room-danger); background: #fcf0f1; }
 .room-editor .ant-btn-dangerous { background: #fcf0f1; color: var(--room-danger); border-color: transparent; }
@@ -68,28 +72,49 @@
 /* Keep the project's visible keyboard focus; inputs use a subtle brand ring. */
 .room-editor .ant-input:focus, .room-editor .ant-input-number-focused, .room-editor .ant-select-focused .ant-select-selector { border-color: var(--room-accent) !important; box-shadow: 0 0 0 2px rgba(10,121,106,.1) !important; }
 @media (max-width: 767px) {
-  .rooms-workspace .page-heading { align-items: stretch; gap: 16px; margin-bottom: 20px; }
-  .rooms-workspace .page-heading h2.ant-typography { font-size: 22px; }
-  .rooms-workspace .page-heading-extra > .ant-btn { min-height: 44px; width: 100%; }
-  .room-directory-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; padding: 14px; }
-  .room-filter { gap: 6px; }
+  .rooms-workspace .page-heading { align-items: center; gap: 8px; margin-bottom: 10px; }
+  .rooms-workspace .page-heading h2.ant-typography { font-size: 18px; font-weight: 700; }
+  .rooms-workspace .page-subtitle { display: none !important; }
+  .rooms-workspace .page-heading-extra > .ant-space { justify-content: space-between; align-items: center; }
+  .rooms-workspace .page-heading-extra > .ant-space > .ant-space-item:first-child:not(:only-child) { flex: 0 1 auto; }
+  .rooms-workspace .page-heading-extra > .ant-space > .ant-space-item:last-child { flex: 1 1 135px; }
+  .rooms-workspace .page-heading-extra > .ant-btn { min-height: 38px; width: 100%; font-weight: 600; }
+  .rooms-workspace .room-directory { background: transparent !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; overflow: visible; }
+  .room-directory-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 0; margin-bottom: 10px; background: transparent; border: 0; border-radius: 0; }
+  .room-filter { gap: 0; }
+  .room-filter > span:first-child:not([class*="ant-"]) { display: none !important; }
   .room-filter:nth-of-type(3) { grid-column: 1 / -1; }
-  .room-filter-result { grid-column: 1 / -1; justify-content: space-between; margin: 0; min-height: 24px; }
-  .rooms-workspace .mobile-record { padding: 16px; }
-  .rooms-workspace .mobile-record .room-actions, .room-card-actions { flex-wrap: wrap; gap: 8px; }
-  .rooms-workspace .room-actions .ant-btn { min-height: 44px; }
-  .rooms-workspace .mobile-record .room-actions .ant-btn:not(.room-more), .room-card-actions .ant-btn:not(.room-more) { min-width: 0; flex: 1 1 calc(50% - 8px); }
-  .room-more.ant-btn { flex-basis: 44px; width: 44px; height: 44px; }
+  .room-filter-result { grid-column: 1 / -1; justify-content: space-between; margin: 0; min-height: 24px; padding: 0 2px; }
+  .rooms-workspace .mobile-records { gap: 8px; }
+  .rooms-workspace .mobile-record { padding: 11px 13px; border: 1px solid #e1ebe8; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(19, 48, 55, 0.03); }
+  .rooms-workspace .mobile-record:last-of-type { border-bottom: 1px solid #e1ebe8; }
+  .room-card-head { align-items: center; gap: 8px; margin-bottom: 6px; }
+  .room-card-head > .room-card-title-inline { display: flex; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .room-card-head > .room-card-title-inline > span::before { content: "· "; color: #9ab0b5; }
+  .room-card-summary-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; padding: 6px 0 0; border-top: 1px solid #f0f4f2; }
+  .room-card-tenant { flex: 1 1 auto; min-width: 0; flex-direction: column; align-items: stretch; gap: 1px; margin-bottom: 0; padding: 0; border-radius: 0; background: transparent; border: 0; }
+  .room-card-tenant .room-field-label { display: none; }
+  .room-card-tenant > div { text-align: left; gap: 1px; }
+  .room-card-tenant strong { font-size: 13.5px; font-weight: 600; }
+  .room-card-tenant > div > span { font-size: 12px; }
+  .room-card-rent { flex: 0 0 auto; display: flex; flex-direction: row; align-items: baseline; gap: 2px; margin-bottom: 0; padding: 0; }
+  .room-card-rent strong { font-size: 14px; font-weight: 700; color: #087c69; }
+  .room-card-rent .room-field-label { font-size: 11.5px; color: #6c8489; }
+  .rooms-workspace .mobile-record .room-actions, .room-card-actions { flex-wrap: wrap; gap: 8px; padding-top: 0; border-top: 0; }
+  .rooms-workspace .room-actions .ant-btn { min-height: 36px; border-radius: 10px; }
+  .rooms-workspace .mobile-record .room-actions .ant-btn:not(.room-more), .room-card-actions .ant-btn:not(.room-more) { min-width: 0; flex: 1 1 auto; padding-inline: 10px; font-size: 13px; }
+  .room-more.ant-btn { flex: 0 0 36px; width: 36px; height: 36px; min-height: 36px; border: 1px solid var(--room-control-line); border-radius: 10px; background: #f8fbfa; }
   .room-editor .ant-input, .room-editor .ant-input-number-input, .room-editor .ant-select, .room-editor .ant-picker-input > input { font-size: 16px; }
   .room-editor .ant-btn { min-height: 44px; }
   .room-link-footer { flex-direction: column-reverse; align-items: stretch; }
   .room-link-footer > .ant-btn-dangerous { margin: 0; }
-  .room-card-tenant .room-field-label { flex: 0 0 auto; }
+  .rooms-workspace .ant-pagination { padding: 12px 4px 4px; text-align: center; }
 }
 @media (max-width: 359px) {
   .room-directory-toolbar { grid-template-columns: minmax(0,1fr); }
   .room-filter:nth-of-type(3) { grid-column: auto; }
   .room-filter-result { grid-column: auto; }
+  .rooms-workspace .mobile-record .room-actions .ant-btn:not(.room-more), .room-card-actions .ant-btn:not(.room-more) { flex: 1 1 calc(50% - 8px); }
 }
 @media (max-width: 767px) {
   .room-filter-result[data-filtered='false'] { display: none; }
@@ -316,26 +341,14 @@
 
 @media (max-width: 767px) {
   .room-tenant-page .page-heading {
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 8px;
+    margin-bottom: 10px;
   }
-  .room-tenant-page .page-heading-extra > .ant-space {
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 8px !important;
-    width: 100%;
+  .room-tenant-page .page-heading-extra {
+    display: none !important;
   }
-  .room-tenant-page .page-heading-extra > .ant-space > .ant-space-item {
-    min-width: 0;
-  }
-  .room-tenant-page .page-heading-extra > .ant-space > .ant-space-item:nth-child(3) {
-    display: none;
-  }
-  .room-tenant-page .page-heading-extra .ant-btn {
-    width: 100%;
-    min-height: 40px;
-    padding-inline: 12px;
-    font-size: 13.5px;
+  .room-tenant-page .room-tenant-card-header {
+    display: none !important;
   }
   .room-tenant-card-header-flex > .ant-btn {
     width: 100%;
@@ -361,6 +374,9 @@
   .room-tenant-page {
     padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
+  .room-tenant-summary-actions {
+    display: none !important;
+  }
   .room-tenant-mobile-bar {
     position: fixed;
     left: 12px;
@@ -368,10 +384,10 @@
     bottom: calc(66px + env(safe-area-inset-bottom, 0px));
     z-index: 90;
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 8px;
     margin-top: 0;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid var(--room-line);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.96);
@@ -379,23 +395,29 @@
     box-shadow: 0 -4px 18px rgba(19, 48, 55, 0.08);
   }
   .room-tenant-mobile-qr-btn.ant-btn {
-    width: 48px !important;
-    min-width: 48px !important;
-    height: 46px;
-    padding: 0 !important;
+    width: 100%;
+    min-height: 46px;
+    height: auto;
+    padding: 6px 10px !important;
     border-radius: 13px;
     border-color: #bce0d5;
     background: #eaf6f2;
     color: #087c69;
-    font-size: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: normal;
   }
   .room-tenant-mobile-save-btn.ant-btn {
+    width: 100%;
     min-height: 46px;
-    height: 46px;
+    height: auto;
+    padding: 6px 12px;
     border-radius: 13px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    padding-inline: 16px;
+    line-height: 1.2;
+    white-space: normal;
   }
   .cccd-qr-modal,
   .cccd-scanner-modal {

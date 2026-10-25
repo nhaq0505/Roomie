@@ -1,30 +1,45 @@
 @keyframes report-shimmer { to { background-position-x: -200%; } }
 
 @media (max-width: 767px) {
-  .archive-filter-toolbar { justify-content: stretch; }
-  .archive-filter-toolbar > label { width: 100%; }
-  .reports-filter-toolbar { grid-template-columns: 1fr 1fr; }
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading > div:first-child { display: none !important; }
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading:not(:has(.page-heading-extra)) { display: none !important; }
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading { margin-bottom: 10px; }
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading-extra,
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading-extra > .ant-btn,
+  .main-layout:not([data-path^="/rooms/"]):not([data-path="/settings/zalo"]):not([data-path^="/admin/"]):not([data-path^="/marketer/"]) .page-heading-extra > .ant-select { width: 100%; }
+  .archive-filter-toolbar { justify-content: stretch; margin: 0 0 10px; }
+  .archive-filter-toolbar > label { width: 100%; gap: 0; }
+  .archive-filter-toolbar > label > span:first-child:not([class*="ant-"]) { display: none !important; }
+  .reports-workspace .ant-tabs-nav { margin-bottom: 10px; }
+  .reports-filter-toolbar { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .reports-filter-toolbar > label { gap: 0; }
+  .reports-filter-toolbar > label > span:first-child:not([class*="ant-"]) { display: none !important; }
   .reports-filter-toolbar > label:first-child { grid-column: 1 / -1; }
-  .reports-filter-toolbar > .ant-btn { width: 100%; }
-  .report-total-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .reports-workspace { padding-left: 16px; padding-right: 16px; }
+  .reports-filter-toolbar > .ant-btn { width: 100%; min-height: 36px; }
+  .reports-filter-toolbar > .ant-btn:nth-child(4) { grid-column: 1 / -1; }
+  .reports-scope-note:not(.reports-scope-warning) { display: none !important; }
+  .reports-scope-warning { margin: 8px 0 6px !important; padding: 7px 10px; border: 1px solid #f0dfc2; border-radius: 10px; background: #fffaf0; color: #7a5821 !important; font-size: 12px; line-height: 1.4; }
+  .report-total-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin: 10px 0; }
+  .report-total-grid > .report-total-tile:nth-child(odd):last-child { grid-column: 1 / -1; }
+  .report-total-tile { min-height: 58px; padding: 10px 12px; gap: 3px; border-radius: 12px; background: #fff; }
   .reports-pagination { justify-content: center; overflow-x: auto; }
   .moveout-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 @media (max-width: 480px) {
   .report-total-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .report-total-tile { min-height: 86px; padding: 11px; }
-  .report-total-tile > strong { font-size: 16px; }
+  .report-total-tile { min-height: 56px; padding: 9px 11px; }
+  .report-total-tile > strong { font-size: 15px; }
   .moveout-summary-grid { grid-template-columns: 1fr 1fr; }
   .moveout-invoice-row { align-items: flex-start; }
   .moveout-invoice-row > .ant-btn { flex: 0 0 auto; }
 }
 @media (max-width: 359px) {
   .reports-filter-toolbar { grid-template-columns: 1fr; }
-  .reports-filter-toolbar > label:first-child { grid-column: auto; }
+  .reports-filter-toolbar > label:first-child,
+  .reports-filter-toolbar > .ant-btn:nth-child(4) { grid-column: auto; }
 }
 @media (max-width: 767px) {
-  .invoice-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .invoice-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .invoice-filter-search { grid-column: 1 / -1; }
   .invoice-list-actions { width: 100%; justify-content: space-between; }
   .ant-input,
