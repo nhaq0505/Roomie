@@ -1,8 +1,8 @@
-import type { InvoiceKindFilter, InvoiceStatusFilter, IssuanceFilter } from './types';
+import type { InvoiceStatusFilter } from './types';
 import { statusLabel, statusClass } from './presentation';
 import { ArrowRightOutlined, FileTextOutlined, MessageOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import type { TableProps } from 'antd';
-import { Button, Col, DatePicker, Input, Row, Select, Space, Tag, Tooltip } from 'antd';
+import { Button, DatePicker, Input, Select, Space, Tag, Tooltip } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
@@ -20,8 +20,8 @@ function invoiceKindLabel(kind: Invoice['kind']) {
 }
 
 export default function InvoicesPage() {
-const state = useInvoicesPage();
-  const { kindFilter, setKindFilter, issuanceFilter, setIssuanceFilter, period, setPeriod, statusFilter, setStatusFilter, searchText, setSearchText, page, setPage, listQuery, invoices, hasActiveFilters, draftCount, issuedCount, totals, generateMutation, showInvoice, copyReminderMessage } = state;
+  const state = useInvoicesPage();
+  const { kindFilter, setKindFilter, setIssuanceFilter, period, setPeriod, statusFilter, setStatusFilter, searchText, setSearchText, page, setPage, listQuery, invoices, hasActiveFilters, generateMutation, showInvoice, copyReminderMessage } = state;
   const columns: TableProps<Invoice>['columns'] = [
     { title: t("PHÒNG / NGƯỜI THUÊ"), key: 'room', width: 220, render: (_, item) => <div className="room-name-cell"><div className="room-avatar room-avatar-invoice"><FileTextOutlined /></div><div><strong>{item.roomName}</strong><span>{item.tenantName || t("Người thuê")} · {item.buildingName || t("Dãy trọ")}</span></div></div> },
     { title: t("LOẠI HÓA ĐƠN"), key: 'kind', width: 140, render: (_, item) => <Tag className={`invoice-kind-tag invoice-kind-${item.kind.toLowerCase()}`}>{invoiceKindLabel(item.kind)}</Tag> },
@@ -123,15 +123,11 @@ const state = useInvoicesPage();
     <PageTitle eyebrow={t("THU TIỀN RÕ RÀNG")} title={t("Hóa đơn")} subtitle={t("Theo dõi tiền thuê, điện, nước và các khoản đã thu theo từng phòng.")} extra={(kindFilter === 'All' || kindFilter === 'Monthly') && period ? <Button title={t("Chỉ tạo hóa đơn còn thiếu; không phát hành các bản nháp.")} type="primary" icon={<PlusOutlined />} loading={generateMutation.isPending} onClick={() => generateMutation.mutate(period)}>{t("Tạo hóa đơn còn thiếu")}</Button> : undefined} />
     <ManualPaymentRequests />
     {listQuery.isError ? <LoadError error={listQuery.error} onRetry={() => void listQuery.refetch()} /> : listQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
-      <Row gutter={[12, 12]} className="invoice-totals-row"><Col xs={12} md={8}><div className="invoice-total-tile"><span>{t("Tổng giá trị hóa đơn")}</span><strong>{formatVnd(totals.billed)}</strong></div></Col><Col xs={12} md={8}><div className="invoice-total-tile invoice-total-paid"><span>{t("Đã ghi nhận trên hóa đơn")}</span><strong>{formatVnd(totals.paid)}</strong></div></Col><Col xs={24} md={8}><div className="invoice-total-tile invoice-total-due"><span>{t("Còn phải thu")}</span><strong>{formatVnd(totals.outstanding)}</strong></div></Col></Row>
-      <p className="invoice-summary-scope">{t("Ba số liệu tính từ {0} hóa đơn đã phát hành phù hợp bộ lọc. Tiền cọc không phải doanh thu.", [issuedCount])}{draftCount > 0 && <> · {t("{0} bản nháp chưa phát hành", [draftCount])}</>}</p>
       <SectionCard className="invoice-list-card" title={t("Hóa đơn")} extra={<div className="invoice-list-actions" data-filtered={hasActiveFilters}><span className="section-caption">{t("Kết quả bộ lọc: {0} hóa đơn", [listQuery.data?.total ?? 0])}</span>{hasActiveFilters && invoices.length > 0 && <Button type="text" onClick={clearFilters}>{t("Xóa lọc")}</Button>}</div>}>
         <div className="invoice-filter-toolbar">
-          <label className="invoice-filter"><span>{t("Loại hóa đơn")}</span><Select aria-label={t("Loại hóa đơn")} value={kindFilter} onChange={(value) => setKindFilter(value as InvoiceKindFilter)} options={[{ value: 'All', label: t("Tất cả loại hóa đơn") }, { value: 'Monthly', label: t("Hóa đơn tháng") }, { value: 'Deposit', label: t("Tiền cọc các lượt thuê") }, { value: 'Supplemental', label: t("Hóa đơn bổ sung") }]} /></label>
-          <label className="invoice-filter"><span>{t("Trạng thái phát hành")}</span><Select aria-label={t("Trạng thái phát hành")} value={issuanceFilter} onChange={(value) => setIssuanceFilter(value as IssuanceFilter)} options={[{ value: 'All', label: t("Tất cả trạng thái phát hành") }, { value: 'Issued', label: t("Đã phát hành") }, { value: 'Draft', label: t("Bản nháp") }]} /></label>
-          <label className="invoice-filter"><span>{t("Kỳ hóa đơn")}</span><DatePicker aria-label={t("Kỳ hóa đơn")} picker="month" value={period ? dayjs(`${period}-01`) : null} onChange={setMonth} format="MM/YYYY" maxDate={dayjs(`${currentPeriod()}-01`)} placeholder={t("Tất cả kỳ")} allowClear /></label>
-          <label className="invoice-filter"><span>{t("Trạng thái thanh toán")}</span><Select aria-label={t("Trạng thái thanh toán")} value={statusFilter} onChange={(value) => setStatusFilter(value as InvoiceStatusFilter)} options={[{ value: 'All', label: t("Tất cả trạng thái") }, { value: 'Unpaid', label: t("Chưa thanh toán") }, { value: 'Partial', label: t("Thanh toán một phần") }, { value: 'Paid', label: t("Đã thanh toán") }]} /></label>
           <label className="invoice-filter invoice-filter-search"><span>{t("Tìm hóa đơn")}</span><Input aria-label={t("Tìm hóa đơn")} prefix={<SearchOutlined />} value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={t("Phòng, dãy trọ hoặc người thuê")} allowClear /></label>
+          <label className="invoice-filter"><span>{t("Kỳ hóa đơn")}</span><DatePicker aria-label={t("Kỳ hóa đơn")} picker="month" value={period ? dayjs(`${period}-01`) : null} onChange={setMonth} format="MM/YYYY" maxDate={dayjs(`${currentPeriod()}-01`)} placeholder={t("Tất cả kỳ")} allowClear /></label>
+          <label className="invoice-filter"><span>{t("Trạng thái thanh toán")}</span><Select aria-label={t("Trạng thái thanh toán")} value={statusFilter} onChange={(value) => setStatusFilter(value as InvoiceStatusFilter)} options={[{ value: 'All', label: t("Tất cả trạng thái") }, { value: 'Unpaid', label: t("Chưa thanh toán") }, { value: 'Paid', label: t("Đã thanh toán") }]} /></label>
         </div>
         {invoices.length ? <ResponsiveTable className="invoice-table" rowKey="id" columns={columns} dataSource={invoices} renderCompact={renderCompactInvoice} pagination={{ current:page, total:listQuery.data?.total ?? 0, onChange:setPage, pageSize:10, showSizeChanger:false, hideOnSinglePage:true }} scroll={{ x: 980 }} /> : hasActiveFilters ? <EmptyPanel title={t("Không có hóa đơn khớp bộ lọc")} description={t("Hãy đổi bộ lọc hoặc từ khóa để xem hóa đơn.")} action={<Button onClick={clearFilters}>{t("Xóa lọc")}</Button>} /> : <EmptyPanel title={t("Chưa có hóa đơn")} description={t("Hóa đơn sẽ xuất hiện sau khi bạn ghi nhận tiền cọc, tạo khoản bổ sung hoặc chốt chỉ số điện.")} />}
       </SectionCard>

@@ -59,6 +59,9 @@
 .room-editor .link-info { padding: 0; text-align: left; }
 .room-editor .link-info-icon { display: none; }
 .room-editor .link-info > .ant-btn { margin-top: 16px; }
+.room-link-copy-row { display: flex; align-items: stretch; gap: 8px; }
+.room-link-copy-row > .ant-input { flex: 1 1 auto; min-width: 0; }
+.room-link-copy-row > .ant-btn { flex: 0 0 auto; font-weight: 600; }
 .room-link-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .room-link-footer > .ant-btn-dangerous { margin-right: auto; color: var(--room-danger); background: #fcf0f1; }
 .room-editor .ant-btn-dangerous { background: #fcf0f1; color: var(--room-danger); border-color: transparent; }

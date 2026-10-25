@@ -9,7 +9,7 @@
 .invoice-summary-scope { margin: -7px 0 18px; color: #5c7178; font-size: 13px; line-height: 1.55; }
 .invoice-list-card .section-card-header { margin-bottom: 10px; }
 .invoice-list-actions { display: flex; align-items: center; gap: 8px; }
-.invoice-filter-toolbar { display: grid; grid-template-columns: 1.15fr .85fr 1fr 1.35fr; gap: 12px; padding: 2px 0 16px; margin-bottom: 15px; border-bottom: 1px solid #edf1f0; }
+.invoice-filter-toolbar { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; padding: 2px 0 16px; margin-bottom: 15px; border-bottom: 1px solid #edf1f0; }
 .invoice-filter { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .invoice-filter > span { color: #52666b; font-size: 12px; font-weight: 600; }
 .invoice-filter > .ant-select, .invoice-filter > .ant-picker, .invoice-filter > .ant-input-affix-wrapper { width: 100%; min-width: 0; }

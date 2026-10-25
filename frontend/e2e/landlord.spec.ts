@@ -441,7 +441,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
 
     // Verify QR code and copy button
     await expect(linkModal.locator('.ant-qrcode')).toHaveCount(0);
-    await expect(linkModal.getByRole('button', { name: 'Sao chép liên kết' })).toBeVisible();
+    await expect(linkModal.getByRole('button', { name: 'Sao chép' })).toBeVisible();
 
     // 4. Test link rotation
     await linkModal.getByRole('button', { name: 'Thu hồi & tạo link mới' }).click();

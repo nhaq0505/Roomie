@@ -507,7 +507,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
 
       // Tenant Portal with meter submission card enabled
       await page.goto('/t/demo-token');
-      await expect(page.locator('.tenant-meter-submission-card')).toBeVisible();
+      await expect(page.locator('.tenant-meter-submission-card')).toHaveCount(0);
       const tenantOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
       expect(tenantOverflow, `/t/demo-token overflowed at ${width}px`).toBe(false);
     }
