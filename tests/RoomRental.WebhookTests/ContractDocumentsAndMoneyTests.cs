@@ -87,8 +87,12 @@ internal static class ContractDocumentsAndMoneyTests
         Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("0123456789", "CCCD") == "0123456789", "10-digit ID accepted");
         Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("01234567890", "CCCD") == "01234567890", "11-digit ID accepted");
         Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("  079098001234  ", "CCCD") == "079098001234", "12-digit CCCD trimmed and accepted");
+        Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("C12345678", "Passport") == "C12345678", "international Passport C12345678 accepted");
+        Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("  pa1234567  ", "Passport") == "PA1234567", "lowercase Passport pa1234567 trimmed, uppercased, and accepted");
+        Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("M87654321", "Passport") == "M87654321", "Korean Passport M87654321 accepted");
+        Assert(OwnerManagementEndpoints.ValidateAndCleanCitizenId("TK7654321", "Passport") == "TK7654321", "Japanese Passport TK7654321 accepted");
 
-        foreach (var invalidId in new[] { "12345678", "0123456789012", "07909800123A", "079 098 0012", "079-098-0012", new string('1', 21) })
+        foreach (var invalidId in new[] { "12345678", "0123456789012", "07909800123A", "A123", "A123456789012", "079 098 0012", "079-098-0012", new string('1', 21) })
         {
             ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndCleanCitizenId(invalidId, "CCCD"),
                 $"CitizenId rejects invalid input '{invalidId}'");
@@ -363,7 +367,7 @@ internal static class ContractDocumentsAndMoneyTests
             new UpdateOccupancyDocumentRequest(occ.Id, OwnerCitizenId: "12345"), owner, building, occ),
             "ValidateAndApplyDocumentUpdates rejects invalid OwnerCitizenId");
         ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(
-            new UpdateOccupancyDocumentRequest(occ.Id, TenantCitizenId: "ABC123456"), owner, building, occ),
+            new UpdateOccupancyDocumentRequest(occ.Id, TenantCitizenId: "07909800123A"), owner, building, occ),
             "ValidateAndApplyDocumentUpdates rejects invalid TenantCitizenId");
         ExpectBadRequest(() => OwnerManagementEndpoints.ValidateAndApplyDocumentUpdates(
             new UpdateOccupancyDocumentRequest(occ.Id, OwnerName: new string('O', 161)), owner, building, occ),

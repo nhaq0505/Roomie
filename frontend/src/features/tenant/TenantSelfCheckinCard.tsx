@@ -1,5 +1,5 @@
-import { CameraOutlined, CheckCircleFilled, DeleteOutlined, IdcardOutlined, UserAddOutlined } from '@ant-design/icons';
-import { Alert, App, Button, Card, Input, Space, Tag, Typography } from 'antd';
+import { CameraOutlined, CheckCircleFilled, DeleteOutlined, EditOutlined, IdcardOutlined, SaveOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Alert, App, Button, Card, Input, Select, Space, Tag, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate, t } from '../../shared/i18n/runtime';
 import { decodeCccdQrFromImageBlob } from '../../shared/ui/cccdQr';
@@ -25,10 +25,37 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
   const [qrError, setQrError] = useState<string | null>(null);
   const [lastSavedSummary, setLastSavedSummary] = useState<string | null>(null);
 
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualTarget, setManualTarget] = useState<'tenant' | 'coResident'>('tenant');
+  const [manualFullName, setManualFullName] = useState(occupancy.tenantName ?? '');
+  const [manualCitizenId, setManualCitizenId] = useState(occupancy.tenantCitizenId ?? '');
+  const [manualDateOfBirth, setManualDateOfBirth] = useState(occupancy.tenantDateOfBirth ?? '');
+  const [manualGender, setManualGender] = useState(occupancy.tenantGender ?? 'Nam');
+  const [manualPermanentAddress, setManualPermanentAddress] = useState(occupancy.tenantPermanentAddress ?? '');
+  const [savingManual, setSavingManual] = useState(false);
+
   useEffect(() => {
     setPhone(occupancy.phone ?? '');
     setEmail(occupancy.tenantEmail ?? '');
   }, [occupancy.phone, occupancy.tenantEmail]);
+
+  const openManualEditor = (target: 'tenant' | 'coResident') => {
+    setManualTarget(target);
+    if (target === 'tenant') {
+      setManualFullName(occupancy.tenantName ?? '');
+      setManualCitizenId(occupancy.tenantCitizenId ?? '');
+      setManualDateOfBirth(occupancy.tenantDateOfBirth ?? '');
+      setManualGender(occupancy.tenantGender ?? 'Nam');
+      setManualPermanentAddress(occupancy.tenantPermanentAddress ?? '');
+    } else {
+      setManualFullName('');
+      setManualCitizenId('');
+      setManualDateOfBirth('');
+      setManualGender('Nam');
+      setManualPermanentAddress('');
+    }
+    setShowManualForm(true);
+  };
 
   const handleFileChange = async (target: 'tenant' | 'coResident', file: File | undefined, inputEl: HTMLInputElement | null) => {
     if (inputEl) inputEl.value = '';
@@ -39,12 +66,28 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
     setBusyTarget(target);
 
     try {
+      let photoUploaded = false;
+      if (file.size <= 2 * 1024 * 1024) {
+        try {
+          await tenantApi.uploadIdentityPhoto(token, file, target === 'tenant' ? 'tenant' : 'coResident');
+          photoUploaded = true;
+        } catch {
+          // Ignore upload error if photo endpoint fails so QR/MRZ decoding still proceeds
+        }
+      }
+
       const parsed = await decodeCccdQrFromImageBlob(file);
       if (!parsed) {
-        setQrError(t("Không tìm thấy mã QR CCCD hợp lệ trong ảnh. Hãy chọn ảnh chụp rõ góc trên bên phải mặt trước CCCD."));
+        openManualEditor(target);
+        setQrError(
+          photoUploaded
+            ? `${''}Đã lưu ảnh giấy tờ cho chủ trọ. Không tự nhận diện được mã QR CCCD hoặc dòng MRZ Hộ chiếu trong ảnh, vui lòng kiểm tra / điền thông tin bên dưới.`
+            : t("Không tìm thấy mã QR CCCD hợp lệ trong ảnh. Hãy chọn ảnh chụp rõ góc trên bên phải mặt trước CCCD."),
+        );
         return;
       }
 
+      const isPassport = parsed.documentType === 'Passport';
       await tenantApi.selfCheckin(token, {
         target,
         fullName: parsed.fullName,
@@ -52,13 +95,14 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
         dateOfBirth: parsed.dateOfBirth,
         gender: parsed.gender,
         citizenIdIssuedDate: parsed.issuedDate,
-        citizenIdIssuedPlace: t("Cục Cảnh sát QLHC về TTXH"),
+        citizenIdIssuedPlace: isPassport ? `${''}Cục Quản lý xuất nhập cảnh` : t("Cục Cảnh sát QLHC về TTXH"),
         permanentAddress: parsed.permanentAddress,
         phone: target === 'tenant' ? (phone.trim() || null) : null,
         email: target === 'tenant' ? (email.trim() || null) : null,
         relation: target === 'coResident' ? (relation.trim() || t("Người thuê trọ")) : null,
       });
 
+      setShowManualForm(false);
       await onUpdated();
       const summary = `${parsed.fullName} (${parsed.citizenId})`;
       setLastSavedSummary(summary);
@@ -68,6 +112,45 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
       setQrError(errMsg);
     } finally {
       setBusyTarget(null);
+    }
+  };
+
+  const handleSaveManual = async () => {
+    const trimmedName = manualFullName.trim();
+    const trimmedId = manualCitizenId.trim().toUpperCase();
+    if (!trimmedName || !trimmedId) {
+      setQrError(`${''}Vui lòng nhập đầy đủ Họ tên và Số CCCD / Hộ chiếu.`);
+      return;
+    }
+
+    const isLikelyPassport = /^[A-Z]/.test(trimmedId);
+    setSavingManual(true);
+    setQrError(null);
+    try {
+      await tenantApi.selfCheckin(token, {
+        target: manualTarget,
+        fullName: trimmedName,
+        citizenId: trimmedId,
+        dateOfBirth: manualDateOfBirth.trim() || null,
+        gender: manualGender.trim() || null,
+        citizenIdIssuedDate: null,
+        citizenIdIssuedPlace: isLikelyPassport ? `${''}Cục Quản lý xuất nhập cảnh` : t("Cục Cảnh sát QLHC về TTXH"),
+        permanentAddress: manualPermanentAddress.trim() || null,
+        phone: manualTarget === 'tenant' ? (phone.trim() || null) : null,
+        email: manualTarget === 'tenant' ? (email.trim() || null) : null,
+        relation: manualTarget === 'coResident' ? (relation.trim() || t("Người thuê trọ")) : null,
+      });
+
+      setShowManualForm(false);
+      await onUpdated();
+      const summary = `${trimmedName} (${trimmedId})`;
+      setLastSavedSummary(summary);
+      message.success(t("Đã điền thông tin CCCD của {0}.", [trimmedName]));
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : t("Không thể đọc file ảnh đã chọn. Vui lòng thử ảnh khác.");
+      setQrError(errMsg);
+    } finally {
+      setSavingManual(false);
     }
   };
 
@@ -96,12 +179,12 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
           <Space size={8} align="center">
             <IdcardOutlined style={{ fontSize: 18, color: '#0f766e' }} />
             <Typography.Title level={4} style={{ margin: 0 }}>
-              {`${''}Khai báo thông tin CCCD & Cư trú`}
+              {`${''}Khai báo thông tin CCCD / Hộ chiếu & Cư trú`}
             </Typography.Title>
           </Space>
           <div style={{ marginTop: 4 }}>
             <Typography.Text type="secondary">
-              {`${''}Chụp hoặc tải ảnh mặt trước thẻ CCCD rõ nét để hệ thống tự động nhận diện và điền thông tin hợp đồng.`}
+              {`${''}Chụp hoặc tải ảnh mặt trước thẻ CCCD hoặc trang thông tin Hộ chiếu (Passport) rõ nét để hệ thống tự động nhận diện và lưu cho chủ trọ.`}
             </Typography.Text>
           </div>
         </div>
@@ -149,7 +232,7 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
               </div>
             )}
           </div>
-          <div>
+          <Space wrap>
             <input
               ref={tenantInputRef}
               type="file"
@@ -167,7 +250,13 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
             >
               {t("Quét / Tải ảnh CCCD")}
             </Button>
-          </div>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => openManualEditor('tenant')}
+            >
+              {`${''}Nhập / Sửa thủ công (Hộ chiếu / CCCD)`}
+            </Button>
+          </Space>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, marginTop: 10 }}>
@@ -184,6 +273,83 @@ export default function TenantSelfCheckinCard({ token, occupancy, onUpdated }: T
             maxLength={320}
           />
         </div>
+
+        {showManualForm && (
+          <div
+            data-testid="tenant-manual-checkin-form"
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 8,
+              background: '#ffffff',
+              border: '1px solid rgba(15, 118, 110, 0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+              <Typography.Text strong>
+                {manualTarget === 'tenant'
+                  ? `${''}Thông tin Hộ chiếu / CCCD (Người thuê chính)`
+                  : `${''}Thông tin Hộ chiếu / CCCD (Thành viên ở cùng)`}
+              </Typography.Text>
+              <Button size="small" type="text" onClick={() => setShowManualForm(false)}>
+                {t("Đóng")}
+              </Button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+              <Input
+                value={manualFullName}
+                onChange={(e) => setManualFullName(e.target.value)}
+                placeholder={t("Tên người thuê")}
+                aria-label={t("Tên người thuê")}
+                maxLength={200}
+              />
+              <Input
+                value={manualCitizenId}
+                onChange={(e) => setManualCitizenId(e.target.value)}
+                placeholder={`${''}Số CCCD / Hộ chiếu`}
+                aria-label={`${''}Số CCCD / Hộ chiếu`}
+                maxLength={50}
+              />
+              <Input
+                type="date"
+                value={manualDateOfBirth}
+                onChange={(e) => setManualDateOfBirth(e.target.value)}
+                placeholder={t("Ngày sinh")}
+                aria-label={t("Ngày sinh")}
+              />
+              <Select
+                value={manualGender || 'Nam'}
+                onChange={(val) => setManualGender(val)}
+                options={[
+                  { value: 'Nam', label: 'Nam' },
+                  { value: `${''}Nữ`, label: `${''}Nữ` },
+                ]}
+              />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <Input
+                value={manualPermanentAddress}
+                onChange={(e) => setManualPermanentAddress(e.target.value)}
+                placeholder={`${''}Địa chỉ thường trú / Quốc tịch`}
+                aria-label={`${''}Địa chỉ thường trú / Quốc tịch`}
+                maxLength={500}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+              <Button onClick={() => setShowManualForm(false)}>
+                {t("Hủy")}
+              </Button>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                loading={savingManual}
+                onClick={() => void handleSaveManual()}
+              >
+                {t("Lưu thay đổi")}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ borderTop: '1px solid rgba(15, 23, 42, 0.08)', paddingTop: 12 }}>

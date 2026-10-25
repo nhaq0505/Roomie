@@ -56,7 +56,9 @@ public sealed record OccupancyDocumentDto(
     string? AdditionalTerms,
     string HouseholdHeadRelation,
     IReadOnlyList<CoResidentDto> CoResidents,
-    DateTimeOffset? TenantSelfCheckinAt = null);
+    DateTimeOffset? TenantSelfCheckinAt = null,
+    bool HasTenantIdentityPhoto = false,
+    string? TenantIdentityPhotoFileName = null);
 
 public sealed record UpdateOccupancyDocumentRequest(
     Guid OccupancyId,

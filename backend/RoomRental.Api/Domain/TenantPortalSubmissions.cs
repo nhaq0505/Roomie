@@ -62,3 +62,26 @@ public sealed record TenantMeterSubmissionDto(
 public sealed record ApproveMeterSubmissionRequest(decimal? CurrentReading = null);
 
 public sealed record RejectMeterSubmissionRequest(string? Reason = null);
+
+public sealed class TenantIdentityDocument
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid OwnerId { get; set; }
+    public Guid BuildingId { get; set; }
+    public Guid RoomId { get; set; }
+    public Guid OccupancyId { get; set; }
+    public string TargetKey { get; set; } = "tenant";
+    public string PhotoFileName { get; set; } = "";
+    public string PhotoContentType { get; set; } = "";
+    public long PhotoSizeBytes { get; set; }
+    public string PhotoSha256 { get; set; } = "";
+    public byte[] PhotoContent { get; set; } = [];
+    public DateTimeOffset UploadedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public sealed record TenantIdentityPhotoDto(
+    string TargetKey,
+    string PhotoFileName,
+    string PhotoContentType,
+    long PhotoSizeBytes,
+    DateTimeOffset UploadedAt);

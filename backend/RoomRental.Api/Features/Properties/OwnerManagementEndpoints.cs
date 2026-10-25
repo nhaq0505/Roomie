@@ -66,11 +66,18 @@ public static partial class OwnerManagementEndpoints
             : await db.Invoices.Include(x => x.DepositSettlements).AsNoTracking()
                 .SingleOrDefaultAsync(x => x.OccupancyId == occupancy.Id && x.Kind == "Deposit", cancellationToken);
         var canShareTenantLink = occupancy is not null && await tokenService.CanShareAsync(building.OwnerId, webhookService, cancellationToken);
-        return BuildRoomDto(tokenService, room, building, occupancy, period, readings, maxFinal, deposit, canShareTenantLink, maxReading);
+        var tenantIdentityPhotoFileName = occupancy is null
+            ? null
+            : await db.TenantIdentityDocuments.AsNoTracking()
+                .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == "tenant")
+                .Select(x => x.PhotoFileName)
+                .FirstOrDefaultAsync(cancellationToken);
+        return BuildRoomDto(tokenService, room, building, occupancy, period, readings, maxFinal, deposit, canShareTenantLink, maxReading, tenantIdentityPhotoFileName);
     }
 
     internal static RoomDto BuildRoomDto(TenantTokenService tokenService, Room room, Building building, Occupancy? occupancy, string period,
-        IReadOnlyList<MonthlyReading> readings, decimal maxFinalReading, Invoice? deposit, bool canShareTenantLink, decimal? maxPhysicalReading = null)
+        IReadOnlyList<MonthlyReading> readings, decimal maxFinalReading, Invoice? deposit, bool canShareTenantLink, decimal? maxPhysicalReading = null,
+        string? tenantIdentityPhotoFileName = null)
     {
         // The physical room can have one reading per occupancy in the same month.
         // Prefer the active occupancy's reading for the room's current-reading field;
@@ -118,7 +125,9 @@ public static partial class OwnerManagementEndpoints
                 occupancy.HandoverAssets,
                 occupancy.AdditionalTerms,
                 occupancy.HouseholdHeadRelation,
-                occupancy.TenantSelfCheckinAt);
+                occupancy.TenantSelfCheckinAt,
+                !string.IsNullOrEmpty(tenantIdentityPhotoFileName),
+                tenantIdentityPhotoFileName);
         }
         return new RoomDto(room.Id, room.BuildingId, building.Name, room.Name, room.Rent, room.ElectricityRate, room.WaterFee,
             room.WaterPerPerson, room.ServiceFee, room.InitialReading, previousReading, occupancyDto);

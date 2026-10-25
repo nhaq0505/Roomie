@@ -28,7 +28,7 @@ vm.runInNewContext(bundled.outputFiles[0].text, {
   Object,
 });
 
-const { parseCccdQr, parseCccdDate, normalizeCccdGender } = module.exports;
+const { parseCccdQr, parsePassportMrz, computeMrzCheckDigit, parseCccdDate, normalizeCccdGender } = module.exports;
 
 // 1. Standard 7-field CCCD with old 9-digit CMND
 {
@@ -143,6 +143,58 @@ const { parseCccdQr, parseCccdDate, normalizeCccdGender } = module.exports;
   assert.equal(parseCccdQr('079098001234|p1|p2|p3|p4'), null, '5 fields without valid DOB rejected');
   assert.equal(parseCccdQr('079098001234|025123456||15081995|Nam|Địa chỉ|20052021'), null, 'Missing fullName in 7-field rejected');
   assert.equal(parseCccdQr('079098001234|   |15081995|Nam|Địa chỉ|20052021'), null, 'Blank fullName in 6-field rejected');
+
+  // 7b. ICAO 9303 TD3 (2x44) Passport MRZ parsing & check-digit verification
+  assert.equal(computeMrzCheckDigit('M87654321'), '4');
+  assert.equal(computeMrzCheckDigit('950815'), '2');
+  assert.equal(computeMrzCheckDigit('320814'), '0');
+  assert.equal(computeMrzCheckDigit('C12345678'), '8');
+  assert.equal(computeMrzCheckDigit('TK7654321<<'), '9');
+
+  const korLine1 = 'P<KORKIM<<MIN<JUN<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+  const korLine2 = 'M876543214KOR9508152M32081401234567<<<<<<<00';
+  const korParsed = parsePassportMrz(`${korLine1}\n${korLine2}`);
+  assert.ok(korParsed, 'Should parse valid Korean TD3 Passport MRZ');
+  assert.equal(korParsed.documentType, 'Passport');
+  assert.equal(korParsed.citizenId, 'M87654321');
+  assert.equal(korParsed.fullName, 'KIM MIN JUN');
+  assert.equal(korParsed.dateOfBirth, '1995-08-15');
+  assert.equal(korParsed.gender, 'Nam');
+  assert.equal(korParsed.nationality, 'Hàn Quốc (KOR)');
+  assert.equal(korParsed.permanentAddress, 'Quốc tịch: Hàn Quốc (KOR)');
+  assert.equal(korParsed.issuedDate, null);
+
+  const usaLine1 = 'P<USASMITH<<EMILY<ROSE<<<<<<<<<<<<<<<<<<<<<<';
+  const usaLine2 = 'C123456788USA9812242F3112238<<<<<<<<<<<<<<00';
+  const usaParsed = parseCccdQr(`${usaLine1}${usaLine2}`);
+  assert.ok(usaParsed, 'parseCccdQr should fall back to parsePassportMrz for 88-char US MRZ');
+  assert.equal(usaParsed.documentType, 'Passport');
+  assert.equal(usaParsed.citizenId, 'C12345678');
+  assert.equal(usaParsed.fullName, 'SMITH EMILY ROSE');
+  assert.equal(usaParsed.dateOfBirth, '1998-12-24');
+  assert.equal(usaParsed.gender, 'Nữ');
+  assert.equal(usaParsed.nationality, 'Hoa Kỳ (USA)');
+  assert.equal(usaParsed.permanentAddress, 'Quốc tịch: Hoa Kỳ (USA)');
+
+  const jpnLine1 = 'P<JPNTANAKA<<KENJI<<<<<<<<<<<<<<<<<<<<<<<<<<';
+  const jpnLine2 = 'TK76543219JPN0105101M3005109<<<<<<<<<<<<<<00';
+  const jpnParsed = parseCccdQr(`${jpnLine1}\r\n${jpnLine2}`);
+  assert.ok(jpnParsed, 'parseCccdQr should parse Japanese Passport MRZ with 2-letter prefix TK7654321');
+  assert.equal(jpnParsed.citizenId, 'TK7654321');
+  assert.equal(jpnParsed.fullName, 'TANAKA KENJI');
+  assert.equal(jpnParsed.dateOfBirth, '2001-05-10');
+  assert.equal(jpnParsed.gender, 'Nam');
+  assert.equal(jpnParsed.nationality, 'Nhật Bản (JPN)');
+  assert.equal(jpnParsed.permanentAddress, 'Quốc tịch: Nhật Bản (JPN)');
+
+  const badPassportCheck = 'M876543215KOR9508152M32081401234567<<<<<<<00';
+  assert.equal(parsePassportMrz(`${korLine1}\n${badPassportCheck}`), null, 'Tampered passport check digit rejected');
+
+  const badDobCheck = 'M876543214KOR9508159M32081401234567<<<<<<<00';
+  assert.equal(parsePassportMrz(`${korLine1}\n${badDobCheck}`), null, 'Tampered DOB check digit rejected');
+
+  const badExpiryCheck = 'M876543214KOR9508152M32081491234567<<<<<<<00';
+  assert.equal(parsePassportMrz(`${korLine1}\n${badExpiryCheck}`), null, 'Tampered expiry check digit rejected');
 }
 
 // 8. SEO metadataFor contract across 4 public pages and private/guest routes

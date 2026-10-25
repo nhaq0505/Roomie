@@ -58,6 +58,7 @@ public class AppDbContext : DbContext
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<ExpenseAttachment> ExpenseAttachments => Set<ExpenseAttachment>();
     public DbSet<TenantMeterSubmission> TenantMeterSubmissions => Set<TenantMeterSubmission>();
+    public DbSet<TenantIdentityDocument> TenantIdentityDocuments => Set<TenantIdentityDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -592,6 +593,18 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsConcurrencyToken();
             entity.Property(x => x.PhotoFileName).HasMaxLength(120).IsRequired();
             entity.Property(x => x.PhotoContentType).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PhotoSha256).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PhotoContent).IsRequired();
+        });
+
+        modelBuilder.Entity<TenantIdentityDocument>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.OccupancyId, x.TargetKey }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.OccupancyId });
+            entity.Property(x => x.TargetKey).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.PhotoFileName).HasMaxLength(260).IsRequired();
+            entity.Property(x => x.PhotoContentType).HasMaxLength(80).IsRequired();
             entity.Property(x => x.PhotoSha256).HasMaxLength(64).IsRequired();
             entity.Property(x => x.PhotoContent).IsRequired();
         });

@@ -11,7 +11,6 @@ import RoomieMark from '../../shared/ui/RoomieMark';
 import { type Invoice } from '../invoices/index';
 import { tenantApi } from './index';
 import TenantMeterSubmissionCard from './TenantMeterSubmissionCard';
-import TenantSelfCheckinCard from './TenantSelfCheckinCard';
 
 function statusLabel(status: string) {
   if (status === 'Paid') return t("Đã thanh toán");
@@ -113,13 +112,6 @@ function TenantPageContent({ token }: { token: string }) {
           currentPeriodHasReading={overview.currentPeriodHasReading}
           meterSubmission={overview.meterSubmission}
           onSubmitted={() => query.refetch()}
-        />
-      )}
-      {overview?.occupancy && (
-        <TenantSelfCheckinCard
-          token={token}
-          occupancy={overview.occupancy}
-          onUpdated={() => query.refetch()}
         />
       )}
       <div className="tenant-section-heading"><div><Typography.Title level={4}>{t("Hóa đơn của bạn")}</Typography.Title><span>{t("Tiền cọc, hóa đơn tháng và khoản thu bổ sung được theo dõi riêng.")}</span></div><span className="tenant-count">{overview?.total ?? 0}  {t("hóa đơn")}</span></div>

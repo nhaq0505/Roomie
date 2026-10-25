@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Net.Http.Headers;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 using RoomRental.Api.Services;
@@ -64,6 +65,29 @@ public static partial class OwnerManagementEndpoints
             var fileName = $"to-khai-ct01-{safeRoom}-{today:yyyyMMdd}.docx";
             return Results.File(bytes, DocxContentType, fileName);
         });
+
+        routes.MapGet("/rooms/{id:guid}/documents/identity-photo", async (Guid id, HttpContext context, AppDbContext db, CancellationToken ct, string? target = "tenant", bool download = false) =>
+        {
+            var ownerId = ApiSupport.OwnerId(context);
+            _ = await PropertyLookup.FindRoomAsync(db, ownerId, id, ct);
+            var occupancy = await db.Occupancies.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.RoomId == id && x.IsActive, ct)
+                ?? throw new ApiException(StatusCodes.Status409Conflict, "Phòng chưa có người thuê đang ở.");
+            var targetKey = PaymentEndpoints.NormalizeIdentityTargetKey(target);
+            var row = await db.TenantIdentityDocuments.AsNoTracking()
+                .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == targetKey)
+                .Select(x => new { x.PhotoFileName, x.PhotoContentType, x.PhotoContent })
+                .SingleOrDefaultAsync(ct)
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy ảnh chụp CCCD/Hộ chiếu.");
+
+            var disposition = new ContentDispositionHeaderValue(download ? "attachment" : "inline");
+            disposition.SetHttpFileName(row.PhotoFileName);
+            context.Response.Headers.ContentDisposition = disposition.ToString();
+            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox";
+            return Results.Bytes(row.PhotoContent, row.PhotoContentType);
+        });
     }
 
     private static async Task<OccupancyDocumentDto> LoadOccupancyDocumentDtoAsync(AppDbContext db, Guid ownerId, Guid roomId, CancellationToken ct)
@@ -86,6 +110,10 @@ public static partial class OwnerManagementEndpoints
     {
         var depositInvoice = await db.Invoices.AsNoTracking()
             .SingleOrDefaultAsync(x => x.OccupancyId == occupancy.Id && x.Kind == "Deposit", ct);
+        var tenantIdentityPhotoFileName = await db.TenantIdentityDocuments.AsNoTracking()
+            .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == "tenant")
+            .Select(x => x.PhotoFileName)
+            .FirstOrDefaultAsync(ct);
         var depositRequired = depositInvoice?.Total ?? 0m;
         var depositPaid = depositInvoice?.Paid ?? 0m;
 
@@ -161,7 +189,9 @@ public static partial class OwnerManagementEndpoints
             AdditionalTerms: occupancy.AdditionalTerms,
             HouseholdHeadRelation: householdRelation,
             CoResidents: coResidents,
-            TenantSelfCheckinAt: occupancy.TenantSelfCheckinAt);
+            TenantSelfCheckinAt: occupancy.TenantSelfCheckinAt,
+            HasTenantIdentityPhoto: !string.IsNullOrEmpty(tenantIdentityPhotoFileName),
+            TenantIdentityPhotoFileName: tenantIdentityPhotoFileName);
     }
 
     internal static void ValidateAndApplyOwnerProfileUpdates(
@@ -277,8 +307,12 @@ public static partial class OwnerManagementEndpoints
     internal static string? ValidateAndCleanCitizenId(string? value, string fieldLabel)
     {
         var cleaned = CleanOptional(value, 20, fieldLabel);
-        if (cleaned is not null && !Regex.IsMatch(cleaned, "^[0-9]{9,12}$"))
-            throw new ApiException(StatusCodes.Status400BadRequest, $"{fieldLabel} phải gồm từ 9 đến 12 chữ số.");
+        if (cleaned is not null)
+        {
+            cleaned = cleaned.ToUpperInvariant();
+            if (!Regex.IsMatch(cleaned, "^([0-9]{9,12}|[A-Z]{1,3}[A-Z0-9]{5,9})$"))
+                throw new ApiException(StatusCodes.Status400BadRequest, $"{fieldLabel} phải gồm từ 9 đến 12 chữ số (CCCD/CMND) hoặc 6 đến 12 ký tự Hộ chiếu hợp lệ.");
+        }
         return cleaned;
     }
 

@@ -19,4 +19,5 @@ export const roomsApi = {
     saveDocuments: (id: string, body: UpdateOccupancyDocumentRequest) => request<OccupancyDocumentData>(`/api/rooms/${encodeURIComponent(id)}/documents`, { method: 'PUT', body: json(body) }),
     downloadContractDocx: (id: string) => requestBlob(`/api/rooms/${encodeURIComponent(id)}/documents/contract.docx`, docxMime),
     downloadCt01Docx: (id: string) => requestBlob(`/api/rooms/${encodeURIComponent(id)}/documents/ct01.docx`, docxMime),
+    getIdentityPhotoUrl: (roomId: string, target = 'tenant', download = false) => `/api/rooms/${encodeURIComponent(roomId)}/documents/identity-photo?target=${encodeURIComponent(target)}${download ? '&download=true' : ''}`,
   };

@@ -1,72 +1,25 @@
-import { ArrowLeftOutlined, DeleteOutlined, FileTextOutlined, PlusOutlined, QrcodeOutlined, UserAddOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Col, ConfigProvider, DatePicker, Form, Grid, Input, InputNumber, Row, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Col, ConfigProvider, DatePicker, Form, Grid, Input, InputNumber, Row, Space, Spin, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
-import { legalCt01Template } from '../../shared/i18n/legalTemplates';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import MoneyInput from '../../shared/ui/MoneyInput';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
-import CccdQrScannerModal from './CccdQrScannerModal';
-import type { ParsedCccdQr } from './cccdQr';
 import './RoomsPage.css';
 import { roomsApi } from './api';
 import { roomTheme } from './theme';
-import type { CoResident, Room } from './types';
-
-type QrScanTarget =
-  | { kind: 'tenant' }
-  | { kind: 'coResident-add' }
-  | { kind: 'coResident-row'; index: number }
-  | null;
-
-interface CoResidentFormItem {
-  fullName?: string;
-  citizenId?: string;
-  gender?: string;
-  dateOfBirth?: dayjs.Dayjs | null;
-  relation?: string;
-}
+import type { Room } from './types';
 
 interface TenantFormValues {
   tenantName: string;
   phone?: string;
-  tenantCitizenId?: string;
-  tenantDateOfBirth?: dayjs.Dayjs | null;
-  tenantGender?: string;
-  tenantCitizenIdIssuedDate?: dayjs.Dayjs | null;
-  tenantCitizenIdIssuedPlace?: string;
-  tenantPermanentAddress?: string;
-  tenantEmail?: string;
-  householdHeadRelation?: string;
   people: number;
   startDate?: dayjs.Dayjs;
-  contractEndDate?: dayjs.Dayjs | null;
-  paymentDueDay?: number;
-  roomAreaSqm?: number | null;
-  handoverAssets?: string;
-  additionalTerms?: string;
   initialReading?: number;
   depositAmount?: number;
-  coResidents?: CoResidentFormItem[];
-}
-
-function formatDayjsDate(val?: dayjs.Dayjs | null): string | null {
-  return val && dayjs.isDayjs(val) ? val.format('YYYY-MM-DD') : null;
-}
-
-function normalizeCoResidents(raw?: CoResidentFormItem[]): CoResident[] {
-  return (raw ?? [])
-    .filter((item) => item && item.fullName && item.fullName.trim().length > 0)
-    .map((item) => ({
-      fullName: item.fullName!.trim(),
-      citizenId: item.citizenId?.trim() || null,
-      gender: item.gender || null,
-      dateOfBirth: formatDayjsDate(item.dateOfBirth),
-      relation: item.relation?.trim() || null,
-    }));
 }
 
 export default function RoomTenantPage() {
@@ -86,12 +39,11 @@ function RoomTenantWorkspace() {
   const { message } = App.useApp();
   const client = useQueryClient();
   const [form] = Form.useForm<TenantFormValues>();
-  const watchedCoResidents = Form.useWatch('coResidents', form);
-  const totalPeople = 1 + (watchedCoResidents?.length ?? 0);
+  const watchedPeople = Form.useWatch('people', form);
+  const totalPeople = Math.max(1, Number(watchedPeople || 1));
   const openContractAfterSaveRef = useRef(false);
   const initializedOccupancyKeyRef = useRef<string | null>(null);
   const serverOccupancySignatureRef = useRef<string | null>(null);
-  const [qrTarget, setQrTarget] = useState<QrScanTarget>(null);
 
   const roomsQuery = useQuery({
     queryKey: ['rooms', 'archive-view'],
@@ -121,27 +73,7 @@ function RoomTenantWorkspace() {
       form.setFieldsValue({
         tenantName: room.occupancy.tenantName,
         phone: room.occupancy.phone ?? '',
-        tenantCitizenId: room.occupancy.tenantCitizenId ?? '',
-        tenantDateOfBirth: room.occupancy.tenantDateOfBirth ? dayjs(room.occupancy.tenantDateOfBirth) : null,
-        tenantGender: room.occupancy.tenantGender ?? undefined,
-        tenantCitizenIdIssuedDate: room.occupancy.tenantCitizenIdIssuedDate ? dayjs(room.occupancy.tenantCitizenIdIssuedDate) : null,
-        tenantCitizenIdIssuedPlace: room.occupancy.tenantCitizenIdIssuedPlace ?? t("Cục Cảnh sát QLHC về TTXH"),
-        tenantPermanentAddress: room.occupancy.tenantPermanentAddress ?? '',
-        tenantEmail: room.occupancy.tenantEmail ?? '',
-        householdHeadRelation: room.occupancy.householdHeadRelation ?? t("Người thuê trọ"),
         people: room.occupancy.people,
-        contractEndDate: room.occupancy.contractEndDate ? dayjs(room.occupancy.contractEndDate) : null,
-        paymentDueDay: room.occupancy.paymentDueDay ?? 5,
-        roomAreaSqm: room.occupancy.roomAreaSqm ?? null,
-        handoverAssets: room.occupancy.handoverAssets ?? '',
-        additionalTerms: room.occupancy.additionalTerms ?? '',
-        coResidents: (room.occupancy.coResidents ?? []).map((member) => ({
-          fullName: member.fullName,
-          citizenId: member.citizenId ?? '',
-          gender: member.gender ?? undefined,
-          dateOfBirth: member.dateOfBirth ? dayjs(member.dateOfBirth) : null,
-          relation: member.relation ?? '',
-        })),
       });
       if (hadPreviousInit && isServerUpdated) {
         message.info(t("Đã tự động đồng bộ thông tin người thuê mới nhất."));
@@ -150,83 +82,13 @@ function RoomTenantWorkspace() {
       form.setFieldsValue({
         tenantName: '',
         phone: '',
-        tenantCitizenId: '',
-        tenantDateOfBirth: null,
-        tenantGender: legalCt01Template.genderMale,
-        tenantCitizenIdIssuedDate: null,
-        tenantCitizenIdIssuedPlace: t("Cục Cảnh sát QLHC về TTXH"),
-        tenantPermanentAddress: '',
-        tenantEmail: '',
-        householdHeadRelation: t("Người thuê trọ"),
         people: 1,
         startDate: dayjs(),
-        contractEndDate: dayjs().add(1, 'year'),
-        paymentDueDay: 5,
-        roomAreaSqm: null,
-        handoverAssets: '',
-        additionalTerms: '',
         depositAmount: 0,
         initialReading: minReading,
-        coResidents: [],
       });
     }
   }, [room, minReading, form, message]);
-
-  const handleQrDetected = (parsed: ParsedCccdQr) => {
-    if (!qrTarget) return;
-    if (qrTarget.kind === 'tenant') {
-      form.setFieldsValue({
-        tenantName: parsed.fullName,
-        tenantCitizenId: parsed.citizenId,
-        tenantDateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : form.getFieldValue('tenantDateOfBirth'),
-        tenantGender: parsed.gender ?? form.getFieldValue('tenantGender'),
-        tenantPermanentAddress: parsed.permanentAddress || form.getFieldValue('tenantPermanentAddress'),
-        tenantCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('tenantCitizenIdIssuedDate'),
-        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || t("Cục Cảnh sát QLHC về TTXH"),
-      });
-      message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
-      return;
-    }
-
-    const currentList: CoResidentFormItem[] = [...(form.getFieldValue('coResidents') ?? [])];
-    const newItem: CoResidentFormItem = {
-      fullName: parsed.fullName,
-      citizenId: parsed.citizenId,
-      gender: parsed.gender ?? legalCt01Template.genderMale,
-      dateOfBirth: parsed.dateOfBirth ? dayjs(parsed.dateOfBirth) : null,
-      relation: t("Người thuê trọ"),
-    };
-
-    if (qrTarget.kind === 'coResident-row') {
-      const idx = qrTarget.index;
-      if (idx >= 0 && idx < currentList.length) {
-        currentList[idx] = {
-          ...currentList[idx],
-          ...newItem,
-          relation: currentList[idx]?.relation || t("Người thuê trọ"),
-        };
-        form.setFieldValue('coResidents', currentList);
-        message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
-      }
-      return;
-    }
-
-    const existingIdx = currentList.findIndex(
-      (item) => (item?.citizenId && item.citizenId.trim() === parsed.citizenId) || (!item?.fullName?.trim() && !item?.citizenId?.trim()),
-    );
-    if (existingIdx >= 0) {
-      currentList[existingIdx] = {
-        ...currentList[existingIdx],
-        ...newItem,
-        relation: currentList[existingIdx]?.relation || t("Người thuê trọ"),
-      };
-    } else if (currentList.length < 29) {
-      currentList.push(newItem);
-    }
-    form.setFieldValue('coResidents', currentList);
-    form.setFieldValue('people', Math.min(30, 1 + currentList.length));
-    message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
-  };
 
   const refreshData = async () => {
     await Promise.all([
@@ -278,24 +140,7 @@ function RoomTenantWorkspace() {
 
   const onFinish = (values: TenantFormValues) => {
     if (!room || isSaving) return;
-    const coResidents = normalizeCoResidents(values.coResidents);
-    const people = 1 + coResidents.length;
-    const commonContractFields = {
-      tenantCitizenId: values.tenantCitizenId?.trim() ?? '',
-      tenantDateOfBirth: formatDayjsDate(values.tenantDateOfBirth),
-      tenantGender: values.tenantGender?.trim() ?? '',
-      tenantCitizenIdIssuedDate: formatDayjsDate(values.tenantCitizenIdIssuedDate),
-      tenantCitizenIdIssuedPlace: values.tenantCitizenIdIssuedPlace?.trim() ?? '',
-      tenantPermanentAddress: values.tenantPermanentAddress?.trim() ?? '',
-      tenantEmail: values.tenantEmail?.trim() ?? '',
-      householdHeadRelation: values.householdHeadRelation?.trim() ?? '',
-      contractEndDate: formatDayjsDate(values.contractEndDate),
-      paymentDueDay: Number(values.paymentDueDay || 5),
-      roomAreaSqm: values.roomAreaSqm === null || values.roomAreaSqm === undefined ? null : Number(values.roomAreaSqm),
-      handoverAssets: values.handoverAssets?.trim() ?? '',
-      additionalTerms: values.additionalTerms?.trim() ?? '',
-      coResidents,
-    };
+    const people = Math.min(30, Math.max(1, Number(values.people || 1)));
 
     if (room.occupancy) {
       editOccupancyMutation.mutate({
@@ -305,7 +150,6 @@ function RoomTenantWorkspace() {
           tenantName: values.tenantName,
           phone: values.phone,
           people,
-          ...commonContractFields,
         },
       });
     } else {
@@ -318,7 +162,6 @@ function RoomTenantWorkspace() {
           startDate: (values.startDate ?? dayjs()).format('YYYY-MM-DD'),
           depositAmount: Number(values.depositAmount ?? 0),
           initialReading: values.initialReading,
-          ...commonContractFields,
         },
       });
     }
@@ -397,21 +240,13 @@ function RoomTenantWorkspace() {
         <div className="room-tenant-workspace-grid">
           <div className="room-tenant-main-column">
             <SectionCard className="room-tenant-card">
-              <div className="room-tenant-card-header room-tenant-card-header-flex">
+              <div className="room-tenant-card-header">
                 <Typography.Title level={5} style={{ margin: 0 }}>
-                  {t("1. Bên thuê phòng / Người kê khai CT01 (Bên B)")}
+                  {isEditing ? t("Sửa thông tin người thuê") : t("Thêm người thuê")}
                 </Typography.Title>
-                <Button
-                  type="primary"
-                  ghost
-                  icon={<QrcodeOutlined />}
-                  onClick={() => setQrTarget({ kind: 'tenant' })}
-                >
-                  {t("Quét / Tải ảnh CCCD")}
-                </Button>
               </div>
               <Row gutter={16}>
-                <Col xs={24} md={14}>
+                <Col xs={24} md={10}>
                   <Form.Item
                     label={t("Tên người thuê")}
                     name="tenantName"
@@ -420,306 +255,82 @@ function RoomTenantWorkspace() {
                     <Input size="large" placeholder={t("Họ và tên")} maxLength={160} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={10}>
+                <Col xs={24} sm={14} md={8}>
                   <Form.Item label={t("Số điện thoại")} name="phone">
                     <Input size="large" inputMode="tel" placeholder="09xx xxx xxx" maxLength={60} />
                   </Form.Item>
                 </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} md={14}>
+                <Col xs={24} sm={10} md={6}>
                   <Form.Item
-                    label={t("Số CCCD / Định danh cá nhân (12 số)")}
-                    name="tenantCitizenId"
-                    rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                    label={t("Số người ở")}
+                    name="people"
+                    rules={[{ required: true, type: 'number', min: 1, max: 30, message: t("Nhập từ 1 đến 30 người.") }]}
                   >
-                    <Input size="large" inputMode="numeric" placeholder={t("Số CCCD")} maxLength={12} />
+                    <InputNumber size="large" min={1} max={30} precision={0} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={10}>
-                  <Form.Item label={t("Giới tính")} name="tenantGender">
-                    <Select
-                      size="large"
-                      allowClear
-                      placeholder={t("Chọn")}
-                      options={[
-                        { value: legalCt01Template.genderMale, label: t("Nam") },
-                        { value: legalCt01Template.genderFemale, label: t("Nữ") },
+              </Row>
+
+              {!isEditing && (
+                <Row gutter={16}>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item
+                      label={t("Ngày chuyển vào")}
+                      name="startDate"
+                      rules={[{ required: true, message: t("Vui lòng chọn ngày.") }]}
+                    >
+                      <DatePicker
+                        size="large"
+                        format={dateFormat()}
+                        disabledDate={(date) => date.isAfter(dayjs(), 'day')}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item
+                      label={t("Chỉ số điện ban đầu")}
+                      name="initialReading"
+                      rules={[
+                        { required: true, message: t("Vui lòng nhập giá trị.") },
+                        { type: 'number', min: minReading, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [minReading]) },
                       ]}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
+                    >
+                      <InputNumber
+                        size="large"
+                        min={minReading}
+                        max={1000000000}
+                        step={0.001}
+                        precision={3}
+                        addonAfter="kWh"
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      label={t("Tiền cọc yêu cầu")}
+                      name="depositAmount"
+                      extra={t("Nhập 0 nếu không thu cọc. Đây là khoản phải thu, chưa ghi nhận khách đã trả.")}
+                      rules={[{ required: true, type: 'number', min: 0, max: 2147483647, message: t("Nhập số tiền cọc hợp lệ.") }]}
+                    >
+                      <MoneyInput size="large" min={0} max={2147483647} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
 
-              <Row gutter={16}>
-                <Col xs={24} sm={12} md={12}>
-                  <Form.Item label={t("Ngày sinh")} name="tenantDateOfBirth">
-                    <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={12}>
-                  <Form.Item label={t("Ngày cấp CCCD")} name="tenantCitizenIdIssuedDate">
-                    <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} md={14}>
-                  <Form.Item label={t("Nơi cấp CCCD")} name="tenantCitizenIdIssuedPlace">
-                    <Input size="large" maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={10}>
-                  <Form.Item label={t("Mối quan hệ với chủ hộ")} name="householdHeadRelation">
-                    <Input size="large" maxLength={100} placeholder={t("Người thuê trọ")} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} md={14}>
-                  <Form.Item label={t("Địa chỉ thường trú")} name="tenantPermanentAddress">
-                    <Input size="large" maxLength={500} placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={10}>
-                  <Form.Item label={t("Email liên hệ (nếu có)")} name="tenantEmail">
-                    <Input size="large" maxLength={320} placeholder="email@example.com" />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </SectionCard>
-
-            <SectionCard className="room-tenant-card">
-              <Form.List name="coResidents">
-                {(fields, { add, remove }) => (
-                  <>
-                    <div className="room-tenant-coresidents-header">
-                      <div>
-                        <Typography.Title level={5} style={{ margin: 0 }}>
-                          {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
-                        </Typography.Title>
-                      </div>
-                      {fields.length > 0 && (
-                        <Space wrap>
-                          <Button
-                            icon={<QrcodeOutlined />}
-                            disabled={fields.length >= 29}
-                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
-                          >
-                            {t("Quét CCCD thêm thành viên")}
-                          </Button>
-                          <Button
-                            type="primary"
-                            ghost
-                            icon={<PlusOutlined />}
-                            disabled={fields.length >= 29}
-                            onClick={() => {
-                              const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
-                              add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
-                              form.setFieldValue('people', nextCount);
-                            }}
-                          >
-                            {t("Thêm thành viên ở cùng")}
-                          </Button>
-                        </Space>
-                      )}
-                    </div>
-
-                    {fields.length === 0 ? (
-                      <div className="room-tenant-coresidents-empty">
-                        <UserAddOutlined className="room-tenant-coresidents-empty-icon" />
-                        <Space wrap>
-                          <Button
-                            icon={<QrcodeOutlined />}
-                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
-                          >
-                            {t("Quét CCCD thêm thành viên")}
-                          </Button>
-                          <Button
-                            type="dashed"
-                            icon={<PlusOutlined />}
-                            onClick={() => {
-                              const nextCount = Math.min(30, Math.max(Number(form.getFieldValue('people') || 1), 1 + fields.length + 1));
-                              add({ fullName: '', citizenId: '', gender: legalCt01Template.genderMale, dateOfBirth: null, relation: t("Người thuê trọ") });
-                              form.setFieldValue('people', nextCount);
-                            }}
-                          >
-                            {t("Thêm thành viên ở cùng")}
-                          </Button>
-                        </Space>
-                      </div>
-                    ) : (
-                      <div className="room-tenant-coresidents-list">
-                        {fields.map((field, index) => (
-                          <div key={field.key} className="room-tenant-coresident-row">
-                            <div className="room-tenant-coresident-row-head" style={{ flexWrap: 'wrap', gap: 8 }}>
-                              <Tag color="cyan">#{index + 1}</Tag>
-                              <Space size={4} wrap>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<QrcodeOutlined />}
-                                  onClick={() => setQrTarget({ kind: 'coResident-row', index })}
-                                >
-                                  {t("Quét / Tải ảnh CCCD")}
-                                </Button>
-                                <Button
-                                  danger
-                                  type="text"
-                                  size="small"
-                                  icon={<DeleteOutlined />}
-                                  onClick={() => {
-                                    const nextCount = Math.max(1, 1 + fields.length - 1);
-                                    remove(field.name);
-                                    form.setFieldValue('people', nextCount);
-                                  }}
-                                  aria-label={t("Xóa thành viên")}
-                                >
-                                  {t("Xóa thành viên")}
-                                </Button>
-                              </Space>
-                            </div>
-                            <Row gutter={12}>
-                              <Col xs={24} md={14}>
-                                <Form.Item
-                                  label={t("Họ và tên")}
-                                  name={[field.name, 'fullName']}
-                                  rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên người thuê.") }]}
-                                >
-                                  <Input placeholder={t("Họ và tên")} maxLength={160} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={10}>
-                                <Form.Item
-                                  label={t("Số CCCD")}
-                                  name={[field.name, 'citizenId']}
-                                  rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
-                                >
-                                  <Input placeholder={t("Số CCCD")} maxLength={12} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                            <Row gutter={12}>
-                              <Col xs={24} sm={12} md={8}>
-                                <Form.Item label={t("Ngày sinh")} name={[field.name, 'dateOfBirth']}>
-                                  <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} sm={12} md={6}>
-                                <Form.Item label={t("Giới tính")} name={[field.name, 'gender']}>
-                                  <Select
-                                    allowClear
-                                    placeholder={t("Chọn")}
-                                    options={[
-                                      { value: legalCt01Template.genderMale, label: t("Nam") },
-                                      { value: legalCt01Template.genderFemale, label: t("Nữ") },
-                                    ]}
-                                  />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={10}>
-                                <Form.Item label={t("Mối quan hệ với chủ hộ")} name={[field.name, 'relation']}>
-                                  <Input placeholder={t("Người thuê trọ")} maxLength={100} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </Form.List>
-            </SectionCard>
-
-            <SectionCard className="room-tenant-card">
-              <div className="room-tenant-card-header">
-                <Typography.Title level={5} style={{ margin: 0 }}>
-                  {t("3. Điều khoản Hợp đồng & Tài sản bàn giao")}
-                </Typography.Title>
-              </div>
-              <Row gutter={16}>
-                <Col xs={24} sm={12} md={9}>
-                  <Form.Item label={t("Ngày kết thúc hợp đồng")} name="contractEndDate">
-                    <DatePicker size="large" format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={8}>
-                  <Form.Item label={t("Hạn đóng tiền (ngày)")} name="paymentDueDay">
-                    <InputNumber size="large" min={1} max={28} precision={0} style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={7}>
-                  <Form.Item label={t("Diện tích phòng")} name="roomAreaSqm">
-                    <InputNumber size="large" min={0} max={10000} step={1} addonAfter="m²" style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Form.Item label={t("Danh mục tài sản bàn giao")} name="handoverAssets">
-                <Input.TextArea
-                  rows={2}
-                  maxLength={2000}
-                  placeholder={t("Ví dụ: 01 máy lạnh, 01 bình nóng lạnh, 01 giường, 01 tủ quần áo, 02 chìa khóa phòng…")}
-                />
-              </Form.Item>
-              <Form.Item label={t("Thỏa thuận / nội quy bổ sung (nếu có)")} name="additionalTerms" style={{ marginBottom: 0 }}>
-                <Input.TextArea
-                  rows={2}
-                  maxLength={2000}
-                  placeholder={t("Ví dụ: Giờ giấc tự do, không nuôi thú cưng, báo trước 30 ngày khi trả phòng…")}
-                />
-              </Form.Item>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginTop: 8 }}
+                message={`${''}Thông tin chi tiết để làm Hợp đồng & Tờ khai CT01 (CCCD / Hộ chiếu, thành viên ở cùng, tài sản bàn giao) sẽ được nhập hoặc quét ảnh tại mục "Xuất hợp đồng & CT01".`}
+              />
             </SectionCard>
           </div>
 
           <div className="room-tenant-side-column">
             <SectionCard className="room-tenant-card room-tenant-summary-card">
-              {!isEditing && (
-                <>
-                  <Form.Item
-                    label={t("Ngày chuyển vào")}
-                    name="startDate"
-                    rules={[{ required: true, message: t("Vui lòng chọn ngày.") }]}
-                  >
-                    <DatePicker
-                      size="large"
-                      format={dateFormat()}
-                      disabledDate={(date) => date.isAfter(dayjs(), 'day')}
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    label={t("Chỉ số điện ban đầu")}
-                    name="initialReading"
-                    rules={[
-                      { required: true, message: t("Vui lòng nhập giá trị.") },
-                      { type: 'number', min: minReading, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [minReading]) },
-                    ]}
-                  >
-                    <InputNumber
-                      size="large"
-                      min={minReading}
-                      max={1000000000}
-                      step={0.001}
-                      precision={3}
-                      addonAfter="kWh"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    label={t("Tiền cọc yêu cầu")}
-                    name="depositAmount"
-                    extra={t("Nhập 0 nếu không thu cọc. Đây là khoản phải thu, chưa ghi nhận khách đã trả.")}
-                    rules={[{ required: true, type: 'number', min: 0, max: 2147483647, message: t("Nhập số tiền cọc hợp lệ.") }]}
-                  >
-                    <MoneyInput size="large" min={0} max={2147483647} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} />
-                  </Form.Item>
-                </>
-              )}
-
               <div className="room-tenant-fee-box">
                 <div className="room-tenant-fee-item">
                   <span>{t("Phòng")}</span>
@@ -789,11 +400,14 @@ function RoomTenantWorkspace() {
         <div className="room-tenant-mobile-bar" role="region" aria-label={t("Thao tác nhanh")}>
           <Button
             className="room-tenant-mobile-qr-btn"
-            icon={<QrcodeOutlined />}
-            aria-label={t("Quét / Tải ảnh CCCD")}
-            title={t("Quét / Tải ảnh CCCD")}
+            icon={<FileTextOutlined />}
+            aria-label={t("Xuất hợp đồng & CT01")}
+            title={t("Xuất hợp đồng & CT01")}
             disabled={isSaving}
-            onClick={() => setQrTarget({ kind: 'tenant' })}
+            onClick={() => {
+              openContractAfterSaveRef.current = true;
+              form.submit();
+            }}
           />
           <Button
             type="primary"
@@ -809,16 +423,6 @@ function RoomTenantWorkspace() {
           </Button>
         </div>
       </Form>
-      <CccdQrScannerModal
-        open={qrTarget !== null}
-        title={
-          qrTarget?.kind === 'tenant'
-            ? t("Quét mã QR CCCD người thuê")
-            : t("Quét mã QR CCCD thành viên ở cùng")
-        }
-        onClose={() => setQrTarget(null)}
-        onDetected={handleQrDetected}
-      />
     </div>
   );
 }

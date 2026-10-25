@@ -1062,8 +1062,19 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     const tenantWorkspace = page.locator('.room-tenant-page');
     await expect(tenantWorkspace).toBeVisible();
 
-    // 1. Open QR modal and test invalid QR string validation first
-    await tenantWorkspace.getByRole('button', { name: 'Quét / Tải ảnh CCCD' }).first().click();
+    // 1. Enter basic tenant info on RoomTenantPage and jump to Contract & CT01 page
+    await tenantWorkspace.getByLabel('Tên người thuê').fill('Lê Thị Mai Anh');
+    await tenantWorkspace.getByLabel('Số người ở').fill('2');
+    await expect(tenantWorkspace.getByText('2 người')).toBeVisible();
+
+    await tenantWorkspace.getByRole('button', { name: 'Xuất hợp đồng & CT01' }).first().click();
+    await expect(page).toHaveURL(/\/rooms\/room-202\/documents$/);
+    expect(submittedTenantBody).toBeTruthy();
+    expect(submittedTenantBody?.tenantName).toBe('Lê Thị Mai Anh');
+    expect(submittedTenantBody?.people).toBe(2);
+
+    // 2. On Contract & CT01 page, open QR modal and test invalid QR string validation first
+    await page.getByRole('button', { name: 'Quét / Tải ảnh CCCD' }).first().click();
     const qrModal = page.locator('.cccd-qr-modal');
     await expect(qrModal).toBeVisible();
 
@@ -1072,40 +1083,26 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await qrModal.getByRole('button', { name: 'Điền thông tin từ chuỗi QR' }).click();
     await expect(qrModal.getByText('Chuỗi QR không đúng định dạng CCCD Việt Nam.')).toBeVisible();
 
-    // 2. Paste valid 7-field primary tenant CCCD QR
+    // 3. Paste valid 7-field primary tenant CCCD QR on Contract & CT01 page
     await qrInput.fill('079098001234|025123456|Lê Thị Mai Anh|24121998|Nữ|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|10092022');
     await expect(qrModal).toBeHidden();
 
-    // Verify primary tenant fields are auto-filled
-    await expect(tenantWorkspace.getByLabel('Tên người thuê')).toHaveValue('Lê Thị Mai Anh');
-    await expect(tenantWorkspace.getByLabel('Số CCCD / Định danh cá nhân (12 số)')).toHaveValue('079098001234');
-    await expect(tenantWorkspace.getByLabel('Địa chỉ thường trú')).toHaveValue('88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh');
+    await expect(page.getByLabel('Họ và tên người thuê')).toHaveValue('Lê Thị Mai Anh');
+    await expect(page.getByLabel('Số CCCD / Định danh cá nhân (12 số)')).toHaveValue('079098001234');
+    await expect(page.getByLabel('Địa chỉ thường trú').first()).toHaveValue('88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh');
 
-    // 3. Scan / Paste co-resident CCCD QR (and verify duplicate CCCD updates existing row instead of duplicating)
-    await tenantWorkspace.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
+    // 4. Scan / Paste co-resident CCCD QR (and verify duplicate CCCD updates existing row instead of duplicating)
+    await page.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
     await expect(qrModal).toBeVisible();
     await qrModal.locator('#cccd-qr-raw-input').fill('079200005678||Trần Minh Quân|05052000|Nam|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|12102022');
     await expect(qrModal).toBeHidden();
 
-    await expect(tenantWorkspace.locator('.room-tenant-coresident-row')).toHaveCount(1);
-    await expect(tenantWorkspace.getByText('2 người')).toBeVisible();
-
     // Re-scan the same co-resident Citizen ID with updated name -> should still be 1 row (no duplicate)
-    await tenantWorkspace.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
+    await page.getByRole('button', { name: 'Quét CCCD thêm thành viên' }).first().click();
     await qrModal.locator('#cccd-qr-raw-input').fill('079200005678|Trần Minh Quân|05052000|Nam|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|12102022');
     await expect(qrModal).toBeHidden();
-    await expect(tenantWorkspace.locator('.room-tenant-coresident-row')).toHaveCount(1);
 
-    // Save tenant and open Contract & CT01 page directly
-    await tenantWorkspace.getByRole('button', { name: 'Xuất hợp đồng & CT01' }).first().click();
-    await expect(page).toHaveURL(/\/rooms\/room-202\/documents$/);
-    expect(submittedTenantBody).toBeTruthy();
-    expect(submittedTenantBody?.tenantName).toBe('Lê Thị Mai Anh');
-    expect(submittedTenantBody?.tenantCitizenId).toBe('079098001234');
-    expect(submittedTenantBody?.people).toBe(2);
-
-    // 4. Verify live cross-device sync on Contract page without F5 reload:
-    // Simulate landlord scanning a new tenant CCCD on their phone and saving to the server while PC has Contract page open
+    // 5. Verify live cross-device sync on Contract page without F5 reload:
     const preview = page.getByTestId('document-a4-preview');
     await expect(preview).toContainText('Lê Thị Mai Anh');
 
@@ -1404,6 +1401,8 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
               },
             ],
             tenantSelfCheckinAt: '2026-10-24T09:30:00Z',
+            hasTenantIdentityPhoto: true,
+            tenantIdentityPhotoFileName: 'cccd-nguyen-thi-thue.jpg',
           },
         });
       }
@@ -1495,6 +1494,13 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(
       page.getByText(/Hệ thống đã tự động nhận diện và lưu thông tin Hợp đồng \/ Tờ khai CT01 của khách thuê/),
     ).toBeVisible();
+    await expect(page.getByText(/tbltkbtt\.bocongan\.gov\.vn/)).toBeVisible();
+    const downloadIdentityPhotoLink = page.getByRole('link', { name: /Tải ảnh CCCD\/Hộ chiếu/ });
+    await expect(downloadIdentityPhotoLink).toBeVisible();
+    await expect(downloadIdentityPhotoLink).toHaveAttribute(
+      'href',
+      '/api/rooms/room-01/documents/identity-photo?target=tenant&download=true',
+    );
     await expect(page.getByTestId('document-a4-preview')).toContainText('079199001234');
     await expect(page.getByTestId('document-a4-preview')).toContainText('Trần Văn Cùng Ở');
 

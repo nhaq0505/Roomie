@@ -15,6 +15,14 @@ export interface TenantSelfCheckinRequest {
   relation?: string | null;
 }
 
+export interface TenantIdentityPhotoDto {
+  targetKey: string;
+  photoFileName: string;
+  photoContentType: string;
+  photoSizeBytes: number;
+  uploadedAt: string;
+}
+
 export interface TenantMeterSubmission {
   id: string;
   roomId: string;

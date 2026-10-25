@@ -2674,6 +2674,64 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.ToTable("SystemPromotions");
                 });
 
+            modelBuilder.Entity("RoomRental.Api.Domain.TenantIdentityDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OccupancyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("PhotoContent")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("PhotoContentType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("PhotoFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<string>("PhotoSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("PhotoSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccupancyId", "TargetKey")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "OccupancyId");
+
+                    b.ToTable("TenantIdentityDocuments");
+                });
+
             modelBuilder.Entity("RoomRental.Api.Domain.TenantMeterSubmission", b =>
                 {
                     b.Property<Guid>("Id")

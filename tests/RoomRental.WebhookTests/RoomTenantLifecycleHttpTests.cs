@@ -803,6 +803,76 @@ internal static class RoomTenantLifecycleHttpTests
         byte[] oversizedPng = new byte[2 * 1024 * 1024 + 128];
         Array.Copy(validPng, oversizedPng, validPng.Length);
 
+        // 3b. Foreign tenant self-checkin with Passport number (M87654321) and identity photo upload
+        var foreignCheckinReq = new TenantSelfCheckinRequest(
+            Target: "tenant",
+            FullName: "KIM MIN JUN",
+            CitizenId: "m87654321",
+            DateOfBirth: new DateOnly(1995, 8, 15),
+            Gender: "Nam",
+            PermanentAddress: "Quốc tịch: Hàn Quốc (KOR)",
+            Phone: "0908889999",
+            Email: "kim@example.com");
+        var foreignResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", foreignCheckinReq);
+        Assert(foreignResp.StatusCode == HttpStatusCode.OK, "foreign tenant self-checkin with Passport M87654321 returns 200 OK");
+        var foreignJson = await foreignResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(foreignJson.GetProperty("tenantName").GetString() == "KIM MIN JUN" &&
+               foreignJson.GetProperty("tenantCitizenId").GetString() == "M87654321" &&
+               foreignJson.GetProperty("tenantPermanentAddress").GetString() == "Quốc tịch: Hàn Quốc (KOR)",
+            "foreign tenant self-checkin normalizes Passport CitizenId to uppercase M87654321 and saves nationality in PermanentAddress");
+
+        static MultipartFormDataContent BuildIdentityPhotoForm(byte[] fileBytes, string fileName, string target = "tenant")
+        {
+            var form = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(fileBytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            form.Add(fileContent, "photo", fileName);
+            form.Add(new StringContent(target), "target");
+            return form;
+        }
+
+        using (var badIdMagicForm = BuildIdentityPhotoForm(invalidMagic, "passport.pdf"))
+        {
+            var badIdMagicResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", badIdMagicForm);
+            Assert(badIdMagicResp.StatusCode == HttpStatusCode.BadRequest, "identity-photo rejects non-image magic bytes with 400 BadRequest");
+        }
+
+        using (var oversizedIdForm = BuildIdentityPhotoForm(oversizedPng, "huge-passport.png"))
+        {
+            var oversizedIdResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", oversizedIdForm);
+            Assert(oversizedIdResp.StatusCode == HttpStatusCode.RequestEntityTooLarge, "identity-photo rejects >2MB photo with 413 PayloadTooLarge");
+        }
+
+        using (var validIdForm = BuildIdentityPhotoForm(validPng, "passport-kim.png"))
+        {
+            var validIdResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", validIdForm);
+            Assert(validIdResp.StatusCode == HttpStatusCode.OK, "POST /api/tenant/{token}/identity-photo returns 200 OK for valid PNG");
+            var idPhotoDto = await validIdResp.Content.ReadFromJsonAsync<TenantIdentityPhotoDto>();
+            Assert(idPhotoDto != null && idPhotoDto.TargetKey == "tenant" && idPhotoDto.PhotoContentType == "image/png",
+                "identity-photo DTO returns target='tenant' and image/png content type");
+        }
+
+        var docAfterIdPhoto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
+        Assert(docAfterIdPhoto != null &&
+               docAfterIdPhoto.TenantCitizenId == "M87654321" &&
+               docAfterIdPhoto.HasTenantIdentityPhoto &&
+               !string.IsNullOrWhiteSpace(docAfterIdPhoto.TenantIdentityPhotoFileName),
+            "GET /api/rooms/{id}/documents reports HasTenantIdentityPhoto=true and non-empty TenantIdentityPhotoFileName");
+
+        var ownerIdPhotoResp = await client.GetAsync($"/api/rooms/{roomId}/documents/identity-photo?download=true");
+        Assert(ownerIdPhotoResp.StatusCode == HttpStatusCode.OK, "GET /api/rooms/{id}/documents/identity-photo returns 200 OK");
+        var ownerIdPhotoBytes = await ownerIdPhotoResp.Content.ReadAsByteArrayAsync();
+        Assert(ownerIdPhotoBytes.SequenceEqual(validPng), "GET /api/rooms/{id}/documents/identity-photo returns exact uploaded image bytes");
+        var cacheControl = ownerIdPhotoResp.Headers.CacheControl?.ToString() ?? string.Empty;
+        var nosniff = ownerIdPhotoResp.Headers.TryGetValues("X-Content-Type-Options", out var xcto) ? string.Join(",", xcto) : string.Empty;
+        var csp = ownerIdPhotoResp.Headers.TryGetValues("Content-Security-Policy", out var cspVals) ? string.Join(",", cspVals) : string.Empty;
+        var contentDisposition = ownerIdPhotoResp.Content.Headers.ContentDisposition?.DispositionType ?? string.Empty;
+        Assert(cacheControl.Contains("no-store", StringComparison.OrdinalIgnoreCase) &&
+               nosniff.Contains("nosniff", StringComparison.OrdinalIgnoreCase) &&
+               csp.Contains("sandbox", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(contentDisposition, "attachment", StringComparison.OrdinalIgnoreCase),
+            "GET /api/rooms/{id}/documents/identity-photo?download=true sets no-store, nosniff, sandbox CSP, and attachment disposition headers");
+
         static MultipartFormDataContent BuildMeterForm(byte[] fileBytes, string fileName, string reading, string? note = null)
         {
             var form = new MultipartFormDataContent();

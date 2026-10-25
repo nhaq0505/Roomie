@@ -156,8 +156,8 @@ public static class PaymentEndpoints
             var occupancy = await FindTenantAsync(db, token, ct);
             var fullName = OwnerManagementEndpoints.CleanOptional(request.FullName, 160, "Họ và tên")
                 ?? throw new ApiException(StatusCodes.Status400BadRequest, "Vui lòng nhập họ và tên (tối đa 160 ký tự).");
-            var citizenId = OwnerManagementEndpoints.ValidateAndCleanCitizenId(request.CitizenId, "Số CCCD/Định danh")
-                ?? throw new ApiException(StatusCodes.Status400BadRequest, "Số CCCD/Định danh phải gồm từ 9 đến 12 chữ số.");
+            var citizenId = OwnerManagementEndpoints.ValidateAndCleanCitizenId(request.CitizenId, "Số CCCD/Định danh/Hộ chiếu")
+                ?? throw new ApiException(StatusCodes.Status400BadRequest, "Số CCCD/Định danh/Hộ chiếu phải gồm từ 9 đến 12 chữ số hoặc 6 đến 12 ký tự Hộ chiếu hợp lệ.");
 
             if (string.Equals(request.Target?.Trim(), "coResident", StringComparison.OrdinalIgnoreCase))
             {
@@ -168,7 +168,7 @@ public static class PaymentEndpoints
                     Gender: OwnerManagementEndpoints.CleanOptional(request.Gender, 20, "Giới tính"),
                     CitizenId: citizenId,
                     Relation: OwnerManagementEndpoints.CleanOptional(request.Relation, 100, "Mối quan hệ") ?? "Người thuê trọ");
-                var existingIndex = existing.FindIndex(x => string.Equals(x.CitizenId, citizenId, StringComparison.Ordinal));
+                var existingIndex = existing.FindIndex(x => string.Equals(x.CitizenId, citizenId, StringComparison.OrdinalIgnoreCase));
                 if (existingIndex >= 0)
                     existing[existingIndex] = member;
                 else
@@ -211,9 +211,9 @@ public static class PaymentEndpoints
         {
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
             var occupancy = await FindTenantAsync(db, token, ct);
-            var targetCitizenId = citizenId?.Trim();
+            var targetCitizenId = citizenId?.Trim().ToUpperInvariant();
             var existing = OwnerManagementEndpoints.DeserializeCoResidents(occupancy.CoResidentsJson);
-            var remaining = existing.Where(x => !string.Equals(x.CitizenId, targetCitizenId, StringComparison.Ordinal)).ToList();
+            var remaining = existing.Where(x => !string.Equals(x.CitizenId, targetCitizenId, StringComparison.OrdinalIgnoreCase)).ToList();
             occupancy.CoResidentsJson = OwnerManagementEndpoints.ValidateAndSerializeCoResidents(remaining, out var cleaned);
             occupancy.People = Math.Max(1, 1 + cleaned.Count);
             occupancy.TenantSelfCheckinAt = DateTimeOffset.UtcNow;
@@ -400,6 +400,131 @@ public static class PaymentEndpoints
             return Results.Bytes(row.PhotoContent, row.PhotoContentType);
         });
 
+        app.MapPost("/api/tenant/{token}/identity-photo", async (string token, HttpContext context, AppDbContext db, CancellationToken ct) =>
+        {
+            if (context.Request.ContentLength is long declared && declared > MaxMeterPhotoRequestBytes)
+                throw new ApiException(StatusCodes.Status413PayloadTooLarge, "Ảnh giấy tờ tùy thân tối đa 2 MB.");
+            var sizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (sizeFeature is { IsReadOnly: false }) sizeFeature.MaxRequestBodySize = MaxMeterPhotoRequestBytes;
+            if (!context.Request.HasFormContentType)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Gửi ảnh giấy tờ tùy thân bằng multipart/form-data.");
+
+            IFormCollection form;
+            try
+            {
+                form = await context.Request.ReadFormAsync(ct);
+            }
+            catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+            {
+                throw new ApiException(StatusCodes.Status413PayloadTooLarge, "Ảnh giấy tờ tùy thân tối đa 2 MB.");
+            }
+            catch (InvalidDataException)
+            {
+                throw new ApiException(StatusCodes.Status400BadRequest, "Không đọc được tệp ảnh giấy tờ tùy thân.");
+            }
+
+            if (form.Files.Count != 1)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Vui lòng chọn đúng một ảnh chụp CCCD/Hộ chiếu.");
+            var file = form.Files[0];
+            if (file.Length <= 0)
+                throw new ApiException(StatusCodes.Status400BadRequest, "Tệp ảnh giấy tờ tùy thân trống.");
+            if (file.Length > MaxMeterPhotoBytes)
+                throw new ApiException(StatusCodes.Status413PayloadTooLarge, "Ảnh giấy tờ tùy thân tối đa 2 MB.");
+
+            byte[] content;
+            await using (var stream = file.OpenReadStream())
+            using (var buffer = new MemoryStream((int)file.Length))
+            {
+                await stream.CopyToAsync(buffer, ct);
+                content = buffer.ToArray();
+            }
+
+            var detected = ExpenseEndpoints.DetectFileType(content);
+            if (detected is null || !detected.Value.ContentType.StartsWith("image/", StringComparison.Ordinal))
+                throw new ApiException(StatusCodes.Status400BadRequest, "Chỉ nhận ảnh chụp CCCD/Hộ chiếu định dạng JPEG, PNG hoặc WebP.");
+
+            var targetKey = NormalizeIdentityTargetKey(form["target"].FirstOrDefault());
+
+            await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+            var occupancy = await FindTenantAsync(db, token, ct);
+            var roomBuilding = await (from r in db.Rooms
+                                      join b in db.Buildings on r.BuildingId equals b.Id
+                                      where r.Id == occupancy.RoomId
+                                      select new { Room = r, Building = b }).SingleOrDefaultAsync(ct)
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy phòng thuê.");
+            var room = roomBuilding.Room;
+            var building = roomBuilding.Building;
+            if (room.ArchivedAt is not null || building.ArchivedAt is not null)
+                throw new ApiException(StatusCodes.Status409Conflict, "Không thể tải giấy tờ cho phòng hoặc dãy đã lưu trữ.");
+
+            var fileName = ExpenseEndpoints.SanitizeFileName(file.FileName, detected.Value.Extension);
+            var sha256 = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+            var now = DateTimeOffset.UtcNow;
+
+            var existingDoc = await db.TenantIdentityDocuments
+                .SingleOrDefaultAsync(x => x.OccupancyId == occupancy.Id && x.TargetKey == targetKey, ct);
+            if (existingDoc is null)
+            {
+                existingDoc = new TenantIdentityDocument
+                {
+                    OwnerId = building.OwnerId,
+                    BuildingId = building.Id,
+                    RoomId = room.Id,
+                    OccupancyId = occupancy.Id,
+                    TargetKey = targetKey,
+                    PhotoFileName = fileName,
+                    PhotoContentType = detected.Value.ContentType,
+                    PhotoSizeBytes = content.LongLength,
+                    PhotoSha256 = sha256,
+                    PhotoContent = content,
+                    UploadedAt = now
+                };
+                db.TenantIdentityDocuments.Add(existingDoc);
+            }
+            else
+            {
+                existingDoc.OwnerId = building.OwnerId;
+                existingDoc.BuildingId = building.Id;
+                existingDoc.RoomId = room.Id;
+                existingDoc.PhotoFileName = fileName;
+                existingDoc.PhotoContentType = detected.Value.ContentType;
+                existingDoc.PhotoSizeBytes = content.LongLength;
+                existingDoc.PhotoSha256 = sha256;
+                existingDoc.PhotoContent = content;
+                existingDoc.UploadedAt = now;
+            }
+
+            occupancy.TenantSelfCheckinAt = now;
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return Results.Ok(new TenantIdentityPhotoDto(
+                existingDoc.TargetKey,
+                existingDoc.PhotoFileName,
+                existingDoc.PhotoContentType,
+                existingDoc.PhotoSizeBytes,
+                existingDoc.UploadedAt));
+        }).RequireRateLimiting("tenant-payment");
+
+        app.MapGet("/api/tenant/{token}/identity-photo", async (string token, HttpContext context, AppDbContext db, CancellationToken ct, string? target = "tenant") =>
+        {
+            var occupancy = await FindTenantAsync(db, token, ct);
+            var targetKey = NormalizeIdentityTargetKey(target);
+            var row = await db.TenantIdentityDocuments.AsNoTracking()
+                .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == targetKey)
+                .Select(x => new { x.PhotoFileName, x.PhotoContentType, x.PhotoContent })
+                .SingleOrDefaultAsync(ct)
+                ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy ảnh chụp CCCD/Hộ chiếu.");
+
+            var disposition = new ContentDispositionHeaderValue("inline");
+            disposition.SetHttpFileName(row.PhotoFileName);
+            context.Response.Headers.ContentDisposition = disposition.ToString();
+            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox";
+            return Results.Bytes(row.PhotoContent, row.PhotoContentType);
+        });
+
         app.MapPost("/api/tenant/{token}/payment", async (string token, AppDbContext db, PayOsService service, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken ct = default) => {
             var occupancy = await FindTenantAsync(db, token, ct);
             var invoice = await db.Invoices.Where(i => i.OccupancyId == occupancy.Id && i.LifecycleState == InvoiceLifecycleState.Issued && i.Total > i.Paid)
@@ -469,6 +594,15 @@ public static class PaymentEndpoints
         submission.ReviewedAt,
         submission.ReadingId,
         submission.InvoiceId);
+
+    internal static string NormalizeIdentityTargetKey(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return "tenant";
+        var trimmed = target.Trim();
+        if (trimmed.Length > 40)
+            throw new ApiException(StatusCodes.Status400BadRequest, "Đối tượng giấy tờ tùy thân tối đa 40 ký tự.");
+        return string.Equals(trimmed, "tenant", StringComparison.OrdinalIgnoreCase) ? "tenant" : trimmed;
+    }
 
     internal static async Task<Occupancy> FindTenantAsync(AppDbContext db, string token, CancellationToken cancellationToken)
     {

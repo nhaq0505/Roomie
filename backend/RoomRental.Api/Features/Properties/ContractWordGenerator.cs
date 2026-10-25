@@ -40,9 +40,9 @@ public static class ContractWordGenerator
             // Bên B
             body.AppendChild(CreateParagraph("2. BÊN THUÊ PHÒNG TRỌ (gọi tắt là Bên B):", bold: true, beforeTwips: 100, afterTwips: 60));
             body.AppendChild(CreateBulletOrLine($"- Ông/Bà: {data.TenantName}"));
-            body.AppendChild(CreateBulletOrLine($"- Ngày sinh: {FormatDateOrDots(data.TenantDateOfBirth)}    Giới tính: {NullIfBlank(data.TenantGender) ?? ".........."}    Số CCCD/Định danh: {NullIfBlank(data.TenantCitizenId) ?? "........................"}"));
+            body.AppendChild(CreateBulletOrLine($"- Ngày sinh: {FormatDateOrDots(data.TenantDateOfBirth)}    Giới tính: {NullIfBlank(data.TenantGender) ?? ".........."}    Số CCCD/Định danh/Hộ chiếu: {NullIfBlank(data.TenantCitizenId) ?? "........................"}"));
             body.AppendChild(CreateBulletOrLine($"- Ngày cấp: {FormatDateOrDots(data.TenantCitizenIdIssuedDate)}    Nơi cấp: {NullIfBlank(data.TenantCitizenIdIssuedPlace) ?? "...................................................."}"));
-            body.AppendChild(CreateBulletOrLine($"- Địa chỉ thường trú: {NullIfBlank(data.TenantPermanentAddress) ?? "................................................................................"}"));
+            body.AppendChild(CreateBulletOrLine($"- Địa chỉ thường trú/Quốc tịch: {NullIfBlank(data.TenantPermanentAddress) ?? "................................................................................"}"));
             body.AppendChild(CreateBulletOrLine($"- Số điện thoại liên hệ: {NullIfBlank(data.TenantPhone) ?? "................................................"}    Số người ở: {data.People} người"));
 
             if (data.CoResidents.Count > 0)

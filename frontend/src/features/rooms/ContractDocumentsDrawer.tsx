@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, QrcodeOutlined, SaveOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Typography } from 'antd';
+import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatVnd } from '../../shared/format';
@@ -100,6 +100,7 @@ export default function ContractDocumentsDrawer({
   const serverDocSignatureRef = useRef<string | null>(null);
   const [isDownloadingDocx, setIsDownloadingDocx] = useState(false);
   const [qrTarget, setQrTarget] = useState<DocQrTarget>(null);
+  const [tenantIdentityMode, setTenantIdentityMode] = useState<'vn' | 'foreign'>('vn');
 
   const query = useQuery({
     queryKey: ['room-documents', targetRoomId],
@@ -122,6 +123,9 @@ export default function ContractDocumentsDrawer({
 
     const hadPreviousInit = initializedOccupancyId.current !== null;
     initializedOccupancyId.current = data.occupancyId;
+    if (data.tenantCitizenId && /^[A-Za-z]/.test(data.tenantCitizenId.trim())) {
+      setTenantIdentityMode('foreign');
+    }
     serverDocSignatureRef.current = nextSignature;
     form.setFieldsValue({
       ownerName: data.ownerName ?? '',
@@ -164,6 +168,9 @@ export default function ContractDocumentsDrawer({
   const handleQrDetected = (parsed: ParsedCccdQr) => {
     if (!qrTarget) return;
     if (qrTarget.kind === 'tenant') {
+      if (parsed.documentType === 'Passport' || /^[A-Za-z]/.test(parsed.citizenId)) {
+        setTenantIdentityMode('foreign');
+      }
       form.setFieldsValue({
         tenantName: parsed.fullName,
         tenantCitizenId: parsed.citizenId,
@@ -171,7 +178,7 @@ export default function ContractDocumentsDrawer({
         tenantGender: parsed.gender ?? form.getFieldValue('tenantGender'),
         tenantPermanentAddress: parsed.permanentAddress || form.getFieldValue('tenantPermanentAddress'),
         tenantCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('tenantCitizenIdIssuedDate'),
-        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || t("Cục Cảnh sát QLHC về TTXH"),
+        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || (parsed.documentType === 'Passport' ? `${''}Cục Quản lý xuất nhập cảnh` : t("Cục Cảnh sát QLHC về TTXH")),
       });
       message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
       return;
@@ -488,13 +495,53 @@ export default function ContractDocumentsDrawer({
   ) : (
     <div className="contract-workspace-grid">
       <div className="contract-form-pane">
-        {data.tenantSelfCheckinAt && (
+        {(data.tenantSelfCheckinAt || data.hasTenantIdentityPhoto) && (
           <Alert
             type="success"
             showIcon
             style={{ marginBottom: 14 }}
-            message={`${''}Khách thuê đã gửi ảnh CCCD qua link phòng (${dayjs(data.tenantSelfCheckinAt).format('DD/MM/YYYY HH:mm')})`}
-            description={`${''}Hệ thống đã tự động nhận diện và lưu thông tin Hợp đồng / Tờ khai CT01 của khách thuê. Bạn có thể kiểm tra lại và tải ngay file Word (.docx) hoặc in PDF.`}
+            message={
+              data.tenantSelfCheckinAt
+                ? `${''}Khách thuê đã gửi ảnh CCCD qua link phòng (${dayjs(data.tenantSelfCheckinAt).format('DD/MM/YYYY HH:mm')})`
+                : `${''}Đã lưu ảnh chụp CCCD / Hộ chiếu của khách thuê`
+            }
+            description={
+              <div>
+                <div>
+                  {`${''}Hệ thống đã tự động nhận diện và lưu thông tin Hợp đồng / Tờ khai CT01 của khách thuê. Bạn có thể kiểm tra lại và tải ngay file Word (.docx) hoặc in PDF.`}
+                </div>
+                {data.hasTenantIdentityPhoto && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ marginBottom: 6, fontSize: 13 }}>
+                      {`${''}Bạn có thể tải ảnh CCCD/Hộ chiếu khách đã tải lên để đính kèm trực tiếp lên cổng dịch vụ công `}
+                      <a href="https://tbltkbtt.bocongan.gov.vn" target="_blank" rel="noopener noreferrer">
+                        tbltkbtt.bocongan.gov.vn
+                      </a>
+                      {data.tenantIdentityPhotoFileName ? ` (${data.tenantIdentityPhotoFileName})` : ''}.
+                    </div>
+                    <Space wrap size={8}>
+                      <Button
+                        size="small"
+                        href={roomsApi.getIdentityPhotoUrl(targetRoomId, 'tenant', false)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {`${''}Xem ảnh CCCD/Hộ chiếu`}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="primary"
+                        ghost
+                        icon={<DownloadOutlined />}
+                        href={roomsApi.getIdentityPhotoUrl(targetRoomId, 'tenant', true)}
+                      >
+                        {`${''}Tải ảnh CCCD/Hộ chiếu`}
+                      </Button>
+                    </Space>
+                  </div>
+                )}
+              </div>
+            }
           />
         )}
         <Alert
@@ -513,7 +560,22 @@ export default function ContractDocumentsDrawer({
                     label: <strong>{t("1. Bên thuê phòng / Người kê khai CT01 (Bên B)")}</strong>,
                     children: (
                       <>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          <Segmented
+                            size="small"
+                            value={tenantIdentityMode}
+                            onChange={(val) => {
+                              const nextMode = val as 'vn' | 'foreign';
+                              setTenantIdentityMode(nextMode);
+                              if (nextMode === 'foreign' && !form.getFieldValue('tenantCitizenIdIssuedPlace')) {
+                                form.setFieldValue('tenantCitizenIdIssuedPlace', `${''}Cục Quản lý xuất nhập cảnh`);
+                              }
+                            }}
+                            options={[
+                              { value: 'vn', label: `${''}Khách Việt Nam (CCCD)` },
+                              { value: 'foreign', label: `${''}Khách nước ngoài (Hộ chiếu)` },
+                            ]}
+                          />
                           <Button
                             size="small"
                             type="primary"
@@ -521,9 +583,18 @@ export default function ContractDocumentsDrawer({
                             icon={<QrcodeOutlined />}
                             onClick={() => setQrTarget({ kind: 'tenant' })}
                           >
-                            {t("Quét / Tải ảnh CCCD")}
+                            {tenantIdentityMode === 'foreign' ? `${''}Quét / Tải ảnh Hộ chiếu (MRZ)` : t("Quét / Tải ảnh CCCD")}
                           </Button>
                         </div>
+                        {tenantIdentityMode === 'foreign' && (
+                          <Alert
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 12 }}
+                            message={`${''}Chế độ Khách nước ngoài (Hộ chiếu / Passport)`}
+                            description={`${''}Bấm "Quét / Tải ảnh Hộ chiếu (MRZ)" để tự động nhận diện 2 dòng MRZ ở mép dưới trang thông tin Passport, hoặc nhập trực tiếp Số hộ chiếu (ví dụ: M12345678) và chọn nhanh Quốc tịch bên dưới.`}
+                          />
+                        )}
                         <Row gutter={12}>
                           <Col xs={24} sm={14}>
                             <Form.Item
@@ -531,7 +602,7 @@ export default function ContractDocumentsDrawer({
                               label={t("Họ và tên người thuê")}
                               rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên người thuê.") }]}
                             >
-                              <Input maxLength={160} placeholder={t("Họ và tên")} />
+                              <Input maxLength={160} placeholder={tenantIdentityMode === 'foreign' ? 'KIM MINJUN / JOHN SMITH' : t("Họ và tên")} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={10}>
@@ -544,10 +615,10 @@ export default function ContractDocumentsDrawer({
                           <Col xs={24} sm={16}>
                             <Form.Item
                               name="tenantCitizenId"
-                              label={t("Số CCCD / Định danh cá nhân (12 số)")}
-                              rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                              label={tenantIdentityMode === 'foreign' ? `${''}Số Hộ chiếu (Passport No.)` : t("Số CCCD / Định danh cá nhân (12 số)")}
+                              rules={[{ pattern: /^(\d{9,12}|[A-Za-z]{1,3}[A-Za-z0-9]{5,9})$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
                             >
-                              <Input maxLength={12} placeholder="07909900xxxx" />
+                              <Input maxLength={12} placeholder={tenantIdentityMode === 'foreign' ? 'M12345678 / PA1234567' : '07909900xxxx'} />
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={8}>
@@ -570,17 +641,65 @@ export default function ContractDocumentsDrawer({
                             </Form.Item>
                           </Col>
                           <Col xs={24} sm={12}>
-                            <Form.Item name="tenantCitizenIdIssuedDate" label={t("Ngày cấp CCCD")}>
+                            <Form.Item
+                              name="tenantCitizenIdIssuedDate"
+                              label={tenantIdentityMode === 'foreign' ? `${''}Ngày cấp Hộ chiếu` : t("Ngày cấp CCCD")}
+                            >
                               <DatePicker format={dateFormat()} style={{ width: '100%' }} placeholder={t("Chọn ngày")} />
                             </Form.Item>
                           </Col>
                         </Row>
-                        <Form.Item name="tenantCitizenIdIssuedPlace" label={t("Nơi cấp CCCD")}>
-                          <Input maxLength={200} placeholder={t("Cục Cảnh sát QLHC về TTXH")} />
+                        <Form.Item
+                          name="tenantCitizenIdIssuedPlace"
+                          label={tenantIdentityMode === 'foreign' ? `${''}Cơ quan / Nơi cấp Hộ chiếu` : t("Nơi cấp CCCD")}
+                        >
+                          <Input
+                            maxLength={200}
+                            placeholder={tenantIdentityMode === 'foreign' ? `${''}Cục Quản lý xuất nhập cảnh / Bộ Ngoại giao` : t("Cục Cảnh sát QLHC về TTXH")}
+                          />
                         </Form.Item>
-                        <Form.Item name="tenantPermanentAddress" label={t("Địa chỉ thường trú")}>
-                          <Input maxLength={500} placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")} />
+                        <Form.Item
+                          name="tenantPermanentAddress"
+                          label={tenantIdentityMode === 'foreign' ? `${''}Quốc tịch / Địa chỉ tại nước ngoài` : t("Địa chỉ thường trú")}
+                        >
+                          <Input
+                            maxLength={500}
+                            placeholder={
+                              tenantIdentityMode === 'foreign'
+                                ? `${''}Ví dụ: Quốc tịch: Hàn Quốc (KOR)`
+                                : t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")
+                            }
+                          />
                         </Form.Item>
+                        {tenantIdentityMode === 'foreign' && (
+                          <div style={{ marginTop: -6, marginBottom: 12 }}>
+                            <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 6 }}>
+                              {`${''}Chọn nhanh quốc tịch:`}
+                            </Typography.Text>
+                            <Space size={[4, 4]} wrap>
+                              {[
+                                `${''}Hàn Quốc (KOR)`,
+                                `${''}Nhật Bản (JPN)`,
+                                `${''}Trung Quốc (CHN)`,
+                                `${''}Đài Loan (TWN)`,
+                                `${''}Hoa Kỳ (USA)`,
+                                `${''}Anh (GBR)`,
+                                `${''}Pháp (FRA)`,
+                                `${''}Đức (DEU)`,
+                                `${''}Úc (AUS)`,
+                                `${''}Singapore (SGP)`,
+                              ].map((nat) => (
+                                <Tag
+                                  key={nat}
+                                  style={{ cursor: 'pointer', margin: 0 }}
+                                  onClick={() => form.setFieldValue('tenantPermanentAddress', `Quốc tịch: ${nat}`)}
+                                >
+                                  {nat}
+                                </Tag>
+                              ))}
+                            </Space>
+                          </div>
+                        )}
                         <Form.Item name="tenantEmail" label={t("Email liên hệ (nếu có)")}>
                           <Input maxLength={320} placeholder="ten@email.com" />
                         </Form.Item>
@@ -622,7 +741,7 @@ export default function ContractDocumentsDrawer({
                         <Form.Item
                           name="ownerCitizenId"
                           label={t("Số CCCD / Định danh chủ hộ (12 số)")}
-                          rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                          rules={[{ pattern: /^(\d{9,12}|[A-Za-z]{1,3}[A-Za-z0-9]{5,9})$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
                         >
                           <Input maxLength={12} placeholder="07908800xxxx" />
                         </Form.Item>
@@ -757,7 +876,7 @@ export default function ContractDocumentsDrawer({
                                         {...restField}
                                         name={[name, 'citizenId']}
                                         label={t("Số CCCD")}
-                                        rules={[{ pattern: /^[0-9]{9,12}$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                                        rules={[{ pattern: /^(\d{9,12}|[A-Za-z]{1,3}[A-Za-z0-9]{5,9})$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
                                       >
                                         <Input maxLength={12} placeholder="07909900xxxx" />
                                       </Form.Item>

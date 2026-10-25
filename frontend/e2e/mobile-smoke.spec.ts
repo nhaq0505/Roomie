@@ -339,7 +339,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     const bottomNav = page.locator('.compact-navigation');
     await expect(stickyBar).toBeVisible();
     await expect(bottomNav).toBeVisible();
-    await expect(stickyBar.getByRole('button', { name: 'Quét / Tải ảnh CCCD' })).toBeVisible();
+    await expect(stickyBar.getByRole('button', { name: 'Xuất hợp đồng & CT01' })).toBeVisible();
     await expect(stickyBar.getByRole('button', { name: 'Lưu thay đổi' })).toBeVisible();
 
     const barBox = await stickyBar.boundingBox();

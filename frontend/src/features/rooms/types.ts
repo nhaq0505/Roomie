@@ -26,6 +26,8 @@ export interface Occupancy {
   additionalTerms?: string | null;
   householdHeadRelation?: string | null;
   tenantSelfCheckinAt?: string | null;
+  hasTenantIdentityPhoto?: boolean;
+  tenantIdentityPhotoFileName?: string | null;
 }
 
 export interface Room {
@@ -152,6 +154,8 @@ export interface OccupancyDocumentData {
   householdHeadRelation: string;
   coResidents: CoResident[];
   tenantSelfCheckinAt?: string | null;
+  hasTenantIdentityPhoto?: boolean;
+  tenantIdentityPhotoFileName?: string | null;
 }
 
 export interface UpdateOccupancyDocumentRequest {

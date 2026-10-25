@@ -216,7 +216,7 @@ export default function CccdQrScannerModal({
         }
       }
       const pastedText = event.clipboardData?.getData('text/plain');
-      if (pastedText && pastedText.includes('|')) {
+      if (pastedText) {
         const parsed = parseCccdQr(pastedText);
         if (parsed) {
           event.preventDefault();
@@ -369,11 +369,9 @@ export default function CccdQrScannerModal({
                 const nextVal = e.target.value;
                 setRawText(nextVal);
                 setErrorMsg(null);
-                if (nextVal.includes('|')) {
-                  const autoParsed = parseCccdQr(nextVal);
-                  if (autoParsed) {
-                    handleSuccess(autoParsed);
-                  }
+                const autoParsed = parseCccdQr(nextVal);
+                if (autoParsed) {
+                  handleSuccess(autoParsed);
                 }
               }}
               placeholder="079099001234|025123456|Nguyen Van A|15081999|Nam|..."
