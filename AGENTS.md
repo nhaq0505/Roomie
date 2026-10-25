@@ -2,7 +2,7 @@
 
 Đọc file này trước khi sửa dự án. Đây là tài liệu bàn giao kỹ thuật chính; README chỉ hướng dẫn vào dự án, runbook trong `docs/` chỉ dành cho thao tác vận hành. Khi code đổi, sửa mục tương ứng ở đây thay vì tạo thêm báo cáo bàn giao theo ngày.
 
-Baseline rà soát: `7be139d`, ngày 21/10/2026. Mô tả dưới đây dựa trên repository, không phải kết luận về phiên bản hay dữ liệu đang chạy trên VPS. Kiểm tra `git status`, `git log` và CI trước khi tiếp tục; không ghi đè thay đổi đang có của người dùng.
+Baseline rà soát: `e4fe403`, ngày 25/10/2026. Mô tả dưới đây dựa trên repository, không phải kết luận về phiên bản hay dữ liệu đang chạy trên VPS. Kiểm tra `git status`, `git log` và CI trước khi tiếp tục; không ghi đè thay đổi đang có của người dùng.
 
 ## 1. Sản phẩm và các quyết định đang áp dụng
 
@@ -115,7 +115,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 ### Hóa đơn, tiền và trả phòng
 
 - Snapshot đơn giá, số người, meter, tên dãy/phòng/khách thuộc lịch sử hóa đơn. Sửa phòng/lượt thuê không được tính lại Issued invoice cũ bằng giá hiện tại.
-- Chỉ số điện không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes.
+- Chỉ số điện không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
 - Revision/version/request fingerprint/idempotency là hợp đồng chống stale write/replay, không phải trường dư. Giữ transaction bao toàn bộ ghi tiền và cập nhật trạng thái.
 - payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
 - Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
@@ -361,3 +361,18 @@ CI lần đầu của bản sửa VietQR: backend/integration đạt, Playwright
   - `npm --prefix zalo-gateway test`: **13/13 tests PASS**.
   - `npm --prefix frontend run test:e2e -- --workers=4`: **81/81 tests PASS**.
   - Frontend build, `i18n:check` (`1664 keys × 4 catalogs`), `check:architecture` (`118 source modules`), `test:api`, `test:http`, `test:analytics`, `test:dates`, `test:cccd` / `test:cccd-qr`, `dotnet ef migrations has-pending-model-changes` và `git diff --check` đều đạt 100%. (Lưu ý: `test_backup_restore.py` và 2 ca `os.statvfs`/POSIX mode trong `test_host_collector.py` phụ thuộc môi trường Linux/POSIX nên chạy trên runner Ubuntu CI; 32/34 ca logic của `test_host_collector.py` đạt trên Windows). Container QA tạm và thư mục publish tạm đã được dọn sạch sau kiểm thử.
+
+## 15. Tối giản hóa UI/UX Mobile & Luồng chỉ số điện — 25/10/2026
+
+- **Thanh điều hướng dưới (Bottom Tab Bar `<= 767px`) và Topbar (`AppShell.tsx`, `controls.css`, `responsive-states.css`)**:
+  - Cố định 5 tab ở đáy màn hình cho chủ trọ: **Dãy trọ (`/buildings`) · Phòng (`/rooms`) · Lập hóa đơn (`/readings`) · Hóa đơn (`/invoices`) · Cấu hình (`/settings/payment`)** (các mục phụ nằm trong menu Hamburger bên trái).
+  - Ẩn tiêu đề trang bị lặp bên dưới `.topbar` trên mobile (`<= 767px`), giữ lại nút thao tác chính (`.page-heading-extra`).
+- **Tối giản các trang nghiệp vụ và hộp thoại**:
+  - **Phòng (`/rooms`)**: rút gọn thẻ phòng mobile còn 3 hàng (Header có badge `Đang thuê` nổi bật, hàng người thuê + giá thuê, hàng nút thao tác); bỏ tag hạn mức phòng và chỉ giữ bộ lọc theo dãy trọ.
+  - **Lập hóa đơn (`/readings`)**: bỏ bộ chọn tháng, nút chốt hàng loạt và các pill trạng thái, chỉ giữ bộ lọc theo dãy trọ.
+  - **Hóa đơn (`/invoices`)**: bỏ 3 thẻ tổng hợp đầu trang và chỉ giữ 3 bộ lọc: **Tìm hóa đơn**, **Kỳ hóa đơn**, **Trạng thái thanh toán** (`Tất cả trạng thái` / `Chưa thanh toán` / `Đã thanh toán`).
+  - **Cấp link cho khách (`RoomDialogs.tsx`)**: bỏ mã QR trong modal cấp link; thu gọn ô đường dẫn và đưa nút **Sao chép** lên nằm cùng hàng bên phải ô link.
+  - **Cổng khách thuê (`/t/{token}`, `TenantPage.tsx`)**: ẩn khối khách tự gửi chỉ số điện (`TenantMeterSubmissionCard`), chỉ hiển thị thông tin phòng, tổng dư nợ và danh sách hóa đơn.
+- **Chỉ số điện nguyên & sửa chỉ số điện ban đầu (`OwnerManagementEndpoints.Occupancies.cs`, `RoomTenantPage.tsx`)**:
+  - Toàn bộ ô `InputNumber` nhập chỉ số điện dùng số nguyên (`precision={0} step={1}`, không còn `.000`).
+  - Cho phép sửa `InitialReading` trong **Sửa thông tin người thuê** (`PATCH /api/rooms/{id}/occupancy`) khi lượt thuê chưa có hóa đơn tháng đã phát hành (`Issued`); tự động tính lại hóa đơn nháp (`Draft`) đầu kỳ nếu có.
