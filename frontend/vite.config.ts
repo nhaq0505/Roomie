@@ -9,9 +9,13 @@ export default defineConfig({
       output: {
         onlyExplicitManualChunks: true,
         manualChunks(id) {
-          if (!id.includes('/node_modules/')) return;
+          const norm = id.replaceAll('\\', '/');
+          const i18nMatch = norm.match(/\/src\/shared\/i18n\/(en|zh|ko|hi)\.json$/);
+          if (i18nMatch) return `i18n-${i18nMatch[1]}`;
+          if (/\/src\/shared\/i18n\/legalTemplates\.ts$/.test(norm)) return 'legal-templates';
+          if (!norm.includes('/node_modules/')) return;
           // Classify the innermost package, including dependencies nested under antd.
-          id = id.slice(id.lastIndexOf('/node_modules/'));
+          id = norm.slice(norm.lastIndexOf('/node_modules/'));
           if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(id)) return 'react-vendor';
           if (id.includes('/@ant-design/icons') || id.includes('/@ant-design/icons-svg/')) return 'antd-icons';
           if (id.includes('/@tanstack/')) return 'react-query';

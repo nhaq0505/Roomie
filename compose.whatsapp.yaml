@@ -1,0 +1,21 @@
+# docker compose -f compose.yaml -f compose.whatsapp.yaml up --build -d
+services:
+  whatsapp:
+    build: ./whatsapp-gateway
+    environment:
+      WHATSAPP_GATEWAY_TOKEN: ${WHATSAPP_GATEWAY_TOKEN:?Set a random gateway token}
+      WHATSAPP_SESSION_KEY: ${WHATSAPP_SESSION_KEY:?Set a 32-byte base64 encryption key}
+    volumes:
+      - whatsapp_sessions:/app/data
+    restart: unless-stopped
+    # Internal only: no published port. Run exactly one gateway per session volume.
+  app:
+    environment:
+      WhatsApp__Enabled: "true"
+      WhatsApp__GatewayUrl: http://whatsapp:5091
+      WhatsApp__GatewayToken: ${WHATSAPP_GATEWAY_TOKEN:?Set a random gateway token}
+    depends_on:
+      whatsapp:
+        condition: service_started
+volumes:
+  whatsapp_sessions:

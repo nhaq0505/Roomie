@@ -130,7 +130,10 @@ public sealed class WhatsAppLocalGatewayHost : IHostedService, IDisposable
             while (DateTime.UtcNow < deadline)
             {
                 if (proc.HasExited)
+                {
+                    StopProcessCore();
                     throw new ApiException(503, "WhatsApp gateway is unavailable. Try again shortly.");
+                }
                 try
                 {
                     using var res = await probeClient.GetAsync("owners/00000000-0000-0000-0000-000000000000/status", ct);
@@ -141,6 +144,7 @@ public sealed class WhatsAppLocalGatewayHost : IHostedService, IDisposable
                 await Task.Delay(50, ct);
             }
 
+            StopProcessCore();
             throw new ApiException(503, "WhatsApp gateway is unavailable. Try again shortly.");
         }
         finally
@@ -171,19 +175,34 @@ public sealed class WhatsAppLocalGatewayHost : IHostedService, IDisposable
     private string ResolveDataDirectory()
     {
         var explicitDir = _config["WhatsApp:DataDir"] ?? Environment.GetEnvironmentVariable("WHATSAPP_DATA_DIR");
-        if (!string.IsNullOrWhiteSpace(explicitDir)) return Path.GetFullPath(explicitDir);
+        if (!string.IsNullOrWhiteSpace(explicitDir)) return EnsureWritableDirectory(Path.GetFullPath(explicitDir));
 
         var keysPath = _config["DataProtection:KeysPath"];
         if (!string.IsNullOrWhiteSpace(keysPath))
         {
             var fullKeys = Path.GetFullPath(keysPath);
             var parent = Path.GetDirectoryName(fullKeys) ?? fullKeys;
-            return Path.Combine(parent, "whatsapp-sessions");
+            return EnsureWritableDirectory(Path.Combine(parent, "whatsapp-sessions"));
         }
 
         var root = _env?.ContentRootPath;
         if (string.IsNullOrWhiteSpace(root)) root = AppContext.BaseDirectory;
-        return Path.Combine(root, ".local-data", "whatsapp-sessions");
+        return EnsureWritableDirectory(Path.Combine(root, ".local-data", "whatsapp-sessions"));
+    }
+
+    private static string EnsureWritableDirectory(string preferredPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(preferredPath);
+            return preferredPath;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            var fallback = Path.Combine(Path.GetTempPath(), "roomie-whatsapp-sessions");
+            Directory.CreateDirectory(fallback);
+            return fallback;
+        }
     }
 
     private string ResolveOrCreateSessionKey(string dataDir)

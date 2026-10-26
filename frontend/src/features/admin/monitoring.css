@@ -42,20 +42,6 @@
   box-shadow: 0 4px 14px rgba(19, 48, 55, 0.05);
 }
 
-.host-stat-mini-card {
-  background: #fbfdfc;
-  border: 1px solid #eef2f1;
-  border-radius: 12px;
-  padding: 12px 14px;
-}
-
-.integration-card {
-  background: #ffffff;
-  border: 1px solid #e8eeec;
-  border-radius: 12px;
-  padding: 14px 16px;
-}
-
 .native-bar-element {
   transition: fill 0.2s ease, opacity 0.2s ease;
   cursor: pointer;

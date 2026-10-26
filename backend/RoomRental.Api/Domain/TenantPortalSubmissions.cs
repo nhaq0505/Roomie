@@ -27,42 +27,6 @@ public sealed class TenantMeterSubmission
     public Guid? InvoiceId { get; set; }
 }
 
-public sealed record TenantSelfCheckinRequest(
-    string? Target,
-    string FullName,
-    string CitizenId,
-    DateOnly? DateOfBirth = null,
-    string? Gender = null,
-    DateOnly? CitizenIdIssuedDate = null,
-    string? CitizenIdIssuedPlace = null,
-    string? PermanentAddress = null,
-    string? Phone = null,
-    string? Email = null,
-    string? Relation = null);
-
-public sealed record TenantMeterSubmissionDto(
-    Guid Id,
-    Guid RoomId,
-    Guid OccupancyId,
-    string Period,
-    decimal PreviousReading,
-    decimal SubmittedReading,
-    decimal? ApprovedReading,
-    string? TenantNote,
-    string? RejectReason,
-    string Status,
-    string PhotoFileName,
-    string PhotoContentType,
-    long PhotoSizeBytes,
-    DateTimeOffset SubmittedAt,
-    DateTimeOffset? ReviewedAt,
-    Guid? ReadingId,
-    Guid? InvoiceId);
-
-public sealed record ApproveMeterSubmissionRequest(decimal? CurrentReading = null);
-
-public sealed record RejectMeterSubmissionRequest(string? Reason = null);
-
 public sealed class TenantIdentityDocument
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -78,10 +42,3 @@ public sealed class TenantIdentityDocument
     public byte[] PhotoContent { get; set; } = [];
     public DateTimeOffset UploadedAt { get; set; } = DateTimeOffset.UtcNow;
 }
-
-public sealed record TenantIdentityPhotoDto(
-    string TargetKey,
-    string PhotoFileName,
-    string PhotoContentType,
-    long PhotoSizeBytes,
-    DateTimeOffset UploadedAt);

@@ -5,7 +5,6 @@ import { t } from '../../shared/i18n/runtime';
 import ResponsiveTable from '../../shared/ui/ResponsiveTable';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
 import RoomDialogs from './RoomDialogs';
-import './RoomsPage.css';
 import { roomTheme } from './theme';
 import { useRoomsPage } from './useRoomsPage';
 

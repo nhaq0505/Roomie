@@ -87,13 +87,28 @@ else
   tar -czf "$backup_dir/data-protection-keys.tar.gz" --files-from /dev/null
 fi
 
+checksum_files=(database.dump data-protection-keys.tar.gz)
+zalo_mount=$(docker volume inspect --format '{{.Mountpoint}}' rehouse_zalo_sessions 2>/dev/null || true)
+if [[ -n "$zalo_mount" && -d "$zalo_mount" ]]; then
+  tar -C "$zalo_mount" -czf "$backup_dir/zalo-sessions.tar.gz" .
+  checksum_files+=(zalo-sessions.tar.gz)
+fi
+whatsapp_mount=$(docker volume inspect --format '{{.Mountpoint}}' rehouse_whatsapp_sessions 2>/dev/null || true)
+if [[ -n "$whatsapp_mount" && -d "$whatsapp_mount" ]]; then
+  tar -C "$whatsapp_mount" -czf "$backup_dir/whatsapp-sessions.tar.gz" .
+  checksum_files+=(whatsapp-sessions.tar.gz)
+fi
+
 {
   printf 'created_utc=%s\n' "$stamp"
   printf 'image_ref=%s\n' "$image_ref"
   printf 'database=PostgreSQL custom dump, database room_rental\n'
   printf 'data_protection_keys=data-protection-keys.tar.gz\n'
+  [[ -f "$backup_dir/zalo-sessions.tar.gz" ]] && printf 'zalo_sessions=zalo-sessions.tar.gz\n'
+  [[ -f "$backup_dir/whatsapp-sessions.tar.gz" ]] && printf 'whatsapp_sessions=whatsapp-sessions.tar.gz\n'
 } > "$backup_dir/manifest.txt"
-(cd "$backup_dir" && sha256sum database.dump data-protection-keys.tar.gz manifest.txt > checksums.sha256)
+checksum_files+=(manifest.txt)
+(cd "$backup_dir" && sha256sum "${checksum_files[@]}" > checksums.sha256)
 chmod 0600 "$backup_dir"/*
 
 # The local backup is complete. A sync failure must not delete the only usable copy.

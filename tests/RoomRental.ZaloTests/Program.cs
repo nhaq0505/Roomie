@@ -24,7 +24,9 @@ Assert(ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T00:00:0
 Assert(ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T13:59:59Z")), "20:59:59 allowed");
 Assert(!ZaloReminderService.InSendWindow(DateTimeOffset.Parse("2026-10-20T14:00:00Z")), "21:00 blocked");
 Assert(ZaloReminderService.NormalizePhone("+84 912 345 678") == "0912345678" && ZaloReminderService.NormalizePhone("84912345678") == "0912345678", "Vietnam phone normalization");
-Assert(ZaloReminderService.NormalizePhone("123") == null && ZaloReminderService.NormalizePhone("19001234") == null, "invalid phones rejected");
+Assert(ZaloReminderService.NormalizePhone("123") == null && ZaloReminderService.NormalizePhone("19001234") == null && ZaloReminderService.NormalizePhone("+821012345678") == null, "invalid or international phones rejected by Zalo");
+Assert(WhatsAppReminderService.NormalizePhone("+82 10-1234-5678") == "+821012345678" && WhatsAppReminderService.NormalizePhone("001 (415) 555-2671") == "+14155552671", "international phone normalization for WhatsApp");
+Assert(WhatsAppReminderService.NormalizePhone("0912345678") == null && WhatsAppReminderService.NormalizePhone("+84912345678") == null && WhatsAppReminderService.NormalizePhone("123") == null, "Vietnam and invalid phones rejected by WhatsApp");
 var schedule = new OwnerZaloSettings { ScheduleEnabled = true, DayOfMonth = 31, Hour = 8, Minute = 30 };
 Assert(!ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2028-02-29T01:29:59Z")), "schedule respects minute in leap month");
 Assert(ZaloReminderService.ScheduleDue(schedule, DateTimeOffset.Parse("2028-02-29T01:30:00Z")), "day 31 clamps to leap-month last day");
@@ -262,21 +264,25 @@ await using (var migrationDb = await PostgresTestDb.CreateAsync(migrate: false, 
 }
 await db.Invoices.ExecuteUpdateAsync(s => s.SetProperty(x => x.Paid, x => x.Total));
 db.ChangeTracker.Clear();
-var waInvoice = AddInvoice("WhatsAppOnly", owner.Id);
+var waInvoice = AddInvoice("WhatsAppOnly", owner.Id, phone: "+82 10-1234-5678");
 await db.SaveChangesAsync();
 var waGateway = new FakeWhatsAppGateway();
 var waService = new WhatsAppReminderService(db, waGateway, clock, tokens, payments);
-Assert(await waService.QueueAsync(owner.Id, default) == 1, "WhatsApp queue stages eligible invoices independently of Zalo");
+Assert(await service.QueueAsync(owner.Id, default) == 0, "Zalo queue ignores international phone numbers");
+Assert(await waService.QueueAsync(owner.Id, default) == 1, "WhatsApp queue stages international phone numbers exclusively");
 await waService.DispatchAsync(owner.Id, default);
-Assert(waGateway.Sends.Count == 1 && (await db.WhatsAppReminders.SingleAsync()).Status == "Sent", "WhatsApp dispatch sends and records Sent independently of Zalo");
+Assert(waGateway.Sends.Count == 1 && waGateway.Sends[0].Phone == "+821012345678" && (await db.WhatsAppReminders.SingleAsync()).Status == "Sent", "WhatsApp dispatch sends to normalized international E.164 phone");
 Assert(waGateway.Sends[0].Message.Contains("Roomie • Invoice") && waGateway.Sends[0].Message.Contains("Total: 100,000 VND;") && waGateway.Sends[0].Message.Contains("Pay here: https://roomie.example/t/"), "WhatsApp message uses English template and tenant link");
 var waDepositMsg = WhatsAppReminderService.BuildMessage(depositInvoice, "https://roomie.example/t/sample");
 Assert(waDepositMsg.Contains("Description: Security deposit") && waDepositMsg.Contains("Total: 2,000,000 VND;") && !waDepositMsg.Contains("Rent: 0 VND;"), "WhatsApp deposit message uses English description and omits zero breakdown");
 var dualBilling = new InvoiceService(db, service, whatsApp: waService);
-var dualInvoice = AddInvoice("DualChannel", owner.Id);
-await dualBilling.StageZaloReminderAsync(dualInvoice, default);
+var vnRoutedInvoice = AddInvoice("VnToZaloOnly", owner.Id, phone: "0912345678");
+var intlRoutedInvoice = AddInvoice("IntlToWhatsAppOnly", owner.Id, phone: "+14155552671");
+await dualBilling.StageZaloReminderAsync(vnRoutedInvoice, default);
+await dualBilling.StageZaloReminderAsync(intlRoutedInvoice, default);
 await db.SaveChangesAsync();
-Assert(await db.ZaloReminders.AnyAsync(x => x.InvoiceId == dualInvoice.Id) && await db.WhatsAppReminders.AnyAsync(x => x.InvoiceId == dualInvoice.Id), "invoice publication stages both Zalo and WhatsApp reminders in parallel");
+Assert(await db.ZaloReminders.AnyAsync(x => x.InvoiceId == vnRoutedInvoice.Id) && !await db.WhatsAppReminders.AnyAsync(x => x.InvoiceId == vnRoutedInvoice.Id), "Vietnam phone stages Zalo reminder only");
+Assert(!await db.ZaloReminders.AnyAsync(x => x.InvoiceId == intlRoutedInvoice.Id) && await db.WhatsAppReminders.AnyAsync(x => x.InvoiceId == intlRoutedInvoice.Id), "International phone stages WhatsApp reminder only");
 Console.WriteLine($"PASS: {checks} Zalo assertions; no external provider calls.");
 
 sealed class FakeClock(DateTimeOffset initial) : TimeProvider

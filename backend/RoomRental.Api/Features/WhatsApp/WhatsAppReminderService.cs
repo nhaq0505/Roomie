@@ -1,11 +1,12 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
 
 namespace RoomRental.Api.Services;
 
-public sealed class WhatsAppReminderService(AppDbContext db, IWhatsAppGateway gateway, TimeProvider clock,
+public sealed partial class WhatsAppReminderService(AppDbContext db, IWhatsAppGateway gateway, TimeProvider clock,
     TenantTokenService tokens, PaymentWebhookService payments)
 {
     public const long CooldownMs = ZaloReminderService.CooldownMs;
@@ -18,7 +19,20 @@ public sealed class WhatsAppReminderService(AppDbContext db, IWhatsAppGateway ga
         return s.ScheduleEnabled && s.LastScheduledPeriod != local.ToString("yyyy-MM") &&
                local >= new DateTimeOffset(local.Year, local.Month, day, s.Hour, s.Minute, 0, local.Offset);
     }
-    public static string? NormalizePhone(string? input) => ZaloReminderService.NormalizePhone(input);
+    // Vietnamese mobile numbers (+84 / 0...) are routed exclusively to Zalo;
+    // international E.164 numbers (non-+84) default to WhatsApp.
+    public static string? NormalizePhone(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+        if (ZaloReminderService.NormalizePhone(input) is not null) return null;
+        var phone = Regex.Replace(input.Trim(), @"[\s().-]", "");
+        if (phone.StartsWith("00")) phone = "+" + phone[2..];
+        if (phone.StartsWith("+84") || phone.StartsWith("0")) return null;
+        return InternationalPhonePattern().IsMatch(phone) ? phone : null;
+    }
+    [GeneratedRegex(@"^\+[1-9]\d{6,14}$")]
+    private static partial Regex InternationalPhonePattern();
+
     public static string BuildMessage(Invoice invoice, string link)
     {
         var description = string.IsNullOrWhiteSpace(invoice.Description)
@@ -121,10 +135,14 @@ public sealed class WhatsAppReminderService(AppDbContext db, IWhatsAppGateway ga
             select new { i.Id, Occupancy = o }).ToListAsync(ct);
         var now = clock.GetUtcNow().ToUnixTimeMilliseconds();
         var added = 0;
-        foreach (var invoice in candidates.Where(x => NormalizePhone(x.Occupancy.Phone) != null && ValidToken(x.Occupancy) != null))
+        var eligible = candidates.Where(x => NormalizePhone(x.Occupancy.Phone) != null && ValidToken(x.Occupancy) != null).ToList();
+        var invoiceIds = eligible.Select(x => x.Id).ToList();
+        var existingRows = invoiceIds.Count == 0
+            ? new Dictionary<Guid, WhatsAppReminder>()
+            : await db.WhatsAppReminders.Where(x => invoiceIds.Contains(x.InvoiceId)).ToDictionaryAsync(x => x.InvoiceId, ct);
+        foreach (var invoice in eligible)
         {
-            var row = await db.WhatsAppReminders.SingleOrDefaultAsync(x => x.InvoiceId == invoice.Id, ct);
-            if (row is null)
+            if (!existingRows.TryGetValue(invoice.Id, out var row))
             {
                 db.WhatsAppReminders.Add(new() { InvoiceId = invoice.Id, OwnerId = ownerId, QueuedAtMs = now });
                 added++;

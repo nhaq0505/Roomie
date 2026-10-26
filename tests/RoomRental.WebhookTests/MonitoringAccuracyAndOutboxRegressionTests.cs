@@ -835,7 +835,7 @@ internal static class MonitoringAccuracyAndOutboxRegressionTests
             ToDate = today
         }, default);
 
-        Assert(growthMetrics.Funnel.StartedCount == 25_005,
+        Assert(growthMetrics.Funnel!.StartedCount == 25_005,
             $"Funnel StartedCount is exact without Take(50k) truncation (expected 25,005, got {growthMetrics.Funnel.StartedCount})");
         Assert(growthMetrics.Funnel.VerifiedCount == 25_005,
             $"Funnel VerifiedCount is exact without Take(50k) truncation (expected 25,005, got {growthMetrics.Funnel.VerifiedCount})");

@@ -76,7 +76,7 @@ export class Gateway {
   }
   async send(owner, body) {
     const s = this.session(owner);
-    if (!/^[a-f0-9-]{36}$/i.test(body.attemptId) || !/^0[35789]\d{8}$/.test(body.phone) ||
+    if (!/^[a-f0-9-]{36}$/i.test(body.attemptId) || !/^(\+[1-9]\d{6,14}|0[35789]\d{8})$/.test(body.phone) ||
         typeof body.message !== 'string' || body.message.length > 6000) throw new Error('Invalid message');
     const fingerprint = createHash('sha256').update(JSON.stringify(body)).digest('hex');
     const previous = s.saved.attempts[body.attemptId];

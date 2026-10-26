@@ -7,8 +7,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
 import { dateFormat, t } from '../../shared/i18n/runtime';
 import MoneyInput from '../../shared/ui/MoneyInput';
+import PhoneInput from '../../shared/ui/PhoneInput';
 import { EmptyPanel, LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
-import './RoomsPage.css';
 import { roomsApi } from './api';
 import { roomTheme } from './theme';
 import type { Room } from './types';
@@ -259,7 +259,7 @@ function RoomTenantWorkspace() {
                 </Col>
                 <Col xs={24} sm={14} md={8}>
                   <Form.Item label={t("Số điện thoại")} name="phone">
-                    <Input size="large" inputMode="tel" placeholder="09xx xxx xxx" maxLength={60} />
+                    <PhoneInput size="large" maxLength={60} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={10} md={6}>

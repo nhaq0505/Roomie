@@ -142,7 +142,6 @@ public sealed record PaymentSettingsDto(bool Configured, string? ClientId, strin
 }
 public sealed record PaymentCheckoutDto(string CheckoutUrl, string? QrCode, int Amount, long OrderCode,
     string? AccountName, string? AccountNumber, string? BankBin, string? Description, string Status, long? ExpiresAt);
-public sealed record TenantSummaryDto(RoomDto Room, OccupancyDto Occupancy, IReadOnlyList<InvoiceDto> Invoices);
 
 public sealed record DepositSettlementRequest(decimal Amount, string Kind, string Reason, string IdempotencyKey, Guid? TargetInvoiceId, long? ExpectedVersion = null, long? TargetExpectedVersion = null);
 

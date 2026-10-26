@@ -192,6 +192,11 @@ public static class MarketerEmailEndpoints
                     });
                     failedCount++;
                 }
+
+                if ((sentCount + failedCount) % 10 == 0)
+                {
+                    await db.SaveChangesAsync(ct);
+                }
             }
 
             campaign.TotalRecipients = recipients.Count;

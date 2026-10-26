@@ -10,7 +10,6 @@ export interface Reading {
   previousReading: number;
   currentReading?: number;
   consumption?: number;
-  isSubmitted?: boolean;
   invoiceId?: string;
   issuanceStatus?: 'Draft' | 'Issued' | string;
 }

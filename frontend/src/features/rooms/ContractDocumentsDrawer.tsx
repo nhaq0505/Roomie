@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatVnd } from '../../shared/format';
 import { legalContractTemplate, legalCt01Template } from '../../shared/i18n/legalTemplates';
 import { dateFormat, t } from '../../shared/i18n/runtime';
+import PhoneInput from '../../shared/ui/PhoneInput';
 import { LoadError, PageTitle } from '../../shared/ui/Ui';
 import { useAuth } from '../auth/session';
 import CccdQrScannerModal from './CccdQrScannerModal';
@@ -605,7 +606,7 @@ export default function ContractDocumentsDrawer({
                           </Col>
                           <Col xs={24} sm={10}>
                             <Form.Item name="tenantPhone" label={t("Số điện thoại")}>
-                              <Input maxLength={60} placeholder="09xx xxx xxx" />
+                              <PhoneInput maxLength={60} />
                             </Form.Item>
                           </Col>
                         </Row>

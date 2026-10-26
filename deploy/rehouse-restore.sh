@@ -173,6 +173,31 @@ cp -a "$keys_stage/." "$keys_mount/"
 rm -rf -- "$keys_stage"
 keys_stage=''
 
+restore_optional_volume() {
+  local archive_name=$1 volume_name=$2
+  [[ -f "$backup_dir/$archive_name" ]] || return 0
+  local archive_members member vol_stage vol_mount
+  archive_members=$(tar -tzf "$backup_dir/$archive_name") || fail "$archive_name archive is invalid"
+  while IFS= read -r member; do
+    member=${member#./}
+    case "$member" in
+      /*|..|../*|*/../*|*/..) fail "$archive_name archive contains an unsafe path" ;;
+    esac
+  done <<< "$archive_members"
+  vol_stage=$(mktemp -d /var/backups/rehouse/.restore-vol.XXXXXX)
+  chmod 0700 "$vol_stage"
+  tar -C "$vol_stage" --same-owner -xzf "$backup_dir/$archive_name"
+  docker volume inspect "$volume_name" >/dev/null 2>&1 || docker volume create "$volume_name" >/dev/null
+  vol_mount=$(docker volume inspect --format '{{.Mountpoint}}' "$volume_name")
+  if [[ -d "$vol_mount" ]]; then
+    find "$vol_mount" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    cp -a "$vol_stage/." "$vol_mount/"
+  fi
+  rm -rf -- "$vol_stage"
+}
+restore_optional_volume zalo-sessions.tar.gz rehouse_zalo_sessions
+restore_optional_volume whatsapp-sessions.tar.gz rehouse_whatsapp_sessions
+
 psql_admin -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${db_name}' AND pid <> pg_backend_pid()" >/dev/null
 psql_admin -c "ALTER DATABASE \"${db_name}\" RENAME TO \"${previous_db}\""
 previous_db_renamed=1

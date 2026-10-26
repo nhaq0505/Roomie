@@ -113,21 +113,26 @@ builder.Services.AddRateLimiter(options =>
     var configuredAuthLimit = int.TryParse(builder.Configuration["AuthRequestsPerMinute"], out var configuredLimit)
         ? Math.Clamp(configuredLimit, 1, 1000)
         : builder.Environment.IsDevelopment() ? 100 : 10;
-    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter($"auth:{PartitionKey(context)}", _ => new FixedWindowRateLimiterOptions
     {
         PermitLimit = configuredAuthLimit,
         Window = TimeSpan.FromMinutes(1),
         QueueLimit = 0,
         AutoReplenishment = true
     }));
-    options.AddPolicy("tenant-payment", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
+    options.AddPolicy("tenant-payment", context =>
     {
-        PermitLimit = builder.Environment.IsDevelopment() ? 120 : 12,
-        Window = TimeSpan.FromMinutes(1),
-        QueueLimit = 0,
-        AutoReplenishment = true
-    }));
-    options.AddPolicy("analytics", context => RateLimitPartition.GetFixedWindowLimiter(PartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        var isTenantRoute = context.Request.Path.StartsWithSegments("/api/t");
+        var scopeKey = isTenantRoute ? $"tenant-payment:anon:{PartitionKey(context)}" : $"tenant-payment:owner:{PartitionKey(context)}";
+        return RateLimitPartition.GetFixedWindowLimiter(scopeKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = builder.Environment.IsDevelopment() ? 120 : (isTenantRoute ? 12 : 30),
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+    });
+    options.AddPolicy("analytics", context => RateLimitPartition.GetFixedWindowLimiter($"analytics:{PartitionKey(context)}", _ => new FixedWindowRateLimiterOptions
     {
         PermitLimit = builder.Environment.IsDevelopment() ? 600 : 120,
         Window = TimeSpan.FromMinutes(1),

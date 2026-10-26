@@ -143,12 +143,13 @@ public static partial class MarketerContentEndpoints
         app.MapGet("/api/public/guides/{slug}", async (string slug, AppDbContext db, CancellationToken ct) =>
         {
             var normalized = slug.Trim().ToLowerInvariant();
-            var article = await db.MarketingArticles
+            var article = await db.MarketingArticles.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Slug == normalized && x.Status == MarketingArticleStatus.Published, ct)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy bài viết hướng dẫn.");
 
-            article.ViewCount++;
-            await db.SaveChangesAsync(ct);
+            await db.MarketingArticles
+                .Where(x => x.Id == article.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.ViewCount, x => x.ViewCount + 1), ct);
 
             return Results.Ok(new PublicGuideArticleDetailDto(
                 article.Slug,
@@ -162,7 +163,7 @@ public static partial class MarketerContentEndpoints
                 article.CtaLabel,
                 article.CtaTargetUrl,
                 article.PublishedAt));
-        });
+        }).RequireRateLimiting("analytics");
 
         app.MapPost("/api/public/guides/{slug}/cta-click", async (string slug, HttpContext context, AppDbContext db, CancellationToken ct) =>
         {

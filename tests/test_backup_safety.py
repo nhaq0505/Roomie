@@ -27,6 +27,6 @@ class BackupSafetyTests(unittest.TestCase):
         def fake_rclone(*args,**kwargs):
             calls.append(args[0])
             if args[0]=='check':raise subprocess.CalledProcessError(1,'rclone')
-        with patch.object(sync,'Path',side_effect=lambda p: Path(p) if str(p)=='/var/backups/rehouse' else FakePath(p)),patch.object(sync.os,'geteuid',return_value=0),patch.object(sync.sys,'argv',['sync','/var/backups/rehouse/rehouse-20261016T000000Z-Ab1234']),patch('configparser.ConfigParser.read'),patch('configparser.ConfigParser.get',side_effect=lambda section,key,**kw: {'type':'crypt' if section=='roomie_backup' else 'drive','remote':'roomie_drive:encrypted','root_folder_id':'approved-folder'}[key]),patch.object(sync,'rclone',side_effect=fake_rclone):
+        with patch.object(sync,'Path',side_effect=lambda p: Path(p) if str(p)=='/var/backups/rehouse' else FakePath(p)),patch.object(sync.os,'geteuid',return_value=0,create=True),patch.object(sync.sys,'argv',['sync','/var/backups/rehouse/rehouse-20261016T000000Z-Ab1234']),patch('configparser.ConfigParser.read'),patch('configparser.ConfigParser.get',side_effect=lambda section,key,**kw: {'type':'crypt' if section=='roomie_backup' else 'drive','remote':'roomie_drive:encrypted','root_folder_id':'approved-folder'}[key]),patch.object(sync,'rclone',side_effect=fake_rclone):
             with self.assertRaises(subprocess.CalledProcessError):sync.main()
         self.assertEqual(calls,['copy','check'])

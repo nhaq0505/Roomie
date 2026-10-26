@@ -168,15 +168,6 @@ public static class PaymentEndpoints
         });
     }
 
-    internal static string NormalizeIdentityTargetKey(string? target)
-    {
-        if (string.IsNullOrWhiteSpace(target)) return "tenant";
-        var trimmed = target.Trim();
-        if (trimmed.Length > 40)
-            throw new ApiException(StatusCodes.Status400BadRequest, "Đối tượng giấy tờ tùy thân tối đa 40 ký tự.");
-        return string.Equals(trimmed, "tenant", StringComparison.OrdinalIgnoreCase) ? "tenant" : trimmed;
-    }
-
     internal static async Task<Occupancy> FindTenantAsync(AppDbContext db, string token, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token) || token.Length > 100)

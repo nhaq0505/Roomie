@@ -73,7 +73,7 @@ public static partial class OwnerManagementEndpoints
             var occupancy = await db.Occupancies.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.RoomId == id && x.IsActive, ct)
                 ?? throw new ApiException(StatusCodes.Status409Conflict, "Phòng chưa có người thuê đang ở.");
-            var targetKey = PaymentEndpoints.NormalizeIdentityTargetKey(target);
+            var targetKey = NormalizeIdentityTargetKey(target);
             var row = await db.TenantIdentityDocuments.AsNoTracking()
                 .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == targetKey)
                 .Select(x => new { x.PhotoFileName, x.PhotoContentType, x.PhotoContent })
@@ -407,6 +407,15 @@ public static partial class OwnerManagementEndpoints
             occupancy.AdditionalTerms = CleanOptional(additionalTerms, 2000, "Điều khoản bổ sung");
         if (householdHeadRelation is not null || !preserveExistingWhenNull)
             occupancy.HouseholdHeadRelation = CleanOptional(householdHeadRelation, 100, "Mối quan hệ với chủ hộ") ?? "Người thuê trọ";
+    }
+
+    internal static string NormalizeIdentityTargetKey(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return "tenant";
+        var trimmed = target.Trim();
+        if (trimmed.Length > 40)
+            throw new ApiException(StatusCodes.Status400BadRequest, "Đối tượng giấy tờ tùy thân tối đa 40 ký tự.");
+        return string.Equals(trimmed, "tenant", StringComparison.OrdinalIgnoreCase) ? "tenant" : trimmed;
     }
 
     internal static string? CleanOptional(string? value, int maxLength, string fieldLabel)

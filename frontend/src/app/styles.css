@@ -4,6 +4,7 @@
 @import "../features/dashboard/dashboard.css";
 @import "../features/buildings/buildings.css";
 @import "../features/rooms/directory.css";
+@import "../features/rooms/RoomsPage.css";
 @import "../features/readings/readings.css";
 @import "../features/invoices/invoices.css";
 @import "../features/payments/payments.css";
@@ -14,6 +15,7 @@
 @import "../features/auth/auth.css";
 @import "../features/subscription/status.css";
 @import "../features/tenant/portal.css";
+@import "layout/shell-responsive.css";
 @import "../shared/styles/controls.css";
 @import "../shared/styles/business-states.css";
 @import "../features/invoices/corrections.css";

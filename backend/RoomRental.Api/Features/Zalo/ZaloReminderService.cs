@@ -127,9 +127,14 @@ public sealed partial class ZaloReminderService(AppDbContext db, IZaloGateway ga
             select new { i.Id, Occupancy = o }).ToListAsync(ct);
         var now = clock.GetUtcNow().ToUnixTimeMilliseconds();
         var added = 0;
-        foreach (var invoice in candidates.Where(x => NormalizePhone(x.Occupancy.Phone) != null && ValidToken(x.Occupancy) != null))
+        var eligible = candidates.Where(x => NormalizePhone(x.Occupancy.Phone) != null && ValidToken(x.Occupancy) != null).ToList();
+        var invoiceIds = eligible.Select(x => x.Id).ToList();
+        var existingByInvoice = invoiceIds.Count == 0
+            ? new Dictionary<Guid, ZaloReminder>()
+            : await db.ZaloReminders.Where(x => invoiceIds.Contains(x.InvoiceId)).ToDictionaryAsync(x => x.InvoiceId, ct);
+        foreach (var invoice in eligible)
         {
-            var row = await db.ZaloReminders.SingleOrDefaultAsync(x => x.InvoiceId == invoice.Id, ct);
+            existingByInvoice.TryGetValue(invoice.Id, out var row);
             if (row is null)
             {
                 db.ZaloReminders.Add(new() { InvoiceId = invoice.Id, OwnerId = ownerId, QueuedAtMs = now });

@@ -1,12 +1,10 @@
 
 /* Invoices */
-.invoice-totals-row { margin-bottom: 18px; }
 .invoice-total-tile { display: flex; flex-direction: column; gap: 9px; min-height: 82px; padding: 16px 18px; border: 1px solid #e7eeec; border-radius: 14px; background: white; }
 .invoice-total-tile span { color: var(--muted); font-size: 13px; }
 .invoice-total-tile strong { color: #304a51; font-family: 'Be Vietnam Pro', sans-serif; font-size: 17px; font-weight: 700; }
 .invoice-total-paid strong { color: #237e60; }
 .invoice-total-due strong { color: #965c21; }
-.invoice-summary-scope { margin: -7px 0 18px; color: #5c7178; font-size: 13px; line-height: 1.55; }
 .invoice-list-card .section-card-header { margin-bottom: 10px; }
 .invoice-list-actions { display: flex; align-items: center; gap: 8px; }
 .invoice-filter-toolbar { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; padding: 2px 0 16px; margin-bottom: 15px; border-bottom: 1px solid #edf1f0; }

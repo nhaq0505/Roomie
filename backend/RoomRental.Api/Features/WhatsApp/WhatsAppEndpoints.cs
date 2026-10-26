@@ -37,7 +37,7 @@ public static class WhatsAppEndpoints
         routes.MapGet("/connection", async (HttpContext context, IWhatsAppGateway gateway, CancellationToken ct) =>
         {
             try { return Results.Ok(await gateway.ConnectionAsync(ApiSupport.OwnerId(context), "status", ct)); }
-            catch (Exception ex) when (ex is HttpRequestException or ApiException or TaskCanceledException && !ct.IsCancellationRequested)
+            catch (Exception ex) when (ex is HttpRequestException or ApiException or TaskCanceledException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception && !ct.IsCancellationRequested)
             { return Results.Ok(new WhatsAppConnection("Unavailable")); }
         });
         routes.MapPost("/connect", async (HttpContext context, IWhatsAppGateway gateway, CancellationToken ct) =>

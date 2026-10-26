@@ -5,12 +5,12 @@ import { build } from 'esbuild';
 
 const require = createRequire(import.meta.url);
 
-// Bundle getInitialDates from AdminMonitoringPage.tsx
+// Bundle getInitialDates from dates.ts
 const bundle = await build({
   stdin: {
-    contents: 'export { getInitialDates } from "./src/features/admin/monitoring/AdminMonitoringPage";',
+    contents: 'export { getInitialDates } from "./src/features/admin/monitoring/dates";',
     resolveDir: process.cwd(),
-    loader: 'tsx',
+    loader: 'ts',
   },
   bundle: true,
   write: false,

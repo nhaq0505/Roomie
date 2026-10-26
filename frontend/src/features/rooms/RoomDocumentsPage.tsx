@@ -1,7 +1,6 @@
 import { App, ConfigProvider, Grid } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import ContractDocumentsDrawer from './ContractDocumentsDrawer';
-import './RoomsPage.css';
 import { roomTheme } from './theme';
 
 export default function RoomDocumentsPage() {

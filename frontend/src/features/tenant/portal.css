@@ -61,83 +61,8 @@
 .tenant-payment-error .ant-alert-message { font-size: 13px; }
 .tenant-payment-error .ant-alert-description { font-size: 12px; }
 
-@media (max-width: 1200px) {
-  .page-content { padding-right: 25px; padding-left: 25px; }
-  .topbar.ant-layout-header { padding-right: 25px; padding-left: 25px; }
-}
-@media (max-width: 991px) {
-  .app-sider { display: none; }
-  .main-layout { margin-left: 0; }
-  .mobile-menu-button { display: inline-flex; }
-  .settings-grid { grid-template-columns: minmax(0, 1.4fr) minmax(240px, .8fr); }
-  .page-content { padding-top: 28px; }
-}
+
 @media (max-width: 767px) {
-  .page-content { padding: 12px 12px 40px; }
-  .topbar.ant-layout-header { height: 50px; padding: 0 12px; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(16px); border-bottom: 1px solid #e4ece9; }
-  .page-heading { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .page-heading > div:first-child { min-width: 0; flex: 1 1 auto; }
-  .page-heading-extra { width: auto; flex: 0 1 auto; justify-content: flex-end; }
-  .page-heading-extra:has(.ant-space) { width: 100%; }
-  .page-heading .eyebrow, .page-heading .page-subtitle { display: none !important; }
-  .page-heading h2.ant-typography { margin: 0 !important; font-size: 18px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
-  .page-heading-extra > .ant-btn { min-height: 36px; height: 36px; padding-inline: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; }
-  .section-card, .content-card { padding: 12px 14px; margin-bottom: 10px; border-radius: 14px; border: 1px solid #e1ebe8; box-shadow: none; }
-  .room-directory.section-card,
-  .reading-section.section-card,
-  .invoice-list-card.section-card,
-  .expenses-workspace.section-card,
-  .reports-workspace.section-card,
-  .owner-list-card.section-card,
-  .section-card:has(> .mobile-records) {
-    padding: 0 !important;
-    margin-bottom: 12px;
-    border: 0 !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-  .mobile-records { gap: 10px; }
-  .mobile-record { padding: 14px 15px; border: 1px solid #e1ebe8; border-radius: 14px; background: #ffffff; box-shadow: 0 1px 3px rgba(19, 48, 55, 0.03); }
-  .section-card-header { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; min-height: 0; }
-  .section-card-header h4.ant-typography { font-size: 14px; }
-  .section-card-header > .ant-space { width: 100%; }
-  .section-card-header > .ant-space .ant-select { flex: 1; }
-  .profile-text, .notice-button { display: none; }
-  .mobile-menu-button { margin: 0; }
-  .topbar-left { flex: 1; }
-  .topbar > .ant-space { margin-left: auto; }
-  .stat-card { min-height: 66px; }
-  .stat-card .ant-card-body { padding: 11px 13px; }
-  .recent-invoice-row { gap: 8px; min-height: 52px; padding: 8px 2px; }
-  .recent-invoice-period { display: none; }
-  .recent-invoice-amount { min-width: 100px; }
-  .building-summary-strip { padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; box-shadow: none; gap: 10px; }
-  .building-summary-strip .summary-icon { display: none; }
-  .building-summary-strip > a { max-width: 110px; text-align: right; white-space: nowrap; }
-  .building-tip-card { display: none !important; }
-  .room-overview-strip { gap: 10px; padding: 10px 12px; }
-  .room-overview-strip > div { gap: 5px; font-size: 12px; }
-  .room-overview-strip > div strong { font-size: 15px; }
-  .room-overview-strip > i { height: 18px; }
-  .reading-progress-card { display: none !important; }
-  .invoice-totals-row { margin-bottom: 8px; }
-  .invoice-total-tile { min-height: 56px; padding: 9px 11px; gap: 2px; border-radius: 12px; }
-  .invoice-total-tile span { font-size: 11px; line-height: 1.2; }
-  .invoice-total-tile strong { font-size: 15px; }
-  .settings-grid { grid-template-columns: 1fr; gap: 12px !important; }
-  .settings-card .ant-card-body { padding: 14px; }
-  .how-steps { flex-direction: column; }
-  .settings-form-footer { align-items: flex-start; flex-direction: column; }
-  .settings-form-footer .ant-btn { width: 100%; }
-  .admin-summary-card { padding: 12px; border-radius: 14px; box-shadow: none; }
-  .admin-summary-note { max-width: 120px; text-align: right; line-height: 1.5; }
-  .auth-page { display: block; min-height: 100vh; background: white; }
-  .auth-aside { display: none; }
-  .auth-main { min-height: 100vh; align-items: flex-start; padding: 24px 18px 32px; }
-  .auth-form-wrap { width: min(430px, 100%); margin: auto; }
-  .auth-small-brand { display: flex; }
-  .auth-legal { margin-top: 20px; }
   .tenant-header { position: sticky; top: 0; z-index: 20; height: 52px; padding: 0 12px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(14px); }
   .tenant-header .brand-mark { width: 32px; height: 32px; flex-basis: 32px; font-size: 19px; }
   .tenant-header strong { font-size: 16px; }
@@ -154,19 +79,6 @@
   .tenant-footer { flex-direction: column; align-items: center; text-align: center; }
 }
 @media (max-width: 480px) {
-  .page-content { padding-right: 12px; padding-left: 12px; }
-  .topbar.ant-layout-header { padding-right: 10px; padding-left: 10px; }
-  .profile-button { gap: 0; }
-  .profile-avatar { width: 32px !important; height: 32px !important; line-height: 32px !important; }
-  .page-heading-extra:has(.ant-space) > .ant-space { flex-direction: row; width: 100%; }
-  .page-heading-extra:has(.ant-space) > .ant-space .ant-picker,
-  .page-heading-extra:has(.ant-space) > .ant-space .ant-btn { flex: 1; }
-  .building-summary-strip > a { font-size: 0; }
-  .building-summary-strip > a .anticon { font-size: 13px; }
-  .room-overview-strip { justify-content: space-between; gap: 6px; }
-  .room-overview-strip > div { gap: 4px; }
-  .room-overview-strip > div strong { font-size: 14px; }
-  .room-overview-strip > div span:last-child { font-size: 12px; }
   .tenant-header-secure { font-size: 0; }
   .tenant-header-secure .anticon { font-size: 13px; }
   .tenant-main { width: calc(100% - 24px); }
@@ -177,12 +89,4 @@
   .tenant-payment-actions .ant-btn-link { padding: 2px 0; }
   .tenant-summary-lock { font-size: 0; }
   .tenant-summary-lock .anticon { font-size: 13px; }
-  .invoice-drawer .ant-drawer-body { padding-right: 16px; padding-left: 16px; }
-  .invoice-period-box { flex-wrap: wrap; }
 }
-
-.webhook-setting { display: flex; flex-direction: column; gap: 9px; padding: 13px 14px; margin-bottom: 19px; border: 1px solid #e8efec; border-radius: 11px; background: #fafcfb; }
-.webhook-setting > div:first-child { display: flex; flex-direction: column; gap: 4px; }
-.webhook-setting > div:first-child strong { color: #4b6267; font-size: 13px; }
-.webhook-setting > div:first-child span { color: #879598; font-size: 12px; line-height: 1.55; }
-.webhook-setting .ant-input { font-size: 12px; }

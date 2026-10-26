@@ -1,8 +1,8 @@
 import RoomieMark from '../../shared/ui/RoomieMark';
-import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
+const ChangePasswordModal = lazy(() => import('../../features/auth/ChangePasswordModal'));
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
-import { useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { App, Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -106,7 +106,7 @@ const adminItems = [
   const menu = <Menu theme="dark" mode="inline" selectedKeys={[activeMenuKey]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
 
   return <Layout className="app-layout">
-    <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+    {passwordOpen && <Suspense fallback={null}><ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} /></Suspense>}
     <Sider width={250} className="app-sider" breakpoint="lg" collapsedWidth={0} trigger={null} onBreakpoint={(broken) => { if (!broken) setMobileOpen(false); }}>
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div>
       <div className="sider-label">{t("MENU CHÍNH")}</div>

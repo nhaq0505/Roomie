@@ -248,4 +248,14 @@ test('Baileys adapter handles CJS-ESM namespace export and 515 restartRequired a
   sockets[1].ev.emit('connection.update', { connection: 'open' });
   const api = await loginPromise;
   assert.equal(api.getOwnId(), '84901234567@s.whatsapp.net');
+  const intlUser = await api.findUser('+821012345678');
+  assert.deepEqual(intlUser, { uid: '821012345678@s.whatsapp.net' });
+});
+
+test('gateway send accepts international E.164 phone numbers', async t => {
+  const f = fixture(t);
+  await connect(f);
+  const res = await f.gateway.send(owner, { ...f.body(), phone: '+821012345678' });
+  assert.equal(res.status, 'Sent');
+  assert.equal(f.sends(), 1);
 });

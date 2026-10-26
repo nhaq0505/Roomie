@@ -102,6 +102,9 @@ jobs:
       - name: Test backup retention
         run: python3 -m unittest discover -s tests -p 'test_backup_*.py' -v
 
+      - name: Test host collector
+        run: python3 -m unittest discover -s tests -p 'test_host_collector.py' -v
+
       - name: Verify database role permissions on isolated PostgreSQL
         run: python3 tests/check_db_roles.py
 
