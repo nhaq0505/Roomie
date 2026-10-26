@@ -5,16 +5,6 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM node:24-bookworm-slim AS whatsapp
-WORKDIR /src/whatsapp-gateway
-COPY whatsapp-gateway/package*.json ./
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
-  && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" \
-  && git config --global url."https://github.com/".insteadOf "git@github.com:" \
-  && npm ci --omit=dev \
-  && rm -rf /var/lib/apt/lists/* /root/.gitconfig
-COPY whatsapp-gateway/src/ ./src/
-
 FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS backend
 WORKDIR /src
 COPY backend/RoomRental.Api/RoomRental.Api.csproj backend/RoomRental.Api/
@@ -24,11 +14,9 @@ RUN dotnet publish backend/RoomRental.Api/RoomRental.Api.csproj -c Release -o /o
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac AS runtime
 WORKDIR /app
-COPY --from=whatsapp /usr/local/bin/node /usr/local/bin/node
 COPY --from=backend /out/ ./
 COPY --from=frontend /src/frontend/dist/ ./wwwroot/
-COPY --from=whatsapp /src/whatsapp-gateway/ ./whatsapp-gateway/
-RUN mkdir -p /app/data/keys /app/data/whatsapp-sessions && chown -R app:app /app/data /app/whatsapp-gateway
+RUN mkdir -p /app/data/keys && chown -R app:app /app/data
 USER app
 ARG MONITORING_ALERT_TO=""
 # Recipient only; SMTP credentials must remain runtime configuration.
