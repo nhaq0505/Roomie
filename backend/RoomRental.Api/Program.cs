@@ -64,10 +64,13 @@ builder.Services.AddScoped<IZaloGateway, ZaloGateway>();
 builder.Services.AddScoped<ZaloReminderService>();
 if (builder.Configuration.GetValue("Zalo:Enabled", false))
     builder.Services.AddHostedService<ZaloReminderWorker>();
-builder.Services.AddHttpClient("WhatsApp", client => client.Timeout = TimeSpan.FromSeconds(40));
+builder.Services.AddHttpClient("WhatsApp", client => client.Timeout = TimeSpan.FromSeconds(40))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseProxy = false });
+builder.Services.AddSingleton<WhatsAppLocalGatewayHost>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<WhatsAppLocalGatewayHost>());
 builder.Services.AddScoped<IWhatsAppGateway, WhatsAppGateway>();
 builder.Services.AddScoped<WhatsAppReminderService>();
-if (builder.Configuration.GetValue("WhatsApp:Enabled", false))
+if (WhatsAppGateway.IsConfigEnabled(builder.Configuration))
     builder.Services.AddHostedService<WhatsAppReminderWorker>();
 builder.Services.AddHostedService<DataMaintenanceService>();
 if (!bool.TryParse(builder.Configuration["EnableInvoiceSweep"], out var enableInvoiceSweep) || enableInvoiceSweep)

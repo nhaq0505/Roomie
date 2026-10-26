@@ -36,6 +36,7 @@ export class Gateway {
     }
     s.api = api; s.saved.uid = uid; s.status = 'Connecting'; s.qrImage = null;
     this.persist(owner, s);
+    api.listener.on('credentials', creds => { if (s.api === api) { s.saved.credentials = creds; this.persist(owner, s); } });
     api.listener.on('connected', () => { if (s.api === api) s.status = 'Connected'; });
     api.listener.on('disconnected', () => { if (s.api === api) s.status = 'Restoring'; });
     api.listener.on('error', () => { if (s.api === api) s.status = 'Restoring'; });

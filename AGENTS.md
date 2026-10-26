@@ -379,3 +379,15 @@ npm --prefix whatsapp-gateway test`: **13/13 tests PASS**.
 - **Chỉ số điện nguyên & sửa chỉ số điện ban đầu (`OwnerManagementEndpoints.Occupancies.cs`, `RoomTenantPage.tsx`)**:
   - Toàn bộ ô `InputNumber` nhập chỉ số điện dùng số nguyên (`precision={0} step={1}`, không còn `.000`).
   - Cho phép sửa `InitialReading` trong **Sửa thông tin người thuê** (`PATCH /api/rooms/{id}/occupancy`) khi lượt thuê chưa có hóa đơn tháng đã phát hành (`Issued`); chỉ cập nhật `PreviousReading` cho kỳ chốt điện / hóa đơn nháp (`Draft`) đầu tiên của lượt thuê (không ghi đè các kỳ `Draft` về sau).
+
+
+## 16. Sửa lỗi không tạo được mã QR kết nối WhatsApp — 26/10/2026
+
+- **Nguyên nhân gốc rễ**:
+  1. **Tương thích ESM/CommonJS trong `whatsapp-gateway/src/whatsapp.mjs`**: Khi nạp `@whiskeysockets/baileys` qua `await import('@whiskeysockets/baileys')` trên Node 24 ESM, `baileys.default` là object `module.exports` của CommonJS chứ không phải hàm `makeWASocket` (`baileys.makeWASocket` / `baileys.default.default`), gây `TypeError: makeWASocket is not a function` ngay khi gọi `loginQR` và làm phiên kết nối tự trở về `Disconnected` mà không có ảnh QR.
+  2. **Phiên bản WhatsApp Web mặc định trong `@whiskeysockets/baileys@6.7.16` quá cũ (`[2, 3000, 1019707846]`)**: Máy chủ WhatsApp từ chối kết nối đăng ký thiết bị với mã lỗi `405 Connection Failure` trước khi phát sinh sự kiện `qr`.
+  3. **Luồng khởi động lại kết nối (`515 restartRequired`) sau khi quét QR**: Giao thức Multi-Device của WhatsApp luôn đóng socket đăng ký ban đầu bằng stream error `515` ngay sau `pair-success` (`isNewLogin: true`) để yêu cầu mở socket xác thực mới; code cũ coi mọi sự kiện `connection: 'close'` trước `open` là lỗi hết hạn QR (`type: 1`).
+  4. **Chưa tự khởi chạy `whatsapp-gateway` khi thiếu cấu hình container rời**: Khi chạy local hoặc trên VPS (`rehouse-app-1`) chưa khai báo biến môi trường `WhatsApp__GatewayUrl`/`WhatsApp__GatewayToken` riêng, `WhatsAppGateway.Enabled` trả về `false`.
+- **Cách khắc phục**:
+  - `whatsapp-gateway/src/whatsapp.mjs`, `gateway.mjs`, `server.mjs`: hỗ trợ giải nén đúng `makeWASocket`/`toDataURL` cho cả CommonJS namespace và ESM mock; tự động lấy `fetchLatestWaWebVersion()` / `fetchLatestBaileysVersion()` (kèm cache 6 giờ và fallback `[2, 3000, 1051697602]`); xử lý `isNewLogin` + tự mở lại socket khi gặp `515 restartRequired`; tắt log pino mặc định để không in khóa/payload ra stdout; `POST /owners/:id/connect` đợi tối đa 5 giây đến khi rời trạng thái `Connecting` để trả thẳng `QrReady` + `qrImage` về UI.
+  - `backend/RoomRental.Api/Features/WhatsApp/WhatsAppGateway.cs`, `Program.cs`, `Dockerfile`: bổ sung `WhatsAppLocalGatewayHost` tự động khởi chạy và giám sát tiến trình `whatsapp-gateway/src/server.mjs` nội bộ trên loopback khi không cấu hình `WhatsApp:GatewayUrl` ngoài (lưu khóa `.session-secret` và phiên mã hóa tại `/app/data/whatsapp-sessions` cùng volume với `DataProtection`), đồng thời đóng gói `node` và `whatsapp-gateway` vào `Dockerfile`.

@@ -194,3 +194,58 @@ test('Baileys adapter normalizes Vietnam phone to JID, emits QR and sends text m
   assert.equal(sent.message.msgId, 'wa-msg-1');
   assert.deepEqual(lastSent, { jid: '84912345678@s.whatsapp.net', payload: { text: 'Hello' } });
 });
+
+
+test('Baileys adapter handles CJS-ESM namespace export and 515 restartRequired after QR scan', async () => {
+  const sockets = [];
+  const makeWASocket = () => {
+    const ev = new EventEmitter();
+    const sock = {
+      ev,
+      user: { id: '84901234567:2@s.whatsapp.net' },
+      onWhatsApp: async (jid) => [{ exists: true, jid }],
+      sendMessage: async () => ({ key: { id: 'wa-msg-2' } }),
+      end: () => {}
+    };
+    sockets.push(sock);
+    return sock;
+  };
+  const cjsNamespaceBaileys = {
+    default: {
+      __esModule: true,
+      default: makeWASocket,
+      makeWASocket,
+      initAuthCreds: () => ({}),
+      BufferJSON: { replacer: (_, v) => v, reviver: (_, v) => v },
+      DisconnectReason: { loggedOut: 401, restartRequired: 515 }
+    }
+  };
+  const cjsNamespaceQr = {
+    default: {
+      toDataURL: async (qr) => `data:image/png;base64,${Buffer.from(qr).toString('base64')}`
+    }
+  };
+  const client = createBaileysClient(cjsNamespaceBaileys, cjsNamespaceQr);
+  const events = [];
+  const loginPromise = client.loginQR({}, e => events.push(e));
+  assert.equal(sockets.length, 1);
+
+  sockets[0].ev.emit('connection.update', { qr: 'PAIR_QR_1' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(events.some(e => e.type === 0 && e.data.image === Buffer.from('PAIR_QR_1').toString('base64')), true);
+
+  // Simulate user scanning QR on phone: pair-success updates creds, sets isNewLogin, and WA closes stream with 515.
+  sockets[0].ev.emit('creds.update', { me: { id: '84901234567:2@s.whatsapp.net' } });
+  sockets[0].ev.emit('connection.update', { isNewLogin: true });
+  sockets[0].ev.emit('connection.update', {
+    connection: 'close',
+    lastDisconnect: { error: { output: { statusCode: 515 } } }
+  });
+
+  assert.equal(events.some(e => e.type === 2), true);
+  assert.equal(sockets.length, 2);
+
+  sockets[1].ev.emit('connection.update', { connection: 'open' });
+  const api = await loginPromise;
+  assert.equal(api.getOwnId(), '84901234567@s.whatsapp.net');
+});

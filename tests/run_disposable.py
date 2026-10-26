@@ -65,7 +65,7 @@ def main():
             env = {**os.environ, 'ASPNETCORE_ENVIRONMENT':'Development','DatabaseProvider':'Postgres',
                 'ConnectionStrings__DefaultConnection':pg_conn, 'DataProtection__KeysPath':str(temp/'keys'),
                 'ASPNETCORE_URLS':base,'PublicBaseUrl':base,'WebhookBaseUrl':base,'SeedDemo':'true',
-                'Zalo__Enabled':'false','EnableInvoiceSweep':'false','EnablePaymentReconciliation':'false','EmailVerification__Enabled':'false',
+                'Zalo__Enabled':'false','WhatsApp__Enabled':'false','EnableInvoiceSweep':'false','EnablePaymentReconciliation':'false','EmailVerification__Enabled':'false',
                 'RequireVerifiedPaymentForTenantLink':'false','Seo__AllowIndexing':'true','AuthRequestsPerMinute':'1000',
                 'Promotions__NewUserProMonths':'0',
                 'HTTP_PROXY':'http://127.0.0.1:9','HTTPS_PROXY':'http://127.0.0.1:9','ALL_PROXY':'http://127.0.0.1:9','NO_PROXY':'127.0.0.1,localhost',

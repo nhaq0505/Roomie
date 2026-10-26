@@ -48,12 +48,12 @@ export default function WhatsAppSettingsPage() {
   const [page, setPage] = useState(1);
   const [guide, setGuide] = useState(false);
   const settings = useQuery({ queryKey: ['whatsapp-settings'], queryFn: whatsAppApi.settings });
-  const connection = useQuery({ queryKey: ['whatsapp-connection'], queryFn: whatsAppApi.connection, refetchInterval: 3000 });
+  const connection = useQuery({ queryKey: ['whatsapp-connection'], queryFn: whatsAppApi.connection, refetchInterval: (query) => query.state.data?.status === 'Connecting' ? 1000 : 3000 });
   const history = useQuery({ queryKey: ['whatsapp-history', page], queryFn: () => whatsAppApi.history(page), refetchInterval: 5000 });
   const refresh = () => { void client.invalidateQueries({ queryKey: ['whatsapp-connection'] }); void client.invalidateQueries({ queryKey: ['whatsapp-history'] }); };
   const onError = (error: Error) => { void message.error(error.message); };
-  const connect = useMutation({ mutationFn: whatsAppApi.connect, onError, onSuccess: refresh });
-  const disconnect = useMutation({ mutationFn: whatsAppApi.disconnect, onError, onSuccess: () => { refresh(); void client.invalidateQueries({ queryKey: ['whatsapp-settings'] }); } });
+  const connect = useMutation({ mutationFn: whatsAppApi.connect, onError, onSuccess: (data) => { if (data?.qrImage) client.setQueryData(['whatsapp-connection'], data); refresh(); } });
+  const disconnect = useMutation({ mutationFn: whatsAppApi.disconnect, onError, onSuccess: (data) => { if (data?.status) client.setQueryData(['whatsapp-connection'], data); refresh(); void client.invalidateQueries({ queryKey: ['whatsapp-settings'] }); } });
   const queue = useMutation({ mutationFn: whatsAppApi.queue, onError, onSuccess: result => { void message.success(t("Đã thêm {0} hóa đơn vào hàng đợi.", [result.queued])); setPage(1); refresh(); } });
 
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
