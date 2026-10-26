@@ -207,35 +207,6 @@ function RoomTenantWorkspace() {
             ? t("Số người mới áp dụng cho hóa đơn nháp chưa thu tiền và kỳ chưa lập hóa đơn. Hóa đơn đã phát hành giữ nguyên.")
             : t("Nhập tiền cọc thỏa thuận riêng với khách. Khoản cọc được tạo riêng và thanh toán qua link khách sau khi lưu.")
         }
-        extra={
-          <Space wrap>
-            <Button onClick={() => navigate('/rooms')} disabled={isSaving}>
-              {t("Hủy")}
-            </Button>
-            <Button
-              icon={<FileTextOutlined />}
-              loading={isSaving && openContractAfterSaveRef.current}
-              disabled={isSaving}
-              onClick={() => {
-                openContractAfterSaveRef.current = true;
-                form.submit();
-              }}
-            >
-              {t("Xuất hợp đồng & CT01")}
-            </Button>
-            <Button
-              type="primary"
-              loading={isSaving && !openContractAfterSaveRef.current}
-              disabled={isSaving}
-              onClick={() => {
-                openContractAfterSaveRef.current = false;
-                form.submit();
-              }}
-            >
-              {isEditing ? t("Lưu thay đổi") : t("Lưu người thuê")}
-            </Button>
-          </Space>
-        }
       />
 
       <Form form={form} layout="vertical" requiredMark={false} onFinish={onFinish}>
