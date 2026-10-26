@@ -1102,20 +1102,13 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await qrModal.locator('#cccd-qr-raw-input').fill('079200005678|Trần Minh Quân|05052000|Nam|88 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh|12102022');
     await expect(qrModal).toBeHidden();
 
-    // 5. Verify live cross-device sync on Contract page without F5 reload:
+    // 5. Verify A4 preview reflects scanned primary tenant and co-resident on Contract & CT01 tabs
     const preview = page.getByTestId('document-a4-preview');
     await expect(preview).toContainText('Lê Thị Mai Anh');
-
-    documentData = {
-      ...documentData,
-      tenantName: 'Phạm Hoàng Gia Bảo',
-      tenantCitizenId: '079095009999',
-      tenantPermanentAddress: '100 Điện Biên Phủ, Quận Bình Thạnh, TP. Hồ Chí Minh',
-    };
-
-    // Wait for background sync (or window focus) without calling page.reload()
-    await expect(preview).toContainText('Phạm Hoàng Gia Bảo', { timeout: 8000 });
-    await expect(preview).toContainText('079095009999');
+    await page.getByText('Bản xem trước: Mẫu CT01 (TT 66/2023/TT-BCA)').click();
+    await expect(preview).toContainText('079098001234');
+    await expect(preview).toContainText('Trần Minh Quân');
+    await expect(preview).toContainText('079200005678');
   });
 
   test('Scenario L10: Owner Subscription Voucher Redemption & Error Handling (/account-status)', async ({ page }) => {
@@ -1292,51 +1285,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
 
     let readings: Reading[] = [];
     let invoices: Invoice[] = [];
-    let submissions = [
-      {
-        id: 'sub-01',
-        roomId: 'room-01',
-        occupancyId: 'occ-01',
-        period: '2026-10',
-        previousReading: 100,
-        submittedReading: 145,
-        approvedReading: null as number | null,
-        tenantNote: 'Đồng hồ chụp lúc 8h sáng',
-        rejectReason: null as string | null,
-        status: 'Pending' as 'Pending' | 'Approved' | 'Rejected',
-        photoFileName: 'meter-101.jpg',
-        photoContentType: 'image/png',
-        photoSizeBytes: 1024,
-        submittedAt: '2026-10-24T08:00:00Z',
-        reviewedAt: null as string | null,
-        readingId: null as string | null,
-        invoiceId: null as string | null,
-      },
-      {
-        id: 'sub-02',
-        roomId: 'room-02',
-        occupancyId: 'occ-02',
-        period: '2026-10',
-        previousReading: 200,
-        submittedReading: 230,
-        approvedReading: null as number | null,
-        tenantNote: 'Ảnh hơi tối',
-        rejectReason: null as string | null,
-        status: 'Pending' as 'Pending' | 'Approved' | 'Rejected',
-        photoFileName: 'meter-102.jpg',
-        photoContentType: 'image/png',
-        photoSizeBytes: 1024,
-        submittedAt: '2026-10-24T08:15:00Z',
-        reviewedAt: null as string | null,
-        readingId: null as string | null,
-        invoiceId: null as string | null,
-      },
-    ];
-
-    const png1x1 = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      'base64',
-    );
+    let submissionsCalled = false;
 
     await page.route('**/api/**', async (route) => {
       const url = new URL(route.request().url());
@@ -1409,78 +1358,9 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       if (path === '/api/readings' && method === 'GET') {
         return route.fulfill({ json: readings });
       }
-      if (path === '/api/readings/submissions' && method === 'GET') {
-        return route.fulfill({ json: submissions });
-      }
-      if (path.startsWith('/api/readings/submissions/') && path.endsWith('/photo')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'image/png',
-          body: png1x1,
-        });
-      }
-      if (path === '/api/readings/submissions/sub-02/reject' && method === 'POST') {
-        const body = route.request().postDataJSON() as { reason?: string | null };
-        submissions = submissions.map((s) =>
-          s.id === 'sub-02'
-            ? { ...s, status: 'Rejected', rejectReason: body.reason ?? 'Ảnh chưa rõ', reviewedAt: '2026-10-24T10:00:00Z' }
-            : s,
-        );
-        return route.fulfill({ json: submissions.find((s) => s.id === 'sub-02') });
-      }
-      if (path === '/api/readings/submissions/sub-01/approve' && method === 'POST') {
-        const body = route.request().postDataJSON() as { currentReading?: number | null };
-        const approvedVal = body.currentReading ?? 145;
-        readings = [
-          ...readings,
-          {
-            id: 'reading-01',
-            roomId: 'room-01',
-            occupancyId: 'occ-01',
-            roomName: 'Phòng 101',
-            buildingName: 'Nhà trọ Bình An',
-            period: '2026-10',
-            previousReading: 100,
-            currentReading: approvedVal,
-            consumption: approvedVal - 100,
-            invoiceId: 'inv-01',
-            issuanceStatus: 'Issued',
-          },
-        ];
-        invoices = [
-          ...invoices,
-          {
-            id: 'inv-01',
-            roomId: 'room-01',
-            occupancyId: 'occ-01',
-            roomName: 'Phòng 101',
-            buildingName: 'Nhà trọ Bình An',
-            tenantName: 'Nguyễn Thị Thuê',
-            period: '2026-10',
-            kind: 'Monthly',
-            lifecycleState: 'Issued',
-            rent: 3000000,
-            electricityAmount: (approvedVal - 100) * 3500,
-            waterAmount: 100000,
-            serviceAmount: 50000,
-            total: 3150000 + (approvedVal - 100) * 3500,
-            paid: 0,
-            status: 'Unpaid',
-          },
-        ];
-        submissions = submissions.map((s) =>
-          s.id === 'sub-01'
-            ? {
-                ...s,
-                status: 'Approved',
-                approvedReading: approvedVal,
-                reviewedAt: '2026-10-24T10:05:00Z',
-                readingId: 'reading-01',
-                invoiceId: 'inv-01',
-              }
-            : s,
-        );
-        return route.fulfill({ json: submissions.find((s) => s.id === 'sub-01') });
+      if (path.startsWith('/api/readings/submissions')) {
+        submissionsCalled = true;
+        return route.fulfill({ status: 404, json: { error: 'Not Found' } });
       }
       if (path === '/api/invoices' && method === 'GET') {
         return route.fulfill({ json: { items: invoices, total: invoices.length, draftCount: 0 } });
@@ -1488,7 +1368,7 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
       return route.fulfill({ json: [] });
     });
 
-    // 1. Verify tenantSelfCheckinAt alert on Contract & CT01 workspace
+    // 1. Verify identity photo download link & A4 preview on Contract & CT01 workspace
     await page.goto('/rooms/room-01/documents');
     await expect(page.getByText(/Khách thuê đã gửi ảnh CCCD qua link phòng/)).toBeVisible();
     await expect(
@@ -1504,33 +1384,12 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(page.getByTestId('document-a4-preview')).toContainText('079199001234');
     await expect(page.getByTestId('document-a4-preview')).toContainText('Trần Văn Cùng Ở');
 
-    // 2. Navigate to ReadingsPage (/readings) and verify prefilled draft + submission badges
+    // 2. Navigate to ReadingsPage (/readings) and verify no submission query or submission review UI exists
     await page.goto('/readings');
-    await expect(page.getByLabel('Chỉ số mới Phòng 101')).toHaveValue(/^145(\.000)?$/);
-    await expect(page.getByRole('button', { name: 'Khách gửi: 145 kWh · Xem ảnh & Duyệt' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Khách gửi: 230 kWh · Xem ảnh & Duyệt' })).toBeVisible();
-
-    // 3. Reject submission for Phòng 102
-    await page.getByRole('button', { name: 'Khách gửi: 230 kWh · Xem ảnh & Duyệt' }).click();
-    const reviewModal = page.locator('.ant-modal').filter({ hasText: 'Kiểm tra & duyệt chỉ số điện khách gửi' });
-    await expect(reviewModal).toBeVisible();
-    await expect(reviewModal.getByText('Ghi chú từ khách thuê: Ảnh hơi tối')).toBeVisible();
-    await reviewModal.getByPlaceholder(/Lý do từ chối/).fill('Ảnh bị mờ, chụp lại giúp anh');
-    await reviewModal.getByRole('button', { name: 'Yêu cầu khách chụp lại' }).click();
-    await expect(reviewModal).toBeHidden();
-    await expect(page.getByText('Đã yêu cầu chụp lại')).toBeVisible();
-
-    // 4. Inspect, adjust reading to 146, and approve submission for Phòng 101
-    await page.getByRole('button', { name: 'Khách gửi: 145 kWh · Xem ảnh & Duyệt' }).click();
-    await expect(reviewModal).toBeVisible();
-    await expect(reviewModal.getByText('Ghi chú từ khách thuê: Đồng hồ chụp lúc 8h sáng')).toBeVisible();
-    const approveInput = reviewModal.getByLabel('Chỉ số duyệt chốt');
-    await expect(approveInput).toHaveValue(/^145(\.000)?$/);
-    await approveInput.fill('146');
-    await expect(reviewModal).toContainText('46 kWh');
-    await reviewModal.getByRole('button', { name: 'Duyệt chỉ số & phát hành hóa đơn' }).click();
-    await expect(reviewModal).toBeHidden();
-    await expect(page.getByText('Đã duyệt ảnh khách gửi')).toBeVisible();
+    await expect(page.getByLabel('Chỉ số mới Phòng 101')).toBeVisible();
+    await expect(page.locator('.reading-submission-btn')).toHaveCount(0);
+    await expect(page.getByText('Kiểm tra & duyệt chỉ số điện khách gửi')).toHaveCount(0);
+    expect(submissionsCalled).toBe(false);
   });
 
   test('Scenario L11: New Landlord Onboarding Checklist on Dashboard tracks progress and supports dismiss/reopen', async ({ page }) => {

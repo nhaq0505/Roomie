@@ -34,7 +34,6 @@ export type * from './features/buildings';
 export type * from './features/rooms';
 export type * from './features/dashboard';
 export type * from './features/readings';
-export type { TenantMeterSubmission } from './features/readings';
 export type * from './features/invoices';
 export type * from './features/reports';
 export type * from './features/admin';

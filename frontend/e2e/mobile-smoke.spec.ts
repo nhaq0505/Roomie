@@ -457,27 +457,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     }
   });
 
-  test('Pending meter submission badge, Pending AccountStatus, and Tenant Portal meter card fit at 320px and 375px', async ({ page }) => {
-    await page.route('**/api/readings/submissions*', (route) =>
-      route.fulfill({
-        json: [
-          {
-            id: 'sub-01',
-            roomId: 'room-01',
-            occupancyId: 'occ-01',
-            period: currentVietnamPeriod,
-            previousReading: 120,
-            submittedReading: 155,
-            approvedReading: null,
-            status: 'Pending',
-            photoFileName: 'meter.jpg',
-            tenantNote: 'Em chụp đồng hồ tháng 10',
-            rejectReason: null,
-            submittedAt: '2026-10-20T08:00:00Z',
-          },
-        ],
-      }),
-    );
+  test('Readings mobile card, Pending AccountStatus, and Tenant Portal fit at 320px and 375px', async ({ page }) => {
     await page.route('**/api/tenant/demo-token*', (route) =>
       route.fulfill({
         json: {
@@ -486,8 +466,6 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
           total: 1,
           totals: { billed: 3325000, paid: 0, outstanding: 3325000 },
           currentPeriod: currentVietnamPeriod,
-          currentPeriodHasReading: false,
-          meterSubmission: null,
         },
       }),
     );
@@ -495,17 +473,15 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     for (const width of [320, 375]) {
       await page.setViewportSize({ width, height: 812 });
       await page.goto('/readings');
-      const badgeBtn = page.locator('.reading-mobile-card .reading-submission-btn').first();
-      await expect(badgeBtn).toBeVisible();
-      const cardBox = await page.locator('.reading-mobile-card').first().boundingBox();
-      const btnBox = await badgeBtn.boundingBox();
+      const mobileCard = page.locator('.reading-mobile-card').first();
+      await expect(mobileCard).toBeVisible();
+      await expect(page.locator('.reading-mobile-card .reading-submission-btn')).toHaveCount(0);
+      const cardBox = await mobileCard.boundingBox();
       expect(cardBox).not.toBeNull();
-      expect(btnBox).not.toBeNull();
-      expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
       const readingOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-      expect(readingOverflow, `/readings with pending submission overflowed at ${width}px`).toBe(false);
+      expect(readingOverflow, `/readings overflowed at ${width}px`).toBe(false);
 
-      // Tenant Portal with meter submission card enabled
+      // Tenant Portal without meter submission card
       await page.goto('/t/demo-token');
       await expect(page.locator('.tenant-meter-submission-card')).toHaveCount(0);
       const tenantOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

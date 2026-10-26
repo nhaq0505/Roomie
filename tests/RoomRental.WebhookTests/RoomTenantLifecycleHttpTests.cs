@@ -580,6 +580,132 @@ internal static class RoomTenantLifecycleHttpTests
         var validOccJson = await validOccResp.Content.ReadFromJsonAsync<JsonElement>();
         Assert(validOccJson.GetProperty("initialReading").GetDecimal() == 185m, "room initialReading updated to 185");
         Assert(validOccJson.GetProperty("previousReading").GetDecimal() == 185m, "room previousReading starts at 185");
+        var occ2Id = validOccJson.GetProperty("occupancy").GetProperty("id").GetGuid();
+
+        // 4. Multi-period Draft readings/invoices: PATCH /api/rooms/{id}/occupancy InitialReading only updates the FIRST period
+        Guid readingPeriod1Id;
+        Guid readingPeriod2Id;
+        Guid draftPeriod1Id;
+        Guid draftPeriod2Id;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var r1 = new MonthlyReading
+            {
+                RoomId = roomId, OccupancyId = occ2Id, Period = "2026-09",
+                PreviousReading = 185, CurrentReading = 220, Consumption = 35,
+                ElectricityRate = 3_500, MonthlyRentRate = 2_000_000, WaterRate = 50_000,
+                RecordedAt = DateTimeOffset.UtcNow.AddDays(-2)
+            };
+            var r2 = new MonthlyReading
+            {
+                RoomId = roomId, OccupancyId = occ2Id, Period = "2026-10",
+                PreviousReading = 220, CurrentReading = 260, Consumption = 40,
+                ElectricityRate = 3_500, MonthlyRentRate = 2_000_000, WaterRate = 50_000,
+                RecordedAt = DateTimeOffset.UtcNow.AddDays(-1)
+            };
+            var d1 = new Invoice
+            {
+                OwnerId = OwnerAId, BuildingId = bldg.Id, RoomId = roomId, OccupancyId = occ2Id,
+                RoomName = "Room Meter-1", BuildingName = "Meter Building", TenantName = "Tenant Two",
+                Period = "2026-09", Kind = "Monthly", LifecycleState = InvoiceLifecycleState.Draft,
+                PreviousReading = 185, CurrentReading = 220, Consumption = 35, ElectricityRate = 3_500,
+                WaterRate = 50_000, WaterPerPerson = true,
+                Rent = 2_000_000, ElectricityAmount = 122_500, WaterAmount = 50_000, ServiceAmount = 0,
+                Total = 2_172_500, Paid = 0, Status = InvoiceStatus.Unpaid, IssuedAt = DateTimeOffset.UtcNow.AddDays(-2)
+            };
+            var d2 = new Invoice
+            {
+                OwnerId = OwnerAId, BuildingId = bldg.Id, RoomId = roomId, OccupancyId = occ2Id,
+                RoomName = "Room Meter-1", BuildingName = "Meter Building", TenantName = "Tenant Two",
+                Period = "2026-10", Kind = "Monthly", LifecycleState = InvoiceLifecycleState.Draft,
+                PreviousReading = 220, CurrentReading = 260, Consumption = 40, ElectricityRate = 3_500,
+                WaterRate = 50_000, WaterPerPerson = true,
+                Rent = 2_000_000, ElectricityAmount = 140_000, WaterAmount = 50_000, ServiceAmount = 0,
+                Total = 2_190_000, Paid = 0, Status = InvoiceStatus.Unpaid, IssuedAt = DateTimeOffset.UtcNow.AddDays(-1)
+            };
+            db.Readings.AddRange(r1, r2);
+            db.Invoices.AddRange(d1, d2);
+            await db.SaveChangesAsync();
+            readingPeriod1Id = r1.Id;
+            readingPeriod2Id = r2.Id;
+            draftPeriod1Id = d1.Id;
+            draftPeriod2Id = d2.Id;
+        }
+
+        // Reject InitialReading > firstReading.CurrentReading (230 > 220)
+        var patchAboveFirstCurrentResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy",
+            new OccupancyUpdateRequest(occ2Id, "Tenant Two", "0904445566", 1, InitialReading: 230));
+        Assert(patchAboveFirstCurrentResp.StatusCode == HttpStatusCode.BadRequest,
+            "PATCH occupancy rejects InitialReading > first reading CurrentReading (230 > 220) with 400 BadRequest");
+
+        // Reject InitialReading < prior occupancy floor (175 < 180)
+        var patchBelowPriorFloorResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy",
+            new OccupancyUpdateRequest(occ2Id, "Tenant Two", "0904445566", 1, InitialReading: 175));
+        Assert(patchBelowPriorFloorResp.StatusCode == HttpStatusCode.BadRequest,
+            "PATCH occupancy rejects InitialReading < prior occupancy floor (175 < 180) with 400 BadRequest");
+
+        // Valid PATCH InitialReading = 190 updates ONLY the first period (2026-09) and leaves 2026-10 untouched
+        var patchValidResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy",
+            new OccupancyUpdateRequest(occ2Id, "Tenant Two", "0904445566", 1, InitialReading: 190));
+        Assert(patchValidResp.StatusCode == HttpStatusCode.OK, "PATCH occupancy with InitialReading=190 succeeds");
+        var patchValidJson = await patchValidResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert(patchValidJson.GetProperty("initialReading").GetDecimal() == 190m, "room initialReading updated to 190");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var r1 = await db.Readings.AsNoTracking().SingleAsync(x => x.Id == readingPeriod1Id);
+            var r2 = await db.Readings.AsNoTracking().SingleAsync(x => x.Id == readingPeriod2Id);
+            var d1 = await db.Invoices.AsNoTracking().SingleAsync(x => x.Id == draftPeriod1Id);
+            var d2 = await db.Invoices.AsNoTracking().SingleAsync(x => x.Id == draftPeriod2Id);
+
+            Assert(r1.PreviousReading == 190m && r1.Consumption == 30m,
+                "first period reading (2026-09) updated to PreviousReading=190, Consumption=30");
+            Assert(d1.PreviousReading == 190m && d1.Consumption == 30m && d1.ElectricityAmount == 105_000m && d1.Total == 2_155_000m,
+                "first period Draft invoice (2026-09) recalculated to PreviousReading=190, Consumption=30, ElectricityAmount=105000, Total=2155000");
+
+            Assert(r2.PreviousReading == 220m && r2.Consumption == 40m,
+                "second period reading (2026-10) preserves PreviousReading=220, Consumption=40");
+            Assert(d2.PreviousReading == 220m && d2.Consumption == 40m && d2.ElectricityAmount == 140_000m && d2.Total == 2_190_000m,
+                "second period Draft invoice (2026-10) preserves PreviousReading=220, Consumption=40, ElectricityAmount=140000, Total=2190000");
+        }
+
+        // Simultaneous PATCH of People (1 -> 2) and InitialReading (190 -> 192) records sequential revisions without unique key collision
+        var patchBothResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy",
+            new OccupancyUpdateRequest(occ2Id, "Tenant Two", "0904445566", 2, InitialReading: 192));
+        Assert(patchBothResp.StatusCode == HttpStatusCode.OK,
+            "PATCH occupancy updating both People and InitialReading simultaneously succeeds with 200 OK");
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var d1 = await db.Invoices.AsNoTracking().SingleAsync(x => x.Id == draftPeriod1Id);
+            var d2 = await db.Invoices.AsNoTracking().SingleAsync(x => x.Id == draftPeriod2Id);
+            var d1Revs = await db.InvoiceRevisions.AsNoTracking()
+                .Where(x => x.InvoiceId == draftPeriod1Id)
+                .OrderBy(x => x.Revision)
+                .Select(x => x.Revision)
+                .ToListAsync();
+            Assert(d1.PreviousReading == 192m && d1.Consumption == 28m && d1.ElectricityAmount == 98_000m && d1.WaterAmount == 100_000m && d1.Total == 2_198_000m,
+                "first period Draft invoice updates both WaterAmount and ElectricityAmount when People and InitialReading change together");
+            Assert(d2.PreviousReading == 220m && d2.Consumption == 40m && d2.ElectricityAmount == 140_000m && d2.WaterAmount == 100_000m && d2.Total == 2_240_000m,
+                "second period Draft invoice updates WaterAmount while preserving PreviousReading=220");
+            Assert(d1Revs.SequenceEqual([1, 2, 3]),
+                "first period Draft invoice records sequential revisions 1, 2, 3 across single and combined occupancy updates");
+        }
+
+        // Once any Monthly invoice is Issued, PATCH InitialReading is blocked with 409 Conflict
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var d1 = await db.Invoices.SingleAsync(x => x.Id == draftPeriod1Id);
+            d1.LifecycleState = InvoiceLifecycleState.Issued;
+            await db.SaveChangesAsync();
+        }
+        var patchAfterIssuedResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy",
+            new OccupancyUpdateRequest(occ2Id, "Tenant Two", "0904445566", 1, InitialReading: 195));
+        Assert(patchAfterIssuedResp.StatusCode == HttpStatusCode.Conflict,
+            "PATCH occupancy rejects InitialReading change with 409 Conflict when an Issued Monthly invoice exists");
     }
 
     private static async Task ContractAndCt01DocumentsExportAsync()
@@ -732,137 +858,90 @@ internal static class RoomTenantLifecycleHttpTests
 
         var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
             "Khach Tam Thoi", "0901000111", 1, VietnamCalendar.TodayVietnam().AddDays(-10), 3_200_000, 100));
-        Assert(occResp.StatusCode == HttpStatusCode.OK, "occupancy created for self-checkin & meter submission test");
+        Assert(occResp.StatusCode == HttpStatusCode.OK, "occupancy created for retired endpoints & landlord identity photo test");
         var occRoot = await occResp.Content.ReadFromJsonAsync<JsonElement>();
         var occElement = occRoot.GetProperty("occupancy");
         var occId = occElement.GetProperty("id").GetGuid();
         var token = occElement.GetProperty("token").GetString()!;
         Assert(!string.IsNullOrWhiteSpace(token), "tenant token issued on occupancy creation");
 
-        // 1. Primary tenant self check-in via POST /api/tenant/{token}/self-checkin
-        var primaryCheckinReq = new TenantSelfCheckinRequest(
-            Target: "tenant",
-            FullName: "Nguyen Thi Thue",
-            CitizenId: "079199001234",
-            DateOfBirth: new DateOnly(1999, 4, 15),
-            Gender: "Nữ",
-            CitizenIdIssuedDate: new DateOnly(2022, 8, 10),
-            CitizenIdIssuedPlace: "Cục Cảnh sát QLHC về TTXH",
-            PermanentAddress: "100 Tran Hung Dao, Quan 1, TP.HCM",
-            Phone: "0908889999",
-            Email: "thue@example.com");
-        var primaryResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", primaryCheckinReq);
-        Assert(primaryResp.StatusCode == HttpStatusCode.OK, "primary tenant self-checkin returns 200 OK");
-        var primaryJson = await primaryResp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert(primaryJson.GetProperty("tenantName").GetString() == "Nguyen Thi Thue" &&
-               primaryJson.GetProperty("tenantCitizenId").GetString() == "079199001234" &&
-               primaryJson.GetProperty("people").GetInt32() == 1,
-            "primary tenant self-checkin updates tenantName, tenantCitizenId, and preserves people = 1");
+        // 1. Removed tenant self-checkin & meter submission endpoints must return 404 NotFound
+        var selfCheckinResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", new
+        {
+            target = "tenant",
+            fullName = "Nguyen Thi Thue",
+            citizenId = "079199001234"
+        });
+        var deleteCoResResp = await client.DeleteAsync($"/api/tenant/{token}/co-residents/079200005678");
+        var tenantIdPhotoGetResp = await client.GetAsync($"/api/tenant/{token}/identity-photo");
+        var tenantMeterPhotoGetResp = await client.GetAsync($"/api/tenant/{token}/meter-submission/photo");
+        var ownerSubmissionsGetResp = await client.GetAsync("/api/readings/submissions");
+        var ownerSubPhotoGetResp = await client.GetAsync($"/api/readings/submissions/{Guid.NewGuid()}/photo");
+        var ownerSubApproveResp = await client.PostAsJsonAsync($"/api/readings/submissions/{Guid.NewGuid()}/approve", new { currentReading = 150 });
+        var ownerSubRejectResp = await client.PostAsJsonAsync($"/api/readings/submissions/{Guid.NewGuid()}/reject", new { reason = "test" });
 
-        // 2. Co-resident self check-in via POST /api/tenant/{token}/self-checkin (target = coResident)
-        var coResidentCheckinReq = new TenantSelfCheckinRequest(
-            Target: "coResident",
-            FullName: "Tran Van Cung O",
-            CitizenId: "079200005678",
-            DateOfBirth: new DateOnly(2000, 1, 20),
-            Gender: "Nam",
-            Relation: "Em ruột");
-        var coResResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", coResidentCheckinReq);
-        Assert(coResResp.StatusCode == HttpStatusCode.OK, "co-resident self-checkin returns 200 OK");
-        var coResJson = await coResResp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert(coResJson.GetProperty("people").GetInt32() == 2 &&
-               coResJson.GetProperty("coResidents").GetArrayLength() == 1,
-            "co-resident self-checkin increments people to 2 and appends co-resident");
-
-        // Verify GET /api/rooms/{id}/documents reflects self check-in and TenantSelfCheckinAt
-        var docDto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
-        Assert(docDto != null &&
-               docDto.TenantName == "Nguyen Thi Thue" &&
-               docDto.TenantCitizenId == "079199001234" &&
-               docDto.TenantPhone == "0908889999" &&
-               docDto.TenantEmail == "thue@example.com" &&
-               docDto.People == 2 &&
-               docDto.CoResidents.Count == 1 &&
-               docDto.CoResidents[0].CitizenId == "079200005678" &&
-               docDto.TenantSelfCheckinAt != null,
-            "GET /api/rooms/{id}/documents reflects primary tenant, co-resident, People=2, and non-null TenantSelfCheckinAt");
-
-        // 3. DELETE /api/tenant/{token}/co-residents/{citizenId} removes co-resident and updates People
-        var delCoResResp = await client.DeleteAsync($"/api/tenant/{token}/co-residents/079200005678");
-        Assert(delCoResResp.StatusCode == HttpStatusCode.OK, "DELETE /api/tenant/{token}/co-residents/{citizenId} returns 200 OK");
-        var afterDelJson = await delCoResResp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert(afterDelJson.GetProperty("people").GetInt32() == 1 &&
-               afterDelJson.GetProperty("coResidents").GetArrayLength() == 0,
-            "removing co-resident updates People back to 1 and empties coResidents");
-
-        // 4. POST /api/tenant/{token}/meter-submission validation & happy path
         byte[] validPng = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 1, 2, 3, 4];
-        byte[] validJpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01];
-        byte[] validWebp = System.Text.Encoding.ASCII.GetBytes("RIFF\0\0\0\0WEBPVP8 ");
-        byte[] invalidMagic = System.Text.Encoding.ASCII.GetBytes("%PDF-1.4 not an image");
-        byte[] oversizedPng = new byte[2 * 1024 * 1024 + 128];
-        Array.Copy(validPng, oversizedPng, validPng.Length);
+        using var multipartForm = new MultipartFormDataContent();
+        multipartForm.Add(new ByteArrayContent(validPng), "photo", "test.png");
+        multipartForm.Add(new StringContent("150"), "submittedReading");
+        var tenantMeterPostResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", multipartForm);
 
-        // 3b. Foreign tenant self-checkin with Passport number (M87654321) and identity photo upload
-        var foreignCheckinReq = new TenantSelfCheckinRequest(
-            Target: "tenant",
-            FullName: "KIM MIN JUN",
-            CitizenId: "m87654321",
-            DateOfBirth: new DateOnly(1995, 8, 15),
-            Gender: "Nam",
-            PermanentAddress: "Quốc tịch: Hàn Quốc (KOR)",
-            Phone: "0908889999",
-            Email: "kim@example.com");
-        var foreignResp = await client.PostAsJsonAsync($"/api/tenant/{token}/self-checkin", foreignCheckinReq);
-        Assert(foreignResp.StatusCode == HttpStatusCode.OK, "foreign tenant self-checkin with Passport M87654321 returns 200 OK");
-        var foreignJson = await foreignResp.Content.ReadFromJsonAsync<JsonElement>();
-        Assert(foreignJson.GetProperty("tenantName").GetString() == "KIM MIN JUN" &&
-               foreignJson.GetProperty("tenantCitizenId").GetString() == "M87654321" &&
-               foreignJson.GetProperty("tenantPermanentAddress").GetString() == "Quốc tịch: Hàn Quốc (KOR)",
-            "foreign tenant self-checkin normalizes Passport CitizenId to uppercase M87654321 and saves nationality in PermanentAddress");
+        using var idPhotoForm = new MultipartFormDataContent();
+        idPhotoForm.Add(new ByteArrayContent(validPng), "photo", "id.png");
+        var tenantIdPhotoPostResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", idPhotoForm);
 
-        static MultipartFormDataContent BuildIdentityPhotoForm(byte[] fileBytes, string fileName, string target = "tenant")
+        Assert(selfCheckinResp.StatusCode == HttpStatusCode.NotFound &&
+               deleteCoResResp.StatusCode == HttpStatusCode.NotFound &&
+               tenantIdPhotoGetResp.StatusCode == HttpStatusCode.NotFound &&
+               tenantIdPhotoPostResp.StatusCode == HttpStatusCode.NotFound &&
+               tenantMeterPostResp.StatusCode == HttpStatusCode.NotFound &&
+               tenantMeterPhotoGetResp.StatusCode == HttpStatusCode.NotFound &&
+               ownerSubmissionsGetResp.StatusCode == HttpStatusCode.NotFound &&
+               ownerSubPhotoGetResp.StatusCode == HttpStatusCode.NotFound &&
+               ownerSubApproveResp.StatusCode == HttpStatusCode.NotFound &&
+               ownerSubRejectResp.StatusCode == HttpStatusCode.NotFound,
+            "all retired tenant self-checkin and meter-submission endpoints return 404 NotFound");
+
+        // 2. GET /api/tenant/{token} remains active for invoice viewing without meterSubmission fields
+        var portalJson = await client.GetFromJsonAsync<JsonElement>($"/api/tenant/{token}");
+        Assert(portalJson.TryGetProperty("room", out _) &&
+               portalJson.TryGetProperty("occupancy", out _) &&
+               portalJson.TryGetProperty("invoices", out _) &&
+               !portalJson.TryGetProperty("meterSubmission", out _) &&
+               !portalJson.TryGetProperty("currentPeriodHasReading", out _),
+            "GET /api/tenant/{token} returns room/occupancy/invoices and omits retired meterSubmission fields");
+
+        // 3. Landlord identity photo endpoint GET /api/rooms/{id}/documents/identity-photo remains active
+        using (var scope = app.Services.CreateScope())
         {
-            var form = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent(fileBytes);
-            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-            form.Add(fileContent, "photo", fileName);
-            form.Add(new StringContent(target), "target");
-            return form;
-        }
-
-        using (var badIdMagicForm = BuildIdentityPhotoForm(invalidMagic, "passport.pdf"))
-        {
-            var badIdMagicResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", badIdMagicForm);
-            Assert(badIdMagicResp.StatusCode == HttpStatusCode.BadRequest, "identity-photo rejects non-image magic bytes with 400 BadRequest");
-        }
-
-        using (var oversizedIdForm = BuildIdentityPhotoForm(oversizedPng, "huge-passport.png"))
-        {
-            var oversizedIdResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", oversizedIdForm);
-            Assert(oversizedIdResp.StatusCode == HttpStatusCode.RequestEntityTooLarge, "identity-photo rejects >2MB photo with 413 PayloadTooLarge");
-        }
-
-        using (var validIdForm = BuildIdentityPhotoForm(validPng, "passport-kim.png"))
-        {
-            var validIdResp = await client.PostAsync($"/api/tenant/{token}/identity-photo", validIdForm);
-            Assert(validIdResp.StatusCode == HttpStatusCode.OK, "POST /api/tenant/{token}/identity-photo returns 200 OK for valid PNG");
-            var idPhotoDto = await validIdResp.Content.ReadFromJsonAsync<TenantIdentityPhotoDto>();
-            Assert(idPhotoDto != null && idPhotoDto.TargetKey == "tenant" && idPhotoDto.PhotoContentType == "image/png",
-                "identity-photo DTO returns target='tenant' and image/png content type");
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.TenantIdentityDocuments.Add(new TenantIdentityDocument
+            {
+                OwnerId = OwnerAId,
+                BuildingId = bldg.Id,
+                RoomId = roomId,
+                OccupancyId = occId,
+                TargetKey = "tenant",
+                PhotoFileName = "passport-kim.png",
+                PhotoContentType = "image/png",
+                PhotoSizeBytes = validPng.LongLength,
+                PhotoSha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                PhotoContent = validPng,
+                UploadedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
         }
 
         var docAfterIdPhoto = await client.GetFromJsonAsync<OccupancyDocumentDto>($"/api/rooms/{roomId}/documents");
         Assert(docAfterIdPhoto != null &&
-               docAfterIdPhoto.TenantCitizenId == "M87654321" &&
                docAfterIdPhoto.HasTenantIdentityPhoto &&
-               !string.IsNullOrWhiteSpace(docAfterIdPhoto.TenantIdentityPhotoFileName),
-            "GET /api/rooms/{id}/documents reports HasTenantIdentityPhoto=true and non-empty TenantIdentityPhotoFileName");
+               docAfterIdPhoto.TenantIdentityPhotoFileName == "passport-kim.png",
+            "GET /api/rooms/{id}/documents reports HasTenantIdentityPhoto=true and TenantIdentityPhotoFileName");
 
         var ownerIdPhotoResp = await client.GetAsync($"/api/rooms/{roomId}/documents/identity-photo?download=true");
         Assert(ownerIdPhotoResp.StatusCode == HttpStatusCode.OK, "GET /api/rooms/{id}/documents/identity-photo returns 200 OK");
         var ownerIdPhotoBytes = await ownerIdPhotoResp.Content.ReadAsByteArrayAsync();
-        Assert(ownerIdPhotoBytes.SequenceEqual(validPng), "GET /api/rooms/{id}/documents/identity-photo returns exact uploaded image bytes");
+        Assert(ownerIdPhotoBytes.SequenceEqual(validPng), "GET /api/rooms/{id}/documents/identity-photo returns exact image bytes");
         var cacheControl = ownerIdPhotoResp.Headers.CacheControl?.ToString() ?? string.Empty;
         var nosniff = ownerIdPhotoResp.Headers.TryGetValues("X-Content-Type-Options", out var xcto) ? string.Join(",", xcto) : string.Empty;
         var csp = ownerIdPhotoResp.Headers.TryGetValues("Content-Security-Policy", out var cspVals) ? string.Join(",", cspVals) : string.Empty;
@@ -872,134 +951,6 @@ internal static class RoomTenantLifecycleHttpTests
                csp.Contains("sandbox", StringComparison.OrdinalIgnoreCase) &&
                string.Equals(contentDisposition, "attachment", StringComparison.OrdinalIgnoreCase),
             "GET /api/rooms/{id}/documents/identity-photo?download=true sets no-store, nosniff, sandbox CSP, and attachment disposition headers");
-
-        static MultipartFormDataContent BuildMeterForm(byte[] fileBytes, string fileName, string reading, string? note = null)
-        {
-            var form = new MultipartFormDataContent();
-            var fileContent = new ByteArrayContent(fileBytes);
-            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-            form.Add(fileContent, "photo", fileName);
-            form.Add(new StringContent(reading), "submittedReading");
-            if (note is not null) form.Add(new StringContent(note), "note");
-            return form;
-        }
-
-        using (var badMagicForm = BuildMeterForm(invalidMagic, "meter.pdf", "145"))
-        {
-            var badMagicResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", badMagicForm);
-            Assert(badMagicResp.StatusCode == HttpStatusCode.BadRequest, "meter-submission rejects non-image magic bytes with 400 BadRequest");
-        }
-
-        using (var oversizedForm = BuildMeterForm(oversizedPng, "huge.png", "145"))
-        {
-            var oversizedResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", oversizedForm);
-            Assert(oversizedResp.StatusCode == HttpStatusCode.RequestEntityTooLarge, "meter-submission rejects >2MB photo with 413 PayloadTooLarge");
-        }
-
-        using (var rollbackForm = BuildMeterForm(validPng, "meter.png", "95"))
-        {
-            var rollbackResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", rollbackForm);
-            Assert(rollbackResp.StatusCode == HttpStatusCode.BadRequest, "meter-submission rejects reading < previousReading (95 < 100) with 400 BadRequest");
-        }
-
-        TenantMeterSubmissionDto? submittedDto;
-        using (var validForm = BuildMeterForm(validPng, "meter.png", "145", "Chi so dien thang nay"))
-        {
-            var validResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", validForm);
-            Assert(validResp.StatusCode == HttpStatusCode.OK, "valid PNG meter-submission returns 200 OK");
-            submittedDto = await validResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
-            Assert(submittedDto != null &&
-                   submittedDto.Status == "Pending" &&
-                   submittedDto.PreviousReading == 100m &&
-                   submittedDto.SubmittedReading == 145m &&
-                   submittedDto.TenantNote == "Chi so dien thang nay" &&
-                   submittedDto.PhotoContentType == "image/png",
-                "meter-submission DTO has Pending status, PreviousReading=100, SubmittedReading=145, and image/png content type");
-        }
-
-        var submissionId = submittedDto!.Id;
-
-        // Verify GET /api/tenant/{token} includes meterSubmission with Pending status
-        var portalJson = await client.GetFromJsonAsync<JsonElement>($"/api/tenant/{token}");
-        Assert(portalJson.GetProperty("meterSubmission").GetProperty("status").GetString() == "Pending" &&
-               portalJson.GetProperty("meterSubmission").GetProperty("submittedReading").GetDecimal() == 145m,
-            "GET /api/tenant/{token} returns Pending meterSubmission");
-
-        // Verify GET /api/readings/submissions returns Pending submission for OwnerA
-        var ownerSubmissions = await client.GetFromJsonAsync<List<TenantMeterSubmissionDto>>("/api/readings/submissions");
-        Assert(ownerSubmissions != null && ownerSubmissions.Count == 1 &&
-               ownerSubmissions[0].Id == submissionId && ownerSubmissions[0].Status == "Pending",
-            "GET /api/readings/submissions returns Pending submission for landlord");
-
-        // Verify photo endpoint returns exact bytes
-        var photoBytes = await client.GetByteArrayAsync($"/api/readings/submissions/{submissionId}/photo");
-        Assert(photoBytes.SequenceEqual(validPng), "GET /api/readings/submissions/{id}/photo returns uploaded image bytes");
-
-        // 5. POST /api/readings/submissions/{id}/reject marks Rejected with reason and allows tenant to resubmit (JPEG & WebP)
-        var rejectResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/reject",
-            new RejectMeterSubmissionRequest("Anh bi loa sang, vui long chup lai"));
-        Assert(rejectResp.StatusCode == HttpStatusCode.OK, "POST /api/readings/submissions/{id}/reject returns 200 OK");
-        var rejectedDto = await rejectResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
-        Assert(rejectedDto!.Status == "Rejected" && rejectedDto.RejectReason == "Anh bi loa sang, vui long chup lai",
-            "submission marked Rejected with landlord reason");
-
-        using (var resubmitJpeg = BuildMeterForm(validJpeg, "retake.jpg", "147", "Chup lai JPEG"))
-        {
-            var resubmitJpegResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", resubmitJpeg);
-            Assert(resubmitJpegResp.StatusCode == HttpStatusCode.OK, "resubmit with valid JPEG succeeds");
-        }
-
-        using (var resubmitWebp = BuildMeterForm(validWebp, "retake.webp", "148", "Chup lai WebP ro net"))
-        {
-            var resubmitWebpResp = await client.PostAsync($"/api/tenant/{token}/meter-submission", resubmitWebp);
-            Assert(resubmitWebpResp.StatusCode == HttpStatusCode.OK, "resubmit with valid WebP succeeds");
-            var resubmittedDto = await resubmitWebpResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
-            Assert(resubmittedDto!.Id == submissionId &&
-                   resubmittedDto.Status == "Pending" &&
-                   resubmittedDto.SubmittedReading == 148m &&
-                   resubmittedDto.RejectReason == null &&
-                   resubmittedDto.PhotoContentType == "image/webp",
-                "resubmission resets status to Pending, updates reading to 148, clears RejectReason, and stores image/webp");
-        }
-
-        // 6. Cross-owner isolation: OwnerB cannot approve, reject, or view photo of OwnerA's submission
-        using (var crossOwnerApprove = new HttpRequestMessage(HttpMethod.Post, $"/api/readings/submissions/{submissionId}/approve")
-        {
-            Content = JsonContent.Create(new ApproveMeterSubmissionRequest(148m))
-        })
-        {
-            crossOwnerApprove.Headers.Add("X-Fixture-Owner", OwnerBId.ToString());
-            using var crossResp = await client.SendAsync(crossOwnerApprove);
-            Assert(crossResp.StatusCode == HttpStatusCode.NotFound, "cross-owner approve is blocked with 404 NotFound");
-        }
-
-        // 7. POST /api/readings/submissions/{id}/approve creates MonthlyReading + Issued Monthly Invoice atomically
-        var approveResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/approve",
-            new ApproveMeterSubmissionRequest(150m));
-        Assert(approveResp.StatusCode == HttpStatusCode.OK, "POST /api/readings/submissions/{id}/approve returns 200 OK");
-        var approvedDto = await approveResp.Content.ReadFromJsonAsync<TenantMeterSubmissionDto>();
-        Assert(approvedDto!.Status == "Approved" &&
-               approvedDto.ApprovedReading == 150m &&
-               approvedDto.ReadingId != null &&
-               approvedDto.InvoiceId != null,
-            "approved submission records Approved status, ApprovedReading=150, ReadingId, and InvoiceId");
-
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var reading = await db.Readings.FindAsync(approvedDto.ReadingId);
-            var invoice = await db.Invoices.FindAsync(approvedDto.InvoiceId);
-            Assert(reading != null && reading.PreviousReading == 100m && reading.CurrentReading == 150m && reading.Consumption == 50m,
-                "MonthlyReading created with PreviousReading=100, CurrentReading=150, Consumption=50");
-            Assert(invoice != null && invoice.Kind == "Monthly" && invoice.LifecycleState == InvoiceLifecycleState.Issued &&
-                   invoice.ElectricityAmount == 50m * 3_500m,
-                "Issued Monthly Invoice created atomically with accurate electricity amount");
-        }
-
-        // Re-approving or tenant resubmitting after approval returns 409 Conflict
-        var doubleApproveResp = await client.PostAsJsonAsync($"/api/readings/submissions/{submissionId}/approve",
-            new ApproveMeterSubmissionRequest(150m));
-        Assert(doubleApproveResp.StatusCode == HttpStatusCode.Conflict, "approving an already-approved submission returns 409 Conflict");
     }
 
     private static WebApplication CreateTestApp(string connectionString)

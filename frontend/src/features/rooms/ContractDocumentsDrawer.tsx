@@ -107,8 +107,6 @@ export default function ContractDocumentsDrawer({
     queryFn: () => roomsApi.getDocuments(targetRoomId),
     enabled: !!targetRoomId,
     refetchOnWindowFocus: true,
-    refetchInterval: 4000,
-    refetchIntervalInBackground: false,
   });
 
   const data = query.data as (OccupancyDocumentData & { tenantSelfCheckinAt?: string | null }) | undefined;

@@ -109,8 +109,11 @@ public static partial class BillingEndpoints
     {
         var actorName = await db.Users.AsNoTracking().Where(x => x.Id == actorId).Select(x => x.Name).SingleOrDefaultAsync(ct)
             ?? "Unknown user";
-        var lastRevision = await db.InvoiceRevisions.Where(x => x.InvoiceId == invoice.Id)
+        var dbLastRevision = await db.InvoiceRevisions.Where(x => x.InvoiceId == invoice.Id)
             .OrderByDescending(x => x.Revision).Select(x => (int?)x.Revision).FirstOrDefaultAsync(ct) ?? 0;
+        var localLastRevision = db.InvoiceRevisions.Local.Where(x => x.InvoiceId == invoice.Id)
+            .Select(x => (int?)x.Revision).Max() ?? 0;
+        var lastRevision = Math.Max(dbLastRevision, localLastRevision);
         var revision = new InvoiceRevision
         {
             InvoiceId = invoice.Id,
