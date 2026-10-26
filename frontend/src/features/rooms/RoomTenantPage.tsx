@@ -248,7 +248,7 @@ function RoomTenantWorkspace() {
                 </Typography.Title>
               </div>
               <Row gutter={16}>
-                <Col xs={24} md={10}>
+                <Col xs={24} md={9}>
                   <Form.Item
                     label={t("Tên người thuê")}
                     name="tenantName"
@@ -257,12 +257,12 @@ function RoomTenantWorkspace() {
                     <Input size="large" placeholder={t("Họ và tên")} maxLength={160} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={14} md={8}>
+                <Col xs={24} sm={15} md={10}>
                   <Form.Item label={t("Số điện thoại")} name="phone">
                     <PhoneInput size="large" maxLength={60} />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={10} md={6}>
+                <Col xs={24} sm={9} md={5}>
                   <Form.Item
                     label={t("Số người ở")}
                     name="people"

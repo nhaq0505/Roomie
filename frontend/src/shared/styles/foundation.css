@@ -34,5 +34,15 @@ a { color: var(--teal-dark); }
 .ant-form-item-control-input-content > .ant-input-number-group-wrapper { display: block; width: 100%; }
 .ant-input-number-group-wrapper .ant-input-number { min-width: 0; }
 .ant-form-item-explain-error, .ant-form-item-extra { font-size: 14px; }
+.roomie-phone-field { position: relative; width: 100%; }
+.roomie-phone-input { display: flex !important; width: 100%; }
+.roomie-phone-input > .roomie-phone-country-select.ant-select { flex: 0 0 72px; width: 72px !important; }
+.roomie-phone-input > .roomie-phone-country-select.ant-select .ant-select-selector { padding-inline: 10px 6px !important; background: #f8fbfa !important; font-size: 13.5px !important; font-weight: 600 !important; color: #254149 !important; }
+.roomie-phone-input > .roomie-phone-country-select.ant-select .ant-select-selection-item { padding-inline-end: 14px !important; text-overflow: clip !important; }
+.roomie-phone-input > .roomie-phone-country-select.ant-select .ant-select-arrow { inset-inline-end: 7px !important; font-size: 10px !important; }
+.roomie-phone-input > .ant-input, .roomie-phone-input > .ant-input-affix-wrapper { flex: 1 1 auto; min-width: 0; }
+.roomie-phone-badge { position: absolute; top: -27px; inset-inline-end: 0; z-index: 1; display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 17px; user-select: none; cursor: help; white-space: nowrap; }
+.roomie-phone-badge.is-zalo { color: #0958d9; background: #e6f4ff; border: 1px solid #91caff; }
+.roomie-phone-badge.is-whatsapp { color: #137333; background: #e6f4ea; border: 1px solid #a8dab5; }
 .screen-center, .center-page { min-height: 100vh; display: grid; place-items: center; background: var(--canvas); }
 .center-page .ant-result { padding: 36px; }
