@@ -610,6 +610,26 @@ internal static class ContractDocumentsAndMoneyTests
             Assert(tables[2].InnerText.Contains("Thành Viên #29 <A&B>") && tables[2].InnerText.Contains("Quan hệ \"29\" & 'bạn'"),
                 "CT01 DOCX preserves XML special characters across all 29 co-resident table rows");
         }
+
+        // Case D: Water billed by meter (m³)
+        var waterMeterDto = minimalDto with
+        {
+            WaterFee = 15_000m,
+            WaterPerPerson = false,
+            WaterByMeter = true,
+            InitialWaterReading = 45m
+        };
+        var waterMeterContractBytes = ContractWordGenerator.GenerateRentalContractDocx(waterMeterDto, issuedDate);
+        using (var ms = new MemoryStream(waterMeterContractBytes))
+        using (var doc = WordprocessingDocument.Open(ms, false))
+        {
+            var text = doc.MainDocumentPart!.Document.Body!.InnerText;
+            Assert(text.Contains("15.000 đồng/m³ theo chỉ số đồng hồ nước riêng của phòng. Chỉ số đồng hồ nước bàn giao lúc nhận phòng: 45 m³."),
+                "contract DOCX formats Clause 2.3 with đồng/m³ and InitialWaterReading when WaterByMeter is true");
+        }
+        if (false)
+        {
+        }
     }
 
     private static void ExpectBadRequest(Action action, string name)

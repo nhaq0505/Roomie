@@ -41,12 +41,17 @@ public static partial class BillingEndpoints
             if (request.Description is { Length: > 500 }) throw new ApiException(400, "Description must be 500 characters or fewer.");
             if (request.CurrentReading is < 0 or > 1_000_000_000 || (request.CurrentReading is decimal meter && decimal.Round(meter, 3) != meter))
                 throw new ApiException(400, "Chỉ số mới phải nằm trong giới hạn và có tối đa ba chữ số thập phân.");
+            if (request.CurrentWaterReading is < 0 or > 1_000_000_000 || (request.CurrentWaterReading is decimal waterMeter && decimal.Round(waterMeter, 3) != waterMeter))
+                throw new ApiException(400, "Chỉ số nước mới phải nằm trong giới hạn và có tối đa ba chữ số thập phân.");
 
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
             var invoice = await db.Invoices.Include(x => x.DepositSettlements).SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, ct)
                 ?? throw new ApiException(404, "Invoice was not found.");
-            var fingerprint = RequestFingerprint.Fingerprint(new { request.ExpectedVersion, Reason = reason, request.Rent, request.ElectricityAmount,
-                request.WaterAmount, request.ServiceAmount, request.CurrentReading, request.DueDate, request.Description, request.Amount });
+            var fingerprint = request.CurrentWaterReading is null
+                ? RequestFingerprint.Fingerprint(new { request.ExpectedVersion, Reason = reason, request.Rent, request.ElectricityAmount,
+                request.WaterAmount, request.ServiceAmount, request.CurrentReading, request.DueDate, request.Description, request.Amount })
+                : RequestFingerprint.Fingerprint(new { request.ExpectedVersion, Reason = reason, request.Rent, request.ElectricityAmount,
+                request.WaterAmount, request.ServiceAmount, request.CurrentReading, request.CurrentWaterReading, request.DueDate, request.Description, request.Amount });
             var prior = await db.InvoiceRevisions.SingleOrDefaultAsync(x => x.InvoiceId == id && x.RequestId == request.RequestId, ct);
             if (prior is not null)
             {
@@ -68,6 +73,7 @@ public static partial class BillingEndpoints
             {
                 if (request.Amount is not null) throw new ApiException(400, "Use monthly charge fields to correct a monthly invoice.");
                 var meterChanged = request.CurrentReading is not null;
+                var waterMeterChanged = request.CurrentWaterReading is not null;
                 MonthlyReading? reading = null;
                 if (meterChanged)
                 {
@@ -85,6 +91,23 @@ public static partial class BillingEndpoints
                     invoice.Consumption = reading.Consumption;
                     changed = true;
                 }
+                if (waterMeterChanged)
+                {
+                    var policy = await MeterCorrectionPolicyAsync(db, invoice, ct);
+                    if (!policy.Allowed) throw new ApiException(409, policy.Reason ?? "Meter correction is no longer allowed.");
+                    reading ??= await db.Readings.SingleOrDefaultAsync(x => x.OccupancyId == invoice.OccupancyId && x.Period == invoice.Period, ct)
+                        ?? throw new ApiException(409, "The source meter reading no longer exists.");
+                    var prevWater = reading.PreviousWaterReading ?? invoice.PreviousWaterReading ?? 0;
+                    if (request.CurrentWaterReading < prevWater)
+                        throw new ApiException(400, "Chỉ số nước mới không thể thấp hơn chỉ số nước trước.");
+                    reading.PreviousWaterReading = prevWater;
+                    reading.CurrentWaterReading = request.CurrentWaterReading!.Value;
+                    reading.WaterConsumption = reading.CurrentWaterReading.Value - prevWater;
+                    invoice.PreviousWaterReading = prevWater;
+                    invoice.CurrentWaterReading = reading.CurrentWaterReading;
+                    invoice.WaterConsumption = reading.WaterConsumption;
+                    changed = true;
+                }
                 if (request.Rent is decimal rent) { invoice.Rent = ValidateCharge(rent); changed = true; }
                 if (request.ElectricityAmount is decimal electricity) { invoice.ElectricityAmount = ValidateCharge(electricity); changed = true; }
                 else if (meterChanged && invoice.ElectricityRate is decimal rate)
@@ -93,8 +116,13 @@ public static partial class BillingEndpoints
                     changed = true;
                 }
                 if (request.WaterAmount is decimal water) { invoice.WaterAmount = ValidateCharge(water); changed = true; }
+                else if (request.CurrentWaterReading is not null && invoice.WaterByMeter == true && invoice.WaterRate is decimal waterRate && invoice.WaterConsumption is decimal waterCons)
+                {
+                    invoice.WaterAmount = ApiSupport.RoundVnd(waterCons * waterRate);
+                    changed = true;
+                }
                 if (request.ServiceAmount is decimal service) { invoice.ServiceAmount = ValidateCharge(service); changed = true; }
-                if (request.CurrentReading is not null && reading is not null) changed = true;
+                if ((request.CurrentReading is not null || request.CurrentWaterReading is not null) && reading is not null) changed = true;
                 invoice.Total = InvoiceService.ValidateTotal(invoice.Rent, invoice.ElectricityAmount, invoice.WaterAmount, invoice.ServiceAmount);
             }
             else if (invoice.Kind == "Deposit")
@@ -131,6 +159,11 @@ public static partial class BillingEndpoints
                 if (request.Rent is decimal rent) { invoice.Rent = ValidateCharge(rent); changed = true; }
                 if (request.ElectricityAmount is decimal electricity) { invoice.ElectricityAmount = ValidateCharge(electricity); changed = true; }
                 if (request.WaterAmount is decimal water) { invoice.WaterAmount = ValidateCharge(water); changed = true; }
+                else if (request.CurrentWaterReading is not null && invoice.WaterByMeter == true && invoice.WaterRate is decimal waterRate && invoice.WaterConsumption is decimal waterCons)
+                {
+                    invoice.WaterAmount = ApiSupport.RoundVnd(waterCons * waterRate);
+                    changed = true;
+                }
                 if (request.ServiceAmount is decimal service) { invoice.ServiceAmount = ValidateCharge(service); changed = true; }
                 if (request.Amount is not null) throw new ApiException(400, "Use meter or charge fields to correct a final meter invoice.");
                 invoice.Total = InvoiceService.ValidateTotal(invoice.Rent, invoice.ElectricityAmount, invoice.WaterAmount, invoice.ServiceAmount);

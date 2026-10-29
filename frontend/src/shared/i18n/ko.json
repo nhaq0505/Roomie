@@ -1908,5 +1908,12 @@
   "Mã quốc gia": "국가 코드",
   "Số Việt Nam (+84): Chỉ gửi nhắc hóa đơn qua Zalo.": "베트남 번호 (+84): 청구서 알림은 Zalo로만 발송됩니다.",
   "Số quốc tế ({0}): Mặc định gửi nhắc hóa đơn qua WhatsApp.": "국제 번호 ({0}): 청구서 알림은 기본적으로 WhatsApp으로 발송됩니다.",
-  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "07:00~21:00 사이에 최소 5초 간격으로 발송됩니다. 청구서당 20시간 내 최대 1회 발송되며 완납 시 건너뜁니다. 유효한 국제 전화번호가 있는 거주 중인 세입자에게 기본 발송됩니다(베트남 번호는 Zalo로 발송)."
+  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "07:00~21:00 사이에 최소 5초 간격으로 발송됩니다. 청구서당 20시간 내 최대 1회 발송되며 완납 시 건너뜁니다. 유효한 국제 전화번호가 있는 거주 중인 세입자에게 기본 발송됩니다(베트남 번호는 Zalo로 발송).",
+  "Chỉ số nước mới": "새 수도 지침",
+  "Chỉ số nước mới {0}": "{0} 새 수도 지침",
+  "Nhập số nước": "수도 지침 입력",
+  "Giá nước / m³": "수도 단가 / m³",
+  "Theo chỉ số đồng hồ (m³)": "수도 계량기 지침별 (m³)",
+  "Chỉ số nước ban đầu": "초기 수도 지침",
+  "Chỉ số nước": "수도 계량기 지침"
 }

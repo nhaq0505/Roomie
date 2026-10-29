@@ -61,6 +61,10 @@ public static partial class OwnerManagementEndpoints
             db.Readings.AsNoTracking().Where(x => x.RoomId == room.Id).Select(x => x.CurrentReading), cancellationToken);
         var maxFinal = await QueryAggregates.MaxReadingAsync(db,
             db.Invoices.AsNoTracking().Where(x => x.RoomId == room.Id && x.IsFinalMeterReading).Select(x => x.CurrentReading), cancellationToken);
+        var maxWaterReading = await QueryAggregates.MaxReadingAsync(db,
+            db.Readings.AsNoTracking().Where(x => x.RoomId == room.Id && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), cancellationToken);
+        var maxFinalWater = await QueryAggregates.MaxReadingAsync(db,
+            db.Invoices.AsNoTracking().Where(x => x.RoomId == room.Id && x.IsFinalMeterReading && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), cancellationToken);
         var deposit = occupancy is null
             ? null
             : await db.Invoices.Include(x => x.DepositSettlements).AsNoTracking()
@@ -72,12 +76,12 @@ public static partial class OwnerManagementEndpoints
                 .Where(x => x.OccupancyId == occupancy.Id && x.TargetKey == "tenant")
                 .Select(x => x.PhotoFileName)
                 .FirstOrDefaultAsync(cancellationToken);
-        return BuildRoomDto(tokenService, room, building, occupancy, period, readings, maxFinal, deposit, canShareTenantLink, maxReading, tenantIdentityPhotoFileName);
+        return BuildRoomDto(tokenService, room, building, occupancy, period, readings, maxFinal, deposit, canShareTenantLink, maxReading, tenantIdentityPhotoFileName, maxFinalWater, maxWaterReading);
     }
 
     internal static RoomDto BuildRoomDto(TenantTokenService tokenService, Room room, Building building, Occupancy? occupancy, string period,
         IReadOnlyList<MonthlyReading> readings, decimal maxFinalReading, Invoice? deposit, bool canShareTenantLink, decimal? maxPhysicalReading = null,
-        string? tenantIdentityPhotoFileName = null)
+        string? tenantIdentityPhotoFileName = null, decimal maxFinalWaterReading = 0, decimal? maxPhysicalWaterReading = null)
     {
         // The physical room can have one reading per occupancy in the same month.
         // Prefer the active occupancy's reading for the room's current-reading field;
@@ -93,6 +97,13 @@ public static partial class OwnerManagementEndpoints
             var maxReading = maxPhysicalReading ?? (readings.Count > 0 ? readings.Max(r => r.CurrentReading) : room.InitialReading);
             var baseline = Math.Max(Math.Max(room.InitialReading, maxReading), maxFinalReading);
             previousReading = Math.Max(previousReading, baseline);
+        }
+        var previousWaterReading = currentReading?.PreviousWaterReading ?? priorReading?.CurrentWaterReading ?? room.InitialWaterReading;
+        if (currentReading?.PreviousWaterReading is null)
+        {
+            var maxWater = maxPhysicalWaterReading ?? (readings.Any(r => r.CurrentWaterReading.HasValue) ? readings.Where(r => r.CurrentWaterReading.HasValue).Max(r => r.CurrentWaterReading!.Value) : room.InitialWaterReading);
+            var waterBaseline = Math.Max(Math.Max(room.InitialWaterReading, maxWater), maxFinalWaterReading);
+            previousWaterReading = Math.Max(previousWaterReading, waterBaseline);
         }
         OccupancyDto? occupancyDto = null;
         if (occupancy is not null)
@@ -130,15 +141,15 @@ public static partial class OwnerManagementEndpoints
                 tenantIdentityPhotoFileName);
         }
         return new RoomDto(room.Id, room.BuildingId, building.Name, room.Name, room.Rent, room.ElectricityRate, room.WaterFee,
-            room.WaterPerPerson, room.ServiceFee, room.InitialReading, previousReading, occupancyDto);
+            room.WaterPerPerson, room.ServiceFee, room.InitialReading, previousReading, occupancyDto, room.WaterByMeter, room.InitialWaterReading, previousWaterReading);
     }
 
-    private static void ValidateFees(string name, decimal rent, decimal electricityRate, decimal waterFee, decimal serviceFee, decimal initialReading)
+    private static void ValidateFees(string name, decimal rent, decimal electricityRate, decimal waterFee, decimal serviceFee, decimal initialReading, decimal initialWaterReading = 0)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 100)
             throw new ApiException(StatusCodes.Status400BadRequest, "Room name is required and must be 100 characters or fewer.");
         if (rent < 0 || electricityRate < 0 || waterFee < 0 || serviceFee < 0 || initialReading < 0 ||
-            rent > 1_000_000_000 || electricityRate > 10_000_000 || waterFee > 100_000_000 || serviceFee > 100_000_000 || initialReading > 1_000_000_000)
+            rent > 1_000_000_000 || electricityRate > 10_000_000 || waterFee > 100_000_000 || serviceFee > 100_000_000 || initialReading > 1_000_000_000 || initialWaterReading < 0 || initialWaterReading > 1_000_000_000)
             throw new ApiException(StatusCodes.Status400BadRequest, "Room fees and meter readings must be non-negative values within supported limits.");
     }
 }

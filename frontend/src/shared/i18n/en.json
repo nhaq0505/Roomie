@@ -1908,5 +1908,12 @@
   "Mã quốc gia": "Country code",
   "Số Việt Nam (+84): Chỉ gửi nhắc hóa đơn qua Zalo.": "Vietnam number (+84): Invoice reminders are sent via Zalo only.",
   "Số quốc tế ({0}): Mặc định gửi nhắc hóa đơn qua WhatsApp.": "International number ({0}): Invoice reminders default to WhatsApp.",
-  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "Sent at least 5 seconds apart, between 07:00 and 21:00. At most one send per invoice every 20 hours; paid invoices are skipped. Defaults to active tenants with a valid international phone number (Vietnam numbers are sent via Zalo)."
+  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "Sent at least 5 seconds apart, between 07:00 and 21:00. At most one send per invoice every 20 hours; paid invoices are skipped. Defaults to active tenants with a valid international phone number (Vietnam numbers are sent via Zalo).",
+  "Chỉ số nước mới": "New water reading",
+  "Chỉ số nước mới {0}": "New water reading {0}",
+  "Nhập số nước": "Enter water reading",
+  "Giá nước / m³": "Water rate / m³",
+  "Theo chỉ số đồng hồ (m³)": "By water meter (m³)",
+  "Chỉ số nước ban đầu": "Initial water reading",
+  "Chỉ số nước": "Water meter reading"
 }

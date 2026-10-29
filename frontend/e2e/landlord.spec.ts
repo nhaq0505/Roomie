@@ -1459,4 +1459,173 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await reopenBtn.click();
     await expect(checklist).toBeVisible();
   });
+
+  test('Scenario L13: Water by Meter (m³) room setup, reading input, and invoice breakdown', async ({ page }) => {
+    let room: Room = {
+      id: 'room-wm-01',
+      buildingId: 'bld-01',
+      buildingName: 'Nhà trọ Bình An',
+      name: 'Phòng 201',
+      rent: 3000000,
+      electricityRate: 3500,
+      waterFee: 15000,
+      waterPerPerson: false,
+      waterByMeter: true,
+      serviceFee: 50000,
+      initialReading: 100,
+      previousReading: 100,
+      initialWaterReading: 20,
+      previousWaterReading: 20,
+      occupancy: {
+        id: 'occ-wm-01',
+        tenantName: 'Phạm Minh Tuấn',
+        phone: '0909888777',
+        people: 2,
+        startDate: '2026-10-01',
+        depositRequired: 3000000,
+        depositPaid: 3000000,
+        depositHeld: 3000000,
+      },
+      isArchived: false,
+    };
+
+    let readings: Reading[] = [];
+    let generatedInvoice: Invoice | null = null;
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
+      if (path === '/api/dashboard') return route.fulfill({ json: defaultDashboard });
+      if (path === '/api/buildings') {
+        return route.fulfill({ json: [{ id: 'bld-01', name: 'Nhà trọ Bình An', address: '123 Đường Số 1', isArchived: false }] });
+      }
+      if (path === '/api/rooms') return route.fulfill({ json: [room] });
+      if (path === '/api/readings') {
+        if (method === 'GET') return route.fulfill({ json: readings });
+        if (method === 'POST') {
+          const body = route.request().postDataJSON() as {
+            roomId: string;
+            period: string;
+            currentReading: number;
+            currentWaterReading?: number;
+          };
+          const elecConsumption = body.currentReading - (room.previousReading ?? 0);
+          const waterConsumption = (body.currentWaterReading ?? 0) - (room.previousWaterReading ?? 0);
+          const readingSaved: Reading = {
+            id: 'reading-wm-01',
+            roomId: room.id,
+            roomName: room.name,
+            buildingName: room.buildingName,
+            period: body.period,
+            previousReading: room.previousReading ?? 0,
+            currentReading: body.currentReading,
+            consumption: elecConsumption,
+            waterByMeter: true,
+            previousWaterReading: room.previousWaterReading ?? 0,
+            currentWaterReading: body.currentWaterReading ?? 0,
+            waterConsumption,
+            recordedAt: new Date().toISOString(),
+            lifecycleState: 'Issued',
+            occupancyId: room.occupancy!.id,
+          };
+          readings = [readingSaved];
+          generatedInvoice = {
+            id: 'inv-wm-01',
+            roomId: room.id,
+            roomName: room.name,
+            buildingName: room.buildingName,
+            tenantName: room.occupancy!.tenantName,
+            period: body.period,
+            kind: 'Monthly',
+            lifecycleState: 'Issued',
+            previousReading: room.previousReading ?? 0,
+            currentReading: body.currentReading,
+            consumption: elecConsumption,
+            waterByMeter: true,
+            previousWaterReading: room.previousWaterReading ?? 0,
+            currentWaterReading: body.currentWaterReading ?? 0,
+            waterConsumption,
+            rent: room.rent,
+            electricityAmount: elecConsumption * room.electricityRate,
+            waterAmount: waterConsumption * room.waterFee,
+            serviceAmount: room.serviceFee,
+            total: room.rent + elecConsumption * room.electricityRate + waterConsumption * room.waterFee + room.serviceFee,
+            paid: 0,
+            outstanding: room.rent + elecConsumption * room.electricityRate + waterConsumption * room.waterFee + room.serviceFee,
+            status: 'Unpaid',
+            occupancyId: room.occupancy!.id,
+          };
+          return route.fulfill({ json: { reading: readingSaved, invoice: generatedInvoice } });
+        }
+      }
+      if (path === '/api/invoices') {
+        return route.fulfill({
+          json: {
+            items: generatedInvoice ? [generatedInvoice] : [],
+            total: generatedInvoice ? 1 : 0,
+            draftCount: 0,
+            totals: {
+              billed: generatedInvoice?.total ?? 0,
+              paid: 0,
+              outstanding: generatedInvoice?.outstanding ?? 0,
+            },
+          },
+        });
+      }
+      if (path === '/api/invoices/inv-wm-01') {
+        return route.fulfill({ json: generatedInvoice });
+      }
+      if (path === '/api/invoices/inv-wm-01/corrections') {
+        return route.fulfill({ json: [] });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    // 1. Verify /rooms displays /m³ rate
+    await page.goto('/rooms');
+    await expect(page.getByText('Phòng 201', { exact: true })).toBeVisible();
+    // 1. Verify /rooms edit modal shows "Theo chỉ số đồng hồ (m³)" and "Giá nước / m³"
+    await page.goto('/rooms');
+    await expect(page.getByText('Phòng 201', { exact: true })).toBeVisible();
+    await page.locator('.room-more').first().click();
+    await page.getByRole('menuitem', { name: 'Sửa thông tin phòng' }).click();
+    const editRoomModal = page.locator('.ant-modal').filter({ hasText: 'Thông tin Phòng 201' });
+    await expect(editRoomModal).toBeVisible();
+    await expect(editRoomModal.getByText('Theo chỉ số đồng hồ (m³)')).toBeVisible();
+    await expect(editRoomModal.getByText('Giá nước / m³')).toBeVisible();
+    await editRoomModal.getByRole('button', { name: 'Hủy' }).click();
+    await expect(editRoomModal).toBeHidden();
+
+    // 2. Navigate to /readings and enter both electricity (100 -> 150) and water (20 -> 28) readings
+    await page.goto('/readings');
+    await expect(page.getByLabel('Chỉ số mới Phòng 201')).toBeVisible();
+    const waterInput = page.getByLabel('Chỉ số nước mới Phòng 201');
+    await expect(waterInput).toBeVisible();
+
+    await page.getByLabel('Chỉ số mới Phòng 201').fill('150');
+    await waterInput.fill('28');
+
+    await expect(page.getByText('50 kWh')).toBeVisible();
+    await expect(page.getByText('8 m³')).toBeVisible();
+    await expect(page.getByText('≈ 120.000')).toBeVisible();
+
+    // 3. Submit reading and verify invoice drawer shows water meter reading breakdown
+    await page.getByRole('button', { name: 'Chốt & lập hóa đơn' }).click();
+    const confirmModal = page.locator('.ant-modal-confirm');
+    await expect(confirmModal).toBeVisible();
+    await confirmModal.getByRole('button', { name: 'Chốt & lập hóa đơn' }).click();
+    await expect(page.locator('.submitted-tag')).toHaveText('Đã phát hành');
+
+    await page.goto('/invoices');
+    await page.getByRole('button', { name: 'Chi tiết' }).click();
+    const drawer = page.locator('.ant-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByText('8 m³ · 20 → 28')).toBeVisible();
+    await expect(drawer.getByText('120.000')).toBeVisible();
+    const checklist = page.locator('body');
+    await expect(checklist).toBeVisible();
+  });
 });

@@ -33,6 +33,7 @@ internal static class AccountingBillingHttpTests
         await AutomaticZaloQueueAsync();
         await MeterReadingAntiRegressionAsync();
         await AutomaticMonthlyInvoiceCalculationAsync();
+        await WaterByMeterBillingAndAntiRegressionAsync();
         await SupplementalInvoiceCreationAsync();
         await InvoiceListSummaryAsync();
         await InvoiceCorrectionAndAuditRevisionsAsync();
@@ -254,6 +255,121 @@ internal static class AccountingBillingHttpTests
         Assert(invoice.Paid == 0 && invoice.Status == InvoiceStatus.Unpaid, "new invoice has Paid = 0 and Status = Unpaid");
         Assert(invoice.LifecycleState == InvoiceLifecycleState.Issued, "invoice lifecycle state is Issued");
         Assert(invoice.DueDate == new DateOnly(2026, 9, 5), "due date set to 5th of next month (2026-09-05)");
+    }
+
+    private static async Task WaterByMeterBillingAndAntiRegressionAsync()
+    {
+        await using var fixture = await PostgresTestDb.CreateAsync(ensureCreated: false);
+        await using var app = CreateTestApp(fixture.ConnectionString);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Fixture-Owner", OwnerId.ToString());
+
+        var bldgResp = await client.PostAsJsonAsync("/api/buildings", new BuildingRequest("Water Meter Building", "Address"));
+        var bldg = await bldgResp.Content.ReadFromJsonAsync<BuildingDto>();
+
+        // Create room with WaterByMeter = true, WaterFee = 15,000 VND/m³, InitialWaterReading = 20
+        var roomResp = await client.PostAsJsonAsync("/api/rooms", new RoomCreateRequest(
+            bldg!.Id, "Room WM-1", Rent: 2_500_000, ElectricityRate: 3_500, WaterFee: 15_000,
+            WaterPerPerson: false, ServiceFee: 50_000, InitialReading: 100, WaterByMeter: true, InitialWaterReading: 20));
+        Assert(roomResp.StatusCode == HttpStatusCode.Created, "room with WaterByMeter = true created with 201 Created");
+        var roomJson = await roomResp.Content.ReadFromJsonAsync<JsonElement>();
+        var roomId = roomJson.GetProperty("id").GetGuid();
+        Assert(roomJson.GetProperty("waterByMeter").GetBoolean() && roomJson.GetProperty("initialWaterReading").GetDecimal() == 20,
+            "room DTO exposes waterByMeter = true and initialWaterReading = 20");
+
+        var occResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyRequest(
+            "Water Tenant", "0911223344", 2, new DateOnly(2026, 8, 1), 0));
+        var occJson = await occResp.Content.ReadFromJsonAsync<JsonElement>();
+        var occupancyId = occJson.GetProperty("occupancy").GetProperty("id").GetGuid();
+
+        // 1. Missing CurrentWaterReading when WaterByMeter = true is rejected with 400 BadRequest
+        var missingWaterResp = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-08", 150));
+        Assert(missingWaterResp.StatusCode == HttpStatusCode.BadRequest,
+            "missing CurrentWaterReading when WaterByMeter = true is rejected with 400 BadRequest");
+
+        // 2. Regressed CurrentWaterReading (18 < 20) is rejected with 400 BadRequest
+        var regressedWaterResp = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-08", 150, CurrentWaterReading: 18));
+        Assert(regressedWaterResp.StatusCode == HttpStatusCode.BadRequest,
+            "regressed CurrentWaterReading (18 < 20) is rejected with 400 BadRequest");
+
+        // 3. Valid reading: Elec 100 -> 150 (50 kWh * 3,500 = 175,000), Water 20 -> 28 (8 m³ * 15,000 = 120,000)
+        var validResp = await client.PostAsJsonAsync("/api/readings/draft", new ReadingRequest(roomId, "2026-08", 150, CurrentWaterReading: 28));
+        Assert(validResp.StatusCode == HttpStatusCode.Created, "valid water meter reading (20 -> 28) created as Draft with 201 Created");
+
+        Guid augInvoiceId;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var inv = await db.Invoices.SingleAsync(i => i.OccupancyId == occupancyId && i.Period == "2026-08");
+            augInvoiceId = inv.Id;
+            Assert(inv.WaterByMeter == true && inv.PreviousWaterReading == 20 && inv.CurrentWaterReading == 28 &&
+                   inv.WaterConsumption == 8 && inv.WaterAmount == 120_000 && inv.Total == 2_845_000,
+                "Draft invoice snapshots WaterByMeter, Previous/CurrentWaterReading (20 -> 28), WaterConsumption (8), and WaterAmount (120,000)");
+        }
+
+        // 4. Updating InitialWaterReading on room/occupancy while first invoice is still Draft recalculates water consumption (15 -> 28 = 13 m³ * 15,000 = 195,000)
+        var updateOccResp = await client.PatchAsJsonAsync($"/api/rooms/{roomId}/occupancy", new OccupancyUpdateRequest(
+            occupancyId, "Water Tenant", "0911223344", 2, InitialReading: 100, InitialWaterReading: 15));
+        Assert(updateOccResp.StatusCode == HttpStatusCode.OK, "updating InitialWaterReading while invoice is Draft succeeds");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var inv = await db.Invoices.FindAsync(augInvoiceId);
+            Assert(inv!.PreviousWaterReading == 15 && inv.WaterConsumption == 13 && inv.WaterAmount == 195_000,
+                "Draft invoice recalculates PreviousWaterReading (15), WaterConsumption (13), and WaterAmount (195,000)");
+        }
+
+        // Issue August invoice and record September reading (Water 28 -> 35 = 7 m³ * 15,000 = 105,000)
+        var issueResp = await client.PostAsync($"/api/invoices/{augInvoiceId}/issue", null);
+        Assert(issueResp.StatusCode == HttpStatusCode.OK, "August invoice issued");
+
+        var sepResp = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-09", 200, CurrentWaterReading: 35));
+        Assert(sepResp.StatusCode == HttpStatusCode.Created, "September reading (Water 28 -> 35) created");
+
+        Guid sepInvoiceId;
+        long sepVersion;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var sep = await db.Invoices.SingleAsync(i => i.OccupancyId == occupancyId && i.Period == "2026-09");
+            sepInvoiceId = sep.Id;
+            sepVersion = sep.Version;
+            Assert(sep.PreviousWaterReading == 28 && sep.CurrentWaterReading == 35 && sep.WaterConsumption == 7 && sep.WaterAmount == 105_000,
+                "September invoice anchors PreviousWaterReading at 28 and calculates WaterAmount = 105,000");
+
+            // Mark all invoices paid for move-out test after correction
+        }
+
+        // 5. Correcting CurrentWaterReading on latest invoice (35 -> 40 = 12 m³ * 15,000 = 180,000)
+        var corrWaterResp = await client.PostAsJsonAsync($"/api/invoices/{sepInvoiceId}/corrections",
+            new InvoiceCorrectionRequest(Guid.NewGuid(), sepVersion, "Chốt lại đồng hồ nước tháng 9", CurrentWaterReading: 40));
+        Assert(corrWaterResp.StatusCode == HttpStatusCode.OK, "correcting CurrentWaterReading on latest invoice succeeds");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var sep = await db.Invoices.FindAsync(sepInvoiceId);
+            Assert(sep!.CurrentWaterReading == 40 && sep.WaterConsumption == 12 && sep.WaterAmount == 180_000,
+                "corrected invoice updates CurrentWaterReading (40), WaterConsumption (12), and WaterAmount (180,000)");
+
+            var invoices = await db.Invoices.Where(i => i.OccupancyId == occupancyId).ToListAsync();
+            foreach (var inv in invoices) { inv.Paid = inv.Total; inv.Status = InvoiceStatus.Paid; }
+            await db.SaveChangesAsync();
+        }
+
+        // 6. Move-out advances room.InitialWaterReading to 40
+        var moveoutResp = await client.PostAsJsonAsync($"/api/rooms/{roomId}/complete-moveout",
+            new CompleteMoveoutRequest(occupancyId, Guid.NewGuid(), 0, 0, null));
+        Assert(moveoutResp.StatusCode == HttpStatusCode.OK, "moveout completed for WaterByMeter room");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var room = await db.Rooms.FindAsync(roomId);
+            Assert(room!.InitialWaterReading == 40, "room InitialWaterReading advanced to latest water meter baseline (40) after move-out");
+        }
     }
 
     private static async Task SupplementalInvoiceCreationAsync()

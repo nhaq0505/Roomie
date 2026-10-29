@@ -17,6 +17,15 @@ public static class MoveoutEndpoints
         return Math.Max(room.InitialReading, Math.Max(reading, legacyFinal));
     }
 
+    internal static async Task<decimal> WaterMeterBaselineAsync(AppDbContext db, Room room, CancellationToken ct)
+    {
+        var reading = await QueryAggregates.MaxReadingAsync(db,
+            db.Readings.AsNoTracking().Where(x => x.RoomId == room.Id && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), ct);
+        var legacyFinal = await QueryAggregates.MaxReadingAsync(db,
+            db.Invoices.AsNoTracking().Where(x => x.RoomId == room.Id && x.IsFinalMeterReading && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), ct);
+        return Math.Max(room.InitialWaterReading, Math.Max(reading, legacyFinal));
+    }
+
     public static void MapMoveoutEndpoints(this WebApplication app)
     {
         var routes = app.MapGroup("/api/rooms").RequireAuthorization(policy => policy.RequireRole("Owner"));
@@ -177,6 +186,7 @@ public static class MoveoutEndpoints
 
         var room = await db.Rooms.SingleAsync(x => x.Id == id, ct);
         room.InitialReading = Math.Max(room.InitialReading, await MeterBaselineAsync(db, room, ct));
+        room.InitialWaterReading = Math.Max(room.InitialWaterReading, await WaterMeterBaselineAsync(db, room, ct));
         occupancy.IsActive = false;
         occupancy.EndDate = endDate;
         occupancy.TenantTokenHash = null;

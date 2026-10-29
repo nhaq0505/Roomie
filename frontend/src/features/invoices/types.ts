@@ -20,6 +20,10 @@ export interface Invoice {
   previousReading: number;
   currentReading: number;
   consumption: number;
+  waterByMeter?: boolean | null;
+  previousWaterReading?: number | null;
+  currentWaterReading?: number | null;
+  waterConsumption?: number | null;
   rent: number;
   electricityAmount: number;
   waterAmount: number;

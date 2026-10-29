@@ -607,6 +607,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<decimal?>("CurrentWaterReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -668,6 +672,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<decimal?>("PreviousWaterReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<decimal>("Rent")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -709,6 +717,13 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.Property<decimal>("WaterAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool?>("WaterByMeter")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("WaterConsumption")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<bool?>("WaterPerPerson")
                         .HasColumnType("boolean");
@@ -1418,6 +1433,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<decimal?>("CurrentWaterReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<decimal?>("ElectricityRate")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1444,6 +1463,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<decimal?>("PreviousWaterReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1453,6 +1476,13 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.Property<decimal?>("ServiceRate")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool?>("WaterByMeter")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("WaterConsumption")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<bool?>("WaterPerPerson")
                         .HasColumnType("boolean");
@@ -2662,6 +2692,10 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<decimal>("InitialWaterReading")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -2674,6 +2708,9 @@ namespace RoomRental.Api.Data.Migrations.Postgres
                     b.Property<decimal>("ServiceFee")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("WaterByMeter")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("WaterFee")
                         .HasPrecision(18, 2)

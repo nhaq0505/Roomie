@@ -10,6 +10,10 @@ export interface Reading {
   previousReading: number;
   currentReading?: number;
   consumption?: number;
+  waterByMeter?: boolean;
+  previousWaterReading?: number | null;
+  currentWaterReading?: number | null;
+  waterConsumption?: number | null;
   invoiceId?: string;
   issuanceStatus?: 'Draft' | 'Issued' | string;
 }

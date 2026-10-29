@@ -52,7 +52,7 @@ public static partial class OwnerManagementEndpoints
             {
                 // Issued invoices (including unpaid ones) are finalized snapshots. Only unpaid drafts may change.
                 var drafts = await db.Invoices.Where(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id &&
-                    x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Draft && x.WaterPerPerson == true).ToListAsync(ct);
+                    x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Draft && x.WaterPerPerson == true && x.WaterByMeter != true).ToListAsync(ct);
                 foreach (var draft in drafts)
                 {
                     if (draft.Paid != 0 || draft.Status == InvoiceStatus.Paid ||
@@ -135,6 +135,72 @@ public static partial class OwnerManagementEndpoints
                     room.InitialReading = newInitialReading;
                 }
             }
+            if (request.InitialWaterReading is decimal newInitialWaterReading)
+            {
+                if (newInitialWaterReading < 0 || newInitialWaterReading > 1_000_000_000)
+                    throw new ApiException(400, "Chỉ số nước phải là số không âm trong giới hạn cho phép.");
+                if (decimal.Round(newInitialWaterReading, 3) != newInitialWaterReading)
+                    throw new ApiException(400, "Chỉ số nước tối đa 3 chữ số thập phân.");
+                if (newInitialWaterReading != room.InitialWaterReading)
+                {
+                    if (await db.Invoices.AnyAsync(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id &&
+                        x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Issued, ct))
+                        throw new ApiException(409, "Phòng đã phát hành hóa đơn tháng nên không thể sửa chỉ số nước ban đầu. Hãy điều chỉnh trực tiếp trên hóa đơn.");
+                    var priorMaxWater = await QueryAggregates.MaxReadingAsync(db,
+                        db.Readings.AsNoTracking().Where(x => x.RoomId == id && x.OccupancyId != occupancy.Id && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), ct);
+                    var priorMaxFinalWater = await QueryAggregates.MaxReadingAsync(db,
+                        db.Invoices.AsNoTracking().Where(x => x.RoomId == id && x.OccupancyId != occupancy.Id && x.IsFinalMeterReading && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), ct);
+                    var priorWaterFloor = Math.Max(priorMaxWater, priorMaxFinalWater);
+                    if (priorWaterFloor > 0 && newInitialWaterReading < priorWaterFloor)
+                        throw new ApiException(400, $"Chỉ số nước ban đầu không thể thấp hơn chỉ số đã chốt của lượt thuê trước ({priorWaterFloor} m³).");
+
+                    var firstReading = await db.Readings
+                        .Where(x => x.RoomId == id && x.OccupancyId == occupancy.Id)
+                        .OrderBy(x => x.Period)
+                        .ThenBy(x => x.RecordedAt)
+                        .FirstOrDefaultAsync(ct);
+                    var firstDraft = await db.Invoices
+                        .Where(x => x.OwnerId == ownerId && x.OccupancyId == occupancy.Id &&
+                                    x.Kind == "Monthly" && x.LifecycleState == InvoiceLifecycleState.Draft)
+                        .OrderBy(x => x.Period)
+                        .ThenBy(x => x.IssuedAt)
+                        .FirstOrDefaultAsync(ct);
+
+                    if (firstReading is not null && firstReading.CurrentWaterReading is decimal curWaterReading &&
+                        (firstDraft is null || string.CompareOrdinal(firstReading.Period, firstDraft.Period) <= 0))
+                    {
+                        if (curWaterReading < newInitialWaterReading)
+                            throw new ApiException(400, $"Chỉ số nước ban đầu ({newInitialWaterReading} m³) không thể lớn hơn chỉ số cuối kỳ đã ghi ({curWaterReading} m³).");
+                        firstReading.PreviousWaterReading = newInitialWaterReading;
+                        firstReading.WaterConsumption = curWaterReading - newInitialWaterReading;
+                    }
+
+                    if (firstDraft is not null && firstDraft.WaterByMeter == true &&
+                        (firstReading is null || string.CompareOrdinal(firstDraft.Period, firstReading.Period) <= 0))
+                    {
+                        if (firstDraft.Paid != 0 || firstDraft.Status == InvoiceStatus.Paid ||
+                            await db.Receipts.AnyAsync(x => x.InvoiceId == firstDraft.Id, ct) ||
+                            await db.PayOsAttempts.AnyAsync(x => (x.InvoiceId == firstDraft.Id || db.Invoices.Any(i => i.Id == firstDraft.Id && i.PaymentReservationId == x.Id)) && x.Status == PaymentAttemptStatus.Pending, ct))
+                            throw new ApiException(409, "Hóa đơn nháp có thanh toán hoặc giao dịch đang chờ. Cần xử lý trước khi đổi chỉ số nước ban đầu.");
+                        if (firstDraft.CurrentWaterReading is decimal curWaterDraft && curWaterDraft < newInitialWaterReading)
+                            throw new ApiException(400, $"Chỉ số nước ban đầu ({newInitialWaterReading} m³) không thể lớn hơn chỉ số cuối kỳ trong bản nháp ({curWaterDraft} m³).");
+                        var before = BillingEndpoints.SerializeSnapshot(firstDraft);
+                        firstDraft.PreviousWaterReading = newInitialWaterReading;
+                        if (firstDraft.CurrentWaterReading is decimal currentWaterVal)
+                        {
+                            firstDraft.WaterConsumption = currentWaterVal - newInitialWaterReading;
+                            firstDraft.WaterAmount = ApiSupport.RoundVnd(firstDraft.WaterConsumption.Value * (firstDraft.WaterRate ?? room.WaterFee));
+                            firstDraft.Total = InvoiceService.ValidateTotal(firstDraft.Rent, firstDraft.ElectricityAmount, firstDraft.WaterAmount, firstDraft.ServiceAmount);
+                        }
+                        firstDraft.Version++;
+                        InvoiceService.RecalculateStatus(firstDraft);
+                        await BillingEndpoints.AddRevisionAsync(db, firstDraft, Guid.NewGuid(), RequestFingerprint.Fingerprint(request),
+                            "Cập nhật chỉ số nước ban đầu cho hóa đơn nháp.", ownerId, before, BillingEndpoints.SerializeSnapshot(firstDraft), ct);
+                    }
+
+                    room.InitialWaterReading = newInitialWaterReading;
+                }
+            }
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return Results.Ok(await ToRoomDtoAsync(db, tokenService, webhookService, room, building, occupancy, VietnamCalendar.CurrentVietnamPeriod(), ct));
@@ -181,6 +247,21 @@ public static partial class OwnerManagementEndpoints
                 if (priorPhysical > 0 && initialReading < priorPhysical)
                     throw new ApiException(400, $"Chỉ số điện không thể thấp hơn chỉ số trước đó ({priorPhysical} kWh).");
                 room.InitialReading = initialReading;
+            }
+            if (request.InitialWaterReading is decimal initialWaterReading)
+            {
+                if (initialWaterReading < 0 || initialWaterReading > 1_000_000_000)
+                    throw new ApiException(400, "Chỉ số nước phải là số không âm trong giới hạn cho phép.");
+                if (decimal.Round(initialWaterReading, 3) != initialWaterReading)
+                    throw new ApiException(400, "Chỉ số nước tối đa 3 chữ số thập phân.");
+                var maxWaterReading = await QueryAggregates.MaxReadingAsync(db,
+                    db.Readings.AsNoTracking().Where(x => x.RoomId == id && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), cancellationToken);
+                var maxFinalWater = await QueryAggregates.MaxReadingAsync(db,
+                    db.Invoices.AsNoTracking().Where(x => x.RoomId == id && x.IsFinalMeterReading && x.CurrentWaterReading != null).Select(x => x.CurrentWaterReading!.Value), cancellationToken);
+                var priorPhysicalWater = Math.Max(room.InitialWaterReading, Math.Max(maxWaterReading, maxFinalWater));
+                if (priorPhysicalWater > 0 && initialWaterReading < priorPhysicalWater)
+                    throw new ApiException(400, $"Chỉ số nước không thể thấp hơn chỉ số trước đó ({priorPhysicalWater} m³).");
+                room.InitialWaterReading = initialWaterReading;
             }
 
             var token = tokenService.Create();

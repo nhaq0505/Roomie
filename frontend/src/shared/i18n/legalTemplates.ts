@@ -39,6 +39,7 @@ export const legalContractTemplate = {
   clause2_3Prefix: '2.3. Tiền nước sinh hoạt: ',
   waterPerPersonUnit: '/người/tháng',
   waterPerRoomUnit: '/phòng/tháng',
+  clause2_3MeterMiddle: '/m³ theo chỉ số đồng hồ nước riêng của phòng. Chỉ số đồng hồ nước bàn giao lúc nhận phòng: ',
   clause2_4Prefix: '2.4. Phí dịch vụ chung (rác, vệ sinh, wifi/an ninh...): ',
   clause2_5Prefix: '2.5. Kỳ hạn thanh toán: Thanh toán định kỳ 01 tháng/lần, từ ngày 01 đến chậm nhất ngày ',
   clause2_5Suffix: ' hàng tháng.',

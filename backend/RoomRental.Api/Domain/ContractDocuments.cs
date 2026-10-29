@@ -58,7 +58,9 @@ public sealed record OccupancyDocumentDto(
     IReadOnlyList<CoResidentDto> CoResidents,
     DateTimeOffset? TenantSelfCheckinAt = null,
     bool HasTenantIdentityPhoto = false,
-    string? TenantIdentityPhotoFileName = null);
+    string? TenantIdentityPhotoFileName = null,
+    bool WaterByMeter = false,
+    decimal InitialWaterReading = 0);
 
 public sealed record UpdateOccupancyDocumentRequest(
     Guid OccupancyId,

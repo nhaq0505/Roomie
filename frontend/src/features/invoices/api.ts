@@ -21,7 +21,7 @@ export const invoicesApi = {
       }
     },
     publishDraft: (id: string, body: { expectedVersion: number; requestId: string; rent: number; electricityAmount: number; waterAmount: number; serviceAmount: number }) => request<Invoice>(`/api/invoices/${encodeURIComponent(id)}/publish`, post(body)),
-    correct: (id: string, body: { expectedVersion: number; requestId: string; reason: string; amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; dueDate?: string; description?: string }) => request<Invoice>(`/api/invoices/${encodeURIComponent(id)}/corrections`, post(body)),
+    correct: (id: string, body: { expectedVersion: number; requestId: string; reason: string; amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; currentWaterReading?: number; dueDate?: string; description?: string }) => request<Invoice>(`/api/invoices/${encodeURIComponent(id)}/corrections`, post(body)),
     corrections: (id: string) => request<unknown>(`/api/invoices/${encodeURIComponent(id)}/corrections`).then(listFrom<InvoiceCorrection>),
     generate: (period: string) => request<unknown>('/api/invoices/generate', post({ period })),
     get: (id: string) => request<Invoice>(`/api/invoices/${encodeURIComponent(id)}`),

@@ -1908,5 +1908,12 @@
   "Mã quốc gia": "国家代码",
   "Số Việt Nam (+84): Chỉ gửi nhắc hóa đơn qua Zalo.": "越南号码 (+84)：账单提醒仅通过 Zalo 发送。",
   "Số quốc tế ({0}): Mặc định gửi nhắc hóa đơn qua WhatsApp.": "国际号码 ({0})：账单提醒默认通过 WhatsApp 发送。",
-  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "发送间隔至少 5 秒，时间为 7:00 至 21:00 之前。每张账单 20 小时内最多发送一次；已付清则跳过。默认发送给拥有有效国际电话号码的在租租客（越南号码通过 Zalo 发送）。"
+  "Gửi cách nhau ít nhất 5 giây, từ 7h đến trước 21h. Mỗi hóa đơn tối đa một lần gửi trong 20 giờ; trả đủ thì bỏ qua. Mặc định gửi đến người thuê đang ở có số điện thoại quốc tế hợp lệ (số Việt Nam gửi qua Zalo).": "发送间隔至少 5 秒，时间为 7:00 至 21:00 之前。每张账单 20 小时内最多发送一次；已付清则跳过。默认发送给拥有有效国际电话号码的在租租客（越南号码通过 Zalo 发送）。",
+  "Chỉ số nước mới": "新水表读数",
+  "Chỉ số nước mới {0}": "新水表读数 {0}",
+  "Nhập số nước": "输入水表读数",
+  "Giá nước / m³": "水价 / m³",
+  "Theo chỉ số đồng hồ (m³)": "按水表读数 (m³)",
+  "Chỉ số nước ban đầu": "初始水表读数",
+  "Chỉ số nước": "水表读数"
 }

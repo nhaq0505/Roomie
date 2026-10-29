@@ -39,9 +39,12 @@ export interface Room {
   electricityRate: number;
   waterFee: number;
   waterPerPerson?: boolean;
+  waterByMeter?: boolean;
+  previousWaterReading?: number;
   serviceFee: number;
   previousReading?: number;
   initialReading?: number;
+  initialWaterReading?: number;
   occupancy: Occupancy | null;
   isArchived?: boolean;
   archivedAt?: string | null;
@@ -55,6 +58,7 @@ export interface OccupancyRequest {
   startDate: string;
   depositAmount: number;
   initialReading?: number;
+  initialWaterReading?: number;
   tenantCitizenId?: string | null;
   coResidents?: CoResident[];
   tenantDateOfBirth?: string | null;
@@ -74,6 +78,7 @@ export interface OccupancyRequest {
 export interface OccupancyUpdatePayload {
   occupancyId: string;
   initialReading?: number;
+  initialWaterReading?: number;
   tenantName: string;
   phone?: string;
   people: number;
@@ -132,6 +137,8 @@ export interface OccupancyDocumentData {
   electricityRate: number;
   waterFee: number;
   waterPerPerson: boolean;
+  waterByMeter?: boolean;
+  initialWaterReading?: number;
   serviceFee: number;
   initialReading: number;
   tenantName: string;
@@ -162,6 +169,7 @@ export interface OccupancyDocumentData {
 export interface UpdateOccupancyDocumentRequest {
   occupancyId: string;
   initialReading?: number;
+  initialWaterReading?: number;
   ownerName?: string | null;
   ownerPhone?: string | null;
   ownerCitizenId?: string | null;

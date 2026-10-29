@@ -21,7 +21,8 @@ public static partial class BillingEndpoints
 
     private sealed record ReadingWork(Room Room, Building Building, Occupancy Occupancy, string Period,
         decimal PreviousReading, decimal CurrentReading, decimal Consumption, DateOnly BillingStartDate,
-        DateOnly BillingEndDate, int BillableDays, int MonthDays);
+        DateOnly BillingEndDate, int BillableDays, int MonthDays,
+        decimal? PreviousWaterReading = null, decimal? CurrentWaterReading = null, decimal? WaterConsumption = null);
 
     private static async Task<ReadingWork> PrepareReadingAsync(AppDbContext db, Guid ownerId, ReadingRequest request, CancellationToken ct)
     {
@@ -59,9 +60,30 @@ public static partial class BillingEndpoints
         if (request.CurrentReading < previousReading)
             throw new ApiException(400, $"Chỉ số mới không thể thấp hơn chỉ số trước ({previousReading}).");
 
+        decimal? previousWaterReading = null;
+        decimal? currentWaterReading = null;
+        decimal? waterConsumption = null;
+        if (room.WaterByMeter)
+        {
+            if (request.CurrentWaterReading is null)
+                throw new ApiException(400, "Phòng tính tiền nước theo đồng hồ nên cần nhập chỉ số nước mới (m³).");
+            var reqWater = request.CurrentWaterReading.Value;
+            if (reqWater < 0 || reqWater > 1_000_000_000 || decimal.Round(reqWater, 3) != reqWater)
+                throw new ApiException(400, "Chỉ số nước phải là số không âm tối đa ba chữ số thập phân trong giới hạn cho phép.");
+            var newestWater = priorReadings.FirstOrDefault(r => r.CurrentWaterReading.HasValue);
+            var prevWater = Math.Max(newestWater?.CurrentWaterReading ?? room.InitialWaterReading,
+                await MoveoutEndpoints.WaterMeterBaselineAsync(db, room, ct));
+            if (reqWater < prevWater)
+                throw new ApiException(400, $"Chỉ số nước mới không thể thấp hơn chỉ số nước trước ({prevWater}).");
+            previousWaterReading = prevWater;
+            currentWaterReading = reqWater;
+            waterConsumption = reqWater - prevWater;
+        }
+
         var days = monthDays;
         return new ReadingWork(room, building, occupancy, period, previousReading, request.CurrentReading,
-            request.CurrentReading - previousReading, periodStart, periodEnd, days, monthDays);
+            request.CurrentReading - previousReading, periodStart, periodEnd, days, monthDays,
+            previousWaterReading, currentWaterReading, waterConsumption);
     }
 
     private static decimal ValidateCharge(decimal amount)
@@ -91,6 +113,9 @@ public static partial class BillingEndpoints
         invoice.CurrentReading,
         invoice.PreviousReading,
         invoice.Consumption,
+        invoice.PreviousWaterReading,
+        invoice.CurrentWaterReading,
+        invoice.WaterConsumption,
         invoice.DueDate,
         invoice.Description,
         invoice.BillingStartDate,
@@ -101,6 +126,7 @@ public static partial class BillingEndpoints
         invoice.ElectricityRate,
         invoice.WaterRate,
         invoice.WaterPerPerson,
+        invoice.WaterByMeter,
         invoice.ServiceRate
     }, AuditJsonOptions);
 

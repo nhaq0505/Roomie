@@ -98,8 +98,10 @@ public sealed class Room
     public decimal ElectricityRate { get; set; }
     public decimal WaterFee { get; set; }
     public bool WaterPerPerson { get; set; }
+    public bool WaterByMeter { get; set; }
     public decimal ServiceFee { get; set; }
     public decimal InitialReading { get; set; }
+    public decimal InitialWaterReading { get; set; }
     public DateTimeOffset? ArchivedAt { get; set; }
     public Guid? ArchivedBy { get; set; }
     public Guid? ArchiveBatchId { get; set; }
@@ -146,10 +148,14 @@ public sealed class MonthlyReading
     public decimal PreviousReading { get; set; }
     public decimal CurrentReading { get; set; }
     public decimal Consumption { get; set; }
+    public decimal? PreviousWaterReading { get; set; }
+    public decimal? CurrentWaterReading { get; set; }
+    public decimal? WaterConsumption { get; set; }
     public decimal? MonthlyRentRate { get; set; }
     public decimal? ElectricityRate { get; set; }
     public decimal? WaterRate { get; set; }
     public bool? WaterPerPerson { get; set; }
+    public bool? WaterByMeter { get; set; }
     public decimal? ServiceRate { get; set; }
     public DateOnly? BillingStartDate { get; set; }
     public DateOnly? BillingEndDate { get; set; }
@@ -197,6 +203,7 @@ public sealed class Invoice
     public decimal? ElectricityRate { get; set; }
     public decimal? WaterRate { get; set; }
     public bool? WaterPerPerson { get; set; }
+    public bool? WaterByMeter { get; set; }
     public decimal? ServiceRate { get; set; }
     public DateOnly? BillingStartDate { get; set; }
     public DateOnly? BillingEndDate { get; set; }
@@ -217,6 +224,9 @@ public sealed class Invoice
     public decimal PreviousReading { get; set; }
     public decimal CurrentReading { get; set; }
     public decimal Consumption { get; set; }
+    public decimal? PreviousWaterReading { get; set; }
+    public decimal? CurrentWaterReading { get; set; }
+    public decimal? WaterConsumption { get; set; }
     public decimal Rent { get; set; }
     public decimal ElectricityAmount { get; set; }
     public decimal WaterAmount { get; set; }

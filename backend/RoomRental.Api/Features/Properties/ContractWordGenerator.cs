@@ -77,7 +77,10 @@ public static class ContractWordGenerator
             body.AppendChild(CreateBulletOrLine($"2.1. Giá thuê phòng: {FormatVnd(data.Rent)} đồng/tháng (Bằng chữ: {data.RentInWords}). Tiền thuê phòng được tính tròn theo tháng."));
             body.AppendChild(CreateBulletOrLine($"2.2. Tiền điện: {FormatVnd(data.ElectricityRate)} đồng/kWh theo chỉ số công tơ riêng của phòng. Chỉ số công tơ điện bàn giao lúc nhận phòng: {data.InitialReading:0.###} kWh."));
             var waterUnit = data.WaterPerPerson ? "đồng/người/tháng" : "đồng/phòng/tháng";
-            body.AppendChild(CreateBulletOrLine($"2.3. Tiền nước sinh hoạt: {FormatVnd(data.WaterFee)} {waterUnit}."));
+            var waterText = data.WaterByMeter
+                ? $"{FormatVnd(data.WaterFee)} đồng/m³ theo chỉ số đồng hồ nước riêng của phòng. Chỉ số đồng hồ nước bàn giao lúc nhận phòng: {data.InitialWaterReading:0.###} m³."
+                : $"{FormatVnd(data.WaterFee)} {(data.WaterPerPerson ? "đồng/người/tháng" : "đồng/phòng/tháng")}.";
+            body.AppendChild(CreateBulletOrLine($"2.3. Tiền nước sinh hoạt: {waterText}"));
             body.AppendChild(CreateBulletOrLine($"2.4. Phí dịch vụ chung (rác, vệ sinh, wifi/an ninh...): {FormatVnd(data.ServiceFee)} đồng/tháng."));
             var dueDay = Math.Clamp(data.PaymentDueDay, 1, 28);
             body.AppendChild(CreateBulletOrLine($"2.5. Kỳ hạn thanh toán: Thanh toán định kỳ 01 tháng/lần, từ ngày 01 đến chậm nhất ngày {dueDay:00} hàng tháng."));

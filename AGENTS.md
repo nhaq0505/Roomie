@@ -116,7 +116,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 ### Hóa đơn, tiền và trả phòng
 
 - Snapshot đơn giá, số người, meter, tên dãy/phòng/khách thuộc lịch sử hóa đơn. Sửa phòng/lượt thuê không được tính lại Issued invoice cũ bằng giá hiện tại.
-- Chỉ số điện không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
+- Chỉ số điện và nước (khi phòng bật `WaterByMeter = true`) không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện và đồng hồ nước (`m³`) trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading`/`InitialWaterReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
 - Revision/version/request fingerprint/idempotency là hợp đồng chống stale write/replay, không phải trường dư. Giữ transaction bao toàn bộ ghi tiền và cập nhật trạng thái.
 - payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
 - Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
@@ -263,7 +263,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 ### Hóa đơn, tiền và trả phòng
 
 - Snapshot đơn giá, số người, meter, tên dãy/phòng/khách thuộc lịch sử hóa đơn. Sửa phòng/lượt thuê không được tính lại Issued invoice cũ bằng giá hiện tại.
-- Chỉ số điện không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
+- Chỉ số điện và nước (khi phòng bật `WaterByMeter = true`) không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện và đồng hồ nước (`m³`) trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading`/`InitialWaterReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
 - Revision/version/request fingerprint/idempotency là hợp đồng chống stale write/replay, không phải trường dư. Giữ transaction bao toàn bộ ghi tiền và cập nhật trạng thái.
 - payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
 - Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.

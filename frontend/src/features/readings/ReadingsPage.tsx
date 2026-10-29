@@ -25,6 +25,7 @@ export default function ReadingsPage() {
   const client = useQueryClient();
   const period = currentPeriod();
   const [drafts, setDrafts] = useState<Record<string, number | null>>({});
+  const [waterDrafts, setWaterDrafts] = useState<Record<string, number | null>>({});
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<{ room: Room; invoice: Invoice } | null>(null);
   const [draftForm] = Form.useForm<DraftAmounts>();
@@ -32,6 +33,7 @@ export default function ReadingsPage() {
   const [searchText, setSearchText] = useState<string>('');
   const publishKeys = useRef(new Map<string, string>());
   const userEditedRoomsRef = useRef(new Set<string>());
+  const userEditedWaterRoomsRef = useRef(new Set<string>());
 
   const roomsQuery = useQuery({ queryKey: ['rooms', period], queryFn: () => roomsApi.list(period) });
   const readingsQuery = useQuery({ queryKey: ['readings', period], queryFn: () => readingsApi.list(period) });
@@ -82,9 +84,14 @@ export default function ReadingsPage() {
     if (prevPeriodRef.current !== period) {
       prevPeriodRef.current = period;
       userEditedRoomsRef.current.clear();
+      userEditedWaterRoomsRef.current.clear();
       setDrafts(Object.fromEntries(rows.map(({ room, saved }) => [
         room.id,
         saved?.currentReading ?? null,
+      ])));
+      setWaterDrafts(Object.fromEntries(rows.map(({ room, saved }) => [
+        room.id,
+        saved?.currentWaterReading ?? null,
       ])));
       return;
     }
@@ -94,6 +101,21 @@ export default function ReadingsPage() {
         if (saved?.currentReading !== undefined) {
           next[room.id] = saved.currentReading;
         } else if (userEditedRoomsRef.current.has(room.id) && prev[room.id] !== undefined) {
+          next[room.id] = prev[room.id];
+        } else if (prev[room.id] !== undefined) {
+          next[room.id] = prev[room.id];
+        } else {
+          next[room.id] = null;
+        }
+      }
+      return next;
+    });
+    setWaterDrafts((prev) => {
+      const next: Record<string, number | null> = {};
+      for (const { room, saved } of rows) {
+        if (saved?.currentWaterReading !== undefined && saved?.currentWaterReading !== null) {
+          next[room.id] = saved.currentWaterReading;
+        } else if (userEditedWaterRoomsRef.current.has(room.id) && prev[room.id] !== undefined) {
           next[room.id] = prev[room.id];
         } else if (prev[room.id] !== undefined) {
           next[room.id] = prev[room.id];
@@ -113,7 +135,7 @@ export default function ReadingsPage() {
   ]);
 
   const readingMutation = useMutation({
-    mutationFn: (body: { roomId: string; period: string; currentReading: number }) => readingsApi.save(body),
+    mutationFn: (body: { roomId: string; period: string; currentReading: number; currentWaterReading?: number | null }) => readingsApi.save(body),
     onSuccess: async () => {
       await refresh();
       message.success(t("Đã chốt chỉ số và lập hóa đơn."));
@@ -132,7 +154,7 @@ export default function ReadingsPage() {
     setDraftSession({ room: row.room, currentReading: row.saved.currentReading, invoice: row.draftInvoice });
     draftForm.setFieldsValue({ rent: row.draftInvoice.rent, electricityAmount: row.draftInvoice.electricityAmount, waterAmount: row.draftInvoice.waterAmount, serviceAmount: row.draftInvoice.serviceAmount });
   };
-  const confirmReading = (row: ReadingRow, currentReading: number) => {
+  const confirmReading = (row: ReadingRow, currentReading: number, currentWaterReading?: number | null) => {
     const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
     const consumption = Math.round(Math.max(0, currentReading - previous) * 1000) / 1000;
     const rent = Math.round(row.room.rent ?? 0);
@@ -140,7 +162,12 @@ export default function ReadingsPage() {
     const electricityAmount = Math.round(consumption * electricityRate);
     const people = row.room.occupancy?.people ?? 1;
     const waterFee = row.room.waterFee ?? 0;
-    const waterAmount = Math.round(row.room.waterPerPerson ? waterFee * people : waterFee);
+    const isWaterByMeter = Boolean(row.room.waterByMeter);
+    const previousWater = row.saved?.previousWaterReading ?? row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0;
+    const waterConsumption = isWaterByMeter && currentWaterReading != null ? Math.round(Math.max(0, currentWaterReading - previousWater) * 1000) / 1000 : null;
+    const waterAmount = isWaterByMeter
+      ? Math.round((waterConsumption ?? 0) * waterFee)
+      : Math.round(row.room.waterPerPerson ? waterFee * people : waterFee);
     const serviceAmount = Math.round(row.room.serviceFee ?? 0);
     const total = rent + electricityAmount + waterAmount + serviceAmount;
 
@@ -168,7 +195,12 @@ export default function ReadingsPage() {
               <strong>{formatVnd(electricityAmount)}</strong>
             </div>
             <div>
-              <span>{t("Tiền nước")}</span>
+              <span>
+                {t("Tiền nước")}
+                {isWaterByMeter && waterConsumption !== null && currentWaterReading != null && (
+                  <> <small>{waterConsumption} m³ · {previousWater} → {currentWaterReading}</small></>
+                )}
+              </span>
               <strong>{formatVnd(waterAmount)}</strong>
             </div>
             <div>
@@ -187,7 +219,7 @@ export default function ReadingsPage() {
       ),
       okText: t("Chốt & lập hóa đơn"),
       cancelText: t("Kiểm tra lại"),
-      onOk: () => readingMutation.mutateAsync({ roomId: row.room.id, period, currentReading }),
+      onOk: () => readingMutation.mutateAsync({ roomId: row.room.id, period, currentReading, ...(isWaterByMeter ? { currentWaterReading } : {}) }),
     });
   };
   const publishDraft = (values: DraftAmounts) => {
@@ -208,6 +240,11 @@ export default function ReadingsPage() {
     setDrafts((current) => ({ ...current, [roomId]: value }));
   };
 
+  const handleWaterDraftChange = (roomId: string, value: number | null) => {
+    userEditedWaterRoomsRef.current.add(roomId);
+    setWaterDrafts((current) => ({ ...current, [roomId]: value }));
+  };
+
   const columns: TableProps<ReadingRow>['columns'] = [
     {
       title: t("Phòng"),
@@ -222,20 +259,67 @@ export default function ReadingsPage() {
         </div>
       ),
     },
-    { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', width: 120, render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
-    { title: t("CHỈ SỐ MỚI"), key: 'current', width: 205, render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber className="reading-desktop-input" inputMode="numeric" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={0} step={1} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" placeholder={t("Nhập chỉ số")} /> },
+    { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', width: 120, render: (_, row) => {
+      const showWater = Boolean(row.saved?.waterByMeter ?? row.room.waterByMeter);
+      return (
+        <div>
+          <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span>
+          {showWater && (
+            <div style={{ marginTop: 6 }}>
+              <span className="meter-value">{row.saved?.previousWaterReading ?? row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0} <small>m³</small></span>
+            </div>
+          )}
+        </div>
+      );
+    } },
+    { title: t("CHỈ SỐ MỚI"), key: 'current', width: 205, render: (_, row) => {
+      const showWater = Boolean(row.saved?.waterByMeter ?? row.room.waterByMeter);
+      if (row.saved?.currentReading !== undefined) {
+        return (
+          <div>
+            <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div>
+            {showWater && row.saved.currentWaterReading != null && (
+              <div className="saved-reading" style={{ marginTop: 4 }}><strong>{row.saved.currentWaterReading} <small>m³</small></strong></div>
+            )}
+          </div>
+        );
+      }
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <InputNumber className="reading-desktop-input" inputMode="numeric" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={0} step={1} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" placeholder={t("Nhập chỉ số")} />
+          {showWater && (
+            <InputNumber className="reading-desktop-input" inputMode="numeric" aria-label={t("Chỉ số nước mới {0}", [row.room.name])} min={row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0} precision={0} step={1} value={waterDrafts[row.room.id] ?? undefined} onChange={(value) => handleWaterDraftChange(row.room.id, value)} addonAfter="m³" placeholder={t("Nhập số nước")} />
+          )}
+        </div>
+      );
+    } },
     { title: t("SỬ DỤNG"), key: 'consumption', width: 130, render: (_, row) => {
       const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
       const current = row.saved?.currentReading ?? drafts[row.room.id];
       const usage = current == null ? null : Math.round(Math.max(0, current - previous) * 1000) / 1000;
       const rate = row.room.electricityRate ?? 0;
       const estimatedCost = usage == null ? null : Math.round(usage * rate);
+      const showWater = Boolean(row.saved?.waterByMeter ?? row.room.waterByMeter);
+      const prevWater = row.saved?.previousWaterReading ?? row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0;
+      const curWater = row.saved?.currentWaterReading ?? waterDrafts[row.room.id];
+      const waterUsage = showWater && curWater != null ? Math.round(Math.max(0, curWater - prevWater) * 1000) / 1000 : null;
+      const waterCost = waterUsage == null ? null : Math.round(waterUsage * (row.room.waterFee ?? 0));
       return (
         <div>
           <span className="consumption-value">{usage === null ? '—' : `${usage} kWh`}</span>
           {estimatedCost != null && usage !== null && (
             <div style={{ color: '#8a999d', fontSize: '11px', marginTop: 2 }}>
               ≈ {formatVnd(estimatedCost)}
+            </div>
+          )}
+          {showWater && (
+            <div style={{ marginTop: 6 }}>
+              <span className="consumption-value">{waterUsage === null ? '—' : `${waterUsage} m³`}</span>
+              {waterCost != null && waterUsage !== null && (
+                <div style={{ color: '#8a999d', fontSize: '11px', marginTop: 2 }}>
+                  ≈ {formatVnd(waterCost)}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -257,7 +341,10 @@ export default function ReadingsPage() {
         );
       }
       const currentReading = drafts[row.room.id];
-      const invalid = currentReading == null || currentReading < (row.room.previousReading ?? row.room.initialReading ?? 0);
+      const isWaterByMeter = Boolean(row.room.waterByMeter);
+      const currentWaterReading = waterDrafts[row.room.id];
+      const invalid = currentReading == null || currentReading < (row.room.previousReading ?? row.room.initialReading ?? 0) ||
+        (isWaterByMeter && (currentWaterReading == null || currentWaterReading < (row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0)));
       return (
         <Button
           type="primary"
@@ -265,7 +352,7 @@ export default function ReadingsPage() {
           loading={readingMutation.isPending && readingMutation.variables?.roomId === row.room.id}
           disabled={invalid || readingMutation.isPending}
           onClick={() => {
-            if (currentReading != null) confirmReading(row, currentReading);
+            if (currentReading != null && (!isWaterByMeter || currentWaterReading != null)) confirmReading(row, currentReading, currentWaterReading);
           }}
         >
           {t("Chốt & lập hóa đơn")}
@@ -281,7 +368,14 @@ export default function ReadingsPage() {
     const rate = row.room.electricityRate ?? 0;
     const estimatedCost = usage == null ? null : Math.round(usage * rate);
     const currentReading = drafts[row.room.id];
-    const invalid = currentReading == null || currentReading < previous;
+    const isWaterByMeter = Boolean(row.saved?.waterByMeter ?? row.room.waterByMeter);
+    const previousWater = row.saved?.previousWaterReading ?? row.room.previousWaterReading ?? row.room.initialWaterReading ?? 0;
+    const currentWater = row.saved?.currentWaterReading ?? waterDrafts[row.room.id];
+    const waterUsage = isWaterByMeter && currentWater != null ? Math.round(Math.max(0, currentWater - previousWater) * 1000) / 1000 : null;
+    const estimatedWaterCost = waterUsage == null ? null : Math.round(waterUsage * (row.room.waterFee ?? 0));
+    const currentWaterReading = waterDrafts[row.room.id];
+    const invalid = currentReading == null || currentReading < previous ||
+      (Boolean(row.room.waterByMeter) && (currentWaterReading == null || currentWaterReading < previousWater));
 
     return (
       <div className="reading-mobile-card">
@@ -302,6 +396,7 @@ export default function ReadingsPage() {
           <div className="reading-mobile-stat">
             <span>{t("CHỈ SỐ TRƯỚC")}</span>
             <strong className="meter-value">{previous} <small>kWh</small></strong>
+            {isWaterByMeter && <strong className="meter-value" style={{ display: 'block', marginTop: 2 }}>{previousWater} <small>m³</small></strong>}
           </div>
           <div className="reading-mobile-stat">
             <span>{t("SỬ DỤNG")}</span>
@@ -310,6 +405,14 @@ export default function ReadingsPage() {
               {estimatedCost != null && usage !== null && (
                 <small className="reading-mobile-cost">≈ {formatVnd(estimatedCost)}</small>
               )}
+              {isWaterByMeter && (
+                <>
+                  <strong className="consumption-value" style={{ display: 'block', marginTop: 2 }}>{waterUsage === null ? '—' : `${waterUsage} m³`}</strong>
+                  {estimatedWaterCost != null && waterUsage !== null && (
+                    <small className="reading-mobile-cost">≈ {formatVnd(estimatedWaterCost)}</small>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -317,7 +420,12 @@ export default function ReadingsPage() {
           <div className="reading-mobile-saved">
             <div>
               <span>{t("CHỈ SỐ MỚI")}</span>
-              <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div>
+              <div className="saved-reading">
+                <strong>{row.saved.currentReading} <small>kWh</small></strong>
+                {isWaterByMeter && row.saved.currentWaterReading != null && (
+                  <strong style={{ marginLeft: 10 }}>{row.saved.currentWaterReading} <small>m³</small></strong>
+                )}
+              </div>
             </div>
             {row.draftInvoice ? (
               <Button type="primary" onClick={() => openDraft(row)}>{t("Sửa bản nháp")}</Button>
@@ -343,13 +451,27 @@ export default function ReadingsPage() {
               addonAfter="kWh"
               placeholder={t("Nhập chỉ số")}
             />
+            {row.room.waterByMeter && (
+              <InputNumber
+                className="reading-mobile-input"
+                inputMode="decimal"
+                aria-label={t("Chỉ số nước mới {0}", [row.room.name])}
+                min={previousWater}
+                precision={0}
+                step={1}
+                value={waterDrafts[row.room.id] ?? undefined}
+                onChange={(value) => handleWaterDraftChange(row.room.id, value)}
+                addonAfter="m³"
+                placeholder={t("Nhập số nước")}
+              />
+            )}
             <Button
               type="primary"
               className="reading-mobile-submit"
               loading={readingMutation.isPending && readingMutation.variables?.roomId === row.room.id}
               disabled={invalid || readingMutation.isPending}
               onClick={() => {
-                if (currentReading != null) confirmReading(row, currentReading);
+                if (currentReading != null && (!row.room.waterByMeter || currentWaterReading != null)) confirmReading(row, currentReading, currentWaterReading);
               }}
             >
               {t("Chốt & lập hóa đơn")}
@@ -451,7 +573,12 @@ export default function ReadingsPage() {
               <strong>{formatVnd(viewingInvoice.invoice.electricityAmount)}</strong>
             </div>
             <div>
-              <span>{t("Tiền nước")}</span>
+              <span>
+                {t("Tiền nước")}
+                {viewingInvoice.invoice.waterByMeter && viewingInvoice.invoice.waterConsumption != null && (
+                  <> <small>{viewingInvoice.invoice.waterConsumption} m³ · {viewingInvoice.invoice.previousWaterReading ?? 0} → {viewingInvoice.invoice.currentWaterReading ?? 0}</small></>
+                )}
+              </span>
               <strong>{formatVnd(viewingInvoice.invoice.waterAmount)}</strong>
             </div>
             <div>

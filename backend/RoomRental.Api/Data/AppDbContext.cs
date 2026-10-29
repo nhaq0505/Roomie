@@ -186,6 +186,7 @@ public class AppDbContext : DbContext
             entity.Property(x => x.WaterFee).HasPrecision(18, 2);
             entity.Property(x => x.ServiceFee).HasPrecision(18, 2);
             entity.Property(x => x.InitialReading).HasPrecision(18, 3);
+            entity.Property(x => x.InitialWaterReading).HasPrecision(18, 3);
         });
 
         modelBuilder.Entity<Occupancy>(entity =>
@@ -219,6 +220,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PreviousReading).HasPrecision(18, 3);
             entity.Property(x => x.CurrentReading).HasPrecision(18, 3);
             entity.Property(x => x.Consumption).HasPrecision(18, 3);
+            entity.Property(x => x.PreviousWaterReading).HasPrecision(18, 3);
+            entity.Property(x => x.CurrentWaterReading).HasPrecision(18, 3);
+            entity.Property(x => x.WaterConsumption).HasPrecision(18, 3);
             entity.Property(x => x.MonthlyRentRate).HasPrecision(18, 2);
             entity.Property(x => x.ElectricityRate).HasPrecision(18, 2);
             entity.Property(x => x.WaterRate).HasPrecision(18, 2);
@@ -265,6 +269,9 @@ public class AppDbContext : DbContext
             entity.Property(x => x.PreviousReading).HasPrecision(18, 3);
             entity.Property(x => x.CurrentReading).HasPrecision(18, 3);
             entity.Property(x => x.Consumption).HasPrecision(18, 3);
+            entity.Property(x => x.PreviousWaterReading).HasPrecision(18, 3);
+            entity.Property(x => x.CurrentWaterReading).HasPrecision(18, 3);
+            entity.Property(x => x.WaterConsumption).HasPrecision(18, 3);
             entity.Property(x => x.Rent).HasPrecision(18, 2);
             entity.Property(x => x.ElectricityAmount).HasPrecision(18, 2);
             entity.Property(x => x.WaterAmount).HasPrecision(18, 2);

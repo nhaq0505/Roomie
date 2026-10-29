@@ -1908,3 +1908,10 @@
 1907|Vietnam number (+84): Invoice reminders are sent via Zalo only.|越南号码 (+84)：账单提醒仅通过 Zalo 发送。|베트남 번호 (+84): 청구서 알림은 Zalo로만 발송됩니다.|वियतनाम नंबर (+84): बिल अनुस्मारक केवल Zalo के माध्यम से भेजे जाते हैं।
 1908|International number ({0}): Invoice reminders default to WhatsApp.|国际号码 ({0})：账单提醒默认通过 WhatsApp 发送。|국제 번호 ({0}): 청구서 알림은 기본적으로 WhatsApp으로 발송됩니다.|अंतर्राष्ट्रीय नंबर ({0}): बिल अनुस्मारक डिफ़ॉल्ट रूप से WhatsApp के माध्यम से भेजे जाते हैं।
 1909|Sent at least 5 seconds apart, between 07:00 and 21:00. At most one send per invoice every 20 hours; paid invoices are skipped. Defaults to active tenants with a valid international phone number (Vietnam numbers are sent via Zalo).|发送间隔至少 5 秒，时间为 7:00 至 21:00 之前。每张账单 20 小时内最多发送一次；已付清则跳过。默认发送给拥有有效国际电话号码的在租租客（越南号码通过 Zalo 发送）。|07:00~21:00 사이에 최소 5초 간격으로 발송됩니다. 청구서당 20시간 내 최대 1회 발송되며 완납 시 건너뜁니다. 유효한 국제 전화번호가 있는 거주 중인 세입자에게 기본 발송됩니다(베트남 번호는 Zalo로 발송).|7:00 से 21:00 के बीच कम से कम 5 सेकंड के अंतराल पर भेजा जाता है। प्रति बिल 20 घंटे में अधिकतम एक बार; पूरा भुगतान होने पर छोड़ दिया जाता है। मान्य अंतर्राष्ट्रीय फ़ोन नंबर वाले सक्रिय किरायेदारों को डिफ़ॉल्ट रूप से भेजा जाता है (वियतनाम नंबर Zalo से भेजे जाते हैं)।
+1910|New water reading|新水表读数|새 수도 지침|नई पानी मीटर रीडिंग
+1911|New water reading {0}|新水表读数 {0}|{0} 새 수도 지침|{0} नई पानी मीटर रीडिंग
+1912|Enter water reading|输入水表读数|수도 지침 입력|पानी रीडिंग दर्ज करें
+1913|Water rate / m³|水价 / m³|수도 단가 / m³|पानी दर / m³
+1914|By water meter (m³)|按水表读数 (m³)|수도 계량기 지침별 (m³)|पानी मीटर रीडिंग के अनुसार (m³)
+1915|Initial water reading|初始水表读数|초기 수도 지침|प्रारंभिक पानी मीटर रीडिंग
+1916|Water meter reading|水表读数|수도 계량기 지침|पानी मीटर रीडिंग

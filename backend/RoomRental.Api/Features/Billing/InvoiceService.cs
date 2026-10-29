@@ -52,7 +52,8 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
                 row.Reading.WaterRate is null || row.Reading.WaterPerPerson is null ||
                 row.Reading.ServiceRate is null || row.Reading.BillingStartDate is null ||
                 row.Reading.BillingEndDate is null ||
-                (row.Reading.WaterPerPerson == true && row.Reading.OccupantsCount is null)) continue;
+                (row.Reading.WaterPerPerson == true && row.Reading.OccupantsCount is null) ||
+                (row.Reading.WaterByMeter == true && row.Reading.WaterConsumption is null)) continue;
 
             var invoice = CreateMonthlyInvoice(ownerId, row.Room, row.Building, row.Occupancy, row.Reading, InvoiceLifecycleState.Issued);
             db.Invoices.Add(invoice);
@@ -138,14 +139,20 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
         if (reading.MonthlyRentRate is null || reading.ElectricityRate is null || reading.WaterRate is null ||
             reading.WaterPerPerson is null || reading.ServiceRate is null || reading.BillingStartDate is null ||
             reading.BillingEndDate is null || reading.BillableDays is null || reading.MonthDays is null ||
-            (reading.WaterPerPerson == true && reading.OccupantsCount is null))
+            (reading.WaterPerPerson == true && reading.OccupantsCount is null) ||
+            (reading.WaterByMeter == true && reading.WaterConsumption is null))
             throw new ApiException(409, "Bảng phí đã chốt không đầy đủ. Không thể tạo hóa đơn tự động.");
 
         var rent = ApiSupport.RoundVnd(reading.MonthlyRentRate.Value);
         var electricity = ApiSupport.RoundVnd(reading.Consumption * reading.ElectricityRate.Value);
-        var water = ApiSupport.RoundVnd(reading.WaterPerPerson.Value
-            ? reading.WaterRate.Value * reading.OccupantsCount!.Value
-            : reading.WaterRate.Value);
+        var water = reading.WaterByMeter == true
+            ? ApiSupport.RoundVnd(reading.WaterConsumption!.Value * reading.WaterRate.Value)
+            : ApiSupport.RoundVnd(reading.WaterPerPerson.Value ? reading.WaterRate.Value * reading.OccupantsCount!.Value : reading.WaterRate.Value);
+            // per-person or meter handled above
+            // flat rate handled above
+        // water computed above
+        // per-person or meter handled above
+        // flat rate handled above
         var service = ApiSupport.RoundVnd(reading.ServiceRate.Value);
         var total = ValidateTotal(rent, electricity, water, service);
         return new Invoice
@@ -161,6 +168,9 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
             PreviousReading = reading.PreviousReading,
             CurrentReading = reading.CurrentReading,
             Consumption = reading.Consumption,
+            PreviousWaterReading = reading.PreviousWaterReading,
+            CurrentWaterReading = reading.CurrentWaterReading,
+            WaterConsumption = reading.WaterConsumption,
             Rent = rent,
             ElectricityAmount = electricity,
             WaterAmount = water,
@@ -175,6 +185,7 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
             ElectricityRate = reading.ElectricityRate,
             WaterRate = reading.WaterRate,
             WaterPerPerson = reading.WaterPerPerson,
+            WaterByMeter = reading.WaterByMeter,
             ServiceRate = reading.ServiceRate,
             BillingStartDate = reading.BillingStartDate,
             BillingEndDate = reading.BillingEndDate,
@@ -224,7 +235,8 @@ public sealed class InvoiceService(AppDbContext db, ZaloReminderService? zalo = 
         invoice.IssuedAt, invoice.Kind, invoice.OccupancyId, invoice.Kind == "Deposit" ? Math.Max(0, invoice.Paid - invoice.DepositSettlements.Sum(x => x.Amount)) : 0,
         invoice.DepositSettlements, invoice.Description, invoice.IsFinalMeterReading, invoice.LifecycleState.ToString(), invoice.Version, invoice.BuildingId,
         invoice.MonthlyRentRate, invoice.ElectricityRate, invoice.WaterRate, invoice.WaterPerPerson, invoice.ServiceRate,
-        invoice.BillingStartDate, invoice.BillingEndDate, invoice.BillableDays, invoice.MonthDays, hasPendingPayment, canCorrectMeter, meterCorrectionBlockedReason, tenantToken);
+        invoice.BillingStartDate, invoice.BillingEndDate, invoice.BillableDays, invoice.MonthDays, hasPendingPayment, canCorrectMeter, meterCorrectionBlockedReason, tenantToken, false,
+        invoice.WaterByMeter, invoice.PreviousWaterReading, invoice.CurrentWaterReading, invoice.WaterConsumption);
 
     public static void RecalculateStatus(Invoice invoice)
     {

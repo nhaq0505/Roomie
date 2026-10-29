@@ -30,7 +30,8 @@ public static partial class BillingEndpoints
                 invoices.TryGetValue(row.Reading.OccupancyId, out var invoice);
                 return new ReadingDto(row.Reading.Id, row.Room.Id, row.Reading.OccupancyId, row.Room.Name, row.Building.Name,
                     row.Reading.Period, row.Reading.PreviousReading, row.Reading.CurrentReading, row.Reading.Consumption,
-                    row.Reading.RecordedAt, invoice is null ? null : InvoiceService.ToDto(invoice), invoice?.LifecycleState.ToString() ?? "Issued");
+                    row.Reading.RecordedAt, invoice is null ? null : InvoiceService.ToDto(invoice), invoice?.LifecycleState.ToString() ?? "Issued",
+                    row.Reading.WaterByMeter ?? row.Room.WaterByMeter, row.Reading.PreviousWaterReading, row.Reading.CurrentWaterReading, row.Reading.WaterConsumption);
             }).ToList();
             return Results.Ok(result);
         });
@@ -41,13 +42,15 @@ public static partial class BillingEndpoints
             var work = await PrepareReadingAsync(db, ownerId, request, ct);
             var rent = ApiSupport.RoundVnd(work.Room.Rent);
             var electricity = ApiSupport.RoundVnd(work.Consumption * work.Room.ElectricityRate);
-            var water = ApiSupport.RoundVnd(work.Room.WaterPerPerson ? work.Room.WaterFee * work.Occupancy.People : work.Room.WaterFee);
+            var water = work.Room.WaterByMeter
+                ? ApiSupport.RoundVnd(work.WaterConsumption!.Value * work.Room.WaterFee)
+                : ApiSupport.RoundVnd(work.Room.WaterPerPerson ? work.Room.WaterFee * work.Occupancy.People : work.Room.WaterFee);
             var service = ApiSupport.RoundVnd(work.Room.ServiceFee);
             var total = InvoiceService.ValidateTotal(rent, electricity, water, service);
             return Results.Ok(new ReadingPreviewDto(work.Room.Id, work.Occupancy.Id, work.Period, work.BillingStartDate,
                 work.BillingEndDate, work.BillableDays, work.MonthDays, rent, work.PreviousReading, work.CurrentReading,
                 work.Consumption, work.Room.ElectricityRate, electricity, work.Room.WaterFee, work.Room.WaterPerPerson,
-                water, work.Room.ServiceFee, service, total));
+                water, work.Room.ServiceFee, service, total, work.Room.WaterByMeter, work.PreviousWaterReading, work.CurrentWaterReading, work.WaterConsumption));
         });
 
         routes.MapPost("/readings", async (ReadingRequest request, HttpContext context, AppDbContext db, InvoiceService invoiceService, [FromServices] RoomRental.Api.Features.Monitoring.IOwnerMilestoneTracker? milestoneTracker = null, CancellationToken cancellationToken = default) =>
@@ -64,10 +67,14 @@ public static partial class BillingEndpoints
                 PreviousReading = work.PreviousReading,
                 CurrentReading = work.CurrentReading,
                 Consumption = work.Consumption,
+                PreviousWaterReading = work.PreviousWaterReading,
+                CurrentWaterReading = work.CurrentWaterReading,
+                WaterConsumption = work.WaterConsumption,
                 MonthlyRentRate = work.Room.Rent,
                 ElectricityRate = work.Room.ElectricityRate,
                 WaterRate = work.Room.WaterFee,
                 WaterPerPerson = work.Room.WaterPerPerson,
+                WaterByMeter = work.Room.WaterByMeter,
                 ServiceRate = work.Room.ServiceFee,
                 BillingStartDate = work.BillingStartDate,
                 BillingEndDate = work.BillingEndDate,
@@ -110,7 +117,8 @@ public static partial class BillingEndpoints
             }
             return Results.Created($"/api/readings?period={work.Period}", new ReadingDto(reading.Id, work.Room.Id, work.Occupancy.Id,
                 work.Room.Name, work.Building.Name, reading.Period, reading.PreviousReading, reading.CurrentReading,
-                reading.Consumption, reading.RecordedAt, InvoiceService.ToDto(invoice), invoice.LifecycleState.ToString()));
+                reading.Consumption, reading.RecordedAt, InvoiceService.ToDto(invoice), invoice.LifecycleState.ToString(),
+                reading.WaterByMeter ?? work.Room.WaterByMeter, reading.PreviousWaterReading, reading.CurrentWaterReading, reading.WaterConsumption));
         });
     }
 }

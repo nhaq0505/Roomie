@@ -144,7 +144,7 @@ export function useRoomsPage() {
       });
       return;
     }
-    setSelectedRoom(null); roomForm.resetFields(); roomForm.setFieldsValue({ rent: 0, electricityRate: 3500, waterFee: 0, waterPerPerson: false, serviceFee: 0, buildingId: activeBuildings.some((building) => building.id === buildingFilter) ? buildingFilter : (activeBuildings.length === 1 ? activeBuildings[0].id : undefined) }); setMode('create');
+    setSelectedRoom(null); roomForm.resetFields(); roomForm.setFieldsValue({ rent: 0, electricityRate: 3500, waterFee: 0, waterPerPerson: false, initialWaterReading: 0, serviceFee: 0, buildingId: activeBuildings.some((building) => building.id === buildingFilter) ? buildingFilter : (activeBuildings.length === 1 ? activeBuildings[0].id : undefined) }); setMode('create');
   };
   const openDuplicate = (room: Room) => {
     if (isQuotaReached) {
@@ -164,10 +164,10 @@ export function useRoomsPage() {
     while (existingNames.has(name.toLocaleLowerCase())) name = t("{0} (bản sao {1})", [baseName, suffix++]);
     setSelectedRoom(room);
     roomForm.resetFields();
-    roomForm.setFieldsValue({ buildingId: room.buildingId, name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee });
+    roomForm.setFieldsValue({ buildingId: room.buildingId, name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterByMeter ? 'meter' : (room.waterPerPerson ?? false), initialWaterReading: 0, serviceFee: room.serviceFee });
     setMode('duplicate');
   };
-  const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.resetFields(); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterPerPerson ?? false, serviceFee: room.serviceFee }); setMode('settings'); };
+  const openSettings = (room: Room) => { setSelectedRoom(room); roomForm.resetFields(); roomForm.setFieldsValue({ name: room.name, rent: room.rent, electricityRate: room.electricityRate, waterFee: room.waterFee, waterPerPerson: room.waterByMeter ? 'meter' : (room.waterPerPerson ?? false), initialWaterReading: room.initialWaterReading ?? 0, serviceFee: room.serviceFee }); setMode('settings'); };
   const openOccupancy = (room: Room) => { navigate(`/rooms/${encodeURIComponent(room.id)}/tenant`); };
 
   const getActions = (room: Room): MenuProps['items'] => [

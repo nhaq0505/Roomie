@@ -19,6 +19,7 @@ interface TenantFormValues {
   people: number;
   startDate?: dayjs.Dayjs;
   initialReading?: number;
+  initialWaterReading?: number;
   depositAmount?: number;
 }
 
@@ -56,6 +57,7 @@ function RoomTenantWorkspace() {
   const room: Room | undefined = (roomsQuery.data ?? []).find((item) => item.id === id);
   const isEditing = !!room?.occupancy;
   const minReading = room?.previousReading ?? room?.initialReading ?? 0;
+  const minWaterReading = room?.previousWaterReading ?? room?.initialWaterReading ?? 0;
 
   useEffect(() => {
     if (!room) return;
@@ -75,6 +77,7 @@ function RoomTenantWorkspace() {
         phone: room.occupancy.phone ?? '',
         people: room.occupancy.people,
         initialReading: room.initialReading ?? room.previousReading ?? 0,
+        initialWaterReading: room.initialWaterReading ?? room.previousWaterReading ?? 0,
       });
       if (hadPreviousInit && isServerUpdated) {
         message.info(t("Đã tự động đồng bộ thông tin người thuê mới nhất."));
@@ -87,6 +90,7 @@ function RoomTenantWorkspace() {
         startDate: dayjs(),
         depositAmount: 0,
         initialReading: minReading,
+        initialWaterReading: minWaterReading,
       });
     }
   }, [room, minReading, form, message]);
@@ -152,6 +156,7 @@ function RoomTenantWorkspace() {
           phone: values.phone,
           people,
           ...(values.initialReading != null && values.initialReading !== room.initialReading ? { initialReading: values.initialReading } : {}),
+          ...(values.initialWaterReading != null && values.initialWaterReading !== room.initialWaterReading ? { initialWaterReading: values.initialWaterReading } : {}),
         },
       });
     } else {
@@ -164,6 +169,7 @@ function RoomTenantWorkspace() {
           startDate: (values.startDate ?? dayjs()).format('YYYY-MM-DD'),
           depositAmount: Number(values.depositAmount ?? 0),
           initialReading: values.initialReading,
+          initialWaterReading: values.initialWaterReading,
         },
       });
     }
@@ -244,7 +250,7 @@ function RoomTenantWorkspace() {
                 </Col>
               </Row>
 
-              {isEditing ? (
+              {isEditing ? (<>
                 <Row gutter={16}>
                   <Col xs={24} sm={12} md={8}>
                     <Form.Item
@@ -267,6 +273,23 @@ function RoomTenantWorkspace() {
                     </Form.Item>
                   </Col>
                 </Row>
+                {room.waterByMeter && (
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label={t("Chỉ số nước ban đầu")}
+                        name="initialWaterReading"
+                        rules={[
+                          { required: true, message: t("Vui lòng nhập giá trị.") },
+                          { type: 'number', min: 0, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [0]) },
+                        ]}
+                      >
+                        <InputNumber size="large" min={0} max={1000000000} step={1} precision={0} addonAfter="m³" style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                )}
+              </>
               ) : (
                 <Row gutter={16}>
                   <Col xs={24} sm={12} md={8}>
@@ -303,6 +326,20 @@ function RoomTenantWorkspace() {
                       />
                     </Form.Item>
                   </Col>
+                  {room.waterByMeter && (
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label={t("Chỉ số nước ban đầu")}
+                        name="initialWaterReading"
+                        rules={[
+                          { required: true, message: t("Vui lòng nhập giá trị.") },
+                          { type: 'number', min: minWaterReading, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [minWaterReading]) },
+                        ]}
+                      >
+                        <InputNumber size="large" min={minWaterReading} max={1000000000} step={1} precision={0} addonAfter="m³" style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  )}
                   <Col xs={24} md={8}>
                     <Form.Item
                       label={t("Tiền cọc yêu cầu")}
@@ -353,7 +390,7 @@ function RoomTenantWorkspace() {
                 <div className="room-tenant-fee-item">
                   <span>{t("Tiền nước")}</span>
                   <strong>
-                    {formatVnd(room.waterFee)} ({room.waterPerPerson ? t("Theo người / tháng") : t("Theo phòng / tháng")})
+                    {formatVnd(room.waterFee)} ({room.waterByMeter ? t("Theo chỉ số đồng hồ (m³)") : room.waterPerPerson ? t("Theo người / tháng") : t("Theo phòng / tháng")})
                   </strong>
                 </div>
                 <div className="room-tenant-fee-item">

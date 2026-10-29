@@ -42,6 +42,13 @@ public static partial class OwnerManagementEndpoints
                 .Where(x => roomIds.Contains(x.RoomId) && x.IsFinalMeterReading)
                 .GroupBy(x => x.RoomId).Select(g => new { RoomId = g.Key, Maximum = g.Max(x => (double)x.CurrentReading) })
                 .ToDictionaryAsync(x => x.RoomId, x => (decimal)x.Maximum, cancellationToken);
+            var waterMeterMaxima = await db.Readings.AsNoTracking().Where(x => roomIds.Contains(x.RoomId) && x.CurrentWaterReading != null)
+                .GroupBy(x => x.RoomId).Select(g => new { RoomId = g.Key, Maximum = g.Max(x => (double)x.CurrentWaterReading!.Value) })
+                .ToDictionaryAsync(x => x.RoomId, x => (decimal)x.Maximum, cancellationToken);
+            var maxFinalWaterByRoom = await db.Invoices.AsNoTracking()
+                .Where(x => roomIds.Contains(x.RoomId) && x.IsFinalMeterReading && x.CurrentWaterReading != null)
+                .GroupBy(x => x.RoomId).Select(g => new { RoomId = g.Key, Maximum = g.Max(x => (double)x.CurrentWaterReading!.Value) })
+                .ToDictionaryAsync(x => x.RoomId, x => (decimal)x.Maximum, cancellationToken);
             var activeOccupancyIds = activeOccupancies.Select(x => x.Id).ToList();
             var deposits = activeOccupancyIds.Count == 0
                 ? []
@@ -59,9 +66,10 @@ public static partial class OwnerManagementEndpoints
                 var roomReadings = readingsByRoom.GetValueOrDefault(row.Room.Id) ?? [];
                 var maxFinal = maxFinalByRoom.GetValueOrDefault(row.Room.Id, 0m);
                 var deposit = occupancy is not null ? depositByOccupancy.GetValueOrDefault(occupancy.Id) : null;
-                var dto = BuildRoomDto(tokenService, row.Room, row.Building, occupancy, readingPeriod, roomReadings, maxFinal, deposit, canShareTenantLink, meterMaxima.GetValueOrDefault(row.Room.Id, row.Room.InitialReading));
+                var maxFinalWater = maxFinalWaterByRoom.GetValueOrDefault(row.Room.Id, 0m);
+                var dto = BuildRoomDto(tokenService, row.Room, row.Building, occupancy, readingPeriod, roomReadings, maxFinal, deposit, canShareTenantLink, meterMaxima.GetValueOrDefault(row.Room.Id, row.Room.InitialReading), null, maxFinalWater, waterMeterMaxima.GetValueOrDefault(row.Room.Id, row.Room.InitialWaterReading));
                 result.Add(new { dto.Id, dto.BuildingId, dto.BuildingName, dto.Name, dto.Rent, dto.ElectricityRate, dto.WaterFee,
-                    dto.WaterPerPerson, dto.ServiceFee, dto.InitialReading, dto.PreviousReading, dto.Occupancy,
+                    dto.WaterPerPerson, dto.WaterByMeter, dto.ServiceFee, dto.InitialReading, dto.PreviousReading, dto.InitialWaterReading, dto.PreviousWaterReading, dto.Occupancy,
                     isArchived = row.Room.ArchivedAt is not null, archivedAt = row.Room.ArchivedAt,
                     archiveBatchId = row.Room.ArchiveBatchId, buildingArchived = row.Building.ArchivedAt is not null });
             }
@@ -85,7 +93,7 @@ public static partial class OwnerManagementEndpoints
                         $"Gói Miễn phí chỉ được tạo tối đa {AppUser.FreeTierMaxRooms} phòng. Vui lòng nâng cấp tài khoản Pro để thêm phòng.");
             }
             var building = await PropertyLookup.FindBuildingAsync(db, ownerId, request.BuildingId, cancellationToken);
-            ValidateFees(request.Name, request.Rent, request.ElectricityRate, request.WaterFee, request.ServiceFee, request.InitialReading);
+            ValidateFees(request.Name, request.Rent, request.ElectricityRate, request.WaterFee, request.ServiceFee, request.InitialReading, request.InitialWaterReading);
             var room = new Room
             {
                 BuildingId = building.Id,
@@ -93,9 +101,11 @@ public static partial class OwnerManagementEndpoints
                 Rent = ApiSupport.RoundVnd(request.Rent),
                 ElectricityRate = ApiSupport.RoundVnd(request.ElectricityRate),
                 WaterFee = ApiSupport.RoundVnd(request.WaterFee),
-                WaterPerPerson = request.WaterPerPerson,
+                WaterPerPerson = !request.WaterByMeter && request.WaterPerPerson,
                 ServiceFee = ApiSupport.RoundVnd(request.ServiceFee),
-                InitialReading = request.InitialReading
+                WaterByMeter = request.WaterByMeter,
+                InitialReading = request.InitialReading,
+                InitialWaterReading = request.InitialWaterReading
             };
             db.Rooms.Add(room);
             await db.SaveChangesAsync(cancellationToken);
@@ -115,7 +125,7 @@ public static partial class OwnerManagementEndpoints
             var readingPeriod = period is null ? VietnamCalendar.CurrentVietnamPeriod() : ApiSupport.NormalizePeriod(period);
             var dto = await ToRoomDtoAsync(db, tokenService, webhookService, row.Room, row.Building, occupancy, readingPeriod, cancellationToken);
             return Results.Ok(new { dto.Id, dto.BuildingId, dto.BuildingName, dto.Name, dto.Rent, dto.ElectricityRate, dto.WaterFee,
-                dto.WaterPerPerson, dto.ServiceFee, dto.InitialReading, dto.PreviousReading, dto.Occupancy,
+                dto.WaterPerPerson, dto.WaterByMeter, dto.ServiceFee, dto.InitialReading, dto.PreviousReading, dto.InitialWaterReading, dto.PreviousWaterReading, dto.Occupancy,
                 isArchived = row.Room.ArchivedAt is not null, archivedAt = row.Room.ArchivedAt,
                 archiveBatchId = row.Room.ArchiveBatchId, buildingArchived = row.Building.ArchivedAt is not null });
         });
@@ -125,12 +135,21 @@ public static partial class OwnerManagementEndpoints
             var ownerId = ApiSupport.OwnerId(context);
             await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
             var (room, building) = await PropertyLookup.FindRoomAsync(db, ownerId, id, cancellationToken);
-            ValidateFees(request.Name, request.Rent, request.ElectricityRate, request.WaterFee, request.ServiceFee, 0);
+            ValidateFees(request.Name, request.Rent, request.ElectricityRate, request.WaterFee, request.ServiceFee, 0, request.InitialWaterReading ?? 0);
             room.Name = request.Name.Trim();
             room.Rent = ApiSupport.RoundVnd(request.Rent);
             room.ElectricityRate = ApiSupport.RoundVnd(request.ElectricityRate);
             room.WaterFee = ApiSupport.RoundVnd(request.WaterFee);
-            room.WaterPerPerson = request.WaterPerPerson;
+            // WaterPerPerson normalized below
+            room.WaterPerPerson = !request.WaterByMeter && request.WaterPerPerson;
+            room.WaterByMeter = request.WaterByMeter;
+            if (request.InitialWaterReading.HasValue)
+            {
+                var waterBaseline = await MoveoutEndpoints.WaterMeterBaselineAsync(db, room, cancellationToken);
+                if (request.InitialWaterReading.Value < waterBaseline && await db.Readings.AnyAsync(x => x.RoomId == room.Id && x.CurrentWaterReading != null, cancellationToken))
+                    throw new ApiException(StatusCodes.Status400BadRequest, "Chỉ số nước ban đầu không được nhỏ hơn chỉ số đồng hồ nước đã ghi nhận.");
+                room.InitialWaterReading = request.InitialWaterReading.Value;
+            }
             room.ServiceFee = ApiSupport.RoundVnd(request.ServiceFee);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

@@ -27,7 +27,7 @@ export function useInvoicesPage() {
   const [adjustmentExpanded, setAdjustmentExpanded] = useState(false);
   const selectedId = searchParams.get('invoice');
   const [receiptForm] = Form.useForm<{ note?: string }>();
-  const [correctionForm] = Form.useForm<{ amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; reason: string; dueDate?: Dayjs; description?: string }>();
+  const [correctionForm] = Form.useForm<{ amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; currentWaterReading?: number; reason: string; dueDate?: Dayjs; description?: string }>();
   const receiptKeys = useRef(new Map<string, string>());
   const correctionKeys = useRef(new Map<string, string>());
   const [page, setPage] = useState(1);
@@ -76,11 +76,11 @@ export function useInvoicesPage() {
   useEffect(() => { setAdjustmentExpanded(false); }, [selectedId]);
   const correctionQuery = useQuery({ queryKey: ['invoiceCorrections', selectedId], queryFn: () => invoicesApi.corrections(selectedId!), enabled: !!selectedId && invoice?.lifecycleState !== 'Draft' });
   const correctionMutation = useMutation({
-    mutationFn: ({ id, values, requestId, version }: { id: string; values: { amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; reason: string; dueDate?: string; description?: string }; requestId: string; version: number }) => invoicesApi.correct(id, { ...values, expectedVersion: version, requestId }),
+    mutationFn: ({ id, values, requestId, version }: { id: string; values: { amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; currentWaterReading?: number; reason: string; dueDate?: string; description?: string }; requestId: string; version: number }) => invoicesApi.correct(id, { ...values, expectedVersion: version, requestId }),
     onSuccess: async (_, variables) => { await Promise.all([client.invalidateQueries({ queryKey: ['invoice', variables.id] }), client.invalidateQueries({ queryKey: ['manual-payments'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['invoiceCorrections', variables.id] }), client.invalidateQueries({ queryKey: ['dashboard'] })]); correctionKeys.current.delete(variables.id); correctionForm.resetFields(); message.success(t("Đã lưu điều chỉnh hóa đơn.")); },
     onError: (error: Error) => message.error(error.message),
   });
-  useEffect(() => { if (invoice) correctionForm.setFieldsValue({ amount: invoice.total, rent: invoice.rent, electricityAmount: invoice.electricityAmount, waterAmount: invoice.waterAmount, serviceAmount: invoice.serviceAmount, currentReading: invoice.currentReading, dueDate: invoice.dueDate ? dayjs(invoice.dueDate) : undefined, description: invoice.description, reason: '' }); }, [invoice, correctionForm]);
+  useEffect(() => { if (invoice) correctionForm.setFieldsValue({ amount: invoice.total, rent: invoice.rent, electricityAmount: invoice.electricityAmount, waterAmount: invoice.waterAmount, serviceAmount: invoice.serviceAmount, currentReading: invoice.currentReading, currentWaterReading: invoice.currentWaterReading ?? undefined, dueDate: invoice.dueDate ? dayjs(invoice.dueDate) : undefined, description: invoice.description, reason: '' }); }, [invoice, correctionForm]);
   const showInvoice = (id: string) => setSearchParams({ invoice: id });
   const confirmReceipt = (values: { note?: string }) => {
     if (!invoice) return;
@@ -101,14 +101,14 @@ export function useInvoicesPage() {
     });
   };
   const closeInvoice = () => setSearchParams({});
-  const confirmCorrection = (values: { amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; reason: string; dueDate?: Dayjs; description?: string }) => {
+  const confirmCorrection = (values: { amount?: number; rent?: number; electricityAmount?: number; waterAmount?: number; serviceAmount?: number; currentReading?: number; currentWaterReading?: number; reason: string; dueDate?: Dayjs; description?: string }) => {
     if (!invoice) return;
     let requestId = correctionKeys.current.get(invoice.id);
     if (!requestId) { requestId = crypto.randomUUID(); correctionKeys.current.set(invoice.id, requestId); }
     const common = { reason: values.reason.trim(), dueDate: values.dueDate?.format('YYYY-MM-DD'), description: values.description?.trim() };
     const monthlyOverlap = !!invoice.hasMonthlyOverlap;
     const body = invoice.kind === 'Monthly'
-      ? { ...common, rent: values.rent, electricityAmount: values.electricityAmount, waterAmount: values.waterAmount, serviceAmount: values.serviceAmount, currentReading: invoice.canCorrectMeter ? values.currentReading : undefined }
+      ? { ...common, rent: values.rent, electricityAmount: values.electricityAmount, waterAmount: values.waterAmount, serviceAmount: values.serviceAmount, currentReading: invoice.canCorrectMeter ? values.currentReading : undefined, ...(invoice.canCorrectMeter && invoice.waterByMeter ? { currentWaterReading: values.currentWaterReading } : {}) }
       : invoice.kind === 'Deposit'
         ? { ...common, amount: values.amount }
         : invoice.isFinalMeterReading

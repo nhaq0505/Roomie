@@ -1166,7 +1166,7 @@ function RentalContractA4Preview({
         {c.clause2_2Prefix}<strong>{formatVnd(p.electricityRate)}</strong>{c.clause2_2Middle}<strong>{p.initialReading} kWh</strong>.
       </p>
       <p className="a4-line">
-        {c.clause2_3Prefix}<strong>{formatVnd(p.waterFee)}{p.waterPerPerson ? c.waterPerPersonUnit : c.waterPerRoomUnit}</strong>.
+        {c.clause2_3Prefix}{p.waterByMeter ? <><strong>{formatVnd(p.waterFee)}</strong>{c.clause2_3MeterMiddle}<strong>{p.initialWaterReading ?? 0} m³</strong>.</> : <><strong>{formatVnd(p.waterFee)}{p.waterPerPerson ? c.waterPerPersonUnit : c.waterPerRoomUnit}</strong>.</>}
       </p>
       <p className="a4-line">
         {c.clause2_4Prefix}<strong>{formatVnd(p.serviceFee)}{c.perMonthSuffix}</strong>.

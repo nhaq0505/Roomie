@@ -191,7 +191,9 @@ public static partial class OwnerManagementEndpoints
             CoResidents: coResidents,
             TenantSelfCheckinAt: occupancy.TenantSelfCheckinAt,
             HasTenantIdentityPhoto: !string.IsNullOrEmpty(tenantIdentityPhotoFileName),
-            TenantIdentityPhotoFileName: tenantIdentityPhotoFileName);
+            TenantIdentityPhotoFileName: tenantIdentityPhotoFileName,
+            WaterByMeter: room.WaterByMeter,
+            InitialWaterReading: room.InitialWaterReading);
     }
 
     internal static void ValidateAndApplyOwnerProfileUpdates(
