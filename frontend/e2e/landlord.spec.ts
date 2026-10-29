@@ -1596,8 +1596,14 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(editRoomModal).toBeVisible();
     await expect(editRoomModal.getByText('Theo chỉ số đồng hồ (m³)')).toBeVisible();
     await expect(editRoomModal.getByText('Giá nước / m³')).toBeVisible();
+    await expect(editRoomModal.getByLabel('Chỉ số nước ban đầu')).toHaveCount(0);
     await editRoomModal.getByRole('button', { name: 'Hủy' }).click();
     await expect(editRoomModal).toBeHidden();
+
+    // 1b. Verify /rooms/:id/tenant (Thêm/Sửa người thuê) shows "Chỉ số nước ban đầu"
+    await page.goto('/rooms/room-wm-01/tenant');
+    await expect(page.getByLabel('Chỉ số điện ban đầu')).toBeVisible();
+    await expect(page.getByLabel('Chỉ số nước ban đầu')).toBeVisible();
 
     // 2. Navigate to /readings and enter both electricity (100 -> 150) and water (20 -> 28) readings
     await page.goto('/readings');
