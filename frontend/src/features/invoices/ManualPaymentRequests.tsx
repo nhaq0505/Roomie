@@ -26,7 +26,7 @@ export default function ManualPaymentRequests() {
   const dismiss = useMutation({ mutationFn: (id: string) => paymentSettingsApi.dismissManual(id), onSuccess: async () => {
     setSelected(null); await refresh(); message.success(t("Đã bỏ yêu cầu khỏi danh sách. Không ghi thêm khoản thu."));
   }, onError: async (error: Error) => { await refresh(); message.error(error.message); } });
-  if (query.isSuccess && query.data.total === 0) return null;
+  if (query.isSuccess && (!query.data?.total || !(query.data.items ?? []).length)) return null;
   return <Card className="manual-payment-confirmations" bordered={false}>
     <div className="manual-payment-heading">
       <div className="manual-payment-title"><ClockCircleOutlined aria-hidden /><Typography.Title level={4}>{t("Yêu cầu chuyển khoản")}</Typography.Title>{!!query.data?.total && <span className="manual-payment-count">{query.data.total}</span>}</div>

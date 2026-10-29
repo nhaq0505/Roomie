@@ -15,6 +15,8 @@
 .meter-value small, .saved-reading small { color: #91a0a2; font-size: 12px; }
 .saved-reading { display: flex; align-items: center; gap: 8px; }
 .saved-reading strong { color: #405a5d; font-size: 13px; }
+.reading-desktop-input.ant-input-number-group-wrapper { width: 168px; max-width: 100%; }
+.reading-desktop-input .ant-input-number { width: 100%; }
 .submitted-tag { color: #2b805f; background: #eaf6ef; border: 0; border-radius: 20px; font-size: 12px; }
 .consumption-value { color: #53696e; font-size: 13px; }
 .already-done { color: #328365; font-size: 12px; }
@@ -39,7 +41,8 @@
 .reading-mobile-submit.ant-btn { min-height: 44px; padding-inline: 14px; font-weight: 600; }
 
 @media (max-width: 767px) {
-  .reading-section > .section-card-header { display: none !important; }
+  .reading-section > .section-card-header > h4.ant-typography { display: none !important; }
+  .reading-section > .section-card-header > .ant-input-affix-wrapper { width: 100% !important; }
   .reading-notice { display: none !important; }
   .reading-section .mobile-records { gap: 10px; }
   .reading-section .mobile-record { padding: 14px 15px; border-radius: 14px; border-color: #e1ebe8; }

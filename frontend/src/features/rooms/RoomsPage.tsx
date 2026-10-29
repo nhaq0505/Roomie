@@ -1,5 +1,5 @@
-import { CrownOutlined, HomeOutlined, PlusOutlined } from '@ant-design/icons';
-import { Alert, App, Button, Card, ConfigProvider, Grid, Select, Typography } from 'antd';
+import { ArrowLeftOutlined, CrownOutlined, EditOutlined, HomeOutlined, PlusOutlined } from '@ant-design/icons';
+import { Alert, App, Button, Card, ConfigProvider, Grid, Select, Space, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import { t } from '../../shared/i18n/runtime';
 import ResponsiveTable from '../../shared/ui/ResponsiveTable';
@@ -15,21 +15,28 @@ export default function RoomsPage() {
 
 function RoomsContent() {
   const state = useRoomsPage();
-  const { navigate, setSearchParams, archiveFilter, buildingFilter, statusFilter, buildingsQuery, roomsQuery, maxRooms, isQuotaReached, rooms, activeBuildings, openCreate, compactRoom, columns, clearFilters } = state;
+  const { navigate, setSearchParams, archiveFilter, buildingFilter, statusFilter, buildingsQuery, roomsQuery, maxRooms, isQuotaReached, rooms, activeBuildings, selectedBuildingObj, openCreate, openCreateBuilding, openEditBuilding, compactRoom, columns, clearFilters } = state;
   return <div className="rooms-workspace">
     <PageTitle
       title={t("Phòng & người thuê")}
-      subtitle={t("Quản lý phòng, người thuê và link hóa đơn.")}
-      extra={archiveFilter === 'Active' ? (
-        <Button
-          type="primary"
-          icon={isQuotaReached ? <CrownOutlined /> : <PlusOutlined />}
-          onClick={isQuotaReached ? () => navigate('/account-status') : openCreate}
-          disabled={!activeBuildings.length && !isQuotaReached}
-        >
-          {isQuotaReached ? t("Nâng cấp tài khoản") : t("Tạo phòng trọ")}
-        </Button>
-      ) : undefined}
+      subtitle={selectedBuildingObj ? `${selectedBuildingObj.name}${selectedBuildingObj.address ? ` · ${selectedBuildingObj.address}` : ''}` : t("Quản lý phòng, người thuê và link hóa đơn.")}
+      extra={
+        <Space size={8}>
+          <Button className="page-back-btn" icon={<ArrowLeftOutlined />} onClick={() => navigate('/buildings')}>
+            {t("Dãy trọ")}
+          </Button>
+          {archiveFilter === 'Active' && (
+            <Button
+              type="primary"
+              icon={isQuotaReached ? <CrownOutlined /> : <PlusOutlined />}
+              onClick={isQuotaReached ? () => navigate('/account-status') : openCreate}
+              disabled={!activeBuildings.length && !isQuotaReached}
+            >
+              {isQuotaReached ? t("Nâng cấp tài khoản") : t("Tạo phòng trọ")}
+            </Button>
+          )}
+        </Space>
+      }
     />
     {isQuotaReached && archiveFilter === 'Active' && (
       <Alert
@@ -45,11 +52,20 @@ function RoomsContent() {
         }
       />
     )}
-    {!buildingsQuery.isPending && !buildingsQuery.isError && activeBuildings.length === 0 && archiveFilter === 'Active' && <AlertBanner onCreate={() => navigate('/buildings?create=1')} />}
+    {!buildingsQuery.isPending && !buildingsQuery.isError && activeBuildings.length === 0 && archiveFilter === 'Active' && <AlertBanner onCreate={openCreateBuilding} />}
     {buildingsQuery.isError && <LoadError error={buildingsQuery.error} onRetry={() => void buildingsQuery.refetch()} />}
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : <SectionCard className="room-directory">
       <div className="room-directory-toolbar">
-        <label className="room-filter"><span>{t("Dãy trọ")}</span><Select aria-label={t("Lọc theo dãy trọ")} allowClear placeholder={t("Tất cả dãy trọ")} value={buildingFilter} onChange={(value) => { setSearchParams(value ? { building: value } : {}); }} options={[...(buildingsQuery.data ?? []).map((building) => ({ value: building.id, label: building.name })), ...(buildingFilter && buildingsQuery.isSuccess && !buildingsQuery.data.some((building) => building.id === buildingFilter) ? [{ value: buildingFilter, label: t("Dãy không còn tồn tại") }] : [])]} /></label>
+        <div className="room-building-filter-group">
+          <label className="room-filter"><span>{t("Dãy trọ")}</span><Select aria-label={t("Lọc theo dãy trọ")} allowClear placeholder={t("Tất cả dãy trọ")} value={buildingFilter} onChange={(value) => { setSearchParams(value ? { building: value } : {}); }} options={[...(buildingsQuery.data ?? []).map((building) => ({ value: building.id, label: building.name })), ...(buildingFilter && buildingsQuery.isSuccess && !buildingsQuery.data.some((building) => building.id === buildingFilter) ? [{ value: buildingFilter, label: t("Dãy không còn tồn tại") }] : [])]} /></label>
+          {archiveFilter === 'Active' && selectedBuildingObj && (
+            <div className="room-building-inline-actions">
+              <Button type="default" icon={<EditOutlined />} onClick={() => openEditBuilding(selectedBuildingObj)} aria-label={t("Sửa dãy trọ")}>
+                {t("Sửa")}
+              </Button>
+            </div>
+          )}
+        </div>
         <div className="room-filter-result" data-filtered={!!buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active'}><span aria-live="polite">{roomsQuery.isPending ? t("Đang tải phòng…") : t("{0} phòng", [rooms.length])}</span>{rooms.length > 0 && (buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active') && <Button type="text" onClick={clearFilters}>{t("Xóa lọc")}</Button>}</div>
       </div>
       {roomsQuery.isPending ? <div className="room-list-loading"><div className="loading-placeholder" /></div> : rooms.length ? <ResponsiveTable className="room-table" rowKey="id" columns={columns} dataSource={rooms} renderCompact={compactRoom} pagination={{ pageSize: 8, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={archiveFilter === 'Archived' ? t("Chưa có phòng được lưu trữ") : (roomsQuery.data?.length ?? 0) === 0 ? t("Chưa có phòng nào") : t("Không tìm thấy phòng phù hợp")} description={archiveFilter === 'Archived' ? t("Phòng đã lưu trữ sẽ xuất hiện ở đây để khôi phục.") : (roomsQuery.data?.length ?? 0) === 0 ? t("Tạo phòng trong một dãy trọ để bắt đầu quản lý người thuê.") : t("Không có phòng khớp với bộ lọc hiện tại.")} action={archiveFilter === 'Active' && (roomsQuery.data?.length ?? 0) === 0 ? <Button type="primary" icon={<PlusOutlined />} disabled={!activeBuildings.length} onClick={openCreate}>{t("Tạo phòng trọ")}</Button> : rooms.length === 0 && (buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active') ? <Button onClick={clearFilters}>{t("Xóa lọc")}</Button> : undefined} />}

@@ -9,12 +9,45 @@ import MoveoutDrawer from './MoveoutDrawer';
 import type { useRoomsPage } from './useRoomsPage';
 
 export default function RoomDialogs({ state }: { state: ReturnType<typeof useRoomsPage> }) {
-  const { numberRule, message, moveoutRoom, setMoveoutRoom, documentRoom, setDocumentRoom, mode, setMode, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, activeBuildings, renewLink, isCreating, isBusy } = state;
+  const { numberRule, message, moveoutRoom, setMoveoutRoom, documentRoom, setDocumentRoom, mode, setMode, buildingModalMode, setBuildingModalMode, editingBuilding, buildingForm, createBuildingMutation, updateBuildingMutation, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, activeBuildings, renewLink, isCreating, isBusy } = state;
   const minReading = selectedRoom?.previousReading ?? selectedRoom?.initialReading ?? 0;
+  const isBuildingBusy = createBuildingMutation.isPending || updateBuildingMutation.isPending;
 
   return <>
     {moveoutRoom && <MoveoutDrawer room={moveoutRoom} onClose={() => setMoveoutRoom(null)} />}
     {documentRoom && <ContractDocumentsDrawer room={documentRoom} onClose={() => setDocumentRoom(null)} />}
+    <Modal
+      className="room-editor"
+      title={buildingModalMode === 'edit' ? t("Sửa dãy trọ") : t("Thêm dãy trọ mới")}
+      open={buildingModalMode !== null}
+      onCancel={() => { if (!isBuildingBusy) setBuildingModalMode(null); }}
+      onOk={() => buildingForm.submit()}
+      okText={buildingModalMode === 'edit' ? t("Lưu thay đổi") : t("Tạo dãy trọ")}
+      cancelText={t("Hủy")}
+      confirmLoading={isBuildingBusy}
+      destroyOnClose
+    >
+      <Typography.Paragraph className="modal-intro">{t("Đặt tên và nhập địa chỉ để dễ nhận biết dãy trọ của bạn.")}</Typography.Paragraph>
+      <Form
+        form={buildingForm}
+        layout="vertical"
+        requiredMark={false}
+        onFinish={(values) => {
+          if (buildingModalMode === 'edit' && editingBuilding) {
+            updateBuildingMutation.mutate({ id: editingBuilding.id, values });
+          } else {
+            createBuildingMutation.mutate(values);
+          }
+        }}
+      >
+        <Form.Item label={t("Tên dãy trọ")} name="name" rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên dãy trọ.") }]}>
+          <Input placeholder={t("Ví dụ: Dãy trọ đường Hoa Sứ")} maxLength={100} />
+        </Form.Item>
+        <Form.Item label={t("Địa chỉ")} name="address" rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập địa chỉ.") }]}>
+          <Input.TextArea placeholder={t("Số nhà, đường, phường/xã, quận/huyện")} autoSize={{ minRows: 2, maxRows: 4 }} maxLength={250} />
+        </Form.Item>
+      </Form>
+    </Modal>
     <Modal className="room-editor" maskClosable={false} title={isCreating ? (mode === 'duplicate' ? t("Nhân bản {0}", [selectedRoom?.name ?? t("phòng")]) : t("Thêm phòng mới")) : mode === 'settings' ? t("Thông tin {0}", [selectedRoom?.name ?? t("phòng")]) : t("Thêm người thuê · {0}", [selectedRoom?.name ?? ''])} open={mode !== null && mode !== 'edit-occupancy'} onCancel={() => setMode(null)} onOk={() => (mode === 'occupancy' ? occupancyForm.submit() : roomForm.submit())} okText={isCreating ? t("Tạo phòng") : mode === 'settings' ? t("Lưu thay đổi") : t("Lưu người thuê")} cancelText={t("Hủy")} confirmLoading={isBusy} width={660} destroyOnClose>
       {mode === 'occupancy' ? <><Typography.Paragraph className="modal-intro">{t("Nhập tiền cọc thỏa thuận riêng với khách. Khoản cọc được tạo riêng và thanh toán qua link khách sau khi lưu.")}</Typography.Paragraph><Form form={occupancyForm} layout="vertical" requiredMark={false} onFinish={(values) => { if (!selectedRoom) return; occupancyMutation.mutate({ id: selectedRoom.id, values: { ...values, people: Number(values.people || 1), startDate: values.startDate.format('YYYY-MM-DD') } }); }}><Form.Item label={t("Tên người thuê")} name="tenantName" rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên người thuê.") }]}><Input placeholder={t("Họ và tên")} /></Form.Item><Row gutter={14}><Col xs={24} sm={15}><Form.Item label={t("Số điện thoại")} name="phone"><PhoneInput maxLength={60} /></Form.Item></Col><Col xs={24} sm={9}><Form.Item label={t("Số người ở")} name="people" rules={[{ required: true, type: 'number', min: 1, max: 30, message: t("Nhập từ 1 đến 30 người.") }]}><InputNumber min={1} max={30} precision={0} style={{ width: '100%' }} /></Form.Item></Col></Row><Row gutter={14}><Col xs={24} sm={12}><Form.Item label={t("Chỉ số điện ban đầu")} name="initialReading" rules={[{ required: true, message: t("Vui lòng nhập giá trị.") }, { type: 'number', min: minReading, max: 1000000000, message: t("Nhập chỉ số từ {0} trở lên.", [minReading]) }]}><InputNumber min={minReading} max={1000000000} step={1} precision={0} addonAfter="kWh" style={{ width: '100%' }} /></Form.Item></Col><Col xs={24} sm={12}><Form.Item label={t("Ngày chuyển vào")} name="startDate" rules={[{ required: true, message: t("Vui lòng chọn ngày.") }]}><DatePicker format={dateFormat()} disabledDate={(date) => date.isAfter(dayjs(), 'day')} style={{ width: '100%' }} /></Form.Item></Col></Row><Form.Item label={t("Tiền cọc yêu cầu")} name="depositAmount" extra={t("Nhập 0 nếu không thu cọc. Đây là khoản phải thu, chưa ghi nhận khách đã trả.")} rules={[{ required: true, type: 'number', min: 0, max: 2147483647, message: t("Nhập số tiền cọc hợp lệ.") }]}><MoneyInput min={0} max={2147483647} precision={0} addonAfter={t("đ")} style={{ width: '100%' }} /></Form.Item></Form></> : <>
         {isCreating && <Typography.Paragraph className="modal-intro">{mode === 'duplicate' ? t("Đã sao chép dãy trọ và các mức phí. Chỉnh tên phòng trước khi tạo. Phòng mới chưa có người thuê, tiền cọc hoặc hóa đơn.") : t("Nhập giá thuê và các khoản phí để dùng khi lập hóa đơn hàng tháng.")}</Typography.Paragraph>}

@@ -7,13 +7,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatVnd } from '../../shared/format';
 import { getLanguage, t, type Language } from '../../shared/i18n/runtime';
-import { buildingsApi } from '../buildings/index';
+import { buildingsApi, type Building } from '../buildings/index';
 import { invoicesApi } from '../invoices/index';
 import { subscriptionApi } from '../subscription/index';
 import { roomsApi, type Room } from './index';
 
 
 type RoomMode = 'create' | 'duplicate' | 'settings' | 'occupancy' | 'edit-occupancy' | null;
+type BuildingModalMode = 'create' | 'edit' | null;
 type ArchiveFilter = 'Active' | 'Archived';
 
 
@@ -26,6 +27,8 @@ export function useRoomsPage() {
   const [moveoutRoom, setMoveoutRoom] = useState<Room | null>(null);
   const [documentRoom, setDocumentRoom] = useState<Room | null>(null);
   const [mode, setMode] = useState<RoomMode>(null);
+  const [buildingModalMode, setBuildingModalMode] = useState<BuildingModalMode>(null);
+  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [linkInfo, setLinkInfo] = useState<{ token: string; url: string; room?: Room; newlyIssued?: boolean } | null>(null);
   const [linkLanguage, setLinkLanguage] = useState<Language>(getLanguage);
@@ -39,6 +42,7 @@ export function useRoomsPage() {
   const [supplemental, setSupplemental] = useState<{ room: Room; requestId: string } | null>(null);
   const [supplementalForm] = Form.useForm();
   const [roomForm] = Form.useForm();
+  const [buildingForm] = Form.useForm<{ name: string; address: string }>();
   const [occupancyForm] = Form.useForm();
   const [editOccupancyForm] = Form.useForm();
   const buildingFilter = searchParams.get('building') || undefined;
@@ -54,6 +58,27 @@ export function useRoomsPage() {
   const subQuery = useQuery({ queryKey: ['subscription'], queryFn: subscriptionApi.getStatus });
 
   const refreshData = async () => { await Promise.all([client.invalidateQueries({ queryKey: ['rooms'] }), client.invalidateQueries({ queryKey: ['dashboard'] }), client.invalidateQueries({ queryKey: ['buildings'] }), client.invalidateQueries({ queryKey: ['invoices'] }), client.invalidateQueries({ queryKey: ['subscription'] }), client.invalidateQueries({ queryKey: ['readings'] })]); };
+  const createBuildingMutation = useMutation({
+    mutationFn: buildingsApi.create,
+    onSuccess: async (created) => {
+      await refreshData();
+      message.success(t("Đã thêm dãy trọ."));
+      setBuildingModalMode(null);
+      buildingForm.resetFields();
+      if (created?.id) setSearchParams({ building: created.id });
+    },
+    onError: (e: Error) => message.error(e.message),
+  });
+  const updateBuildingMutation = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: { name: string; address: string } }) => buildingsApi.update(id, values),
+    onSuccess: async () => {
+      await refreshData();
+      message.success(t("Đã cập nhật dãy trọ."));
+      setBuildingModalMode(null);
+      setEditingBuilding(null);
+    },
+    onError: (e: Error) => message.error(e.message),
+  });
   const createMutation = useMutation({ mutationFn: roomsApi.create, onSuccess: async () => { await refreshData(); message.success(t("Đã thêm phòng.")); setMode(null); roomForm.resetFields(); }, onError: (e: Error) => message.error(e.message) });
   const supplementalMutation = useMutation({ mutationFn: ({ roomId, body }: { roomId: string; body: Parameters<typeof invoicesApi.createSupplemental>[1] }) => invoicesApi.createSupplemental(roomId, body), onSuccess: async () => { await refreshData(); message.success(t("Đã tạo hóa đơn bổ sung trên link khách.")); setSupplemental(null); supplementalForm.resetFields(); }, onError: (e: Error) => message.error(e.message) });
   const updateMutation = useMutation({ mutationFn: ({ id, values }: { id: string; values: Parameters<typeof roomsApi.update>[1] }) => roomsApi.update(id, values), onSuccess: async () => { await refreshData(); message.success(t("Đã cập nhật thông tin phòng.")); setMode(null); }, onError: (e: Error) => message.error(e.message) });
@@ -97,6 +122,17 @@ export function useRoomsPage() {
   const occupiedCount = buildingRooms.filter((room) => room.occupancy).length;
   const vacancyCount = buildingRooms.length - occupiedCount;
   const activeBuildings = (buildingsQuery.data ?? []).filter((building) => !building.isArchived);
+  const selectedBuildingObj = activeBuildings.find((b) => b.id === buildingFilter) ?? null;
+  const openCreateBuilding = () => {
+    setEditingBuilding(null);
+    buildingForm.resetFields();
+    setBuildingModalMode('create');
+  };
+  const openEditBuilding = (building: Building) => {
+    setEditingBuilding(building);
+    buildingForm.setFieldsValue({ name: building.name, address: building.address ?? '' });
+    setBuildingModalMode('edit');
+  };
   const openCreate = () => {
     if (isQuotaReached) {
       modal.confirm({
@@ -178,6 +214,7 @@ export function useRoomsPage() {
         setSearchParams(next, { replace: true });
       } else {
         message.info(t("Vui lòng tạo dãy trọ trước khi thêm phòng."));
+        openCreateBuilding();
         const next = new URLSearchParams(searchParams);
         next.delete('create');
         setSearchParams(next, { replace: true });
@@ -222,5 +259,5 @@ export function useRoomsPage() {
 
   const clearFilters = () => { setStatusFilter('all'); setArchiveFilter('Active'); setSearchParams({}); };
 
-  return { numberRule, message, modal, navigate, setSearchParams, moveoutRoom, setMoveoutRoom, documentRoom, setDocumentRoom, mode, setMode, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, archiveFilter, setArchiveFilter, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, buildingFilter, statusFilter, setStatusFilter, buildingsQuery, roomsQuery, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, isPro, maxRooms, activeRoomCount, isQuotaReached, buildingRooms, rooms, occupiedCount, vacancyCount, activeBuildings, openCreate, renewLink, compactRoom, columns, isCreating, isBusy, clearFilters };
+  return { numberRule, message, modal, navigate, setSearchParams, moveoutRoom, setMoveoutRoom, documentRoom, setDocumentRoom, mode, setMode, buildingModalMode, setBuildingModalMode, editingBuilding, setEditingBuilding, buildingForm, createBuildingMutation, updateBuildingMutation, openCreateBuilding, openEditBuilding, selectedBuildingObj, selectedRoom, linkInfo, setLinkInfo, linkLanguage, setLinkLanguage, archiveFilter, setArchiveFilter, tenantLinkUrl, supplemental, setSupplemental, supplementalForm, roomForm, occupancyForm, editOccupancyForm, buildingFilter, statusFilter, setStatusFilter, buildingsQuery, roomsQuery, createMutation, supplementalMutation, updateMutation, occupancyMutation, editOccupancyMutation, isPro, maxRooms, activeRoomCount, isQuotaReached, buildingRooms, rooms, occupiedCount, vacancyCount, activeBuildings, openCreate, renewLink, compactRoom, columns, isCreating, isBusy, clearFilters };
 }

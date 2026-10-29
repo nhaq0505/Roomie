@@ -2,6 +2,13 @@
 /* Accessible controls and compact layouts */
 .compact-navigation { display: none; }
 .compact-nav-more, .compact-nav-label-short { display: none; }
+.workspace-subtabs-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.workspace-subtabs { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, auto); align-items: center; gap: 4px; padding: 4px; background: #eaf1ee; border: 1px solid #dce7e3; border-radius: 12px; max-width: 100%; }
+.workspace-subtab { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 6px 14px; border-radius: 9px; color: #466169; font-size: 13.5px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease; }
+.workspace-subtab:hover { color: #19333b; }
+.workspace-subtab.is-active { background: #ffffff; color: #087c69; box-shadow: 0 1px 3px rgba(19, 48, 55, 0.08); }
+.workspace-subtab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: rgba(25, 51, 59, 0.08); color: inherit; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.workspace-subtab.is-active .workspace-subtab-badge { background: #dff3ec; color: #066958; }
 .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .quick-actions > a { display: grid; grid-template-columns: 36px 1fr 18px; align-items: center; gap: 4px 10px; padding: 16px; border: 1px solid #d7e6e1; border-radius: 12px; color: #25464e; text-decoration: none; background: #f8fcfa; }
 .quick-actions > a:hover { border-color: #109d83; background: #edf8f4; }
@@ -39,7 +46,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .mobile-menu-button { margin-right: 12px; }
 }
 @media (max-width: 767px) {
-  .compact-navigation { position: fixed; inset: auto 0 0 0; z-index: 95; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(16px); border-top: 1px solid #e2ece9; border-bottom: 0; box-shadow: 0 -2px 14px rgba(19, 48, 55, 0.04); overflow: visible; }
+  .workspace-subtabs-bar { margin-bottom: 10px; }
+  .workspace-subtabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .workspace-subtab { min-height: 36px; padding: 6px 8px; font-size: 13px; }
+  .compact-navigation { position: fixed; inset: auto 0 0 0; z-index: 95; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(16px); border-top: 1px solid #e2ece9; border-bottom: 0; box-shadow: 0 -2px 14px rgba(19, 48, 55, 0.04); overflow: visible; }
   .compact-navigation[data-role="admin"] { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding-left: 6px; padding-right: 6px; }
   .compact-navigation[data-role="admin"] > :is(a, button) { font-size: 10px; }
   .compact-nav-dropdown.ant-dropdown { position: fixed; }
@@ -108,11 +118,13 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
   .auth-small-brand { display: flex; }
 }
 @media (max-width: 767px) {
-  .page-heading-extra > .ant-space { width: 100%; gap: 6px !important; }
-  .page-heading-extra > .ant-space > .ant-space-item { flex: 1 1 125px; min-width: 0; }
-  .page-heading-extra > .ant-space > .ant-space-item:nth-child(2) { flex: 0 1 125px; }
+  .page-heading-extra > .ant-space { width: 100%; gap: 8px !important; }
+  .page-heading-extra > .ant-space > .ant-space-item { flex: 1 1 auto; min-width: 0; }
+  .page-heading-extra > .ant-space:has(.page-back-btn) > .ant-space-item:first-child { flex: 0 0 auto !important; }
+  .page-heading-extra > .ant-space:has(.page-back-btn) > .ant-space-item:nth-child(2) { flex: 1 1 180px !important; }
   .page-heading-extra > .ant-space > .ant-space-item:nth-child(n+3) { flex: 1 1 100%; }
-  .page-heading-extra > .ant-space .ant-picker, .page-heading-extra > .ant-space .ant-btn, .page-heading-extra > .ant-space .ant-select { width: 100%; min-width: 0 !important; }
+  .page-heading-extra > .ant-space .ant-picker, .page-heading-extra > .ant-space .ant-btn:not(.page-back-btn), .page-heading-extra > .ant-space .ant-select, .page-heading-extra > .ant-space .ant-input-affix-wrapper { width: 100% !important; min-width: 0 !important; padding-inline: 12px; }
+  .page-heading-extra > .ant-space .page-back-btn.ant-btn { width: auto !important; padding-inline: 14px; }
   .invoice-detail-head { flex-wrap: wrap; }
   .tenant-header-secure { max-width: 110px; line-height: 1.4; }
 }
@@ -135,7 +147,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 .mobile-menu-drawer .ant-drawer-header .ant-drawer-close:focus-visible { outline: 3px solid #9ce8d2; outline-offset: 3px; }
 
 /* All languages share the same layout; long labels may wrap. */
-.language-selector { width: 128px; flex-shrink: 0; }
+.language-selector { width: 150px; flex-shrink: 0; }
+.language-selector .ant-select-selection-item { font-size: 13px !important; }
+.language-option { display: inline-flex; align-items: center; gap: 7px; line-height: 1; }
 .public-language { position: absolute; z-index: 5; right: 24px; top: 20px; }
 .auth-page, .status-page { position: relative; }
 .auth-main { padding-top: 76px; }
@@ -144,7 +158,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #087c69; outline-offs
 html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'Be Vietnam Pro', system-ui, sans-serif; }
 @media (max-width: 600px) {
   .public-language { right: 16px; top: 16px; }
-  .language-selector { width: 102px; }
+  .language-selector { width: 136px; }
   .tenant-header { flex-wrap: wrap; gap: 10px; }
   .tenant-header-secure { display: none; }
   .topbar .ant-space { gap: 6px !important; }
@@ -152,7 +166,7 @@ html:lang(zh), html:lang(ko), html:lang(hi) { font-family: 'Be Vietnam Pro', sys
   .status-page { padding-top: 80px; }
 }
 @media (max-width: 359px) {
-  .language-selector { width: 92px; }
+  .language-selector { width: 128px; }
   .mobile-menu-button.ant-btn { width: 34px; min-width: 34px; height: 34px; margin-right: 6px; }
 }
 .tenant-header .language-selector .ant-select-selection-item { font-size: 13px; color: var(--ink); }

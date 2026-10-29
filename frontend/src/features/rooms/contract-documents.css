@@ -86,6 +86,35 @@
   gap: 10px;
 }
 
+.contract-form-pane .ant-segmented,
+.contract-preview-toolbar .ant-segmented {
+  background: #e8f1ee;
+  border: 1px solid #cfe0db;
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.contract-form-pane .ant-segmented-item,
+.contract-preview-toolbar .ant-segmented-item {
+  border-radius: 7px !important;
+  color: #365259;
+  font-weight: 600;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.contract-form-pane .ant-segmented-item-selected,
+.contract-preview-toolbar .ant-segmented-item-selected {
+  background: #087c69 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(8, 124, 105, 0.22);
+}
+
+.contract-form-pane .ant-segmented-item-selected .ant-segmented-item-label,
+.contract-preview-toolbar .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #ffffff !important;
+}
+
 .contract-preview-toolbar .ant-segmented {
   max-width: 100%;
   overflow-x: auto;
@@ -308,22 +337,27 @@
     padding: 12px !important;
   }
   .contract-form-pane .ant-segmented {
+    width: 100%;
     max-width: 100%;
-    overflow-x: auto;
   }
   .contract-form-pane .ant-segmented-group {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
   }
   .contract-form-pane .ant-segmented-item {
     min-width: 0;
-    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .contract-form-pane .ant-segmented-item-label {
     white-space: normal;
-    line-height: 1.25;
-    padding: 5px 8px;
+    line-height: 1.3;
+    padding: 7px 8px;
     height: auto;
     text-align: center;
+    font-size: 12.5px;
   }
   .contract-preview-pane,
   .room-documents-page .contract-preview-pane {

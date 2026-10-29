@@ -1,9 +1,10 @@
 import type { InvoiceStatusFilter } from './types';
 import { statusLabel, statusClass } from './presentation';
-import { ArrowRightOutlined, FileTextOutlined, MessageOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, CalculatorOutlined, FileTextOutlined, MessageOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import type { TableProps } from 'antd';
 import { Button, DatePicker, Input, Select, Space, Tag, Tooltip } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
 import ResponsiveTable from '../../shared/ui/ResponsiveTable';
@@ -20,6 +21,7 @@ function invoiceKindLabel(kind: Invoice['kind']) {
 }
 
 export default function InvoicesPage() {
+  const navigate = useNavigate();
   const state = useInvoicesPage();
   const { kindFilter, setKindFilter, setIssuanceFilter, period, setPeriod, statusFilter, setStatusFilter, searchText, setSearchText, page, setPage, listQuery, invoices, hasActiveFilters, generateMutation, showInvoice, copyReminderMessage } = state;
   const columns: TableProps<Invoice>['columns'] = [
@@ -120,7 +122,23 @@ export default function InvoicesPage() {
   const setMonth = (value: Dayjs | null) => setPeriod(value?.format('YYYY-MM') ?? null);
 
   return <>
-    <PageTitle eyebrow={t("THU TIỀN RÕ RÀNG")} title={t("Hóa đơn")} subtitle={t("Theo dõi tiền thuê, điện, nước và các khoản đã thu theo từng phòng.")} extra={(kindFilter === 'All' || kindFilter === 'Monthly') && period ? <Button title={t("Chỉ tạo hóa đơn còn thiếu; không phát hành các bản nháp.")} type="primary" icon={<PlusOutlined />} loading={generateMutation.isPending} onClick={() => generateMutation.mutate(period)}>{t("Tạo hóa đơn còn thiếu")}</Button> : undefined} />
+    <PageTitle
+      eyebrow={t("THU TIỀN RÕ RÀNG")}
+      title={t("Hóa đơn")}
+      subtitle={t("Theo dõi tiền thuê, điện, nước và các khoản đã thu theo từng phòng.")}
+      extra={
+        <Space size={8}>
+          <Button type={period ? 'default' : 'primary'} icon={<CalculatorOutlined />} onClick={() => navigate('/readings')}>
+            {t("Lập hóa đơn")}
+          </Button>
+          {(kindFilter === 'All' || kindFilter === 'Monthly') && period && (
+            <Button title={t("Chỉ tạo hóa đơn còn thiếu; không phát hành các bản nháp.")} type="primary" icon={<PlusOutlined />} loading={generateMutation.isPending} onClick={() => generateMutation.mutate(period)}>
+              {t("Tạo hóa đơn còn thiếu")}
+            </Button>
+          )}
+        </Space>
+      }
+    />
     <ManualPaymentRequests />
     {listQuery.isError ? <LoadError error={listQuery.error} onRetry={() => void listQuery.refetch()} /> : listQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
       <SectionCard className="invoice-list-card" title={t("Hóa đơn")} extra={<div className="invoice-list-actions" data-filtered={hasActiveFilters}><span className="section-caption">{t("Kết quả bộ lọc: {0} hóa đơn", [listQuery.data?.total ?? 0])}</span>{hasActiveFilters && invoices.length > 0 && <Button type="text" onClick={clearFilters}>{t("Xóa lọc")}</Button>}</div>}>

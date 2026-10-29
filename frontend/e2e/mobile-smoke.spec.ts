@@ -230,8 +230,8 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     const drawer = page.locator('.mobile-menu-drawer');
     await expect(drawer).toBeVisible();
 
-    // Verify navigation menu items are visible
-    await expect(drawer.locator('.ant-menu-item').filter({ hasText: /^Dãy trọ/ })).toBeVisible();
+    // Verify merged navigation menu items are visible
+    await expect(drawer.locator('.ant-menu-item').filter({ hasText: /^Dãy trọ$/ })).toBeVisible();
     await expect(drawer.locator('.ant-menu-item').filter({ hasText: /^Hóa đơn$/ })).toBeVisible();
 
     // Close via close icon
@@ -322,18 +322,20 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     expect(navBox!.y).toBeGreaterThan(700);
     expect(navBox!.x + navBox!.width).toBeLessThanOrEqual(375);
 
-    // Verify all 5 primary bottom nav items display their text labels simultaneously (no mystery icons)
+    // Verify all 3 merged primary bottom nav items display their text labels simultaneously (no mystery icons)
     const visibleLabels = await bottomNav
       .locator('> :is(a, button):not([data-mobile-secondary="true"]) .compact-nav-text')
       .evaluateAll((els) => els.map((el) => getComputedStyle(el).display));
-    expect(visibleLabels).toHaveLength(5);
+    expect(visibleLabels).toHaveLength(3);
     for (const display of visibleLabels) {
       expect(display).not.toBe('none');
     }
 
-    // Navigate via bottom tab bar to Readings and verify status filter pills & side-by-side kWh entry
+    // Navigate via bottom tab bar to Invoices and click "Lập hóa đơn" button to enter Readings
     await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
-    await bottomNav.getByRole('link', { name: 'Lập hóa đơn' }).click();
+    await bottomNav.getByRole('link', { name: /Hóa đơn/ }).click();
+    await expect(page).toHaveURL(/\/invoices$/);
+    await page.getByRole('button', { name: 'Lập hóa đơn' }).click();
     await expect(page).toHaveURL(/\/readings$/);
     await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
     const firstReadingCard = page.locator('.reading-mobile-card').first();
@@ -347,19 +349,19 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     expect(submitBox).not.toBeNull();
     expect(Math.abs(inputBox!.y - submitBox!.y)).toBeLessThan(12);
 
-    // Open Settings dropdown from bottom tab bar "Cấu hình" button and navigate to Sổ chi phí
+    // Open Settings dropdown from bottom tab bar "Cấu hình" button and navigate to Hồ sơ
     const moreBtn = bottomNav.getByRole('button', { name: /Cấu hình/ });
     await moreBtn.click();
     const dropdown = page.locator('.ant-dropdown:visible');
     await expect(dropdown).toBeVisible();
-    await expect(bottomNav.getByRole('link', { name: 'Dãy trọ' })).toBeVisible();
-    await expect(dropdown.getByRole('menuitem', { name: 'Tổng quan' })).toBeVisible();
-    await expect(dropdown.getByRole('menuitem', { name: 'Chi phí' })).toBeVisible();
-    await expect(dropdown.getByRole('menuitem', { name: 'Báo cáo' })).toBeVisible();
+    await expect(bottomNav.getByRole('link', { name: /Dãy trọ/ })).toBeVisible();
+    await expect(dropdown.getByRole('menuitem', { name: 'Tổng quan' })).toHaveCount(0);
+    await expect(dropdown.getByRole('menuitem', { name: 'Chi phí' })).toHaveCount(0);
+    await expect(dropdown.getByRole('menuitem', { name: 'Báo cáo' })).toHaveCount(0);
     await expect(dropdown.getByRole('menuitem', { name: 'Hồ sơ' })).toBeVisible();
     await expect(dropdown.getByRole('menuitem', { name: 'Gói cước' })).toBeVisible();
-    await dropdown.getByRole('menuitem', { name: 'Chi phí' }).click();
-    await expect(page).toHaveURL(/\/expenses$/);
+    await dropdown.getByRole('menuitem', { name: 'Hồ sơ' }).click();
+    await expect(page).toHaveURL(/\/profile$/);
     await expect(moreBtn).toHaveAttribute('data-mobile-more-active', 'true');
   });
 
@@ -658,23 +660,11 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await expect(page.getByRole('combobox', { name: 'Lọc trạng thái lưu trữ' })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Lọc theo tình trạng' })).toHaveCount(0);
 
-
-
     await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
     await page.goto('/readings');
     await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
     await expect(page.locator('.page-heading-extra .ant-picker')).toHaveCount(0);
     await expect(page.locator('.reading-filter-pills')).toHaveCount(0);
-
-
-
-
-
-
-
-
-
-
 
     // 5. Multi-locale check (?lang=en, ko, zh, hi) on /readings at 375px and 320px has zero horizontal overflow
     for (const lang of ['en', 'ko', 'zh', 'hi']) {
@@ -688,7 +678,3 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     }
   });
 });
-
-
-
-

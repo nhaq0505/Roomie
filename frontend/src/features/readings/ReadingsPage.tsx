@@ -1,8 +1,9 @@
-import { CheckCircleFilled, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CheckCircleFilled, ClockCircleOutlined, InfoCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TableProps } from 'antd';
-import { Alert, App, Button, Form, InputNumber, Modal, Select, Tag, Typography } from 'antd';
+import { Alert, App, Button, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { t } from '../../shared/i18n/runtime';
 import MoneyInput from '../../shared/ui/MoneyInput';
@@ -12,7 +13,7 @@ import { invoicesApi, type Invoice } from '../invoices/index';
 import { roomsApi, type Room } from '../rooms/index';
 import { readingsApi, type Reading } from './index';
 
-interface ReadingRow { room: Room; saved?: Reading; draftInvoice?: Invoice; }
+interface ReadingRow { room: Room; saved?: Reading; draftInvoice?: Invoice; issuedInvoice?: Invoice; }
 interface DraftSession { room: Room; currentReading: number; invoice: Invoice; }
 interface DraftAmounts { rent: number; electricityAmount: number; waterAmount: number; serviceAmount: number; }
 
@@ -20,12 +21,15 @@ function lastDay(period: string) { const [year, month] = period.split('-').map(N
 
 export default function ReadingsPage() {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const client = useQueryClient();
   const period = currentPeriod();
   const [drafts, setDrafts] = useState<Record<string, number | null>>({});
   const [draftSession, setDraftSession] = useState<DraftSession | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<{ room: Room; invoice: Invoice } | null>(null);
   const [draftForm] = Form.useForm<DraftAmounts>();
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
+  const [searchText, setSearchText] = useState<string>('');
   const publishKeys = useRef(new Map<string, string>());
   const userEditedRoomsRef = useRef(new Set<string>());
 
@@ -39,6 +43,7 @@ export default function ReadingsPage() {
       room,
       saved: (readingsQuery.data ?? []).find((reading) => reading.roomId === room.id && reading.occupancyId === room.occupancy?.id),
       draftInvoice: (invoicesQuery.data ?? []).find((invoice) => invoice.kind === 'Monthly' && invoice.roomId === room.id && invoice.period === period && invoice.lifecycleState === 'Draft' && invoice.occupancyId === room.occupancy?.id),
+      issuedInvoice: (invoicesQuery.data ?? []).find((invoice) => invoice.kind === 'Monthly' && invoice.roomId === room.id && invoice.period === period && invoice.lifecycleState === 'Issued' && invoice.occupancyId === room.occupancy?.id),
     })), [roomsQuery.data, readingsQuery.data, invoicesQuery.data, period]);
 
   const buildingOptions = useMemo(() => {
@@ -59,7 +64,18 @@ export default function ReadingsPage() {
     return rows.filter((r) => r.room.buildingId === selectedBuilding);
   }, [rows, selectedBuilding]);
 
-  const filteredRows = buildingRows;
+  const filteredRows = useMemo(() => {
+    const keyword = searchText.trim().toLocaleLowerCase();
+    const matched = keyword
+      ? buildingRows.filter((r) => r.room.name.toLocaleLowerCase().includes(keyword))
+      : buildingRows;
+    return [...matched].sort((a, b) => {
+      const aIssued = Boolean(a.saved && !a.draftInvoice);
+      const bIssued = Boolean(b.saved && !b.draftInvoice);
+      if (aIssued !== bIssued) return aIssued ? 1 : -1;
+      return 0;
+    });
+  }, [buildingRows, searchText]);
 
   const prevPeriodRef = useRef(period);
   useEffect(() => {
@@ -117,10 +133,60 @@ export default function ReadingsPage() {
     draftForm.setFieldsValue({ rent: row.draftInvoice.rent, electricityAmount: row.draftInvoice.electricityAmount, waterAmount: row.draftInvoice.waterAmount, serviceAmount: row.draftInvoice.serviceAmount });
   };
   const confirmReading = (row: ReadingRow, currentReading: number) => {
+    const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
+    const consumption = Math.round(Math.max(0, currentReading - previous) * 1000) / 1000;
+    const rent = Math.round(row.room.rent ?? 0);
+    const electricityRate = row.room.electricityRate ?? 0;
+    const electricityAmount = Math.round(consumption * electricityRate);
+    const people = row.room.occupancy?.people ?? 1;
+    const waterFee = row.room.waterFee ?? 0;
+    const waterAmount = Math.round(row.room.waterPerPerson ? waterFee * people : waterFee);
+    const serviceAmount = Math.round(row.room.serviceFee ?? 0);
+    const total = rent + electricityAmount + waterAmount + serviceAmount;
+
     modal.confirm({
+      width: 480,
+      icon: null,
+      className: 'reading-confirm-modal',
       title: t("Chốt chỉ số và lập hóa đơn?"),
-      content: t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê."),
-      okText: t("Chốt & lập hóa đơn"), cancelText: t("Kiểm tra lại"),
+      content: (
+        <div className="reading-confirm-detail">
+          <div className="invoice-period-box" style={{ margin: '10px 0 12px' }}>
+            <span>{row.room.name} · {row.room.occupancy?.tenantName || t("Người thuê")}</span>
+            <strong style={{ textAlign: 'right' }}>{periodLabel(period)}</strong>
+          </div>
+          <div className="invoice-breakdown">
+            <div>
+              <span>{t("Tiền thuê phòng")}</span>
+              <strong>{formatVnd(rent)}</strong>
+            </div>
+            <div>
+              <span>
+                {t("Tiền điện")}{' '}
+                <small>{consumption} kWh · {previous} → {currentReading}</small>
+              </span>
+              <strong>{formatVnd(electricityAmount)}</strong>
+            </div>
+            <div>
+              <span>{t("Tiền nước")}</span>
+              <strong>{formatVnd(waterAmount)}</strong>
+            </div>
+            <div>
+              <span>{t("Phí dịch vụ")}</span>
+              <strong>{formatVnd(serviceAmount)}</strong>
+            </div>
+            <div className="breakdown-total">
+              <span>{t("Tổng hóa đơn")}</span>
+              <strong style={{ color: '#087c69', fontSize: 16 }}>{formatVnd(total)}</strong>
+            </div>
+          </div>
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#f6faf8', color: '#526970', fontSize: 12.5 }}>
+            {t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê.")}
+          </div>
+        </div>
+      ),
+      okText: t("Chốt & lập hóa đơn"),
+      cancelText: t("Kiểm tra lại"),
       onOk: () => readingMutation.mutateAsync({ roomId: row.room.id, period, currentReading }),
     });
   };
@@ -144,21 +210,21 @@ export default function ReadingsPage() {
 
   const columns: TableProps<ReadingRow>['columns'] = [
     {
-      title: t("PHÒNG / NGƯỜI THUÊ"),
+      title: t("Phòng"),
       key: 'room',
+      width: 150,
       render: (_, row) => (
         <div className="room-name-cell">
           <div className="room-avatar"><span>⚡</span></div>
           <div>
             <strong>{row.room.name}</strong>
-            <span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span>
           </div>
         </div>
       ),
     },
-    { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
-    { title: t("CHỈ SỐ MỚI"), key: 'current', render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber inputMode="numeric" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={0} step={1} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" style={{ width: 170 }} placeholder={t("Nhập chỉ số")} /> },
-    { title: t("SỬ DỤNG"), key: 'consumption', render: (_, row) => {
+    { title: t("CHỈ SỐ TRƯỚC"), key: 'previous', width: 120, render: (_, row) => <span className="meter-value">{row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0} <small>kWh</small></span> },
+    { title: t("CHỈ SỐ MỚI"), key: 'current', width: 205, render: (_, row) => row.saved?.currentReading !== undefined ? <div className="saved-reading"><strong>{row.saved.currentReading} <small>kWh</small></strong></div> : <InputNumber className="reading-desktop-input" inputMode="numeric" aria-label={t("Chỉ số mới {0}", [row.room.name])} min={row.room.previousReading ?? row.room.initialReading ?? 0} precision={0} step={1} value={drafts[row.room.id] ?? undefined} onChange={(value) => handleDraftChange(row.room.id, value)} addonAfter="kWh" placeholder={t("Nhập chỉ số")} /> },
+    { title: t("SỬ DỤNG"), key: 'consumption', width: 130, render: (_, row) => {
       const previous = row.saved?.previousReading ?? row.room.previousReading ?? row.room.initialReading ?? 0;
       const current = row.saved?.currentReading ?? drafts[row.room.id];
       const usage = current == null ? null : Math.round(Math.max(0, current - previous) * 1000) / 1000;
@@ -175,10 +241,21 @@ export default function ReadingsPage() {
         </div>
       );
     } },
-    { title: t("TRẠNG THÁI PHÁT HÀNH"), key: 'lifecycle', width: 140, render: (_, row) => row.draftInvoice ? <Tag className="draft-state-tag" icon={<ClockCircleOutlined />}>{t("Bản nháp")}</Tag> : row.saved ? <Tag icon={<CheckCircleFilled />} className="submitted-tag">{t("Đã phát hành")}</Tag> : <span>—</span> },
-    { title: '', key: 'action', fixed: 'right', width: 190, align: 'right', render: (_, row) => {
+    { title: t("TRẠNG THÁI PHÁT HÀNH"), key: 'lifecycle', width: 145, render: (_, row) => row.draftInvoice ? <Tag className="draft-state-tag" icon={<ClockCircleOutlined />}>{t("Bản nháp")}</Tag> : row.saved ? <Tag icon={<CheckCircleFilled />} className="submitted-tag">{t("Đã phát hành")}</Tag> : <span>—</span> },
+    { title: '', key: 'action', fixed: 'right', width: 175, align: 'right', render: (_, row) => {
       if (row.draftInvoice) return <Button type="primary" size="small" onClick={() => openDraft(row)}>{t("Sửa bản nháp")}</Button>;
-      if (row.saved) return <span className="already-done">{t("Đã phát hành")}</span>;
+      if (row.saved) {
+        return (
+          <Space size={6}>
+            <span className="already-done">{t("Đã phát hành")}</span>
+            {row.issuedInvoice && (
+              <Button type="default" size="small" onClick={() => setViewingInvoice({ room: row.room, invoice: row.issuedInvoice! })}>
+                {t("Chi tiết")}
+              </Button>
+            )}
+          </Space>
+        );
+      }
       const currentReading = drafts[row.room.id];
       const invalid = currentReading == null || currentReading < (row.room.previousReading ?? row.room.initialReading ?? 0);
       return (
@@ -213,7 +290,6 @@ export default function ReadingsPage() {
             <div className="room-avatar"><span>⚡</span></div>
             <div>
               <strong>{row.room.name}</strong>
-              <span>{row.room.occupancy?.tenantName} · {row.room.buildingName || t("Dãy trọ")}</span>
             </div>
           </div>
           {row.draftInvoice ? (
@@ -245,6 +321,10 @@ export default function ReadingsPage() {
             </div>
             {row.draftInvoice ? (
               <Button type="primary" onClick={() => openDraft(row)}>{t("Sửa bản nháp")}</Button>
+            ) : row.issuedInvoice ? (
+              <Button type="default" size="small" onClick={() => setViewingInvoice({ room: row.room, invoice: row.issuedInvoice! })}>
+                {t("Chi tiết")}
+              </Button>
             ) : (
               <span className="already-done">{t("Đã phát hành")}</span>
             )}
@@ -293,13 +373,18 @@ export default function ReadingsPage() {
       title={t("Lập hóa đơn")}
       subtitle={t("Ghi nhận chỉ số cuối kỳ. Hóa đơn sẽ được lập ngay sau khi bạn chốt.")}
       extra={
-        <Select
-          aria-label={t("Lọc theo dãy trọ")}
-          style={{ minWidth: 160 }}
-          value={selectedBuilding}
-          onChange={setSelectedBuilding}
-          options={buildingOptions}
-        />
+        <Space size={8}>
+          <Button className="page-back-btn" icon={<ArrowLeftOutlined />} onClick={() => navigate('/invoices')}>
+            {t("Hóa đơn")}
+          </Button>
+          <Select
+            aria-label={t("Lọc theo dãy trọ")}
+            style={{ minWidth: 200 }}
+            value={selectedBuilding}
+            onChange={setSelectedBuilding}
+            options={buildingOptions}
+          />
+        </Space>
       }
     />
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : readingsQuery.isError ? <LoadError error={readingsQuery.error} onRetry={() => void readingsQuery.refetch()} /> : invoicesQuery.isError ? <LoadError error={invoicesQuery.error} onRetry={() => void invoicesQuery.refetch()} /> : roomsQuery.isPending || readingsQuery.isPending || invoicesQuery.isPending ? <div className="content-card"><div className="loading-placeholder" /></div> : <>
@@ -307,9 +392,20 @@ export default function ReadingsPage() {
       <SectionCard
         className="reading-section"
         title={t("Danh sách phòng đang thuê")}
+        extra={
+          <Input
+            allowClear
+            prefix={<SearchOutlined />}
+            aria-label={t("Tên phòng")}
+            placeholder={t("Tên phòng")}
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            style={{ width: 220 }}
+          />
+        }
       >
         <div className="reading-notice"><InfoCircleOutlined /><span><strong>{t("Tiền thuê tính đủ theo tháng")}</strong> {t("Tiền thuê được tính đủ theo tháng, không phụ thuộc ngày bắt đầu thuê.")}</span></div>
-        {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} renderCompact={renderCompactReading} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
+        {filteredRows.length ? <ResponsiveTable className="reading-table" rowKey={(row) => row.room.id} columns={columns} dataSource={filteredRows} renderCompact={renderCompactReading} pagination={{ pageSize: 10, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : searchText.trim() ? <EmptyPanel title={t("Không tìm thấy phòng phù hợp")} description={t("Không có phòng khớp với bộ lọc hiện tại.")} action={<Button onClick={() => setSearchText('')}>{t("Xóa lọc")}</Button>} /> : <EmptyPanel title={occupied === 0 ? t("Chưa có phòng đang thuê") : t("Chưa có phòng cần chốt cho {0}", [periodLabel(period)])} description={occupied === 0 ? t("Thêm người thuê vào phòng trước khi ghi chỉ số điện.") : t("Tất cả phòng hiện đã được chốt chỉ số trong kỳ này.")} />}
         {buildingRows.length > 0 && done === buildingRows.length && <div className="all-readings-done"><CheckCircleFilled /> {t("Tất cả phòng đang thuê đã có hóa đơn cho kỳ này.")}</div>}
       </SectionCard>
     </>}
@@ -327,6 +423,60 @@ export default function ReadingsPage() {
         <Typography.Paragraph className="draft-version-note">{t("Phiên bản bản nháp")} {draftSession.invoice.version ?? 0}</Typography.Paragraph>
         <Button type="primary" block loading={publishMutation.isPending} onClick={() => draftForm.submit()}>{t("Phát hành hóa đơn")}</Button>
       </>}
+    </Modal>
+    <Modal
+      title={t("Chi tiết hóa đơn")}
+      open={!!viewingInvoice}
+      onCancel={() => setViewingInvoice(null)}
+      footer={<Button type="primary" onClick={() => setViewingInvoice(null)}>{t("Đóng")}</Button>}
+      width={480}
+      destroyOnClose
+    >
+      {viewingInvoice && (
+        <div className="reading-confirm-detail">
+          <div className="invoice-period-box" style={{ margin: '10px 0 12px' }}>
+            <span>{viewingInvoice.room.name} · {viewingInvoice.room.occupancy?.tenantName || viewingInvoice.invoice.tenantName || t("Người thuê")}</span>
+            <strong style={{ textAlign: 'right' }}>{periodLabel(viewingInvoice.invoice.period)}</strong>
+          </div>
+          <div className="invoice-breakdown">
+            <div>
+              <span>{t("Tiền thuê phòng")}</span>
+              <strong>{formatVnd(viewingInvoice.invoice.rent)}</strong>
+            </div>
+            <div>
+              <span>
+                {t("Tiền điện")}{' '}
+                <small>{viewingInvoice.invoice.consumption} kWh · {viewingInvoice.invoice.previousReading} → {viewingInvoice.invoice.currentReading}</small>
+              </span>
+              <strong>{formatVnd(viewingInvoice.invoice.electricityAmount)}</strong>
+            </div>
+            <div>
+              <span>{t("Tiền nước")}</span>
+              <strong>{formatVnd(viewingInvoice.invoice.waterAmount)}</strong>
+            </div>
+            <div>
+              <span>{t("Phí dịch vụ")}</span>
+              <strong>{formatVnd(viewingInvoice.invoice.serviceAmount)}</strong>
+            </div>
+            <div className="breakdown-total">
+              <span>{t("Tổng hóa đơn")}</span>
+              <strong style={{ color: '#087c69', fontSize: 16 }}>{formatVnd(viewingInvoice.invoice.total)}</strong>
+            </div>
+          </div>
+          <div className="invoice-balance-box" style={{ marginTop: 12 }}>
+            <div>
+              <span>{t("Đã ghi nhận")}</span>
+              <strong>{formatVnd(viewingInvoice.invoice.paid)}</strong>
+            </div>
+            <div>
+              <span>{t("Còn phải thu")}</span>
+              <strong className={viewingInvoice.invoice.outstanding > 0 ? 'balance-due' : 'balance-clear'}>
+                {formatVnd(viewingInvoice.invoice.outstanding)}
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   </>;
 }

@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, QrcodeOutlined, SaveOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Col, Collapse, DatePicker, Drawer, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatVnd } from '../../shared/format';
@@ -19,8 +19,8 @@ type DocumentTab = 'contract' | 'ct01';
 type DocQrTarget =
   | { kind: 'tenant' }
   | { kind: 'owner' }
-  | { kind: 'coResident-add' }
-  | { kind: 'coResident-row'; index: number }
+  | { kind: 'coResident-add'; mode: 'cccd' | 'passport' }
+  | { kind: 'coResident-row'; index: number; mode: 'cccd' | 'passport' }
   | null;
 
 interface CoResidentFormItem {
@@ -167,9 +167,7 @@ export default function ContractDocumentsDrawer({
   const handleQrDetected = (parsed: ParsedCccdQr) => {
     if (!qrTarget) return;
     if (qrTarget.kind === 'tenant') {
-      if (parsed.documentType === 'Passport' || /^[A-Za-z]/.test(parsed.citizenId)) {
-        setTenantIdentityMode('foreign');
-      }
+      const isForeignTenant = tenantIdentityMode === 'foreign';
       form.setFieldsValue({
         tenantName: parsed.fullName,
         tenantCitizenId: parsed.citizenId,
@@ -177,9 +175,15 @@ export default function ContractDocumentsDrawer({
         tenantGender: parsed.gender ?? form.getFieldValue('tenantGender'),
         tenantPermanentAddress: parsed.permanentAddress || form.getFieldValue('tenantPermanentAddress'),
         tenantCitizenIdIssuedDate: parsed.issuedDate ? dayjs(parsed.issuedDate) : form.getFieldValue('tenantCitizenIdIssuedDate'),
-        tenantCitizenIdIssuedPlace: form.getFieldValue('tenantCitizenIdIssuedPlace') || (parsed.documentType === 'Passport' ? `${''}Cục Quản lý xuất nhập cảnh` : t("Cục Cảnh sát QLHC về TTXH")),
+        tenantCitizenIdIssuedPlace:
+          form.getFieldValue('tenantCitizenIdIssuedPlace') ||
+          (isForeignTenant ? `${''}Cục Quản lý xuất nhập cảnh` : t("Cục Cảnh sát QLHC về TTXH")),
       });
-      message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+      message.success(
+        isForeignTenant
+          ? `${''}Đã điền thông tin Hộ chiếu của ${parsed.fullName}.`
+          : t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]),
+      );
       return;
     }
 
@@ -214,7 +218,11 @@ export default function ContractDocumentsDrawer({
           relation: currentList[idx]?.relation || legalCt01Template.defaultRelation,
         };
         form.setFieldValue('coResidents', currentList);
-        message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+        message.success(
+          qrTarget.mode === 'passport'
+            ? `${''}Đã điền thông tin Hộ chiếu của ${parsed.fullName}.`
+            : t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]),
+        );
       }
       return;
     }
@@ -232,7 +240,11 @@ export default function ContractDocumentsDrawer({
       currentList.push(newItem);
     }
     form.setFieldValue('coResidents', currentList);
-    message.success(t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]));
+    message.success(
+      qrTarget.mode === 'passport'
+        ? `${''}Đã điền thông tin Hộ chiếu của ${parsed.fullName}.`
+        : t("Đã điền thông tin CCCD của {0}.", [parsed.fullName]),
+    );
   };
 
   const buildPayload = (values: DocumentFormValues): UpdateOccupancyDocumentRequest => ({
@@ -566,8 +578,16 @@ export default function ContractDocumentsDrawer({
                             onChange={(val) => {
                               const nextMode = val as 'vn' | 'foreign';
                               setTenantIdentityMode(nextMode);
-                              if (nextMode === 'foreign' && !form.getFieldValue('tenantCitizenIdIssuedPlace')) {
-                                form.setFieldValue('tenantCitizenIdIssuedPlace', `${''}Cục Quản lý xuất nhập cảnh`);
+                              const currentAddr = String(form.getFieldValue('tenantPermanentAddress') ?? '').trim();
+                              if (nextMode === 'foreign') {
+                                if (!currentAddr.startsWith(`${''}Quốc tịch:`)) {
+                                  form.setFieldValue('tenantPermanentAddress', undefined);
+                                }
+                                if (!form.getFieldValue('tenantCitizenIdIssuedPlace')) {
+                                  form.setFieldValue('tenantCitizenIdIssuedPlace', `${''}Cục Quản lý xuất nhập cảnh`);
+                                }
+                              } else if (currentAddr.startsWith(`${''}Quốc tịch:`)) {
+                                form.setFieldValue('tenantPermanentAddress', '');
                               }
                             }}
                             options={[
@@ -591,7 +611,7 @@ export default function ContractDocumentsDrawer({
                             showIcon
                             style={{ marginBottom: 12 }}
                             message={`${''}Chế độ Khách nước ngoài (Hộ chiếu / Passport)`}
-                            description={`${''}Bấm "Quét / Tải ảnh Hộ chiếu (MRZ)" để tự động nhận diện 2 dòng MRZ ở mép dưới trang thông tin Passport, hoặc nhập trực tiếp Số hộ chiếu (ví dụ: M12345678) và chọn nhanh Quốc tịch bên dưới.`}
+                            description={`${''}Bấm "Quét / Tải ảnh Hộ chiếu (MRZ)" để tự động nhận diện 2 dòng MRZ ở mép dưới trang thông tin Passport, hoặc nhập Số hộ chiếu và chọn Quốc tịch bên dưới.`}
                           />
                         )}
                         <Row gutter={12}>
@@ -659,49 +679,169 @@ export default function ContractDocumentsDrawer({
                         </Form.Item>
                         <Form.Item
                           name="tenantPermanentAddress"
-                          label={tenantIdentityMode === 'foreign' ? `${''}Quốc tịch / Địa chỉ tại nước ngoài` : t("Địa chỉ thường trú")}
+                          label={tenantIdentityMode === 'foreign' ? `${''}Quốc tịch` : t("Địa chỉ thường trú")}
                         >
-                          <Input
-                            maxLength={500}
-                            placeholder={
-                              tenantIdentityMode === 'foreign'
-                                ? `${''}Ví dụ: Quốc tịch: Hàn Quốc (KOR)`
-                                : t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")
-                            }
-                          />
-                        </Form.Item>
-                        {tenantIdentityMode === 'foreign' && (
-                          <div style={{ marginTop: -6, marginBottom: 12 }}>
-                            <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 6 }}>
-                              {`${''}Chọn nhanh quốc tịch:`}
-                            </Typography.Text>
-                            <Space size={[4, 4]} wrap>
-                              {[
+                          {tenantIdentityMode === 'foreign' ? (
+                            <Select
+                              showSearch
+                              allowClear
+                              optionFilterProp="label"
+                              options={[
                                 `${''}Hàn Quốc (KOR)`,
                                 `${''}Nhật Bản (JPN)`,
                                 `${''}Trung Quốc (CHN)`,
                                 `${''}Đài Loan (TWN)`,
+                                `${''}Hồng Kông (HKG)`,
+                                `${''}Singapore (SGP)`,
+                                `${''}Thái Lan (THA)`,
+                                `${''}Malaysia (MYS)`,
+                                `${''}Philippines (PHL)`,
+                                `${''}Indonesia (IDN)`,
+                                `${''}Ấn Độ (IND)`,
                                 `${''}Hoa Kỳ (USA)`,
+                                `${''}Canada (CAN)`,
                                 `${''}Anh (GBR)`,
                                 `${''}Pháp (FRA)`,
                                 `${''}Đức (DEU)`,
                                 `${''}Úc (AUS)`,
-                                `${''}Singapore (SGP)`,
-                              ].map((nat) => (
-                                <Tag
-                                  key={nat}
-                                  style={{ cursor: 'pointer', margin: 0 }}
-                                  onClick={() => form.setFieldValue('tenantPermanentAddress', `Quốc tịch: ${nat}`)}
-                                >
-                                  {nat}
-                                </Tag>
-                              ))}
-                            </Space>
-                          </div>
-                        )}
+                                `${''}Nga (RUS)`,
+                              ].map((nat) => ({
+                                value: `${''}Quốc tịch: ${nat}`,
+                                label: nat,
+                              }))}
+                            />
+                          ) : (
+                            <Input
+                              maxLength={500}
+                              placeholder={t("Số nhà, đường, xã/phường, quận/huyện, tỉnh/thành phố")}
+                            />
+                          )}
+                        </Form.Item>
                         <Form.Item name="tenantEmail" label={t("Email liên hệ (nếu có)")}>
                           <Input maxLength={320} placeholder="ten@email.com" />
                         </Form.Item>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                          <Typography.Text strong style={{ display: 'block' }}>
+                            {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
+                          </Typography.Text>
+                          <Space size={8} wrap>
+                            <Button
+                              size="small"
+                              type="primary"
+                              ghost
+                              icon={<QrcodeOutlined />}
+                              onClick={() => setQrTarget({ kind: 'coResident-add', mode: 'cccd' })}
+                            >
+                              {t("Quét CCCD thêm thành viên")}
+                            </Button>
+                            {tenantIdentityMode === 'foreign' && (
+                              <Button
+                                size="small"
+                                type="primary"
+                                ghost
+                                icon={<QrcodeOutlined />}
+                                onClick={() => setQrTarget({ kind: 'coResident-add', mode: 'passport' })}
+                              >
+                                {`${''}Quét Hộ chiếu thêm thành viên`}
+                              </Button>
+                            )}
+                          </Space>
+                        </div>
+                        <Form.List name="coResidents">
+                          {(fields, { add, remove }) => (
+                            <div className="co-residents-list">
+                              {fields.map(({ key, name, ...restField }, index) => (
+                                <div key={key} className="co-resident-item">
+                                  <div className="co-resident-item-head">
+                                    <Typography.Text strong style={{ fontSize: 13 }}>#{index + 1}</Typography.Text>
+                                    <Space size={4}>
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        icon={<QrcodeOutlined />}
+                                        onClick={() => setQrTarget({ kind: 'coResident-row', index, mode: 'cccd' })}
+                                      >
+                                        {tenantIdentityMode === 'foreign' ? 'CCCD' : undefined}
+                                      </Button>
+                                      {tenantIdentityMode === 'foreign' && (
+                                        <Button
+                                          size="small"
+                                          type="text"
+                                          icon={<QrcodeOutlined />}
+                                          onClick={() => setQrTarget({ kind: 'coResident-row', index, mode: 'passport' })}
+                                        >
+                                          {`${''}Hộ chiếu`}
+                                        </Button>
+                                      )}
+                                      <Button
+                                        danger
+                                        size="small"
+                                        type="text"
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => remove(name)}
+                                        aria-label={t("Xóa thành viên")}
+                                      />
+                                    </Space>
+                                  </div>
+                                  <Row gutter={10}>
+                                    <Col xs={24} sm={14}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'fullName']}
+                                        label={t("Họ và tên")}
+                                        rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên người thuê.") }]}
+                                      >
+                                        <Input placeholder={t("Họ và tên")} maxLength={160} />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={10}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'citizenId']}
+                                        label={tenantIdentityMode === 'foreign' ? `${''}Số CCCD / Hộ chiếu` : t("Số CCCD")}
+                                        rules={[{ pattern: /^(\d{9,12}|[A-Za-z]{1,3}[A-Za-z0-9]{5,9})$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
+                                      >
+                                        <Input maxLength={12} placeholder={tenantIdentityMode === 'foreign' ? '07909900xxxx / M12345678' : '07909900xxxx'} />
+                                      </Form.Item>
+                                    </Col>
+                                  </Row>
+                                  <Row gutter={10}>
+                                    <Col xs={24} sm={8}>
+                                      <Form.Item {...restField} name={[name, 'dateOfBirth']} label={t("Ngày sinh")}>
+                                        <DatePicker format={dateFormat()} style={{ width: '100%' }} />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={6}>
+                                      <Form.Item {...restField} name={[name, 'gender']} label={t("Giới tính")}>
+                                        <Select
+                                          allowClear
+                                          options={[
+                                            { value: legalCt01Template.genderMale, label: t("Nam") },
+                                            { value: legalCt01Template.genderFemale, label: t("Nữ") },
+                                          ]}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={10}>
+                                      <Form.Item {...restField} name={[name, 'relation']} label={t("Mối quan hệ với chủ hộ")}>
+                                        <Input maxLength={100} placeholder={t("Người thuê trọ")} />
+                                      </Form.Item>
+                                    </Col>
+                                  </Row>
+                                </div>
+                              ))}
+                              <Button
+                                type="dashed"
+                                block
+                                icon={<PlusOutlined />}
+                                disabled={fields.length >= 29}
+                                onClick={() => add({ fullName: '', relation: legalCt01Template.defaultRelation })}
+                              >
+                                {t("Thêm thành viên ở cùng")}
+                              </Button>
+                            </div>
+                          )}
+                        </Form.List>
                       </>
                     ),
                   },
@@ -821,103 +961,6 @@ export default function ContractDocumentsDrawer({
                         <Form.Item name="householdHeadRelation" label={t("Mối quan hệ với chủ hộ")}>
                           <Input maxLength={100} placeholder={t("Người thuê trọ")} />
                         </Form.Item>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                          <Typography.Text strong style={{ display: 'block' }}>
-                            {t("Thành viên cùng thay đổi cư trú / ở cùng phòng")}
-                          </Typography.Text>
-                          <Button
-                            size="small"
-                            type="primary"
-                            ghost
-                            icon={<QrcodeOutlined />}
-                            onClick={() => setQrTarget({ kind: 'coResident-add' })}
-                          >
-                            {t("Quét CCCD thêm thành viên")}
-                          </Button>
-                        </div>
-                        <Form.List name="coResidents">
-                          {(fields, { add, remove }) => (
-                            <div className="co-residents-list">
-                              {fields.map(({ key, name, ...restField }, index) => (
-                                <div key={key} className="co-resident-item">
-                                  <div className="co-resident-item-head">
-                                    <Typography.Text strong style={{ fontSize: 13 }}>#{index + 1}</Typography.Text>
-                                    <Space size={4}>
-                                      <Button
-                                        size="small"
-                                        type="text"
-                                        icon={<QrcodeOutlined />}
-                                        onClick={() => setQrTarget({ kind: 'coResident-row', index })}
-                                      />
-                                      <Button
-                                        danger
-                                        size="small"
-                                        type="text"
-                                        icon={<DeleteOutlined />}
-                                        onClick={() => remove(name)}
-                                        aria-label={t("Xóa thành viên")}
-                                      />
-                                    </Space>
-                                  </div>
-                                  <Row gutter={10}>
-                                    <Col xs={24} sm={14}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'fullName']}
-                                        label={t("Họ và tên")}
-                                        rules={[{ required: true, whitespace: true, message: t("Vui lòng nhập tên người thuê.") }]}
-                                      >
-                                        <Input placeholder={t("Họ và tên")} maxLength={160} />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={10}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'citizenId']}
-                                        label={t("Số CCCD")}
-                                        rules={[{ pattern: /^(\d{9,12}|[A-Za-z]{1,3}[A-Za-z0-9]{5,9})$/, message: t("Nhập từ 9 đến 12 chữ số.") }]}
-                                      >
-                                        <Input maxLength={12} placeholder="07909900xxxx" />
-                                      </Form.Item>
-                                    </Col>
-                                  </Row>
-                                  <Row gutter={10}>
-                                    <Col xs={24} sm={8}>
-                                      <Form.Item {...restField} name={[name, 'dateOfBirth']} label={t("Ngày sinh")}>
-                                        <DatePicker format={dateFormat()} style={{ width: '100%' }} />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={6}>
-                                      <Form.Item {...restField} name={[name, 'gender']} label={t("Giới tính")}>
-                                        <Select
-                                          allowClear
-                                          options={[
-                                            { value: legalCt01Template.genderMale, label: t("Nam") },
-                                            { value: legalCt01Template.genderFemale, label: t("Nữ") },
-                                          ]}
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={10}>
-                                      <Form.Item {...restField} name={[name, 'relation']} label={t("Mối quan hệ với chủ hộ")}>
-                                        <Input maxLength={100} placeholder={t("Người thuê trọ")} />
-                                      </Form.Item>
-                                    </Col>
-                                  </Row>
-                                </div>
-                              ))}
-                              <Button
-                                type="dashed"
-                                block
-                                icon={<PlusOutlined />}
-                                disabled={fields.length >= 29}
-                                onClick={() => add({ fullName: '', relation: legalCt01Template.defaultRelation })}
-                              >
-                                {t("Thêm thành viên ở cùng")}
-                              </Button>
-                            </div>
-                          )}
-                        </Form.List>
                       </>
                     ),
                   },
@@ -976,12 +1019,25 @@ export default function ContractDocumentsDrawer({
           </div>
           <CccdQrScannerModal
             open={qrTarget !== null}
+            mode={
+              qrTarget?.kind === 'tenant'
+                ? tenantIdentityMode === 'foreign'
+                  ? 'passport'
+                  : 'cccd'
+                : qrTarget?.kind === 'coResident-add' || qrTarget?.kind === 'coResident-row'
+                  ? qrTarget.mode
+                  : 'cccd'
+            }
             title={
               qrTarget?.kind === 'owner'
                 ? t("Quét mã QR CCCD chủ trọ")
                 : qrTarget?.kind === 'tenant'
-                  ? t("Quét mã QR CCCD người thuê")
-                  : t("Quét mã QR CCCD thành viên ở cùng")
+                  ? tenantIdentityMode === 'foreign'
+                    ? `${''}Quét mã MRZ Hộ chiếu người thuê`
+                    : t("Quét mã QR CCCD người thuê")
+                  : (qrTarget?.kind === 'coResident-add' || qrTarget?.kind === 'coResident-row') && qrTarget.mode === 'passport'
+                    ? `${''}Quét mã MRZ Hộ chiếu thành viên ở cùng`
+                    : t("Quét mã QR CCCD thành viên ở cùng")
             }
             onClose={() => setQrTarget(null)}
             onDetected={handleQrDetected}

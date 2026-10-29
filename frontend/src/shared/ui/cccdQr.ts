@@ -259,20 +259,20 @@ export function normalizeCccdGender(raw?: string | null): string | null {
   return null;
 }
 
-export function parseCccdQr(rawInput: string): ParsedCccdQr | null {
+export function parseCccdOnlyQr(rawInput: string): ParsedCccdQr | null {
   if (!rawInput) return null;
   const cleaned = rawInput.replace(/^\uFEFF/, '').trim();
   if (!cleaned.includes('|')) {
-    return parsePassportMrz(cleaned);
+    return null;
   }
 
   const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const candidateLine = lines.find((line) => line.includes('|')) ?? cleaned;
   const parts = candidateLine.split('|').map((item) => item.trim());
-  if (parts.length < 5) return parsePassportMrz(cleaned);
+  if (parts.length < 5) return null;
 
   const citizenId = parts[0].replace(/\s+/g, '');
-  if (!/^\d{9,12}$/.test(citizenId)) return parsePassportMrz(cleaned);
+  if (!/^\d{9,12}$/.test(citizenId)) return null;
 
   // Format 1 (standard 7 fields): citizenId | oldCmnd | fullName | dob | gender | address | issuedDate
   // Format 2 (6 fields without oldCmnd): citizenId | fullName | dob | gender | address | issuedDate
@@ -313,7 +313,19 @@ export function parseCccdQr(rawInput: string): ParsedCccdQr | null {
     };
   }
 
-  return parsePassportMrz(cleaned);
+  return null;
+}
+
+export function parseCccdQr(rawInput: string, mode?: 'cccd' | 'passport'): ParsedCccdQr | null {
+  if (!rawInput) return null;
+  if (mode === 'cccd') {
+    return parseCccdOnlyQr(rawInput);
+  }
+  const cleaned = rawInput.replace(/^\uFEFF/, '').trim();
+  if (mode === 'passport') {
+    return parsePassportMrz(cleaned);
+  }
+  return parseCccdOnlyQr(rawInput) ?? parsePassportMrz(cleaned);
 }
 
 let jsQrLoader: Promise<(typeof import('jsqr'))['default']> | null = null;
@@ -357,10 +369,15 @@ function enhanceContrastInPlace(imageData: ImageData): void {
 export async function decodeCccdQrFromVideoFrame(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
+  mode: 'cccd' | 'passport' = 'cccd',
 ): Promise<ParsedCccdQr | null> {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return null;
+
+  if (mode === 'passport') {
+    return decodePassportMrzFromImageSource(video, vw, vh, canvas);
+  }
 
   const detector = createBarcodeDetector();
   if (detector) {
@@ -368,7 +385,7 @@ export async function decodeCccdQrFromVideoFrame(
       const results = await detector.detect(video);
       for (const item of results) {
         if (item.rawValue) {
-          const parsed = parseCccdQr(item.rawValue);
+          const parsed = parseCccdOnlyQr(item.rawValue);
           if (parsed) return parsed;
         }
       }
@@ -393,7 +410,7 @@ export async function decodeCccdQrFromVideoFrame(
   const imageData = ctx.getImageData(0, 0, w, h);
   const code = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
   if (code?.data) {
-    const parsed = parseCccdQr(code.data);
+    const parsed = parseCccdOnlyQr(code.data);
     if (parsed) return parsed;
   }
 
@@ -418,7 +435,7 @@ export async function decodeCccdQrFromVideoFrame(
         const cropResults = await detector.detect(canvas);
         for (const item of cropResults) {
           if (item.rawValue) {
-            const parsed = parseCccdQr(item.rawValue);
+            const parsed = parseCccdOnlyQr(item.rawValue);
             if (parsed) return parsed;
           }
         }
@@ -433,7 +450,7 @@ export async function decodeCccdQrFromVideoFrame(
     }
     const cropCode = jsQR(cropData.data, dstSize, dstSize, { inversionAttempts: 'attemptBoth' });
     if (cropCode?.data) {
-      const parsed = parseCccdQr(cropCode.data);
+      const parsed = parseCccdOnlyQr(cropCode.data);
       if (parsed) return parsed;
     }
   }
@@ -943,17 +960,17 @@ function recognizeMrzPair(
   return null;
 }
 
-export async function decodePassportMrzFromImageBlob(blob: Blob): Promise<ParsedCccdQr | null> {
+function decodePassportMrzFromImageSource(
+  source: HTMLImageElement | HTMLVideoElement,
+  nw: number,
+  nh: number,
+  canvas: HTMLCanvasElement,
+): ParsedCccdQr | null {
   try {
     const templates = getMrzTemplates();
     if (!templates) return null;
-
-    const img = await loadImageElement(blob);
-    const nw = img.naturalWidth || img.width;
-    const nh = img.naturalHeight || img.height;
     if (!nw || !nh) return null;
 
-    const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
 
@@ -971,7 +988,7 @@ export async function decodePassportMrzFromImageBlob(blob: Blob): Promise<Parsed
 
       canvas.width = dstW;
       canvas.height = dstH;
-      ctx.drawImage(img, 0, srcY, nw, srcH, 0, 0, dstW, dstH);
+      ctx.drawImage(source, 0, srcY, nw, srcH, 0, 0, dstW, dstH);
 
       const imageData = ctx.getImageData(0, 0, dstW, dstH);
       const bin = binarizeAdaptive(imageData, dstW, dstH);
@@ -1017,6 +1034,20 @@ export async function decodePassportMrzFromImageBlob(blob: Blob): Promise<Parsed
   }
 }
 
+export async function decodePassportMrzFromImageBlob(blob: Blob): Promise<ParsedCccdQr | null> {
+  try {
+    if (typeof document === 'undefined') return null;
+    const img = await loadImageElement(blob);
+    const nw = img.naturalWidth || img.width;
+    const nh = img.naturalHeight || img.height;
+    if (!nw || !nh) return null;
+    const canvas = document.createElement('canvas');
+    return decodePassportMrzFromImageSource(img, nw, nh, canvas);
+  } catch {
+    return null;
+  }
+}
+
 interface CropRegion {
   sx: number;
   sy: number;
@@ -1026,7 +1057,14 @@ interface CropRegion {
   enhanceContrast?: boolean;
 }
 
-export async function decodeCccdQrFromImageBlob(blob: Blob): Promise<ParsedCccdQr | null> {
+export async function decodeCccdQrFromImageBlob(
+  blob: Blob,
+  mode: 'cccd' | 'passport' = 'cccd',
+): Promise<ParsedCccdQr | null> {
+  if (mode === 'passport') {
+    return await decodePassportMrzFromImageBlob(blob);
+  }
+
   const img = await loadImageElement(blob);
   const nw = img.naturalWidth || img.width;
   const nh = img.naturalHeight || img.height;
@@ -1038,7 +1076,7 @@ export async function decodeCccdQrFromImageBlob(blob: Blob): Promise<ParsedCccdQ
       const results = await detector.detect(img);
       for (const item of results) {
         if (item.rawValue) {
-          const parsed = parseCccdQr(item.rawValue);
+          const parsed = parseCccdOnlyQr(item.rawValue);
           if (parsed) return parsed;
         }
       }
@@ -1088,7 +1126,7 @@ export async function decodeCccdQrFromImageBlob(blob: Blob): Promise<ParsedCccdQ
         const results = await detector.detect(canvas);
         for (const item of results) {
           if (item.rawValue) {
-            const parsed = parseCccdQr(item.rawValue);
+            const parsed = parseCccdOnlyQr(item.rawValue);
             if (parsed) return parsed;
           }
         }
@@ -1103,10 +1141,10 @@ export async function decodeCccdQrFromImageBlob(blob: Blob): Promise<ParsedCccdQ
     }
     const code = jsQR(imageData.data, dstW, dstH, { inversionAttempts: 'attemptBoth' });
     if (code?.data) {
-      const parsed = parseCccdQr(code.data);
+      const parsed = parseCccdOnlyQr(code.data);
       if (parsed) return parsed;
     }
   }
 
-  return await decodePassportMrzFromImageBlob(blob);
+  return null;
 }

@@ -11,6 +11,7 @@ type ScanTab = 'image' | 'camera';
 export interface CccdQrScannerModalProps {
   open: boolean;
   title?: string;
+  mode?: 'cccd' | 'passport';
   onClose: () => void;
   onDetected: (parsed: ParsedCccdQr) => void;
 }
@@ -18,11 +19,13 @@ export interface CccdQrScannerModalProps {
 export default function CccdQrScannerModal({
   open,
   title,
+  mode = 'cccd',
   onClose,
   onDetected,
 }: CccdQrScannerModalProps) {
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
+  const isPassportMode = mode === 'passport';
   const [tab, setTab] = useState<ScanTab>(isMobile ? 'camera' : 'image');
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [rawText, setRawText] = useState('');
@@ -81,11 +84,15 @@ export default function CccdQrScannerModal({
       setErrorMsg(null);
       setIsProcessingImage(true);
       try {
-        const parsed = await decodeCccdQrFromImageBlob(blob);
+        const parsed = await decodeCccdQrFromImageBlob(blob, mode);
         if (parsed) {
           handleSuccess(parsed);
         } else {
-          setErrorMsg(t("Không tìm thấy mã QR CCCD hợp lệ trong ảnh. Hãy chọn ảnh chụp rõ góc trên bên phải mặt trước CCCD."));
+          setErrorMsg(
+            isPassportMode
+              ? `${''}Không tìm thấy dãy mã MRZ Hộ chiếu hợp lệ trong ảnh. Hãy chọn ảnh chụp rõ 2 dòng mã MRZ ở mép dưới trang thông tin Hộ chiếu.`
+              : t("Không tìm thấy mã QR CCCD hợp lệ trong ảnh. Hãy chọn ảnh chụp rõ góc trên bên phải mặt trước CCCD."),
+          );
         }
       } catch {
         setErrorMsg(t("Không thể đọc file ảnh đã chọn. Vui lòng thử ảnh khác."));
@@ -93,7 +100,7 @@ export default function CccdQrScannerModal({
         setIsProcessingImage(false);
       }
     },
-    [handleSuccess],
+    [handleSuccess, isPassportMode, mode],
   );
 
   useEffect(() => {
@@ -172,7 +179,7 @@ export default function CccdQrScannerModal({
         scanTimerRef.current = window.setInterval(() => {
           if (scanningFrame || hasDetectedRef.current || !videoRef.current || !canvasRef.current) return;
           scanningFrame = true;
-          void decodeCccdQrFromVideoFrame(videoRef.current, canvasRef.current)
+          void decodeCccdQrFromVideoFrame(videoRef.current, canvasRef.current, mode)
             .then((parsed) => {
               if (parsed && !cancelled) {
                 handleSuccess(parsed);
@@ -198,7 +205,7 @@ export default function CccdQrScannerModal({
       cancelled = true;
       stopCamera();
     };
-  }, [open, tab, facingMode, cameraRetryTick, handleSuccess, stopCamera]);
+  }, [open, tab, facingMode, cameraRetryTick, handleSuccess, stopCamera, mode]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,7 +224,7 @@ export default function CccdQrScannerModal({
       }
       const pastedText = event.clipboardData?.getData('text/plain');
       if (pastedText) {
-        const parsed = parseCccdQr(pastedText);
+        const parsed = parseCccdQr(pastedText, mode);
         if (parsed) {
           event.preventDefault();
           handleSuccess(parsed);
@@ -227,12 +234,16 @@ export default function CccdQrScannerModal({
 
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [open, processImageBlob, handleSuccess]);
+  }, [open, processImageBlob, handleSuccess, mode]);
 
   const handleApplyRawText = () => {
-    const parsed = parseCccdQr(rawText);
+    const parsed = parseCccdQr(rawText, mode);
     if (!parsed) {
-      setErrorMsg(t("Chuỗi QR không đúng định dạng CCCD Việt Nam."));
+      setErrorMsg(
+        isPassportMode
+          ? `${''}Chuỗi MRZ không đúng định dạng Hộ chiếu quốc tế (2 dòng 44 ký tự).`
+          : t("Chuỗi QR không đúng định dạng CCCD Việt Nam."),
+      );
       return;
     }
     handleSuccess(parsed);
@@ -244,7 +255,7 @@ export default function CccdQrScannerModal({
       title={
         <Space>
           <QrcodeOutlined />
-          <span>{title || t("Quét mã QR trên thẻ CCCD")}</span>
+          <span>{title || (isPassportMode ? `${''}Quét mã MRZ trên Hộ chiếu` : t("Quét mã QR trên thẻ CCCD"))}</span>
         </Space>
       }
       onCancel={onClose}
@@ -316,7 +327,7 @@ export default function CccdQrScannerModal({
           <div
             role="button"
             tabIndex={0}
-            aria-label={t("Chọn ảnh CCCD từ thiết bị")}
+            aria-label={isPassportMode ? `${''}Chọn ảnh Hộ chiếu từ thiết bị` : t("Chọn ảnh CCCD từ thiết bị")}
             className={`cccd-qr-dropzone${isDragging ? ' is-dragging' : ''}`}
             onClick={() => fileInputRef.current?.click()}
             onKeyDown={(e) => {
@@ -342,16 +353,22 @@ export default function CccdQrScannerModal({
             {isProcessingImage ? (
               <Space direction="vertical" align="center" size={10}>
                 <Spin size="large" />
-                <Typography.Text strong>{t("Đang giải mã QR từ ảnh CCCD…")}</Typography.Text>
+                <Typography.Text strong>
+                  {isPassportMode ? `${''}Đang giải mã MRZ từ ảnh Hộ chiếu…` : t("Đang giải mã QR từ ảnh CCCD…")}
+                </Typography.Text>
               </Space>
             ) : (
               <Space direction="vertical" align="center" size={8}>
                 <UploadOutlined className="cccd-qr-dropzone-icon" />
                 <Typography.Text strong style={{ fontSize: 15 }}>
-                  {t("Bấm chọn ảnh mặt trước CCCD hoặc kéo thả vào đây")}
+                  {isPassportMode
+                    ? `${''}Bấm chọn ảnh trang thông tin Hộ chiếu hoặc kéo thả vào đây`
+                    : t("Bấm chọn ảnh mặt trước CCCD hoặc kéo thả vào đây")}
                 </Typography.Text>
                 <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                  {t("Mẹo trên máy tính: Copy ảnh CCCD từ Zalo rồi bấm Ctrl + V ngay tại cửa sổ này.")}
+                  {isPassportMode
+                    ? `${''}Mẹo trên máy tính: Copy ảnh Hộ chiếu từ Zalo/WhatsApp rồi bấm Ctrl + V ngay tại cửa sổ này.`
+                    : t("Mẹo trên máy tính: Copy ảnh CCCD từ Zalo rồi bấm Ctrl + V ngay tại cửa sổ này.")}
                 </Typography.Text>
               </Space>
             )}
@@ -359,7 +376,9 @@ export default function CccdQrScannerModal({
 
           <div className="cccd-qr-raw-box">
             <label htmlFor="cccd-qr-raw-input" className="cccd-qr-raw-label">
-              {t("Hoặc dán chuỗi văn bản QR (nếu quét bằng Zalo điện thoại):")}
+              {isPassportMode
+                ? `${''}Hoặc dán 2 dòng chuỗi MRZ Hộ chiếu (44 ký tự/dòng):`
+                : t("Hoặc dán chuỗi văn bản QR (nếu quét bằng Zalo điện thoại):")}
             </label>
             <Input.TextArea
               id="cccd-qr-raw-input"
@@ -369,12 +388,16 @@ export default function CccdQrScannerModal({
                 const nextVal = e.target.value;
                 setRawText(nextVal);
                 setErrorMsg(null);
-                const autoParsed = parseCccdQr(nextVal);
+                const autoParsed = parseCccdQr(nextVal, mode);
                 if (autoParsed) {
                   handleSuccess(autoParsed);
                 }
               }}
-              placeholder="079099001234|025123456|Nguyen Van A|15081999|Nam|..."
+              placeholder={
+                isPassportMode
+                  ? 'P<KORKIM<<MIN<JUN<<<<<<<<<<<<<<<<<<<<<<<<<<<\nM876543214KOR9508152M32081401234567<<<<<<<00'
+                  : '079099001234|025123456|Nguyen Van A|15081999|Nam|...'
+              }
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
               <Button
@@ -382,7 +405,7 @@ export default function CccdQrScannerModal({
                 disabled={!rawText.trim()}
                 onClick={handleApplyRawText}
               >
-                {t("Điền thông tin từ chuỗi QR")}
+                {isPassportMode ? `${''}Điền thông tin từ chuỗi MRZ` : t("Điền thông tin từ chuỗi QR")}
               </Button>
             </div>
           </div>
@@ -405,7 +428,9 @@ export default function CccdQrScannerModal({
             )}
           </div>
           <Typography.Paragraph type="secondary" style={{ textAlign: 'center', marginTop: 10, marginBottom: 12 }}>
-            {t("Đưa góc trên bên phải mặt trước thẻ CCCD vào khung hình để tự động nhận diện.")}
+            {isPassportMode
+              ? `${''}Đưa 2 dòng mã MRZ ở mép dưới trang thông tin Hộ chiếu vào khung hình để tự động nhận diện.`
+              : t("Đưa góc trên bên phải mặt trước thẻ CCCD vào khung hình để tự động nhận diện.")}
           </Typography.Paragraph>
           <Space style={{ width: '100%', justifyContent: 'center' }} wrap>
             <Button
@@ -418,7 +443,7 @@ export default function CccdQrScannerModal({
               icon={<PictureOutlined />}
               onClick={() => fileInputRef.current?.click()}
             >
-              {t("Chọn ảnh CCCD từ thiết bị")}
+              {isPassportMode ? `${''}Chọn ảnh Hộ chiếu từ thiết bị` : t("Chọn ảnh CCCD từ thiết bị")}
             </Button>
           </Space>
         </div>

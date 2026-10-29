@@ -1,5 +1,4 @@
 import RoomieMark from '../../shared/ui/RoomieMark';
-const ChangePasswordModal = lazy(() => import('../../features/auth/ChangePasswordModal'));
 import LanguageSelector from '../../shared/i18n/LanguageSelector';
 import { t } from '../../shared/i18n/runtime';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
@@ -7,15 +6,14 @@ import { App, Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typog
 import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  AppstoreOutlined, BankOutlined, CalculatorOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
-  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined,
+  AppstoreOutlined, BankOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
+  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, LogoutOutlined,
   MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
 
+const ChangePasswordModal = lazy(() => import('../../features/auth/ChangePasswordModal'));
 const { Sider, Header, Content } = Layout;
-
-
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { message } = App.useApp();
@@ -33,59 +31,65 @@ export default function AppShell({ children }: { children: ReactNode }) {
     { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
     { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
     { key: '/settings/whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp' },
-
   ];
   const compactSettingsItems: MenuProps['items'] = [
     { key: '/settings/payment', icon: <CreditCardOutlined />, label: t("Thanh toán") },
     { key: '/settings/zalo', icon: <MessageOutlined />, label: 'Zalo' },
     { key: '/settings/whatsapp', icon: <WhatsAppOutlined />, label: 'WhatsApp' },
     { type: 'divider' as const },
-    { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
-    { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
-    { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
-    { type: 'divider' as const },
     { key: '/profile', icon: <UserOutlined />, label: t("Hồ sơ") },
     { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước") },
   ];
   useEffect(() => { window.scrollTo({ top: 0, left: 0 }); }, [location.pathname]);
-const ownerItems = [
-  { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
-  { type: 'divider' as const },
-  { key: '/buildings', icon: <BankOutlined />, label: t("Dãy trọ") },
-  { key: '/rooms', icon: <HomeOutlined />, label: t("Phòng & người thuê") },
-  { key: '/readings', icon: <CalculatorOutlined />, label: t("Lập hóa đơn") },
-  { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
-  { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
-  { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
-  { type: 'divider' as const },
-  { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
-  { key: '/profile', icon: <UserOutlined />, label: t("Hồ sơ") },
-  { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước") },
-];
-const marketerItems = [
-  { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Tăng trưởng & Doanh thu") },
-  { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi & Voucher") },
-  { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
-  { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
-  { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
-];
-const adminItems = [
-  { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ & Nhân sự") },
-  { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Giám sát") },
-  { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi") },
-  { type: 'divider' as const },
-  { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
-  { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
-  { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
-];
+  const ownerItems = [
+    { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
+    { type: 'divider' as const },
+    { key: '/buildings', icon: <BankOutlined />, label: t("Dãy trọ") },
+    { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
+    { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
+    { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
+    { type: 'divider' as const },
+    { key: 'settings', icon: <SettingOutlined />, label: t("Cấu hình"), children: settingsItems },
+    { key: '/profile', icon: <UserOutlined />, label: t("Hồ sơ") },
+    { key: '/account-status', icon: <CrownOutlined />, label: t("Gói cước") },
+  ];
+  const marketerItems = [
+    { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Tăng trưởng & Doanh thu") },
+    { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi & Voucher") },
+    { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
+    { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
+    { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
+  ];
+  const adminItems = [
+    { key: '/admin/owners', icon: <UserOutlined />, label: t("Chủ trọ & Nhân sự") },
+    { key: '/admin/monitoring', icon: <BarChartOutlined />, label: t("Giám sát") },
+    { key: '/admin/promotions', icon: <GiftOutlined />, label: t("Khuyến mãi") },
+    { type: 'divider' as const },
+    { key: '/marketer/leads', icon: <TeamOutlined />, label: t("Chăm sóc Chủ trọ (CRM)") },
+    { key: '/marketer/content', icon: <NotificationOutlined />, label: t("Cẩm nang & Banner") },
+    { key: '/marketer/emails', icon: <MailOutlined />, label: t("Email theo Phân khúc") },
+  ];
   const isAdmin = user?.role === 'Admin';
   const isMarketer = user?.role === 'Marketer';
   const isStaff = isAdmin || isMarketer;
   const items = isAdmin ? adminItems : isMarketer ? marketerItems : ownerItems;
-  const activeMenuKey = location.pathname.startsWith('/rooms/') ? '/rooms' : location.pathname;
-  const primaryMobileKeys = new Set(['/buildings', '/rooms', '/readings', '/invoices', 'settings']);
-  const isMobileMoreActive = ['/dashboard', '/expenses', '/reports', '/profile', '/account-status'].includes(location.pathname);
-  const title = settingsItems.find((item) => item.key === activeMenuKey)?.label ?? items.find((item) => item.key === activeMenuKey)?.label ?? 'Roomie';
+  const activeMenuKey = (location.pathname.startsWith('/rooms') || location.pathname === '/buildings')
+    ? '/buildings'
+    : (location.pathname === '/readings' || location.pathname === '/invoices')
+      ? '/invoices'
+      : location.pathname;
+  const primaryMobileKeys = new Set(['/buildings', '/invoices', 'settings']);
+  const isMobileMoreActive = ['/profile', '/account-status'].includes(location.pathname);
+  const pageTitleMap: Record<string, string> = {
+    '/buildings': t("Dãy trọ"),
+    '/rooms': t("Phòng & người thuê"),
+    '/readings': t("Lập hóa đơn"),
+    '/invoices': t("Hóa đơn"),
+  };
+  const title = pageTitleMap[location.pathname]
+    ?? settingsItems.find((item) => item.key === activeMenuKey)?.label
+    ?? items.find((item) => item.key === activeMenuKey)?.label
+    ?? 'Roomie';
 
   const userMenu: MenuProps['items'] = [
     { key: 'account', label: <div className="user-menu-info"><strong>{user?.name}</strong><span>{user?.email}</span></div>, disabled: true },
@@ -137,7 +141,7 @@ const adminItems = [
       <nav className="compact-navigation" data-role={isStaff ? 'admin' : 'owner'} aria-label={t("Điều hướng chính")}>{items.filter((item) => item.key).map((item) => {
         const isSecondary = !isStaff && !primaryMobileKeys.has(String(item.key));
         const shortLabelMap: Record<string, string> = {
-          '/rooms': t("Phòng"),
+          '/buildings': t("Dãy trọ"),
           '/admin/owners': t("Chủ trọ"),
           '/admin/monitoring': t("Giám sát"),
           '/admin/promotions': t("Khuyến mãi"),

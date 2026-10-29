@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Input, Select, Space, Tooltip } from 'antd';
+import { Input, Select, Space } from 'antd';
 import type { InputProps } from 'antd';
 import { t } from '../i18n/runtime';
 
@@ -12,24 +12,24 @@ export interface CountryDialOption {
 }
 
 export const COUNTRY_DIAL_OPTIONS: readonly CountryDialOption[] = [
-  { dial: '+84', iso: 'VN', flag: '🇻🇳', label: '🇻🇳 +84 (VN · Zalo)', shortLabel: '+84' },
-  { dial: '+82', iso: 'KR', flag: '🇰🇷', label: '🇰🇷 +82 (KR · WhatsApp)', shortLabel: '+82' },
-  { dial: '+81', iso: 'JP', flag: '🇯🇵', label: '🇯🇵 +81 (JP · WhatsApp)', shortLabel: '+81' },
-  { dial: '+86', iso: 'CN', flag: '🇨🇳', label: '🇨🇳 +86 (CN · WhatsApp)', shortLabel: '+86' },
-  { dial: '+886', iso: 'TW', flag: '🇹🇼', label: '🇹🇼 +886 (TW · WhatsApp)', shortLabel: '+886' },
-  { dial: '+852', iso: 'HK', flag: '🇭🇰', label: '🇭🇰 +852 (HK · WhatsApp)', shortLabel: '+852' },
-  { dial: '+65', iso: 'SG', flag: '🇸🇬', label: '🇸🇬 +65 (SG · WhatsApp)', shortLabel: '+65' },
-  { dial: '+66', iso: 'TH', flag: '🇹🇭', label: '🇹🇭 +66 (TH · WhatsApp)', shortLabel: '+66' },
-  { dial: '+60', iso: 'MY', flag: '🇲🇾', label: '🇲🇾 +60 (MY · WhatsApp)', shortLabel: '+60' },
-  { dial: '+63', iso: 'PH', flag: '🇵🇭', label: '🇵🇭 +63 (PH · WhatsApp)', shortLabel: '+63' },
-  { dial: '+62', iso: 'ID', flag: '🇮🇩', label: '🇮🇩 +62 (ID · WhatsApp)', shortLabel: '+62' },
-  { dial: '+91', iso: 'IN', flag: '🇮🇳', label: '🇮🇳 +91 (IN · WhatsApp)', shortLabel: '+91' },
-  { dial: '+1', iso: 'US', flag: '🇺🇸', label: '🇺🇸 +1 (US/CA · WhatsApp)', shortLabel: '+1' },
-  { dial: '+44', iso: 'GB', flag: '🇬🇧', label: '🇬🇧 +44 (UK · WhatsApp)', shortLabel: '+44' },
-  { dial: '+61', iso: 'AU', flag: '🇦🇺', label: '🇦🇺 +61 (AU · WhatsApp)', shortLabel: '+61' },
-  { dial: '+33', iso: 'FR', flag: '🇫🇷', label: '🇫🇷 +33 (FR · WhatsApp)', shortLabel: '+33' },
-  { dial: '+49', iso: 'DE', flag: '🇩🇪', label: '🇩🇪 +49 (DE · WhatsApp)', shortLabel: '+49' },
-  { dial: '+7', iso: 'RU', flag: '🇷🇺', label: '🇷🇺 +7 (RU · WhatsApp)', shortLabel: '+7' },
+  { dial: '+84', iso: 'VN', flag: '🇻🇳', label: '🇻🇳 +84 (VN)', shortLabel: '+84' },
+  { dial: '+82', iso: 'KR', flag: '🇰🇷', label: '🇰🇷 +82 (KR)', shortLabel: '+82' },
+  { dial: '+81', iso: 'JP', flag: '🇯🇵', label: '🇯🇵 +81 (JP)', shortLabel: '+81' },
+  { dial: '+86', iso: 'CN', flag: '🇨🇳', label: '🇨🇳 +86 (CN)', shortLabel: '+86' },
+  { dial: '+886', iso: 'TW', flag: '🇹🇼', label: '🇹🇼 +886 (TW)', shortLabel: '+886' },
+  { dial: '+852', iso: 'HK', flag: '🇭🇰', label: '🇭🇰 +852 (HK)', shortLabel: '+852' },
+  { dial: '+65', iso: 'SG', flag: '🇸🇬', label: '🇸🇬 +65 (SG)', shortLabel: '+65' },
+  { dial: '+66', iso: 'TH', flag: '🇹🇭', label: '🇹🇭 +66 (TH)', shortLabel: '+66' },
+  { dial: '+60', iso: 'MY', flag: '🇲🇾', label: '🇲🇾 +60 (MY)', shortLabel: '+60' },
+  { dial: '+63', iso: 'PH', flag: '🇵🇭', label: '🇵🇭 +63 (PH)', shortLabel: '+63' },
+  { dial: '+62', iso: 'ID', flag: '🇮🇩', label: '🇮🇩 +62 (ID)', shortLabel: '+62' },
+  { dial: '+91', iso: 'IN', flag: '🇮🇳', label: '🇮🇳 +91 (IN)', shortLabel: '+91' },
+  { dial: '+1', iso: 'US', flag: '🇺🇸', label: '🇺🇸 +1 (US/CA)', shortLabel: '+1' },
+  { dial: '+44', iso: 'GB', flag: '🇬🇧', label: '🇬🇧 +44 (UK)', shortLabel: '+44' },
+  { dial: '+61', iso: 'AU', flag: '🇦🇺', label: '🇦🇺 +61 (AU)', shortLabel: '+61' },
+  { dial: '+33', iso: 'FR', flag: '🇫🇷', label: '🇫🇷 +33 (FR)', shortLabel: '+33' },
+  { dial: '+49', iso: 'DE', flag: '🇩🇪', label: '🇩🇪 +49 (DE)', shortLabel: '+49' },
+  { dial: '+7', iso: 'RU', flag: '🇷🇺', label: '🇷🇺 +7 (RU)', shortLabel: '+7' },
 ];
 
 const SORTED_DIALS = [...COUNTRY_DIAL_OPTIONS].sort((a, b) => b.dial.length - a.dial.length);
@@ -78,7 +78,7 @@ export interface PhoneInputProps extends Omit<InputProps, 'value' | 'onChange'> 
 export default function PhoneInput({
   value,
   onChange,
-  showChannelHint = true,
+  showChannelHint: _showChannelHint,
   placeholder,
   disabled,
   size,
@@ -112,30 +112,15 @@ export default function PhoneInput({
     onChange?.(formatPhoneOutput(activeCountry, raw));
   };
 
-  const channelSuffix = showChannelHint ? (
-    <Tooltip
-      title={
-        isVietnam
-          ? t("Số Việt Nam (+84): Chỉ gửi nhắc hóa đơn qua Zalo.")
-          : t("Số quốc tế ({0}): Mặc định gửi nhắc hóa đơn qua WhatsApp.", [activeCountry])
-      }
-    >
-      <span className={`roomie-phone-badge ${isVietnam ? 'is-zalo' : 'is-whatsapp'}`}>
-        {isVietnam ? 'Zalo' : 'WhatsApp'}
-      </span>
-    </Tooltip>
-  ) : undefined;
-
   return (
     <div className="roomie-phone-field">
-      {channelSuffix}
       <Space.Compact className="roomie-phone-input" style={{ width: '100%' }}>
         <Select
           value={activeCountry}
           onChange={handleCountryChange}
           disabled={disabled}
           size={size}
-          popupMatchSelectWidth={210}
+          popupMatchSelectWidth={140}
           className="roomie-phone-country-select"
           aria-label={t("Mã quốc gia")}
           options={COUNTRY_DIAL_OPTIONS.map((item) => ({
