@@ -7,10 +7,11 @@ import type { MenuProps } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppstoreOutlined, BankOutlined, BarChartOutlined, CreditCardOutlined, MessageOutlined,
-  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, LogoutOutlined,
+  SettingOutlined, DownOutlined, CrownOutlined, FileTextOutlined, GiftOutlined, HomeOutlined, LogoutOutlined,
   MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
+import { OnboardingTourOverlay } from '../../features/dashboard/OnboardingChecklist';
 
 const ChangePasswordModal = lazy(() => import('../../features/auth/ChangePasswordModal'));
 const { Sider, Header, Content } = Layout;
@@ -45,6 +46,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     { key: '/dashboard', icon: <AppstoreOutlined />, label: t("Tổng quan") },
     { type: 'divider' as const },
     { key: '/buildings', icon: <BankOutlined />, label: t("Dãy trọ") },
+    { key: '/rooms', icon: <HomeOutlined />, label: t("Phòng & người thuê") },
     { key: '/invoices', icon: <FileTextOutlined />, label: t("Hóa đơn") },
     { key: '/expenses', icon: <WalletOutlined />, label: t("Chi phí") },
     { key: '/reports', icon: <BarChartOutlined />, label: t("Báo cáo") },
@@ -73,8 +75,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isMarketer = user?.role === 'Marketer';
   const isStaff = isAdmin || isMarketer;
   const items = isAdmin ? adminItems : isMarketer ? marketerItems : ownerItems;
-  const activeMenuKey = (location.pathname.startsWith('/rooms') || location.pathname === '/buildings')
-    ? '/buildings'
+  const activeMenuKey = location.pathname.startsWith('/rooms')
+    ? '/rooms'
     : (location.pathname === '/readings' || location.pathname === '/invoices')
       ? '/invoices'
       : location.pathname;
@@ -110,6 +112,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const menu = <Menu theme="dark" mode="inline" selectedKeys={[activeMenuKey]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
 
   return <Layout className="app-layout">
+    {!isStaff && <OnboardingTourOverlay onEnsureSettingsOpen={() => setOpenKeys(keys => keys.includes('settings') ? keys : [...keys, 'settings'])} />}
     {passwordOpen && <Suspense fallback={null}><ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} /></Suspense>}
     <Sider width={250} className="app-sider" breakpoint="lg" collapsedWidth={0} trigger={null} onBreakpoint={(broken) => { if (!broken) setMobileOpen(false); }}>
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div>

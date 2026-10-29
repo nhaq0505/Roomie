@@ -1915,3 +1915,23 @@
 1914|By water meter (m³)|按水表读数 (m³)|수도 계량기 지침별 (m³)|पानी मीटर रीडिंग के अनुसार (m³)
 1915|Initial water reading|初始水表读数|초기 수도 지침|प्रारंभिक पानी मीटर रीडिंग
 1916|Water meter reading|水表读数|수도 계량기 지침|पानी मीटर रीडिंग
+1917|Step-by-step tour|分步引导|단계별 안내 보기|चरण-दर-चरण मार्गदर्शिका देखें
+1918|Step {0}/{1}|第 {0}/{1} 步|{0}/{1}단계|चरण {0}/{1}
+1919|1. Create your first building|1. 创建第一栋房源|1. 첫 건물(동) 만들기|1. अपनी पहली इमारत बनाएँ
+1920|Give your boarding house or building a name and address to start grouping rental rooms.|为您的出租屋或楼栋设置名称和地址，以便开始对出租房间进行分组。|임대 건물이나 동의 이름과 주소를 입력하여 객실 묶음을 시작하세요.|किराये के कमरों को समूहित करने के लिए अपने भवन का नाम और पता दर्ज करें।
+1921|2. Create rooms & utility rates|2. 创建房间与水电单价|2. 호실 생성 및 전기·수도 단가 설정|2. कमरे और बिजली/पानी की दरें बनाएँ
+1922|Add rooms to your building and configure monthly rent, electricity rate (VND/kWh), water billing mode (per room, per person, or by meter m³), and service fees.|在楼栋中添加房间，设置月租金、电价 (VND/kWh)、水费计费方式（按房间、按人数或按水表 m³）以及服务费。|건물에 호실을 추가하고 월세, 전기 단가(VND/kWh), 수도 요금 산정 방식(호실별, 인원별, 계량기 m³별) 및 관리비를 설정하세요.|भवन में कमरे जोड़ें और मासिक किराया, बिजली दर (VND/kWh), पानी बिलिंग तरीका (प्रति कमरा, प्रति व्यक्ति, या मीटर m³) और सेवा शुल्क सेट करें।
+1923|3. Set up VietQR bank account|3. 设置 VietQR 收款账户|3. VietQR 수취 계좌 설정|3. VietQR बैंक खाता सेट करें
+1924|Select your bank and enter your account number. Roomie will automatically generate a VietQR code with the exact amount on every tenant invoice.|选择银行并输入收款账号。Roomie 将在每张租客账单上自动生成包含准确金额的转账二维码。|은행을 선택하고 계좌번호를 입력하세요. Roomie가 각 세입자 청구서에 정확한 금액의 QR 코드를 자동으로 생성합니다.|अपना बैंक चुनें और खाता संख्या दर्ज करें। Roomie प्रत्येक किरायेदार के बिल पर सटीक राशि के साथ QR कोड स्वतः बनाएगा।
+1925|4. Add tenants, Contract & Room link|4. 添加租客、合同与房间链接|4. 세입자 추가, 계약서 및 호실 링크|4. किरायेदार, अनुबंध और रूम लिंक जोड़ें
+1926|Check in tenants to vacant rooms, enter initial electricity/water readings, scan Citizen ID/Passport to print Rental Contract + CT01 form, and share the private invoice link.|为空房办理租客入住，输入初始水电表读数，扫描身份证/护照打印租房合同与 CT01 表，并向租客发送专属账单链接。|빈 방에 세입자를 등록하고 초기 전기·수도 지침을 입력하며 신분증/여권 스캔으로 임대차계약서·CT01 양식을 출력하고 전용 청구서 링크를 공유하세요.|खाली कमरों में किरायेदार जोड़ें, प्रारंभिक बिजली/पानी रीडिंग दर्ज करें, अनुबंध + CT01 प्रिंट करने के लिए आईडी/पासपोर्ट स्कैन करें और बिल लिंक साझा करें।
+1927|5. Record meters & issue monthly invoices|5. 抄录水电表并生成月度账单|5. 월별 검침 및 청구서 발행|5. मीटर रीडिंग दर्ज करें और मासिक बिल जारी करें
+1928|Each month, simply enter the new electricity/water readings here. The system automatically calculates the total, issues the invoice, and prepares payment reminders.|每月只需在此输入最新水电表读数，系统将自动计算总额、生成账单并准备催缴提醒消息。|매달 이곳에서 새 전기·수도 지침만 입력하면 시스템이 총액을 자동 계산해 청구서를 발행하고 납부 알림 메시지를 준비합니다.|हर महीने यहाँ केवल नई बिजली/पानी रीडिंग दर्ज करें। सिस्टम स्वतः कुल राशि की गणना करेगा, बिल जारी करेगा और भुगतान अनुस्मारक तैयार करेगा।
+1929|Do this step now|立即执行此步|지금 이 단계 진행|यह चरण अभी करें
+1930|Configure now|立即设置|지금 설정하기|अभी सेट करें
+1931|Go to Rooms|前往房间页|호실 페이지로 이동|कमरे पृष्ठ पर जाएँ
+1932|Enter readings now|立即录入读数|지금 검침 입력|अभी रीडिंग दर्ज करें
+1933|Skip tour|跳过引导|안내 건너뛰기|मार्गदर्शिका छोड़ें
+1934|Back|上一步|이전|पीछे
+1935|Next|下一步|다음|अगला
+1936|Finish tour|完成引导|안내 완료|मार्गदर्शिका समाप्त करें

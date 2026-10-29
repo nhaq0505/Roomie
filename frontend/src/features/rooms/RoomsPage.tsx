@@ -28,6 +28,7 @@ function RoomsContent() {
           {archiveFilter === 'Active' && (
             <Button
               type="primary"
+              data-tour-page-target="room"
               icon={isQuotaReached ? <CrownOutlined /> : <PlusOutlined />}
               onClick={isQuotaReached ? () => navigate('/account-status') : openCreate}
               disabled={!activeBuildings.length && !isQuotaReached}

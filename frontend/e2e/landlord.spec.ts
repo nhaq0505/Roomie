@@ -1458,6 +1458,353 @@ test.describe('Landlord Workflows (Chủ trọ)', () => {
     await expect(reopenBtn).toBeVisible();
     await reopenBtn.click();
     await expect(checklist).toBeVisible();
+
+    // Open Spotlight Guided Tour and verify it starts at Step 3/5 (first incomplete step)
+    await page.getByTestId('onboarding-start-tour').click();
+    const spotlightTour = page.getByTestId('onboarding-spotlight-tour');
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 3/5')).toBeVisible();
+    await expect(spotlightTour.getByText('3. Cài đặt tài khoản nhận tiền VietQR')).toBeVisible();
+
+    // Close the spotlight tour
+    await page.getByTestId('onboarding-tour-close').click();
+    await expect(spotlightTour).toHaveCount(0);
+  });
+
+  test('Scenario L11b: Full 5-Step Cross-Page Interactive Spotlight Tour with pause on modals/forms/contract documents', async ({ page }) => {
+    let buildings: Building[] = [];
+    let rooms: Room[] = [];
+    let invoices: Invoice[] = [];
+    let paymentSettings: {
+      configured: boolean;
+      webhookStatus: string;
+      confirmationMode: 'Manual' | 'Automatic';
+      manualBank: { bankBin: string; accountNumber: string; accountName: string } | null;
+    } = {
+      configured: false,
+      webhookStatus: 'NotConfigured',
+      confirmationMode: 'Manual',
+      manualBank: null,
+    };
+
+    await page.route('**/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname;
+      const method = route.request().method();
+
+      if (path === '/api/auth/me') return route.fulfill({ json: landlordUser });
+      if (path === '/api/dashboard') {
+        const occupiedRooms = rooms.filter((r) => Boolean(r.occupancy)).length;
+        const issuedMonthly = invoices.filter((inv) => inv.kind !== 'Deposit' && inv.lifecycleState === 'Issued');
+        const billed = issuedMonthly.reduce((sum, inv) => sum + inv.total, 0);
+        return route.fulfill({
+          json: {
+            ...defaultDashboard,
+            totalRooms: rooms.length,
+            occupiedRooms,
+            totalBilled: billed,
+            monthlyBilled: billed,
+            monthlyOutstanding: billed,
+            totalOutstanding: billed,
+          },
+        });
+      }
+      if (path === '/api/buildings') {
+        if (method === 'GET') return route.fulfill({ json: buildings });
+        if (method === 'POST') {
+          const body = route.request().postDataJSON() as { name: string; address: string };
+          const created: Building = {
+            id: 'bld-01',
+            name: body.name,
+            address: body.address,
+            roomCount: 0,
+            isArchived: false,
+          };
+          buildings = [created];
+          return route.fulfill({ json: created });
+        }
+      }
+      if (path === '/api/rooms') {
+        if (method === 'GET') return route.fulfill({ json: rooms });
+        if (method === 'POST') {
+          const body = route.request().postDataJSON() as {
+            buildingId: string;
+            name: string;
+            rent: number;
+            electricityRate: number;
+            waterFee: number;
+            waterPerPerson: boolean;
+            waterByMeter?: boolean;
+            serviceFee: number;
+          };
+          const created: Room = {
+            id: 'room-01',
+            buildingId: body.buildingId,
+            buildingName: buildings[0]?.name ?? 'Nhà trọ Bình An',
+            name: body.name,
+            rent: body.rent || 3000000,
+            electricityRate: body.electricityRate || 3500,
+            waterFee: body.waterFee || 15000,
+            waterPerPerson: Boolean(body.waterPerPerson),
+            waterByMeter: Boolean(body.waterByMeter),
+            serviceFee: body.serviceFee || 50000,
+            initialReading: 0,
+            previousReading: 0,
+            initialWaterReading: 0,
+            previousWaterReading: 0,
+            occupancy: null,
+            isArchived: false,
+          };
+          rooms = [created];
+          return route.fulfill({ json: created });
+        }
+      }
+      if (path === '/api/settings/payment' && method === 'GET') {
+        return route.fulfill({ json: paymentSettings });
+      }
+      if (path === '/api/settings/payment/banks' && method === 'GET') {
+        return route.fulfill({
+          json: [{ bin: '970436', shortName: 'Vietcombank', name: 'Ngân hàng TMCP Ngoại thương Việt Nam' }],
+        });
+      }
+      if (path === '/api/settings/payment/preferences' && (method === 'PUT' || method === 'POST')) {
+        const body = route.request().postDataJSON() as {
+          confirmationMode: 'Manual' | 'Automatic';
+          bankBin?: string;
+          accountNumber?: string;
+          accountName?: string;
+        };
+        paymentSettings = {
+          ...paymentSettings,
+          confirmationMode: body.confirmationMode ?? 'Manual',
+          manualBank: {
+            bankBin: body.bankBin ?? '970436',
+            accountNumber: body.accountNumber ?? '0123456789',
+            accountName: body.accountName ?? 'CHU TRO BINH AN',
+          },
+        };
+        return route.fulfill({ json: paymentSettings });
+      }
+      if (path === '/api/rooms/room-01/occupancy' && method === 'POST') {
+        const body = route.request().postDataJSON() as {
+          tenantName: string;
+          phone?: string;
+          people?: number;
+          startDate?: string;
+          depositAmount?: number;
+        };
+        rooms = rooms.map((r) =>
+          r.id === 'room-01'
+            ? {
+                ...r,
+                occupancy: {
+                  id: 'occ-01',
+                  tenantName: body.tenantName,
+                  phone: body.phone ?? '0909123456',
+                  people: body.people ?? 1,
+                  startDate: body.startDate ?? '2026-10-01',
+                  depositRequired: body.depositAmount ?? 3000000,
+                  depositPaid: 0,
+                  depositHeld: 0,
+                  token: 'tok-01',
+                  url: '/t/tok-01',
+                },
+              }
+            : r,
+        );
+        // Simulate backend creating a Deposit invoice when depositAmount > 0
+        if ((body.depositAmount ?? 0) > 0) {
+          invoices = [
+            {
+              id: 'inv-dep-01',
+              roomId: 'room-01',
+              roomName: 'Phòng 101',
+              buildingName: 'Nhà trọ Bình An',
+              tenantName: body.tenantName,
+              period: defaultDashboard.period,
+              kind: 'Deposit',
+              lifecycleState: 'Issued',
+              rent: 0,
+              electricityAmount: 0,
+              waterAmount: 0,
+              serviceAmount: 0,
+              total: body.depositAmount ?? 3000000,
+              paid: 0,
+              outstanding: body.depositAmount ?? 3000000,
+              status: 'Unpaid',
+              occupancyId: 'occ-01',
+            },
+          ];
+        }
+        return route.fulfill({ json: rooms[0] });
+      }
+      if (path === '/api/rooms/room-01/documents' && method === 'GET') {
+        return route.fulfill({
+          json: {
+            roomId: 'room-01',
+            buildingId: 'bld-01',
+            occupancyId: 'occ-01',
+            ownerName: 'Chủ Trọ Bình An',
+            ownerPhone: '0911222333',
+            ownerEmail: 'landlord@example.com',
+            ownerCitizenId: '079088001122',
+            buildingName: 'Nhà trọ Bình An',
+            buildingAddress: '123 Đường Số 1, Quận 7',
+            policeStationName: 'Công an Phường Tân Phong',
+            roomName: 'Phòng 101',
+            roomAreaSqm: 25,
+            rent: 3000000,
+            rentInWords: 'Ba triệu đồng chẵn',
+            electricityRate: 3500,
+            waterFee: 15000,
+            waterPerPerson: false,
+            waterByMeter: true,
+            serviceFee: 50000,
+            initialReading: 0,
+            initialWaterReading: 0,
+            tenantName: 'Nguyễn Văn Khách',
+            tenantPhone: '0909123456',
+            people: 1,
+            startDate: '2026-10-01',
+            paymentDueDay: 5,
+            depositRequired: 3000000,
+            depositInWords: 'Ba triệu đồng chẵn',
+            depositPaid: 0,
+            coResidents: [],
+          },
+        });
+      }
+      if (path === '/api/invoices') {
+        return route.fulfill({
+          json: {
+            items: invoices,
+            total: invoices.length,
+            draftCount: 0,
+            totals: { billed: 0, paid: 0, outstanding: 0 },
+          },
+        });
+      }
+      if (path === '/api/subscription' || path === '/api/subscription/status') {
+        return route.fulfill({
+          json: { tier: 'Free', isPro: false, roomCount: rooms.length, maxRooms: 5, availablePackages: [] },
+        });
+      }
+      return route.fulfill({ json: [] });
+    });
+
+    // 1. First visit with 0/5 steps completed -> Spotlight Tour auto-opens at Step 1/5
+    await page.goto('/dashboard');
+    const checklist = page.getByTestId('onboarding-checklist');
+    await expect(checklist).toBeVisible();
+    await expect(checklist.getByText('Hoàn thành 0/5 bước thiết lập')).toBeVisible();
+
+    const spotlightTour = page.getByTestId('onboarding-spotlight-tour');
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 1/5')).toBeVisible();
+    await expect(spotlightTour.getByText('1. Tạo dãy trọ đầu tiên')).toBeVisible();
+    await expect(spotlightTour.getByRole('button', { name: /Làm bước này|Tiếp theo|Quay lại/ })).toHaveCount(0);
+    await expect(page.locator('.app-sider [data-menu-id$="/buildings"].onboarding-tour-active-target')).toBeVisible();
+
+    // 2. Step 1 -> Step 2: Click highlighted "Dãy trọ" sidebar item -> /buildings -> click "Tạo dãy trọ" -> modal pauses tour -> save advances to Step 2/5
+    await page.locator('.app-sider [data-menu-id$="/buildings"]').click();
+    await expect(page).toHaveURL(/\/buildings$/);
+    const createBuildingBtn = page.locator('[data-tour-page-target="building"].onboarding-tour-active-target');
+    await expect(createBuildingBtn).toBeVisible();
+    await createBuildingBtn.click();
+
+    const buildingModal = page.locator('.ant-modal').filter({ hasText: 'Thêm dãy trọ mới' });
+    await expect(buildingModal).toBeVisible();
+    await expect(spotlightTour).toHaveCount(0); // Paused while modal is open
+
+    await buildingModal.getByLabel('Tên dãy trọ').fill('Nhà trọ Bình An');
+    await buildingModal.getByLabel('Địa chỉ').fill('123 Đường Số 1, Quận 7');
+    await buildingModal.getByRole('button', { name: 'Tạo dãy trọ' }).click();
+    await expect(buildingModal).toBeHidden();
+
+    // Tour automatically resumes at Step 2/5 on /buildings and highlights "Phòng & người thuê" on sidebar
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 2/5')).toBeVisible();
+    await expect(spotlightTour.getByText('2. Tạo phòng & đơn giá điện/nước')).toBeVisible();
+    const siderRooms = page.locator('.app-sider [data-menu-id$="/rooms"].onboarding-tour-active-target');
+    await expect(siderRooms).toBeVisible();
+
+    // 3. Step 2 -> Step 3: Click "Phòng & người thuê" -> /rooms -> click "Tạo phòng trọ" -> modal pauses tour -> save advances to Step 3/5
+    await siderRooms.click();
+    await expect(page).toHaveURL(/\/rooms$/);
+    const createRoomBtn = page.locator('[data-tour-page-target="room"].onboarding-tour-active-target');
+    await expect(createRoomBtn).toBeVisible();
+    await createRoomBtn.click();
+
+    const roomModal = page.locator('.ant-modal').filter({ hasText: 'Thêm phòng mới' });
+    await expect(roomModal).toBeVisible();
+    await expect(spotlightTour).toHaveCount(0); // Paused while modal is open
+
+    await roomModal.getByLabel('Tên phòng').fill('Phòng 101');
+    await roomModal.getByRole('button', { name: 'Tạo phòng' }).click();
+    await expect(roomModal).toBeHidden();
+
+    // Tour automatically resumes at Step 3/5, opens "Cấu hình" submenu, and highlights "Thanh toán"
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 3/5')).toBeVisible();
+    await expect(spotlightTour.getByText('3. Cài đặt tài khoản nhận tiền VietQR')).toBeVisible();
+    const siderPayment = page.locator('.app-sider [data-menu-id$="/settings/payment"].onboarding-tour-active-target');
+    await expect(siderPayment).toBeVisible();
+
+    // 4. Step 3 -> Step 4: Click "Thanh toán" -> /settings/payment pauses tour -> save VietQR advances to Step 4/5
+    await siderPayment.click();
+    await expect(page).toHaveURL(/\/settings\/payment$/);
+    await expect(spotlightTour).toHaveCount(0); // Paused on /settings/payment form
+
+    await page.getByLabel('Ngân hàng nhận tiền').click();
+    await page.locator('.ant-select-item-option').filter({ hasText: 'Vietcombank' }).click();
+    await page.getByLabel('Số tài khoản').fill('0123456789');
+    await page.getByLabel('Tên chủ tài khoản').fill('CHU TRO BINH AN');
+    await page.getByRole('button', { name: 'Lưu chế độ thanh toán' }).click();
+
+    // Tour automatically resumes at Step 4/5 on /settings/payment and highlights "Phòng & người thuê"
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 4/5')).toBeVisible();
+    await expect(spotlightTour.getByText('4. Thêm người thuê, Hợp đồng & Link phòng')).toBeVisible();
+    await expect(siderRooms).toBeVisible();
+
+    // 5. Step 4 & Edge Case "Xuất hợp đồng & CT01":
+    // Click "Phòng & người thuê" -> /rooms -> click "Thêm người thuê" -> /rooms/room-01/tenant -> click "Xuất hợp đồng & CT01" -> /rooms/room-01/documents
+    await siderRooms.click();
+    await expect(page).toHaveURL(/\/rooms$/);
+    const addTenantBtn = page.locator('[data-tour-page-target="tenant"].onboarding-tour-active-target');
+    await expect(addTenantBtn).toBeVisible();
+    await addTenantBtn.click();
+
+    await expect(page).toHaveURL(/\/rooms\/room-01\/tenant$/);
+    await expect(spotlightTour).toHaveCount(0); // Paused on /rooms/:id/tenant form
+
+    await page.getByLabel('Tên người thuê').fill('Nguyễn Văn Khách');
+    await page.getByLabel('Tiền cọc yêu cầu').fill('3000000');
+    await page.getByRole('button', { name: 'Xuất hợp đồng & CT01' }).first().click();
+
+    // Edge case: On /rooms/room-01/documents, tour MUST stay paused so contract preview is unobstructed
+    await expect(page).toHaveURL(/\/rooms\/room-01\/documents$/);
+    await expect(page.getByTestId('document-a4-preview')).toBeVisible();
+    await expect(spotlightTour).toHaveCount(0);
+
+    // Click back button ("Phòng & người thuê") to return to /rooms -> Tour resumes at Step 5/5 (even with Deposit invoice present!)
+    await page.getByRole('button', { name: 'Phòng & người thuê' }).click();
+    await expect(page).toHaveURL(/\/rooms$/);
+    await expect(spotlightTour).toBeVisible();
+    await expect(spotlightTour.getByText('Bước 5/5')).toBeVisible();
+    await expect(spotlightTour.getByText('5. Chốt điện/nước & lập hóa đơn hàng tháng')).toBeVisible();
+    const siderInvoices = page.locator('.app-sider [data-menu-id$="/invoices"].onboarding-tour-active-target');
+    await expect(siderInvoices).toBeVisible();
+
+    // 6. Step 5 -> Completion: Click "Hóa đơn" -> /invoices -> click "Lập hóa đơn" -> /readings completes & closes tour
+    await siderInvoices.click();
+    await expect(page).toHaveURL(/\/invoices$/);
+    const createInvoiceBtn = page.locator('[data-tour-page-target="invoice"].onboarding-tour-active-target');
+    await expect(createInvoiceBtn).toBeVisible();
+    await createInvoiceBtn.click();
+
+    await expect(page).toHaveURL(/\/readings$/);
+    await expect(spotlightTour).toHaveCount(0);
   });
 
   test('Scenario L13: Water by Meter (m³) room setup, reading input, and invoice breakdown', async ({ page }) => {

@@ -128,7 +128,7 @@ export default function InvoicesPage() {
       subtitle={t("Theo dõi tiền thuê, điện, nước và các khoản đã thu theo từng phòng.")}
       extra={
         <Space size={8}>
-          <Button type={period ? 'default' : 'primary'} icon={<CalculatorOutlined />} onClick={() => navigate('/readings')}>
+          <Button type={period ? 'default' : 'primary'} icon={<CalculatorOutlined />} data-tour-page-target="invoice" onClick={() => navigate('/readings')}>
             {t("Lập hóa đơn")}
           </Button>
           {(kindFilter === 'All' || kindFilter === 'Monthly') && period && (

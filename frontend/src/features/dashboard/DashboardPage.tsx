@@ -45,9 +45,10 @@ export default function DashboardPage() {
     : Boolean(paymentSettings?.manualBank?.bankBin && paymentSettings?.manualBank?.accountNumber))
     || rooms.some((r) => Boolean(r.occupancy?.token));
   const hasTenant = (summary?.occupiedRooms ?? 0) > 0 || rooms.some((r) => Boolean(r.occupancy));
-  const hasInvoice = (summary?.totalBilled ?? 0) > 0 || (summary?.monthlyBilled ?? 0) > 0 || invoices.length > 0;
+  const hasInvoice = (summary?.totalBilled ?? 0) > 0 || (summary?.monthlyBilled ?? 0) > 0 || invoices.some((inv) => inv.kind !== 'Deposit');
   const completedSteps = [hasBuilding, hasRoom, hasPayment, hasTenant, hasInvoice].filter(Boolean).length;
   const showOnboarding = forceShowOnboarding || (!dismissed && completedSteps < 5);
+  const autoOpenTour = !loading && !buildingsQuery.isPending && !paymentSettingsQuery.isPending && Boolean(paymentSettings?.confirmationMode) && completedSteps === 0 && !dismissed;
 
   const handleDismissOnboarding = () => {
     setForceShowOnboarding(false);
@@ -67,14 +68,16 @@ export default function DashboardPage() {
   if (dashboardQuery.isError) return <><PageTitle eyebrow={t("TỔNG QUAN")} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} /><LoadError error={dashboardQuery.error} onRetry={() => void dashboardQuery.refetch()} /></>;
   return <>
     <ActiveBannerStrip placement="OwnerDashboard" />
-    <PageTitle eyebrow={todayLabel} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} extra={<Button type="primary" icon={<CalculatorOutlined />} onClick={() => navigate('/readings')}>{t("Nhập chỉ số tháng này")}</Button>} />
+    <PageTitle eyebrow={todayLabel} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} extra={<Button type="primary" icon={<CalculatorOutlined />} data-tour-target="invoice" onClick={() => navigate('/readings')}>{t("Nhập chỉ số tháng này")}</Button>} />
     {!loading && showOnboarding && (
       <OnboardingChecklist
+        userId={user?.id ?? 'owner'}
         hasBuilding={hasBuilding}
         hasRoom={hasRoom}
         hasPayment={hasPayment}
         hasTenant={hasTenant}
         hasInvoice={hasInvoice}
+        autoOpenTour={autoOpenTour}
         onDismiss={handleDismissOnboarding}
       />
     )}
@@ -88,11 +91,11 @@ export default function DashboardPage() {
               {t("Hướng dẫn bắt đầu ({0}/{1})", [completedSteps, 5])}
             </Button>
           )}
-          <Button onClick={() => navigate('/settings/payment')}>{t("Cài đặt thanh toán")}</Button>
+          <Button data-tour-target="payment" onClick={() => navigate('/settings/payment')}>{t("Cài đặt thanh toán")}</Button>
         </Space>
       }
     >
-      <div className="quick-actions"><Link to="/buildings?create=1"><BankOutlined /><strong>{t("Tạo dãy trọ")}</strong><span>{t("Thêm địa điểm cho thuê")}</span><PlusOutlined /></Link><Link to="/rooms?create=1"><HomeOutlined /><strong>{t("Tạo phòng trọ")}</strong><span>{t("Thiết lập giá thuê và phí")}</span><PlusOutlined /></Link><Link to="/rooms?links=1"><LinkOutlined /><strong>{t("Cấp link cho khách")}</strong><span>{t("Chọn phòng đang có người thuê")}</span><ArrowRightOutlined /></Link></div>
+      <div className="quick-actions"><Link to="/buildings?create=1" data-tour-target="building"><BankOutlined /><strong>{t("Tạo dãy trọ")}</strong><span>{t("Thêm địa điểm cho thuê")}</span><PlusOutlined /></Link><Link to="/rooms?create=1" data-tour-target="room"><HomeOutlined /><strong>{t("Tạo phòng trọ")}</strong><span>{t("Thiết lập giá thuê và phí")}</span><PlusOutlined /></Link><Link to="/rooms?links=1" data-tour-target="tenant"><LinkOutlined /><strong>{t("Cấp link cho khách")}</strong><span>{t("Chọn phòng đang có người thuê")}</span><ArrowRightOutlined /></Link></div>
     </SectionCard>
     {loading ? <div className="content-card"><Skeleton active paragraph={{ rows: 8 }} /></div> : <>
       <Row gutter={[16, 16]} className="stat-grid">

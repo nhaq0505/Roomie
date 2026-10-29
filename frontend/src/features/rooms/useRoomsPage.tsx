@@ -237,7 +237,7 @@ export function useRoomsPage() {
   const roomStatus = (room: Room) => room.isArchived ? <Tag className="archived-state-tag">{t("Đã lưu trữ")}</Tag> : <Tag className={`room-state ${room.occupancy ? 'room-state-occupied' : 'room-state-vacant'}`}>{room.occupancy ? t("Đang thuê") : t("Còn trống")}</Tag>;
   const roomActions = (room: Room) => <div className="room-actions">
     {room.isArchived ? <Button icon={<RollbackOutlined />} loading={restoreMutation.isPending && restoreMutation.variables === room.id} onClick={() => restoreMutation.mutate(room.id)}>{t("Khôi phục")}</Button> : <>
-    {room.occupancy ? <Button icon={<LinkOutlined />} loading={rotateMutation.isPending && rotateMutation.variables === room.id} onClick={() => issueLink(room)}>{t("Cấp link cho khách")}</Button> : <Button icon={<UserAddOutlined />} onClick={() => openOccupancy(room)}>{t("Thêm người thuê")}</Button>}
+    {room.occupancy ? <Button icon={<LinkOutlined />} loading={rotateMutation.isPending && rotateMutation.variables === room.id} onClick={() => issueLink(room)}>{t("Cấp link cho khách")}</Button> : <Button icon={<UserAddOutlined />} data-tour-page-target="tenant" onClick={() => openOccupancy(room)}>{t("Thêm người thuê")}</Button>}
     <Dropdown menu={{ items: getActions(room), onClick: ({ key }) => onAction(key, room) }} trigger={['click']}><Button type="text" className="room-more" icon={<EllipsisOutlined />} aria-label={t("Tác vụ {0}", [room.name])} /></Dropdown>
     </>}
   </div>;
