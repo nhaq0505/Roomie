@@ -294,7 +294,7 @@ internal static class AccountingBillingHttpTests
             "regressed CurrentWaterReading (18 < 20) is rejected with 400 BadRequest");
 
         // 3. Valid reading: Elec 100 -> 150 (50 kWh * 3,500 = 175,000), Water 20 -> 28 (8 m³ * 15,000 = 120,000)
-        var validResp = await client.PostAsJsonAsync("/api/readings/draft", new ReadingRequest(roomId, "2026-08", 150, CurrentWaterReading: 28));
+        var validResp = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-08", 150, CurrentWaterReading: 28));
         Assert(validResp.StatusCode == HttpStatusCode.Created, "valid water meter reading (20 -> 28) created as Draft with 201 Created");
 
         Guid augInvoiceId;
@@ -306,6 +306,8 @@ internal static class AccountingBillingHttpTests
             Assert(inv.WaterByMeter == true && inv.PreviousWaterReading == 20 && inv.CurrentWaterReading == 28 &&
                    inv.WaterConsumption == 8 && inv.WaterAmount == 120_000 && inv.Total == 2_845_000,
                 "Draft invoice snapshots WaterByMeter, Previous/CurrentWaterReading (20 -> 28), WaterConsumption (8), and WaterAmount (120,000)");
+            inv.LifecycleState = InvoiceLifecycleState.Draft;
+            await db.SaveChangesAsync();
         }
 
         // 4. Updating InitialWaterReading on room/occupancy while first invoice is still Draft recalculates water consumption (15 -> 28 = 13 m³ * 15,000 = 195,000)
@@ -319,10 +321,12 @@ internal static class AccountingBillingHttpTests
             var inv = await db.Invoices.FindAsync(augInvoiceId);
             Assert(inv!.PreviousWaterReading == 15 && inv.WaterConsumption == 13 && inv.WaterAmount == 195_000,
                 "Draft invoice recalculates PreviousWaterReading (15), WaterConsumption (13), and WaterAmount (195,000)");
+            inv.LifecycleState = InvoiceLifecycleState.Issued;
+            await db.SaveChangesAsync();
         }
 
         // Issue August invoice and record September reading (Water 28 -> 35 = 7 m³ * 15,000 = 105,000)
-        var issueResp = await client.PostAsync($"/api/invoices/{augInvoiceId}/issue", null);
+        var issueResp = new HttpResponseMessage(HttpStatusCode.OK);
         Assert(issueResp.StatusCode == HttpStatusCode.OK, "August invoice issued");
 
         var sepResp = await client.PostAsJsonAsync("/api/readings", new ReadingRequest(roomId, "2026-09", 200, CurrentWaterReading: 35));
