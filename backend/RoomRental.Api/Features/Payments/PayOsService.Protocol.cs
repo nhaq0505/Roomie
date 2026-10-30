@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -12,6 +13,34 @@ namespace RoomRental.Api.Services;
 
 public sealed partial class PayOsService
 {
+    // Official payOS OpenAPI 3.1.3 spec (#/components/examples/PAYMENT_LINK_NOT_FOUND):
+    // {"code":"101","desc":"Mã thanh toán không tồn tại"}
+    private const string PayOsOrderNotFoundCode = "101";
+
+    private static bool IsExpiredUnlinkedOrderNotFound(
+        PayOsAttempt attempt,
+        HttpStatusCode statusCode,
+        JsonElement root,
+        string? providerCode)
+    {
+        if (!string.IsNullOrWhiteSpace(attempt.CheckoutUrl) ||
+            !string.IsNullOrWhiteSpace(attempt.PaymentLinkId) ||
+            !string.IsNullOrWhiteSpace(attempt.QrCode))
+        {
+            return false;
+        }
+
+        if (attempt.ExpiresAt is null || DateTimeOffset.UtcNow.ToUnixTimeSeconds() <= attempt.ExpiresAt.Value)
+        {
+            return false;
+        }
+
+        return (int)statusCode is >= 200 and < 300 &&
+               root.ValueKind == JsonValueKind.Object &&
+               string.Equals(providerCode, PayOsOrderNotFoundCode, StringComparison.Ordinal) &&
+               (!root.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null);
+    }
+
     private (string ClientId, string ApiKey, string ChecksumKey) Decrypt(OwnerPaymentSettings settings)
     {
         try

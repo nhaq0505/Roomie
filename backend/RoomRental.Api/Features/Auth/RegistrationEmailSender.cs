@@ -17,8 +17,14 @@ public interface IPasswordRecoveryEmailSender
     Task SendPasswordChangedAsync(string email, CancellationToken ct);
 }
 
+public interface IMarketingEmailSender
+{
+    void EnsureConfigured();
+    Task SendMarketingEmailAsync(string recipientEmail, string subject, string htmlBody, CancellationToken ct);
+}
+
 public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvironment environment,
-    ILogger<SmtpRegistrationEmailSender> logger) : IRegistrationEmailSender, IPasswordRecoveryEmailSender
+    ILogger<SmtpRegistrationEmailSender> logger) : IRegistrationEmailSender, IPasswordRecoveryEmailSender, IMarketingEmailSender
 {
     private const string Unavailable = "Chức năng gửi email chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.";
 
@@ -44,6 +50,9 @@ public sealed class SmtpRegistrationEmailSender(IConfiguration config, IHostEnvi
         {
             Text = "Mật khẩu tài khoản Roomie của bạn vừa được đặt lại. Các phiên đăng nhập cũ đã kết thúc. Nếu bạn không thực hiện thao tác này, hãy liên hệ quản trị viên ngay. Không chia sẻ mật khẩu hoặc OTP với bất kỳ ai."
         }, ct);
+
+    public Task SendMarketingEmailAsync(string recipientEmail, string subject, string htmlBody, CancellationToken ct) =>
+        DeliverAsync(recipientEmail, subject, new TextPart("html") { Text = htmlBody }, ct);
 
     private async Task DeliverAsync(string email, string subject, MimeEntity body, CancellationToken ct)
     {

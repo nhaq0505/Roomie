@@ -1,6 +1,7 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
+using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using MimeKit;
 using RoomRental.Api.Data;
 using RoomRental.Api.Domain;
@@ -10,6 +11,9 @@ namespace RoomRental.Api.Endpoints;
 
 public static class MarketerEmailEndpoints
 {
+    public static readonly TimeSpan StaleSendingTimeout = TimeSpan.FromMinutes(2);
+    private static readonly ConcurrentDictionary<Guid, Task<MarketingEmailCampaignDto>> ActiveDispatches = new();
+
     private static readonly HashSet<string> ValidSegments = new(StringComparer.OrdinalIgnoreCase)
     {
         "StuckOnboarding",
@@ -21,11 +25,30 @@ public static class MarketerEmailEndpoints
 
     public static void MapMarketerEmailEndpoints(this WebApplication app)
     {
+        app.Lifetime.ApplicationStarted.Register(() =>
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await using var scope = app.Services.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var clock = scope.ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+                    await RecoverStaleSendingCampaignsAsync(db, clock.GetUtcNow() + StaleSendingTimeout, CancellationToken.None);
+                }
+                catch
+                {
+                    // Best-effort startup recovery; request-time recovery also handles stale rows.
+                }
+            });
+        });
+
         var group = app.MapGroup("/api/marketer/emails")
             .RequireAuthorization(policy => policy.RequireRole("Admin", "Marketer"));
 
-        group.MapGet("", async (AppDbContext db, CancellationToken ct) =>
+        group.MapGet("", async (AppDbContext db, TimeProvider clock, CancellationToken ct) =>
         {
+            await RecoverStaleSendingCampaignsAsync(db, clock.GetUtcNow(), ct);
             var items = await db.MarketingEmailCampaigns.AsNoTracking()
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(x => ToDto(x))
@@ -41,14 +64,16 @@ public static class MarketerEmailEndpoints
             CancellationToken ct) =>
         {
             var resolvedSegment = ResolveSegment(request);
-            ValidateRequest(request, resolvedSegment);
+            var resolvedCtaLabel = !string.IsNullOrWhiteSpace(request.CtaLabel) ? request.CtaLabel.Trim() : (!string.IsNullOrWhiteSpace(request.CtaText) ? request.CtaText.Trim() : null);
+            ValidateRequest(request, resolvedSegment, resolvedCtaLabel);
             var now = clock.GetUtcNow();
             var actorId = ApiSupport.UserId(context);
             var actorName = context.User.Identity?.Name ?? "Marketer";
 
             var allLeads = await MarketerLeadsEndpoints.LoadAllOwnerLeadsAsync(db, now, ct);
-            var matchingCount = allLeads.Count(x => MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, resolvedSegment, now));
-            var resolvedCtaLabel = !string.IsNullOrWhiteSpace(request.CtaLabel) ? request.CtaLabel.Trim() : (!string.IsNullOrWhiteSpace(request.CtaText) ? request.CtaText.Trim() : null);
+            var matchingCount = allLeads.Count(x =>
+                x.Lead.Status == OwnerStatus.Approved &&
+                MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, resolvedSegment, now));
 
             var campaign = new MarketingEmailCampaign
             {
@@ -80,18 +105,22 @@ public static class MarketerEmailEndpoints
             TimeProvider clock,
             CancellationToken ct) =>
         {
+            var now = clock.GetUtcNow();
+            await RecoverStaleSendingCampaignsAsync(db, now, ct);
+
             var campaign = await db.MarketingEmailCampaigns.SingleOrDefaultAsync(x => x.Id == id, ct)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy chiến dịch email.");
 
-            if (campaign.Status == MarketingEmailCampaignStatus.Completed)
-                throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email đã được gửi không thể chỉnh sửa.");
+            if (campaign.Status is MarketingEmailCampaignStatus.Completed or MarketingEmailCampaignStatus.Sending)
+                throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email đã hoặc đang được gửi không thể chỉnh sửa.");
 
             var resolvedSegment = ResolveSegment(request);
-            ValidateRequest(request, resolvedSegment);
-            var now = clock.GetUtcNow();
-            var allLeads = await MarketerLeadsEndpoints.LoadAllOwnerLeadsAsync(db, now, ct);
-            var matchingCount = allLeads.Count(x => MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, resolvedSegment, now));
             var resolvedCtaLabel = !string.IsNullOrWhiteSpace(request.CtaLabel) ? request.CtaLabel.Trim() : (!string.IsNullOrWhiteSpace(request.CtaText) ? request.CtaText.Trim() : null);
+            ValidateRequest(request, resolvedSegment, resolvedCtaLabel);
+            var allLeads = await MarketerLeadsEndpoints.LoadAllOwnerLeadsAsync(db, now, ct);
+            var matchingCount = allLeads.Count(x =>
+                x.Lead.Status == OwnerStatus.Approved &&
+                MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, resolvedSegment, now));
 
             campaign.Name = request.Name.Trim();
             campaign.TargetSegment = resolvedSegment;
@@ -113,6 +142,7 @@ public static class MarketerEmailEndpoints
             AppDbContext db,
             IConfiguration config,
             IHostEnvironment env,
+            [FromServices] IMarketingEmailSender? sender,
             CancellationToken ct) =>
         {
             var campaign = await db.MarketingEmailCampaigns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
@@ -123,92 +153,249 @@ public static class MarketerEmailEndpoints
             if (string.IsNullOrWhiteSpace(testEmail) || !testEmail.Contains('@') || !MailboxAddress.TryParse(testEmail, out _))
                 throw new ApiException(StatusCodes.Status400BadRequest, "Địa chỉ email nhận thử không hợp lệ.");
 
+            var emailSender = sender ?? new SmtpRegistrationEmailSender(config, env, NullLogger<SmtpRegistrationEmailSender>.Instance);
+            emailSender.EnsureConfigured();
+
             var renderedSubject = "[TEST] " + RenderTokens(campaign.Subject, "Chủ trọ mẫu", 4, campaign.PromoCode);
             var renderedHtml = BuildEmailHtml(campaign, "Chủ trọ mẫu", 4);
 
-            await TryDeliverMarketingEmailAsync(config, env, testEmail, renderedSubject, renderedHtml, ct);
+            await emailSender.SendMarketingEmailAsync(testEmail, renderedSubject, renderedHtml, ct);
             return Results.Ok(new { success = true, recipient = testEmail, message = $"Đã gửi email thử nghiệm tới {testEmail}." });
-        });
+        }).RequireRateLimiting("auth");
 
         group.MapPost("/{id:guid}/send", async (
             Guid id,
             AppDbContext db,
+            IServiceScopeFactory scopeFactory,
+            IHostApplicationLifetime appLifetime,
             IConfiguration config,
             IHostEnvironment env,
             TimeProvider clock,
+            [FromServices] IMarketingEmailSender? sender,
             CancellationToken ct) =>
         {
-            var campaign = await db.MarketingEmailCampaigns.SingleOrDefaultAsync(x => x.Id == id, ct)
+            var now = clock.GetUtcNow();
+            await RecoverStaleSendingCampaignsAsync(db, now, ct);
+
+            var existingCampaign = await db.MarketingEmailCampaigns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct)
                 ?? throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy chiến dịch email.");
 
-            if (campaign.Status == MarketingEmailCampaignStatus.Completed)
+            if (existingCampaign.Status == MarketingEmailCampaignStatus.Completed)
                 throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email này đã được gửi.");
+            if (existingCampaign.Status == MarketingEmailCampaignStatus.Sending)
+                throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email đang được gửi. Vui lòng chờ hoàn tất.");
 
+            var emailSender = sender ?? new SmtpRegistrationEmailSender(config, env, NullLogger<SmtpRegistrationEmailSender>.Instance);
+            emailSender.EnsureConfigured();
+
+            var claimed = await db.MarketingEmailCampaigns
+                .Where(x => x.Id == id && (x.Status == MarketingEmailCampaignStatus.Draft || x.Status == MarketingEmailCampaignStatus.Failed))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, MarketingEmailCampaignStatus.Sending)
+                    .SetProperty(x => x.UpdatedAt, now), ct);
+
+            if (claimed == 0)
+            {
+                var current = await db.MarketingEmailCampaigns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+                if (current is null)
+                    throw new ApiException(StatusCodes.Status404NotFound, "Không tìm thấy chiến dịch email.");
+                if (current.Status == MarketingEmailCampaignStatus.Completed)
+                    throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email này đã được gửi.");
+                throw new ApiException(StatusCodes.Status409Conflict, "Chiến dịch email đang được gửi. Vui lòng chờ hoàn tất.");
+            }
+
+            // Run the SMTP dispatch loop in an independent background scope tied only to
+            // ApplicationStopping, never to the HTTP request's CancellationToken.
+            var dispatchTask = Task.Run(() => DispatchCampaignCoreAsync(
+                id,
+                scopeFactory,
+                config,
+                env,
+                clock,
+                sender,
+                appLifetime.ApplicationStopping));
+            ActiveDispatches[id] = dispatchTask;
+
+            try
+            {
+                var completedDto = await dispatchTask.WaitAsync(TimeSpan.FromSeconds(15), ct);
+                return Results.Ok(completedDto);
+            }
+            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && ct.IsCancellationRequested))
+            {
+                // Proxy timeout or client disconnect: the background task continues sending and
+                // persisting each recipient log with CancellationToken.None.
+                var inFlight = await db.MarketingEmailCampaigns.AsNoTracking()
+                    .SingleOrDefaultAsync(x => x.Id == id, CancellationToken.None);
+                return inFlight is not null ? Results.Ok(ToDto(inFlight)) : Results.StatusCode(StatusCodes.Status202Accepted);
+            }
+        });
+    }
+
+    private static async Task<MarketingEmailCampaignDto> DispatchCampaignCoreAsync(
+        Guid id,
+        IServiceScopeFactory scopeFactory,
+        IConfiguration config,
+        IHostEnvironment env,
+        TimeProvider clock,
+        IMarketingEmailSender? sender,
+        CancellationToken stoppingToken)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var emailSender = sender
+            ?? scope.ServiceProvider.GetService<IMarketingEmailSender>()
+            ?? new SmtpRegistrationEmailSender(config, env, NullLogger<SmtpRegistrationEmailSender>.Instance);
+
+        try
+        {
             var now = clock.GetUtcNow();
-            var allLeads = await MarketerLeadsEndpoints.LoadAllOwnerLeadsAsync(db, now, ct);
+            var campaign = await db.MarketingEmailCampaigns.SingleAsync(x => x.Id == id, CancellationToken.None);
+            var allLeads = await MarketerLeadsEndpoints.LoadAllOwnerLeadsAsync(db, now, CancellationToken.None);
             var recipients = allLeads
-                .Where(x => MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, campaign.TargetSegment, now))
+                .Where(x => x.Lead.Status == OwnerStatus.Approved &&
+                            MarketerLeadsEndpoints.MatchesSegment(x.Lead, x.LastActivityDate, campaign.TargetSegment, now))
                 .Select(x => x.Lead)
                 .ToList();
 
-            var alreadySentIds = (await db.MarketingEmailRecipientLogs.AsNoTracking()
+            var existingLogsByOwner = await db.MarketingEmailRecipientLogs
                 .Where(l => l.CampaignId == campaign.Id)
-                .Select(l => l.OwnerId)
-                .ToListAsync(ct)).ToHashSet();
+                .ToDictionaryAsync(l => l.OwnerId, CancellationToken.None);
 
-            var sentCount = 0;
-            var failedCount = 0;
+            campaign.TotalRecipients = recipients.Count;
+            campaign.UpdatedAt = clock.GetUtcNow();
+            await db.SaveChangesAsync(CancellationToken.None);
 
             foreach (var lead in recipients)
             {
-                if (alreadySentIds.Contains(lead.OwnerId))
+                stoppingToken.ThrowIfCancellationRequested();
+
+                if (existingLogsByOwner.TryGetValue(lead.OwnerId, out var existingLog) && existingLog.Status == "Sent")
                     continue;
 
                 var subject = RenderTokens(campaign.Subject, lead.Name, lead.RoomCount, campaign.PromoCode);
                 var html = BuildEmailHtml(campaign, lead.Name, lead.RoomCount);
+                var stepTime = clock.GetUtcNow();
                 try
                 {
-                    await TryDeliverMarketingEmailAsync(config, env, lead.Email, subject, html, ct);
-                    db.MarketingEmailRecipientLogs.Add(new MarketingEmailRecipientLog
+                    await emailSender.SendMarketingEmailAsync(lead.Email, subject, html, stoppingToken);
+                    if (existingLog is not null)
                     {
-                        CampaignId = campaign.Id,
-                        OwnerId = lead.OwnerId,
-                        Email = lead.Email,
-                        Status = "Sent",
-                        SentAt = now
-                    });
-                    sentCount++;
+                        existingLog.Email = lead.Email;
+                        existingLog.Status = "Sent";
+                        existingLog.ErrorMessage = null;
+                        existingLog.SentAt = stepTime;
+                    }
+                    else
+                    {
+                        var newLog = new MarketingEmailRecipientLog
+                        {
+                            CampaignId = campaign.Id,
+                            OwnerId = lead.OwnerId,
+                            Email = lead.Email,
+                            Status = "Sent",
+                            SentAt = stepTime
+                        };
+                        db.MarketingEmailRecipientLogs.Add(newLog);
+                        existingLogsByOwner[lead.OwnerId] = newLog;
+                    }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
-                    db.MarketingEmailRecipientLogs.Add(new MarketingEmailRecipientLog
+                    var errMsg = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
+                    if (existingLog is not null)
                     {
-                        CampaignId = campaign.Id,
-                        OwnerId = lead.OwnerId,
-                        Email = lead.Email,
-                        Status = "Failed",
-                        ErrorMessage = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message,
-                        SentAt = now
-                    });
-                    failedCount++;
+                        existingLog.Email = lead.Email;
+                        existingLog.Status = "Failed";
+                        existingLog.ErrorMessage = errMsg;
+                        existingLog.SentAt = stepTime;
+                    }
+                    else
+                    {
+                        var failedLog = new MarketingEmailRecipientLog
+                        {
+                            CampaignId = campaign.Id,
+                            OwnerId = lead.OwnerId,
+                            Email = lead.Email,
+                            Status = "Failed",
+                            ErrorMessage = errMsg,
+                            SentAt = stepTime
+                        };
+                        db.MarketingEmailRecipientLogs.Add(failedLog);
+                        existingLogsByOwner[lead.OwnerId] = failedLog;
+                    }
                 }
 
-                if ((sentCount + failedCount) % 10 == 0)
-                {
-                    await db.SaveChangesAsync(ct);
-                }
+                // Persist every single recipient outcome immediately with CancellationToken.None
+                // so a client disconnect or process interruption never loses a sent log.
+                campaign.SentCount = existingLogsByOwner.Values.Count(x => x.Status == "Sent");
+                campaign.FailedCount = existingLogsByOwner.Values.Count(x => x.Status != "Sent");
+                campaign.UpdatedAt = clock.GetUtcNow();
+                await db.SaveChangesAsync(CancellationToken.None);
             }
 
-            campaign.TotalRecipients = recipients.Count;
-            campaign.SentCount += sentCount;
-            campaign.FailedCount += failedCount;
-            campaign.Status = MarketingEmailCampaignStatus.Completed;
-            campaign.SentAt = now;
-            campaign.UpdatedAt = now;
+            var finishTime = clock.GetUtcNow();
+            var totalSent = existingLogsByOwner.Values.Count(x => x.Status == "Sent");
+            var totalFailed = existingLogsByOwner.Values.Count(x => x.Status != "Sent");
 
-            await db.SaveChangesAsync(ct);
-            return Results.Ok(ToDto(campaign));
-        });
+            campaign.TotalRecipients = recipients.Count;
+            campaign.SentCount = totalSent;
+            campaign.FailedCount = totalFailed;
+            campaign.Status = totalFailed > 0
+                ? MarketingEmailCampaignStatus.Failed
+                : MarketingEmailCampaignStatus.Completed;
+            campaign.SentAt = finishTime;
+            campaign.UpdatedAt = finishTime;
+
+            await db.SaveChangesAsync(CancellationToken.None);
+            return ToDto(campaign);
+        }
+        catch
+        {
+            await db.MarketingEmailCampaigns
+                .Where(x => x.Id == id && x.Status == MarketingEmailCampaignStatus.Sending)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, MarketingEmailCampaignStatus.Failed)
+                    .SetProperty(x => x.UpdatedAt, clock.GetUtcNow()), CancellationToken.None);
+            throw;
+        }
+        finally
+        {
+            ActiveDispatches.TryRemove(id, out _);
+        }
+    }
+
+    private static async Task RecoverStaleSendingCampaignsAsync(
+        AppDbContext db,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var staleCutoff = now - StaleSendingTimeout;
+        var staleCampaigns = await db.MarketingEmailCampaigns
+            .Where(x => x.Status == MarketingEmailCampaignStatus.Sending && x.UpdatedAt <= staleCutoff)
+            .ToListAsync(ct);
+
+        var changed = false;
+        foreach (var stale in staleCampaigns)
+        {
+            if (ActiveDispatches.TryGetValue(stale.Id, out var activeTask) && !activeTask.IsCompleted)
+                continue;
+
+            var logs = await db.MarketingEmailRecipientLogs.AsNoTracking()
+                .Where(l => l.CampaignId == stale.Id)
+                .ToListAsync(ct);
+
+            stale.SentCount = logs.Count(l => l.Status == "Sent");
+            stale.FailedCount = logs.Count(l => l.Status != "Sent");
+            stale.Status = MarketingEmailCampaignStatus.Failed;
+            stale.UpdatedAt = now;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
     }
 
     private static string ResolveSegment(UpsertMarketingEmailCampaignRequest request)
@@ -218,7 +405,7 @@ public static class MarketerEmailEndpoints
         return string.Empty;
     }
 
-    private static void ValidateRequest(UpsertMarketingEmailCampaignRequest request, string resolvedSegment)
+    private static void ValidateRequest(UpsertMarketingEmailCampaignRequest request, string resolvedSegment, string? resolvedCtaLabel)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 200)
             throw new ApiException(StatusCodes.Status400BadRequest, "Tên chiến dịch phải từ 1 đến 200 ký tự.");
@@ -228,6 +415,24 @@ public static class MarketerEmailEndpoints
             throw new ApiException(StatusCodes.Status400BadRequest, "Tiêu đề email phải từ 1 đến 250 ký tự.");
         if (string.IsNullOrWhiteSpace(request.BodyHtml))
             throw new ApiException(StatusCodes.Status400BadRequest, "Nội dung email không được để trống.");
+        if (!string.IsNullOrWhiteSpace(request.PromoCode) && request.PromoCode.Trim().Length > 32)
+            throw new ApiException(StatusCodes.Status400BadRequest, "Mã khuyến mãi tối đa 32 ký tự.");
+        if (resolvedCtaLabel is { Length: > 120 })
+            throw new ApiException(StatusCodes.Status400BadRequest, "Nhãn nút CTA tối đa 120 ký tự.");
+        if (!string.IsNullOrWhiteSpace(request.CtaUrl))
+        {
+            var ctaUrl = request.CtaUrl.Trim();
+            if (ctaUrl.Length > 500 || !IsAllowedCtaUrl(ctaUrl))
+                throw new ApiException(StatusCodes.Status400BadRequest, "Đường dẫn CTA không hợp lệ (chỉ chấp nhận http/https hoặc đường dẫn nội bộ).");
+        }
+    }
+
+    private static bool IsAllowedCtaUrl(string url)
+    {
+        if (url.StartsWith('/') && !url.StartsWith("//"))
+            return true;
+        return Uri.TryCreate(url, UriKind.Absolute, out var parsed) &&
+               (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps);
     }
 
     private static string RenderTokens(string template, string ownerName, int roomCount, string? promoCode)
@@ -246,49 +451,6 @@ public static class MarketerEmailEndpoints
             : string.Empty;
 
         return $"<div style=\"font-family:'Be Vietnam Pro',sans-serif;line-height:1.6;color:#0f172a;max-width:600px;margin:0 auto;\">{body}{ctaBlock}</div>";
-    }
-
-    private static async Task TryDeliverMarketingEmailAsync(
-        IConfiguration config,
-        IHostEnvironment environment,
-        string recipientEmail,
-        string subject,
-        string htmlBody,
-        CancellationToken ct)
-    {
-        var host = config["Email:Smtp:Host"];
-        var fromAddress = config["Email:FromAddress"];
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(fromAddress) || !MailboxAddress.TryParse(fromAddress, out _))
-        {
-            // When SMTP is not configured in local dev/test, complete gracefully without network call.
-            return;
-        }
-
-        var security = config["Email:Smtp:Security"] ?? "StartTls";
-        var localTest = environment.IsDevelopment() && host is "localhost" or "127.0.0.1" or "::1";
-        if (!int.TryParse(config["Email:Smtp:Port"] ?? "587", out var port) || port is < 1 or > 65535 ||
-            (security != "StartTls" && security != "SslOnConnect" && !(security == "None" && localTest)))
-        {
-            return;
-        }
-
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(15));
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(config["Email:FromName"] ?? "Roomie", fromAddress));
-        message.To.Add(MailboxAddress.Parse(recipientEmail));
-        message.Subject = subject;
-        message.Body = new TextPart("html") { Text = htmlBody };
-
-        using var client = new SmtpClient { Timeout = 15000 };
-        await client.ConnectAsync(host, port, Enum.Parse<SecureSocketOptions>(security), timeout.Token);
-        var username = config["Email:Smtp:Username"];
-        if (!string.IsNullOrWhiteSpace(username))
-            await client.AuthenticateAsync(username, config["Email:Smtp:Password"] ?? "", timeout.Token);
-        await client.SendAsync(message, timeout.Token);
-        try { await client.DisconnectAsync(true, timeout.Token); }
-        catch (Exception) when (!ct.IsCancellationRequested) { }
     }
 
     private static MarketingEmailCampaignDto ToDto(MarketingEmailCampaign x) => new(

@@ -50,6 +50,7 @@ builder.Services.AddScoped<PaymentWebhookService>();
 builder.Services.AddScoped<IRegistrationEmailSender, SmtpRegistrationEmailSender>();
 builder.Services.AddScoped<RegistrationVerificationService>();
 builder.Services.AddScoped<IPasswordRecoveryEmailSender, SmtpRegistrationEmailSender>();
+builder.Services.AddScoped<IMarketingEmailSender, SmtpRegistrationEmailSender>();
 builder.Services.AddScoped<PasswordRecoveryService>();
 builder.Services.AddHostedService<PasswordRecoveryEmailWorker>();
 // Disabling verification is reserved for isolated Development integration fixtures.

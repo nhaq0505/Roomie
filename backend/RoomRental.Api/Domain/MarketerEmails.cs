@@ -6,7 +6,9 @@ namespace RoomRental.Api.Domain;
 public enum MarketingEmailCampaignStatus
 {
     Draft = 0,
-    Completed = 1
+    Completed = 1,
+    Sending = 2,
+    Failed = 3
 }
 
 public sealed class MarketingEmailCampaign

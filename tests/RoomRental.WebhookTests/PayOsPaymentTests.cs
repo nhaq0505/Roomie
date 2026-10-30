@@ -33,6 +33,9 @@ internal static class PayOsPaymentTests
         await InvalidCreateResponseIsRejectedAsync(CreateResponseFault.ExpiredAtMismatch, "unexpected signed checkout expiry is rejected");
         await WebhookRemainsTheOnlyPaymentConfirmationAsync();
         await SubscriptionPaymentAndWebhookActivatesProAsync();
+        await SubscriptionNeverFallsBackToOwnerCredentialsAsync();
+        await StuckPendingOrderNotFoundUnblocksReconcileAndManualReceiptAsync();
+        await SubscriptionReconcileChecksAmountPaidBeforeFailingTerminalStatusAsync();
     }
 
     private static async Task SignedQrRoundTripAndPendingReuseAsync()
@@ -350,6 +353,202 @@ internal static class PayOsPaymentTests
         Assert(owner.SubscriptionExpiresAt == originalExpiry, "subscription webhook replay is idempotent and preserves expiry");
     }
 
+    private static async Task SubscriptionNeverFallsBackToOwnerCredentialsAsync()
+    {
+        using var fixture = new PayOsFixture();
+        var handler = new FakePayOsHandler(ChecksumKey);
+        var webhookService = new PaymentWebhookService(fixture.Db, fixture.Protection, handler, new ConfigurationBuilder().Build());
+        var service = fixture.CreateService(handler, webhookService);
+
+        // Fixture already has an Owner with PaymentSettings, but NO Admin with PaymentSettings and no AdminPayOS env config.
+        var creds = await service.GetAdminCredentialsAsync(default);
+        Assert(creds is null, "GetAdminCredentialsAsync returns null when admin payOS is not configured, even if an owner has PaymentSettings");
+
+        var checkoutBlocked = false;
+        try { await service.CreateSubscriptionCheckoutAsync(fixture.OwnerId, "pro_1m", default); }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status400BadRequest) { checkoutBlocked = true; }
+        Assert(checkoutBlocked, "subscription checkout is rejected with 400 when admin payOS is unconfigured");
+
+        // Forged subscription webhook signed with owner's checksum key must be rejected with 401
+        const long forgedSubOrderCode = 8_765_432_999;
+        fixture.Db.PayOsAttempts.Add(new PayOsAttempt
+        {
+            OwnerId = fixture.OwnerId,
+            InvoiceId = Guid.NewGuid(),
+            Kind = "Subscription",
+            SubscriptionDays = 30,
+            OrderCode = forgedSubOrderCode,
+            Amount = 99_000,
+            Status = PaymentAttemptStatus.Pending
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        using var forgedWebhook = CreateSignedWebhook(forgedSubOrderCode, 99_000, "forged-sub-ref", ChecksumKey);
+        var webhookRejected = false;
+        try { await service.ProcessWebhookAsync(fixture.OwnerId, forgedWebhook.RootElement, default); }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status401Unauthorized) { webhookRejected = true; }
+        Assert(webhookRejected, "subscription webhook signed with owner key is rejected with 401 when admin payOS is unconfigured");
+
+        var owner = await fixture.Db.Users.FindAsync(fixture.OwnerId);
+        Assert(!owner!.IsPro && owner.SubscriptionTier == SubscriptionTier.Free, "owner does not gain Pro from forged webhook");
+    }
+
+    private static async Task StuckPendingOrderNotFoundUnblocksReconcileAndManualReceiptAsync()
+    {
+        using var fixture = new PayOsFixture();
+        var handler = new FakePayOsHandler(ChecksumKey) { UnknownOrderResponseCode = "101" };
+        var service = fixture.CreateService(handler);
+
+        // 1. An attempt that ALREADY has a CheckoutUrl must NEVER be marked Failed when payOS returns 101 or any error
+        // (protects against double-charging if customer already has link/QR and pays while landlord records cash).
+        const long linkedExpiredOrder = 8_765_432_800;
+        var linkedAttempt = new PayOsAttempt
+        {
+            OwnerId = fixture.OwnerId,
+            InvoiceId = fixture.Invoice.Id,
+            OrderCode = linkedExpiredOrder,
+            Amount = 100_000,
+            CheckoutUrl = HostedCheckoutUrl,
+            Status = PaymentAttemptStatus.Pending,
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-15),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-5).ToUnixTimeSeconds()
+        };
+        fixture.Db.PayOsAttempts.Add(linkedAttempt);
+        await fixture.Db.SaveChangesAsync();
+
+        var linkedReconcileRejected = false;
+        try { await service.ReconcileInvoiceAsync(fixture.OwnerId, fixture.Invoice.Id, default); }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status502BadGateway) { linkedReconcileRejected = true; }
+        await fixture.Db.Entry(linkedAttempt).ReloadAsync();
+        Assert(linkedReconcileRejected && linkedAttempt.Status == PaymentAttemptStatus.Pending,
+            "an attempt that already has a CheckoutUrl stays Pending and throws 502 even if payOS returns code 101 after ExpiresAt");
+
+        fixture.Db.PayOsAttempts.Remove(linkedAttempt);
+        await fixture.Db.SaveChangesAsync();
+
+        // 2. An unlinked attempt BEFORE ExpiresAt must stay Pending even if payOS returns code 101
+        const long unlinkedUnexpiredOrder = 8_765_432_801;
+        var unexpiredAttempt = new PayOsAttempt
+        {
+            OwnerId = fixture.OwnerId,
+            InvoiceId = fixture.Invoice.Id,
+            OrderCode = unlinkedUnexpiredOrder,
+            Amount = 100_000,
+            Status = PaymentAttemptStatus.Pending,
+            CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-2),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(8).ToUnixTimeSeconds()
+        };
+        fixture.Db.PayOsAttempts.Add(unexpiredAttempt);
+        await fixture.Db.SaveChangesAsync();
+
+        var unexpiredRejected = false;
+        try { await service.ReconcileInvoiceAsync(fixture.OwnerId, fixture.Invoice.Id, default); }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status502BadGateway) { unexpiredRejected = true; }
+        await fixture.Db.Entry(unexpiredAttempt).ReloadAsync();
+        Assert(unexpiredRejected && unexpiredAttempt.Status == PaymentAttemptStatus.Pending,
+            "an unlinked attempt before ExpiresAt stays Pending and throws 502 when payOS returns code 101");
+
+        // 3. An unlinked attempt AFTER ExpiresAt with a non-101 error code (e.g. 214 gateway paused/not found) must stay Pending
+        unexpiredAttempt.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds();
+        await fixture.Db.SaveChangesAsync();
+        handler.UnknownOrderResponseCode = "214";
+
+        var non101Rejected = false;
+        try { await service.ReconcileInvoiceAsync(fixture.OwnerId, fixture.Invoice.Id, default); }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status502BadGateway) { non101Rejected = true; }
+        await fixture.Db.Entry(unexpiredAttempt).ReloadAsync();
+        Assert(non101Rejected && unexpiredAttempt.Status == PaymentAttemptStatus.Pending,
+            "an unlinked expired attempt stays Pending when payOS returns a non-101 error code (214)");
+
+        // 4. CancelPendingForManualReceiptAsync never infers cancellation from code 101
+        handler.UnknownOrderResponseCode = "101";
+        var manualService = new ManualReceiptService(fixture.Db, service);
+        var manualBeforeReconcileRejected = false;
+        try
+        {
+            await manualService.RecordAsync(
+                fixture.OwnerId,
+                fixture.Invoice.Id,
+                new ReceiptRequest(100_000, "Cash before reconcile", "ghost-cash-before-reconcile"),
+                null,
+                default);
+        }
+        catch (ApiException ex) when (ex.StatusCode == StatusCodes.Status502BadGateway)
+        {
+            manualBeforeReconcileRejected = true;
+        }
+        await fixture.Db.Entry(unexpiredAttempt).ReloadAsync();
+        Assert(manualBeforeReconcileRejected && unexpiredAttempt.Status == PaymentAttemptStatus.Pending,
+            "CancelPendingForManualReceiptAsync never fabricates cancellation from a missing order response");
+
+        // 5. Reconciling the unlinked expired attempt when payOS returns exact code 101 (PAYMENT_LINK_NOT_FOUND)
+        // safely marks it Failed, unblocking manual cash receipt afterward.
+        var reconcileStatus = await service.ReconcileInvoiceAsync(fixture.OwnerId, fixture.Invoice.Id, default);
+        await fixture.Db.Entry(unexpiredAttempt).ReloadAsync();
+        Assert(reconcileStatus == "Cancelled" && unexpiredAttempt.Status == PaymentAttemptStatus.Failed,
+            "reconciling an unlinked expired attempt that returns exact code 101 from payOS marks it Failed (Cancelled)");
+
+        var paidInvoice = await manualService.RecordAsync(
+            fixture.OwnerId,
+            fixture.Invoice.Id,
+            new ReceiptRequest(100_000, "Cash after reconcile cleared expired unlinked order", "ghost-cash-key"),
+            null,
+            default);
+        Assert(paidInvoice.Status == "Paid",
+            "manual receipt succeeds after reconcile marks the expired unlinked order Failed");
+    }
+
+    private static async Task SubscriptionReconcileChecksAmountPaidBeforeFailingTerminalStatusAsync()
+    {
+        using var fixture = new PayOsFixture();
+        var adminId = Guid.NewGuid();
+        fixture.Db.Users.Add(new AppUser
+        {
+            Id = adminId,
+            Name = "Admin",
+            Email = "admin-sub-reconcile@system.local",
+            PasswordHash = "unused",
+            Role = UserRole.Admin,
+            Status = OwnerStatus.Approved
+        });
+        var protector = fixture.Protection.CreateProtector("RoomRental.OwnerPayOsCredentials.v1");
+        fixture.Db.PaymentSettings.Add(new OwnerPaymentSettings
+        {
+            OwnerId = adminId,
+            ClientId = "admin-client-id",
+            ProtectedApiKey = protector.Protect("admin-api-key"),
+            ProtectedChecksumKey = protector.Protect(ChecksumKey)
+        });
+
+        const long subOrderPaidOnExpired = 8_765_432_850;
+        fixture.Db.PayOsAttempts.Add(new PayOsAttempt
+        {
+            OwnerId = fixture.OwnerId,
+            InvoiceId = Guid.NewGuid(),
+            Kind = "Subscription",
+            SubscriptionDays = 30,
+            OrderCode = subOrderPaidOnExpired,
+            Amount = 99_000,
+            Status = PaymentAttemptStatus.Pending
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var handler = new FakePayOsHandler(ChecksumKey)
+        {
+            ReconcileProviderStatus = "EXPIRED",
+            ReconcileAmountPaid = 99_000
+        };
+        handler.AddKnownOrder(subOrderPaidOnExpired, 99_000);
+        var webhookService = new PaymentWebhookService(fixture.Db, fixture.Protection, handler, new ConfigurationBuilder().Build());
+        var service = fixture.CreateService(handler, webhookService);
+
+        await service.ReconcileSubscriptionOrderAsync(fixture.OwnerId, subOrderPaidOnExpired, default);
+        var attempt = await fixture.Db.PayOsAttempts.SingleAsync(a => a.OrderCode == subOrderPaidOnExpired);
+        var owner = await fixture.Db.Users.FindAsync(fixture.OwnerId);
+        Assert(attempt.Status == PaymentAttemptStatus.Paid && owner!.IsPro,
+            "subscription reconcile with EXPIRED status but full amountPaid activates Pro instead of marking Failed");
+    }
+
     private static JsonDocument CreateSignedWebhook(long orderCode, int amount, string reference, string checksumKey)
     {
         var data = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -386,6 +585,7 @@ internal sealed class FakePayOsHandler(string checksumKey) : HttpMessageHandler,
     public string CreateProviderStatus { get; init; } = "PENDING";
     public string ReconcileProviderStatus { get; init; } = "PENDING";
     public decimal ReconcileAmountPaid { get; init; }
+    public string? UnknownOrderResponseCode { get; set; }
 
     public HttpClient CreateClient(string name)
     {
@@ -436,7 +636,22 @@ internal sealed class FakePayOsHandler(string checksumKey) : HttpMessageHandler,
             ReconcileCalls++;
             if (!long.TryParse(request.RequestUri.AbsolutePath[("/v2/payment-requests/".Length)..], out var orderCode) ||
                 !_knownOrders.TryGetValue(orderCode, out var amount))
+            {
+                if (!string.IsNullOrWhiteSpace(UnknownOrderResponseCode))
+                {
+                    var body = JsonSerializer.Serialize(new
+                    {
+                        code = UnknownOrderResponseCode,
+                        desc = UnknownOrderResponseCode == "101" ? "Mã thanh toán không tồn tại" : "Provider error",
+                        data = (object?)null
+                    });
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(body, Encoding.UTF8, "application/json")
+                    };
+                }
                 throw new InvalidOperationException("The fake received a reconciliation for an unknown order.");
+            }
             var data = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = amount.ToString(System.Globalization.CultureInfo.InvariantCulture),

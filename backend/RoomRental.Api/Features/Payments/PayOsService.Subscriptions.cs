@@ -20,15 +20,12 @@ public sealed partial class PayOsService
         if (!string.IsNullOrWhiteSpace(configClientId) && !string.IsNullOrWhiteSpace(configApiKey) && !string.IsNullOrWhiteSpace(configChecksumKey))
             return (configClientId, configApiKey, configChecksumKey);
 
-        var adminUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Role == UserRole.Admin, cancellationToken);
-        if (adminUser is not null)
-        {
-            var settings = await db.PaymentSettings.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == adminUser.Id, cancellationToken);
-            if (settings is not null) return Decrypt(settings);
-        }
-
-        var anySettings = await db.PaymentSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        if (anySettings is not null) return Decrypt(anySettings);
+        var adminSettings = await (from s in db.PaymentSettings.AsNoTracking()
+                                   join u in db.Users.AsNoTracking() on s.OwnerId equals u.Id
+                                   where u.Role == UserRole.Admin && u.Status == OwnerStatus.Approved
+                                   orderby s.UpdatedAt descending
+                                   select s).FirstOrDefaultAsync(cancellationToken);
+        if (adminSettings is not null) return Decrypt(adminSettings);
 
         return null;
     }
@@ -202,47 +199,79 @@ public sealed partial class PayOsService
 
     private async Task<string> ReconcileSubscriptionAttemptAsync(Guid ownerId, PayOsAttempt attempt, CancellationToken cancellationToken)
     {
-        var credentials = await GetAdminCredentialsAsync(cancellationToken);
-        if (credentials is null) return attempt.Status.ToString();
-        var adminCreds = credentials.Value;
+        var adminCreds = await GetAdminCredentialsAsync(cancellationToken)
+            ?? throw new ApiException(StatusCodes.Status400BadRequest, "Hệ thống chưa thiết lập cấu hình payOS của quản trị viên.");
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/v2/payment-requests/{attempt.OrderCode}");
-        request.Headers.TryAddWithoutValidation("x-client-id", adminCreds.ClientId);
-        request.Headers.TryAddWithoutValidation("x-api-key", adminCreds.ApiKey);
-        using var response = await httpClientFactory.CreateClient("payOS").SendAsync(request, cancellationToken);
-        using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-        var root = json.RootElement;
-        var providerCode = root.TryGetProperty("code", out var codeElement) ? codeElement.GetString() : null;
-        if (!response.IsSuccessStatusCode || providerCode != "00" || !root.TryGetProperty("data", out var data) ||
-            !root.TryGetProperty("signature", out var signature) || !PayOsSignature.VerifyData(adminCreds.ChecksumKey, data, signature.GetString()) ||
-            !TryGetLong(data, "orderCode", out var responseOrderCode) || responseOrderCode != attempt.OrderCode ||
-            !TryGetDecimal(data, "amount", out var responseAmount) || responseAmount != attempt.Amount)
-            return attempt.Status.ToString();
-
-        var status = ReadString(data, "status") ?? "Pending";
-        attempt.ProviderStatus = status;
-        if (status.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase) || status.Equals("EXPIRED", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            attempt.Status = PaymentAttemptStatus.Failed;
-            await db.SaveChangesAsync(cancellationToken);
-            return status.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Expired";
-        }
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/v2/payment-requests/{attempt.OrderCode}");
+            request.Headers.TryAddWithoutValidation("x-client-id", adminCreds.ClientId);
+            request.Headers.TryAddWithoutValidation("x-api-key", adminCreds.ApiKey);
+            using var response = await httpClientFactory.CreateClient("payOS").SendAsync(request, cancellationToken);
+            using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+            var root = json.RootElement;
+            var providerCode = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("code", out var codeElement)
+                ? codeElement.GetString()
+                : null;
+            if (IsExpiredUnlinkedOrderNotFound(attempt, response.StatusCode, root, providerCode))
+            {
+                attempt.Status = PaymentAttemptStatus.Failed;
+                attempt.ProviderStatus = "CANCELLED";
+                await db.SaveChangesAsync(cancellationToken);
+                return "Cancelled";
+            }
 
-        var linkId = ReadString(data, "id") ?? ReadString(data, "paymentLinkId");
-        if (string.IsNullOrWhiteSpace(attempt.CheckoutUrl) && !string.IsNullOrWhiteSpace(linkId))
+            if (!response.IsSuccessStatusCode || root.ValueKind != JsonValueKind.Object || providerCode != "00" || !root.TryGetProperty("data", out var data) ||
+                !root.TryGetProperty("signature", out var signature) || !PayOsSignature.VerifyData(adminCreds.ChecksumKey, data, signature.GetString()) ||
+                !TryGetLong(data, "orderCode", out var responseOrderCode) || responseOrderCode != attempt.OrderCode ||
+                !TryGetDecimal(data, "amount", out var responseAmount) || responseAmount != attempt.Amount)
+                throw new ApiException(StatusCodes.Status502BadGateway, "payOS returned an invalid or unavailable subscription order status.");
+
+            var status = ReadString(data, "status") ?? "Pending";
+            var providerStatusChanged = !string.Equals(attempt.ProviderStatus, status, StringComparison.Ordinal);
+            attempt.ProviderStatus = status;
+            if (status.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase) || status.Equals("EXPIRED", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryGetDecimal(data, "amountPaid", out var terminalPaid) || terminalPaid < 0) return "Pending";
+                if (terminalPaid == 0)
+                {
+                    attempt.Status = PaymentAttemptStatus.Failed;
+                    await db.SaveChangesAsync(cancellationToken);
+                    return status.Equals("CANCELLED", StringComparison.OrdinalIgnoreCase) ? "Cancelled" : "Expired";
+                }
+                if (terminalPaid != attempt.Amount)
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                    return "Partial";
+                }
+                // Exact, verified payment evidence is reconciled below even for a closed link.
+            }
+
+            var linkId = ReadString(data, "id") ?? ReadString(data, "paymentLinkId");
+            var changed = false;
+            if (string.IsNullOrWhiteSpace(attempt.CheckoutUrl) && !string.IsNullOrWhiteSpace(linkId))
+            {
+                attempt.PaymentLinkId = linkId;
+                attempt.CheckoutUrl = $"https://pay.payos.vn/web/{Uri.EscapeDataString(linkId)}";
+                changed = true;
+            }
+
+            if (changed || providerStatusChanged)
+                await db.SaveChangesAsync(cancellationToken);
+
+            if (!TryGetDecimal(data, "amountPaid", out var amountPaid) || amountPaid <= 0)
+                return status.Equals("PAID", StringComparison.OrdinalIgnoreCase) ? "Pending" : status;
+            if (amountPaid != attempt.Amount) return "Partial";
+
+            var reference = TryFindTransactionReference(data) ?? ReadString(data, "id") ?? $"reconcile-{attempt.OrderCode}";
+            await _webhookService.HandleSubscriptionPaymentSuccessAsync(attempt, amountPaid, reference, cancellationToken);
+            return "Paid";
+        }
+        catch (ApiException) { throw; }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested && exception is HttpRequestException or OperationCanceledException or JsonException)
         {
-            attempt.PaymentLinkId = linkId;
-            attempt.CheckoutUrl = $"https://pay.payos.vn/web/{Uri.EscapeDataString(linkId)}";
-            await db.SaveChangesAsync(cancellationToken);
+            throw new ApiException(StatusCodes.Status502BadGateway, "payOS returned an invalid or unavailable subscription order status.");
         }
-
-        if (!TryGetDecimal(data, "amountPaid", out var amountPaid) || amountPaid <= 0)
-            return status.Equals("PAID", StringComparison.OrdinalIgnoreCase) ? "Pending" : status;
-        if (amountPaid != attempt.Amount) return "Partial";
-
-        var reference = TryFindTransactionReference(data) ?? ReadString(data, "id") ?? $"reconcile-{attempt.OrderCode}";
-        await _webhookService.HandleSubscriptionPaymentSuccessAsync(attempt, amountPaid, reference, cancellationToken);
-        return "Paid";
     }
 
 

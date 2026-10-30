@@ -204,6 +204,25 @@ internal static class MarketerSuiteHttpTests
         Check(clickBannerResp.StatusCode == HttpStatusCode.OK, "Banner click tracking succeeds");
 
         // 7. Segmented Email Campaign & Deduplication
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<AppUser>>();
+            var secondOwner = new AppUser
+            {
+                Id = Guid.NewGuid(),
+                Name = "Chu Tro Thu Hai",
+                Email = "chutro2@example.com",
+                PasswordHash = "",
+                Role = UserRole.Owner,
+                Status = OwnerStatus.Approved,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            secondOwner.PasswordHash = hasher.HashPassword(secondOwner, "OwnerPass123!");
+            db.Users.Add(secondOwner);
+            await db.SaveChangesAsync();
+        }
+
         var createEmailResp = await SendJsonAsync(client, HttpMethod.Post, "/api/marketer/emails", marketerCookie,
             new
             {
@@ -218,16 +237,67 @@ internal static class MarketerSuiteHttpTests
         Check(createEmailResp.StatusCode == HttpStatusCode.Created, "Marketer creates segmented email campaign");
         var emailCampaign = await createEmailResp.Content.ReadFromJsonAsync<MarketingEmailCampaignDto>();
 
-        var sendTestResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign!.Id}/send-test", marketerCookie,
+        // 7a. When SMTP is not configured, send-test and send return 503 ServiceUnavailable instead of falsely claiming success
+        otpSender.IsConfigured = false;
+        var unconfiguredTestResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign!.Id}/send-test", marketerCookie,
+            new { toEmail = "mai.marketer@phongtro.local" });
+        Check(unconfiguredTestResp.StatusCode == HttpStatusCode.ServiceUnavailable,
+            "Unconfigured SMTP returns 503 ServiceUnavailable on send-test");
+
+        var unconfiguredSendResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send", marketerCookie, new { });
+        Check(unconfiguredSendResp.StatusCode == HttpStatusCode.ServiceUnavailable,
+            "Unconfigured SMTP returns 503 ServiceUnavailable on campaign send without marking Completed");
+        otpSender.IsConfigured = true;
+
+        var sendTestResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send-test", marketerCookie,
             new { toEmail = "mai.marketer@phongtro.local" });
         Check(sendTestResp.StatusCode == HttpStatusCode.OK,
             "Marketer sends test email with personalized token replacement");
 
+        // 7b. Simulate transient failure on one recipient -> first recipient log is persisted immediately (even < 10 recipients),
+        // campaign is marked Failed, and retry delivers ONLY to the failed recipient (no duplicate send).
+        otpSender.ResetCounts();
+        otpSender.FailOnceForEmail = "chutro2@example.com";
+        var failedDispatchResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send", marketerCookie, new { });
+        Check(failedDispatchResp.StatusCode == HttpStatusCode.OK, "Campaign send with recipient error returns 200 with failure summary");
+        var failedDispatchDto = await failedDispatchResp.Content.ReadFromJsonAsync<MarketingEmailCampaignDto>();
+        Check(failedDispatchDto != null && failedDispatchDto.SentCount == 1 && failedDispatchDto.FailedCount == 1 && failedDispatchDto.Status == MarketingEmailCampaignStatus.Failed,
+            "Campaign with 1 succeeded and 1 failed recipient persists per-recipient logs immediately and marks Failed");
+
+        // 7c. Active Sending lock vs Stale Sending recovery (crash/restart resilience)
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var campaignRow = await db.MarketingEmailCampaigns.SingleAsync(x => x.Id == emailCampaign.Id);
+            campaignRow.Status = MarketingEmailCampaignStatus.Sending;
+            campaignRow.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        var activeSendingSendResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send", marketerCookie, new { });
+        Check(activeSendingSendResp.StatusCode == HttpStatusCode.Conflict,
+            "Campaign actively in Sending state (fresh heartbeat) rejects concurrent send with 409 Conflict");
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var campaignRow = await db.MarketingEmailCampaigns.SingleAsync(x => x.Id == emailCampaign.Id);
+            campaignRow.Status = MarketingEmailCampaignStatus.Sending;
+            campaignRow.UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+            await db.SaveChangesAsync();
+        }
+
         var sendCampaignResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send", marketerCookie, new { });
-        Check(sendCampaignResp.StatusCode == HttpStatusCode.OK, "Marketer dispatches segmented email campaign");
+        Check(sendCampaignResp.StatusCode == HttpStatusCode.OK,
+            "Stale Sending campaign (after crash/restart) is automatically recovered and retried");
         var dispatchResult = await sendCampaignResp.Content.ReadFromJsonAsync<MarketingEmailCampaignDto>();
-        Check(dispatchResult != null && dispatchResult.SentCount >= 1 && dispatchResult.Status == MarketingEmailCampaignStatus.Completed,
-            "Segmented email campaign sends to StuckOnboarding owners and marks Completed");
+        Check(dispatchResult != null && dispatchResult.SentCount == 2 && dispatchResult.FailedCount == 0 && dispatchResult.Status == MarketingEmailCampaignStatus.Completed,
+            "Retrying segmented email campaign delivers to previously failed recipient and marks Completed");
+        Check(otpSender.GetSentCount("chutropromo@example.com") == 1 && otpSender.GetSentCount("chutro2@example.com") == 1,
+            "Already-sent recipient is never sent a duplicate email on retry");
+
+        var duplicateSendResp = await SendJsonAsync(client, HttpMethod.Post, $"/api/marketer/emails/{emailCampaign.Id}/send", marketerCookie, new { });
+        Check(duplicateSendResp.StatusCode == HttpStatusCode.Conflict,
+            "Completed email campaign rejects duplicate send with 409 Conflict");
     }
 
     private static WebApplication CreateTestApp(
@@ -256,6 +326,7 @@ internal static class MarketerSuiteHttpTests
         builder.Services.AddScoped<PaymentWebhookService>();
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<IRegistrationEmailSender>(otpSender);
+        builder.Services.AddSingleton<IMarketingEmailSender>(otpSender);
         builder.Services.AddScoped<RegistrationVerificationService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddMonitoringCore(builder.Configuration);
@@ -346,13 +417,38 @@ internal static class MarketerSuiteHttpTests
         Console.WriteLine("PASS: " + name);
     }
 
-    private sealed class TestOtpSender : IRegistrationEmailSender
+    private sealed class TestOtpSender : IRegistrationEmailSender, IMarketingEmailSender
     {
+        private readonly Dictionary<string, int> _sentCounts = new(StringComparer.OrdinalIgnoreCase);
         public string? LastCode { get; private set; }
-        public void EnsureConfigured() { }
+        public bool IsConfigured { get; set; } = true;
+        public string? FailOnceForEmail { get; set; }
+
+        public void ResetCounts() => _sentCounts.Clear();
+        public int GetSentCount(string email) => _sentCounts.TryGetValue(email, out var count) ? count : 0;
+
+        public void EnsureConfigured()
+        {
+            if (!IsConfigured)
+                throw new ApiException(StatusCodes.Status503ServiceUnavailable, "SMTP is not configured.");
+        }
+
         public Task SendAsync(string email, string code, CancellationToken cancellationToken)
         {
+            EnsureConfigured();
             LastCode = code;
+            return Task.CompletedTask;
+        }
+
+        public Task SendMarketingEmailAsync(string recipientEmail, string subject, string htmlBody, CancellationToken ct)
+        {
+            EnsureConfigured();
+            if (FailOnceForEmail != null && string.Equals(FailOnceForEmail, recipientEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                FailOnceForEmail = null;
+                throw new InvalidOperationException("Simulated transient SMTP delivery failure.");
+            }
+            _sentCounts[recipientEmail] = GetSentCount(recipientEmail) + 1;
             return Task.CompletedTask;
         }
     }
