@@ -1,65 +1,26 @@
-import { ArrowRightOutlined, BankOutlined, CalculatorOutlined, FileTextOutlined, HomeOutlined, LinkOutlined, PlusOutlined, RiseOutlined, RocketOutlined, WarningOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, BankOutlined, CalculatorOutlined, FileTextOutlined, HomeOutlined, RiseOutlined, WarningOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, Col, Progress, Row, Skeleton, Space, Statistic, Typography } from 'antd';
-import { useMemo, useState } from 'react';
+import { Button, Card, Col, Progress, Row, Skeleton, Statistic, Typography } from 'antd';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { currentPeriod, formatVnd, periodLabel } from '../../shared/format';
 import { getLocale, t } from '../../shared/i18n/runtime';
 import { ActiveBannerStrip } from '../../shared/ui/ActiveBannerStrip';
 import { LoadError, PageTitle, SectionCard } from '../../shared/ui/Ui';
-import { useAuth } from '../auth/session';
-import { buildingsApi } from '../buildings/index';
 import { invoicesApi } from '../invoices/index';
-import { paymentSettingsApi } from '../payments/index';
 import { roomsApi } from '../rooms/index';
 import { dashboardApi } from './index';
-import OnboardingChecklist from './OnboardingChecklist';
-
-const ONBOARDING_STORAGE_PREFIX = 'roomie:onboarding-dismissed:';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const storageKey = `${ONBOARDING_STORAGE_PREFIX}${user?.id ?? 'owner'}`;
-  const [dismissed, setDismissed] = useState<boolean>(() => {
-    try { return localStorage.getItem(storageKey) === '1'; } catch { return false; }
-  });
-  const [forceShowOnboarding, setForceShowOnboarding] = useState(false);
 
   const dashboardQuery = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi });
   const roomsQuery = useQuery({ queryKey: ['rooms'], queryFn: () => roomsApi.list() });
-  const buildingsQuery = useQuery({ queryKey: ['buildings'], queryFn: () => buildingsApi.list() });
-  const paymentSettingsQuery = useQuery({ queryKey: ['payment-settings'], queryFn: paymentSettingsApi.get });
   const loading = dashboardQuery.isPending || roomsQuery.isPending;
   const summary = dashboardQuery.data;
   const invoicesQuery = useQuery({ queryKey: ['invoices', summary?.period], queryFn: () => invoicesApi.list(summary!.period), enabled: !!summary });
   const rooms = Array.isArray(roomsQuery.data) ? roomsQuery.data : [];
-  const buildings = Array.isArray(buildingsQuery.data) ? buildingsQuery.data : [];
   const invoices = Array.isArray(invoicesQuery.data) ? invoicesQuery.data : [];
-  const paymentSettings = paymentSettingsQuery.data && typeof paymentSettingsQuery.data === 'object' && !Array.isArray(paymentSettingsQuery.data) ? paymentSettingsQuery.data : null;
-
-  const hasRoom = (summary?.totalRooms ?? 0) > 0 || rooms.some((r) => !r.isArchived);
-  const hasBuilding = buildings.some((b) => !b.isArchived) || hasRoom;
-  const hasPayment = (paymentSettings?.confirmationMode === 'Automatic'
-    ? paymentSettings?.webhookStatus === 'Verified'
-    : Boolean(paymentSettings?.manualBank?.bankBin && paymentSettings?.manualBank?.accountNumber))
-    || rooms.some((r) => Boolean(r.occupancy?.token));
-  const hasTenant = (summary?.occupiedRooms ?? 0) > 0 || rooms.some((r) => Boolean(r.occupancy));
-  const hasInvoice = (summary?.totalBilled ?? 0) > 0 || (summary?.monthlyBilled ?? 0) > 0 || invoices.some((inv) => inv.kind !== 'Deposit');
-  const completedSteps = [hasBuilding, hasRoom, hasPayment, hasTenant, hasInvoice].filter(Boolean).length;
-  const showOnboarding = forceShowOnboarding || (!dismissed && completedSteps < 5);
-  const autoOpenTour = !loading && !buildingsQuery.isPending && !paymentSettingsQuery.isPending && Boolean(paymentSettings?.confirmationMode) && completedSteps === 0 && !dismissed;
-
-  const handleDismissOnboarding = () => {
-    setForceShowOnboarding(false);
-    setDismissed(true);
-    try { localStorage.setItem(storageKey, '1'); } catch { /* ignore */ }
-  };
-  const handleShowOnboarding = () => {
-    setForceShowOnboarding(true);
-    setDismissed(false);
-    try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
-  };
 
   const occupancyPct = summary?.totalRooms ? Math.round((summary.occupiedRooms / summary.totalRooms) * 100) : 0;
   const todayLabel = new Intl.DateTimeFormat(getLocale(), { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: '2-digit', month: 'long' }).format(new Date());
@@ -68,35 +29,7 @@ export default function DashboardPage() {
   if (dashboardQuery.isError) return <><PageTitle eyebrow={t("TỔNG QUAN")} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} /><LoadError error={dashboardQuery.error} onRetry={() => void dashboardQuery.refetch()} /></>;
   return <>
     <ActiveBannerStrip placement="OwnerDashboard" />
-    <PageTitle eyebrow={todayLabel} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} extra={<Button type="primary" icon={<CalculatorOutlined />} data-tour-target="invoice" onClick={() => navigate('/readings')}>{t("Nhập chỉ số tháng này")}</Button>} />
-    {!loading && showOnboarding && (
-      <OnboardingChecklist
-        userId={user?.id ?? 'owner'}
-        hasBuilding={hasBuilding}
-        hasRoom={hasRoom}
-        hasPayment={hasPayment}
-        hasTenant={hasTenant}
-        hasInvoice={hasInvoice}
-        autoOpenTour={autoOpenTour}
-        onDismiss={handleDismissOnboarding}
-      />
-    )}
-    <SectionCard
-      title={t("Thao tác nhanh")}
-      className="quick-actions-card"
-      extra={
-        <Space wrap size={8}>
-          {!showOnboarding && (
-            <Button icon={<RocketOutlined />} onClick={handleShowOnboarding} data-testid="onboarding-reopen">
-              {t("Hướng dẫn bắt đầu ({0}/{1})", [completedSteps, 5])}
-            </Button>
-          )}
-          <Button data-tour-target="payment" onClick={() => navigate('/settings/payment')}>{t("Cài đặt thanh toán")}</Button>
-        </Space>
-      }
-    >
-      <div className="quick-actions"><Link to="/buildings?create=1" data-tour-target="building"><BankOutlined /><strong>{t("Tạo dãy trọ")}</strong><span>{t("Thêm địa điểm cho thuê")}</span><PlusOutlined /></Link><Link to="/rooms?create=1" data-tour-target="room"><HomeOutlined /><strong>{t("Tạo phòng trọ")}</strong><span>{t("Thiết lập giá thuê và phí")}</span><PlusOutlined /></Link><Link to="/rooms?links=1" data-tour-target="tenant"><LinkOutlined /><strong>{t("Cấp link cho khách")}</strong><span>{t("Chọn phòng đang có người thuê")}</span><ArrowRightOutlined /></Link></div>
-    </SectionCard>
+    <PageTitle eyebrow={todayLabel} title={t("Chào mừng trở lại")} subtitle={t("Tình hình nhà trọ của bạn, trong nháy mắt.")} extra={<Button type="primary" icon={<CalculatorOutlined />} onClick={() => navigate('/readings')}>{t("Nhập chỉ số tháng này")}</Button>} />
     {loading ? <div className="content-card"><Skeleton active paragraph={{ rows: 8 }} /></div> : <>
       <Row gutter={[16, 16]} className="stat-grid">
         <Col xs={12} xl={6}><Card className="stat-card"><div className="stat-icon stat-blue"><FileTextOutlined /></div><Statistic title={t("Tổng phải thu tháng này")} value={summary?.monthlyBilled ?? 0} formatter={(v) => formatVnd(Number(v))} /><div className="stat-foot"><span className="stat-muted">{t("Đã phát hành")}</span></div></Card></Col>

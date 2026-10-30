@@ -391,38 +391,11 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     expect(overflow).toBe(false);
   });
 
-  test('Dashboard onboarding checklist step titles have high-contrast dark teal color', async ({ page }) => {
-    await page.route('**/api/dashboard', (route) =>
-      route.fulfill({
-        json: {
-          ...defaultDashboard,
-          totalRooms: 0,
-          occupiedRooms: 0,
-          totalBilled: 0,
-          monthlyBilled: 0,
-          monthlyOutstanding: 0,
-          totalOutstanding: 0,
-        },
-      }),
-    );
-    await page.route('**/api/buildings', (route) => route.fulfill({ json: [] }));
-    await page.route('**/api/rooms', (route) => route.fulfill({ json: [] }));
-    await page.route('**/api/invoices*', (route) =>
-      route.fulfill({
-        json: {
-          items: [],
-          total: 0,
-          draftCount: 0,
-          totals: { billed: 0, paid: 0, outstanding: 0 },
-        },
-      }),
-    );
+  test('Dashboard omits onboarding checklist and quick actions card on mobile', async ({ page }) => {
     await page.goto('/dashboard');
-    const stepTitle = page.locator('.onboarding-step-title-row strong').first();
-    await expect(stepTitle).toBeVisible();
-    const color = await stepTitle.evaluate((el) => getComputedStyle(el).color);
-    expect(color).not.toBe('rgb(224, 241, 237)');
-    expect(color).toBe('rgb(28, 55, 62)');
+    await expect(page.getByText('Tổng phải thu tháng này')).toBeVisible();
+    await expect(page.getByTestId('onboarding-checklist')).toHaveCount(0);
+    await expect(page.locator('.quick-actions-card')).toHaveCount(0);
   });
 
   test('Mobile inputs have font-size >= 16px on /login and /settings/payment to prevent iOS auto-zoom', async ({ page }) => {
@@ -570,6 +543,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await expect(page.locator('.room-filter > span').first()).toBeHidden();
     // Filter controls remain accessible via aria-label
     await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Lọc theo tình trạng' })).toBeVisible();
 
     const roomDirectoryStyle = await page.locator('.room-directory.section-card').evaluate((el) => {
       const s = getComputedStyle(el);
@@ -658,7 +632,7 @@ test.describe('Mobile 375px Smoke & Responsiveness Suite', () => {
     await expect(page.getByRole('button', { name: 'Tạo phòng trọ' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Lọc theo dãy trọ' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Lọc trạng thái lưu trữ' })).toHaveCount(0);
-    await expect(page.getByRole('combobox', { name: 'Lọc theo tình trạng' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Lọc theo tình trạng' })).toBeVisible();
 
     await page.route('**/api/readings*', (route) => route.fulfill({ json: [] }));
     await page.goto('/readings');

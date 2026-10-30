@@ -111,7 +111,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Cấp/hiện link mới yêu cầu Automatic có webhook Verified hoặc Manual có bank details hợp lệ; xem `TenantTokenService.CanShareAsync`. Bypass chỉ dùng fixture Development, không Production.
 - Chế độ nhận tiền mặc định của chủ trọ mới là `Manual` (VietQR thủ công). Lưu cấu hình payOS (`PUT /api/settings/payment`) tự chuyển `PaymentConfirmationMode` sang `Automatic`.
 - payOS cấu hình riêng từng owner: Client ID/API Key/Checksum Key lưu mã hóa, không trả secret về UI. Lưu và xác minh gọi `confirm-webhook` với origin HTTPS từ config server; đổi origin/khóa làm verification cũ hết hiệu lực. Manual lưu ngân hàng/tài khoản riêng, không xóa khóa payOS; pending attempt chặn đổi chế độ/thông tin nhận tiền.
-- Dashboard chủ trọ (`DashboardPage.tsx`, `OnboardingChecklist.tsx`) hiển thị checklist 5 bước bắt đầu nhanh kèm **Spotlight Guided Tour 5 bước** làm tối màn hình và chiếu sáng lần lượt từng nút thao tác (Tạo dãy → Tạo phòng → Cài đặt VietQR → Thêm người thuê → Chốt điện/nước & phát hành hóa đơn hàng tháng), tự bật lần đầu khi chủ trọ mới chưa hoàn tất bước nào (`roomie:onboarding-tour-seen:*`) hoặc mở lại bất kỳ lúc nào qua nút `Xem hướng dẫn từng bước`.
+- Dashboard chủ trọ (`DashboardPage.tsx`) hiển thị trực tiếp 4 thẻ thống kê tháng, thống kê toàn thời gian, danh sách việc cần làm, tỷ lệ lấp đầy phòng và hóa đơn gần đây (đã bỏ khối Hướng dẫn bắt đầu nhanh và Thao tác nhanh theo yêu cầu).
 
 ### Hóa đơn, tiền và trả phòng
 
@@ -258,7 +258,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Cấp/hiện link mới yêu cầu Automatic có webhook Verified hoặc Manual có bank details hợp lệ; xem `TenantTokenService.CanShareAsync`. Bypass chỉ dùng fixture Development, không Production.
 - Chế độ nhận tiền mặc định của chủ trọ mới là `Manual` (VietQR thủ công). Lưu cấu hình payOS (`PUT /api/settings/payment`) tự chuyển `PaymentConfirmationMode` sang `Automatic`.
 - payOS cấu hình riêng từng owner: Client ID/API Key/Checksum Key lưu mã hóa, không trả secret về UI. Lưu và xác minh gọi `confirm-webhook` với origin HTTPS từ config server; đổi origin/khóa làm verification cũ hết hiệu lực. Manual lưu ngân hàng/tài khoản riêng, không xóa khóa payOS; pending attempt chặn đổi chế độ/thông tin nhận tiền.
-- Dashboard chủ trọ (`DashboardPage.tsx`, `OnboardingChecklist.tsx`) hiển thị checklist 5 bước bắt đầu nhanh kèm **Spotlight Guided Tour 5 bước** làm tối màn hình và chiếu sáng lần lượt từng nút thao tác (Tạo dãy → Tạo phòng → Cài đặt VietQR → Thêm người thuê → Chốt điện/nước & phát hành hóa đơn hàng tháng), tự bật lần đầu khi chủ trọ mới chưa hoàn tất bước nào (`roomie:onboarding-tour-seen:*`) hoặc mở lại bất kỳ lúc nào qua nút `Xem hướng dẫn từng bước`.
+- Dashboard chủ trọ (`DashboardPage.tsx`) hiển thị trực tiếp 4 thẻ thống kê tháng, thống kê toàn thời gian, danh sách việc cần làm, tỷ lệ lấp đầy phòng và hóa đơn gần đây (đã bỏ khối Hướng dẫn bắt đầu nhanh và Thao tác nhanh theo yêu cầu).
 
 ### Hóa đơn, tiền và trả phòng
 

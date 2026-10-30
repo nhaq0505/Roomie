@@ -15,7 +15,7 @@ export default function RoomsPage() {
 
 function RoomsContent() {
   const state = useRoomsPage();
-  const { navigate, setSearchParams, archiveFilter, buildingFilter, statusFilter, buildingsQuery, roomsQuery, maxRooms, isQuotaReached, rooms, activeBuildings, selectedBuildingObj, openCreate, openCreateBuilding, openEditBuilding, compactRoom, columns, clearFilters } = state;
+  const { navigate, setSearchParams, archiveFilter, buildingFilter, statusFilter, setStatusFilter, buildingRooms, occupiedCount, vacancyCount, buildingsQuery, roomsQuery, maxRooms, isQuotaReached, rooms, activeBuildings, selectedBuildingObj, openCreate, openCreateBuilding, openEditBuilding, compactRoom, columns, clearFilters } = state;
   return <div className="rooms-workspace">
     <PageTitle
       title={t("Phòng & người thuê")}
@@ -57,7 +57,7 @@ function RoomsContent() {
     {buildingsQuery.isError && <LoadError error={buildingsQuery.error} onRetry={() => void buildingsQuery.refetch()} />}
     {roomsQuery.isError ? <LoadError error={roomsQuery.error} onRetry={() => void roomsQuery.refetch()} /> : <SectionCard className="room-directory">
       <div className="room-directory-toolbar">
-        <div className="room-building-filter-group">
+        <div className={`room-building-filter-group${archiveFilter === 'Active' && selectedBuildingObj ? ' has-inline-actions' : ''}`}>
           <label className="room-filter"><span>{t("Dãy trọ")}</span><Select aria-label={t("Lọc theo dãy trọ")} allowClear placeholder={t("Tất cả dãy trọ")} value={buildingFilter} onChange={(value) => { setSearchParams(value ? { building: value } : {}); }} options={[...(buildingsQuery.data ?? []).map((building) => ({ value: building.id, label: building.name })), ...(buildingFilter && buildingsQuery.isSuccess && !buildingsQuery.data.some((building) => building.id === buildingFilter) ? [{ value: buildingFilter, label: t("Dãy không còn tồn tại") }] : [])]} /></label>
           {archiveFilter === 'Active' && selectedBuildingObj && (
             <div className="room-building-inline-actions">
@@ -67,6 +67,19 @@ function RoomsContent() {
             </div>
           )}
         </div>
+        <label className="room-filter">
+          <span>{t("Trạng thái")}</span>
+          <Select
+            aria-label={t("Lọc theo tình trạng")}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: t("Tất cả ({0})", [buildingRooms.length]) },
+              { value: 'occupied', label: t("Đang thuê ({0})", [occupiedCount]) },
+              { value: 'vacant', label: t("Còn trống ({0})", [vacancyCount]) },
+            ]}
+          />
+        </label>
         <div className="room-filter-result" data-filtered={!!buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active'}><span aria-live="polite">{roomsQuery.isPending ? t("Đang tải phòng…") : t("{0} phòng", [rooms.length])}</span>{rooms.length > 0 && (buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active') && <Button type="text" onClick={clearFilters}>{t("Xóa lọc")}</Button>}</div>
       </div>
       {roomsQuery.isPending ? <div className="room-list-loading"><div className="loading-placeholder" /></div> : rooms.length ? <ResponsiveTable className="room-table" rowKey="id" columns={columns} dataSource={rooms} renderCompact={compactRoom} pagination={{ pageSize: 8, showSizeChanger: false, hideOnSinglePage: true }} scroll={{ x: 900 }} /> : <EmptyPanel title={archiveFilter === 'Archived' ? t("Chưa có phòng được lưu trữ") : (roomsQuery.data?.length ?? 0) === 0 ? t("Chưa có phòng nào") : t("Không tìm thấy phòng phù hợp")} description={archiveFilter === 'Archived' ? t("Phòng đã lưu trữ sẽ xuất hiện ở đây để khôi phục.") : (roomsQuery.data?.length ?? 0) === 0 ? t("Tạo phòng trong một dãy trọ để bắt đầu quản lý người thuê.") : t("Không có phòng khớp với bộ lọc hiện tại.")} action={archiveFilter === 'Active' && (roomsQuery.data?.length ?? 0) === 0 ? <Button type="primary" icon={<PlusOutlined />} disabled={!activeBuildings.length} onClick={openCreate}>{t("Tạo phòng trọ")}</Button> : rooms.length === 0 && (buildingFilter || statusFilter !== 'all' || archiveFilter !== 'Active') ? <Button onClick={clearFilters}>{t("Xóa lọc")}</Button> : undefined} />}

@@ -1935,5 +1935,8 @@
   "Bỏ qua hướng dẫn": "Skip tour",
   "Quay lại": "Back",
   "Tiếp theo": "Next",
-  "Hoàn tất hướng dẫn": "Finish tour"
+  "Hoàn tất hướng dẫn": "Finish tour",
+  "Tất cả ({0})": "All ({0})",
+  "Đang thuê ({0})": "Occupied ({0})",
+  "Còn trống ({0})": "Vacant ({0})"
 }

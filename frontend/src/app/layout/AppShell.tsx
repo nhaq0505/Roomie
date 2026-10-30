@@ -11,7 +11,6 @@ import {
   MailOutlined, MenuOutlined, NotificationOutlined, TeamOutlined, UserOutlined, WalletOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../features/auth/session';
-import { OnboardingTourOverlay } from '../../features/dashboard/OnboardingChecklist';
 
 const ChangePasswordModal = lazy(() => import('../../features/auth/ChangePasswordModal'));
 const { Sider, Header, Content } = Layout;
@@ -112,7 +111,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const menu = <Menu theme="dark" mode="inline" selectedKeys={[activeMenuKey]} openKeys={openKeys} onOpenChange={setOpenKeys} items={items} onClick={({ key }) => { navigate(key); setMobileOpen(false); }} />;
 
   return <Layout className="app-layout">
-    {!isStaff && <OnboardingTourOverlay onEnsureSettingsOpen={() => setOpenKeys(keys => keys.includes('settings') ? keys : [...keys, 'settings'])} />}
     {passwordOpen && <Suspense fallback={null}><ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} /></Suspense>}
     <Sider width={250} className="app-sider" breakpoint="lg" collapsedWidth={0} trigger={null} onBreakpoint={(broken) => { if (!broken) setMobileOpen(false); }}>
       <div className="brand"><div className="brand-mark"><RoomieMark /></div><div><strong>Roomie</strong><span>{t("QUẢN LÝ PHÒNG TRỌ")}</span></div></div>
