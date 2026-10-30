@@ -1938,5 +1938,8 @@
   "Hoàn tất hướng dẫn": "Finish tour",
   "Tất cả ({0})": "All ({0})",
   "Đang thuê ({0})": "Occupied ({0})",
-  "Còn trống ({0})": "Vacant ({0})"
+  "Còn trống ({0})": "Vacant ({0})",
+  "Chiến dịch đang được gửi nền. Kết quả sẽ tự cập nhật.": "The campaign is sending in the background. Results will update automatically.",
+  "Đã gửi tới {0}/{1} chủ trọ, {2} người nhận bị lỗi. Bấm Gửi lại để thử lại phần lỗi.": "Sent to {0}/{1} landlords; {2} recipients failed. Click Resend to retry the failed ones.",
+  "Gửi lại": "Resend"
 }

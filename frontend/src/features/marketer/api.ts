@@ -94,6 +94,7 @@ export const marketerApi = {
   sendTestEmail: (id: string, toEmail: string) =>
     request<{ message: string }>(`/api/marketer/emails/${encodeURIComponent(id)}/send-test`, post({ toEmail })),
 
+  // Returns the campaign state; 202 without a body means the background dispatch is still running.
   sendEmailCampaign: (id: string) =>
-    request<MarketerEmailDispatchResponse>(`/api/marketer/emails/${encodeURIComponent(id)}/send`, post({})),
+    request<MarketerEmailDispatchResponse | undefined>(`/api/marketer/emails/${encodeURIComponent(id)}/send`, post({})),
 };

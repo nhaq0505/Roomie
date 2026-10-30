@@ -121,6 +121,8 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
 - Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
 - Manual receipt bằng toàn bộ dư nợ. Với pending payOS đơn: phải xác minh hủy an toàn; nếu provider đã Paid thì reconcile và không ghi tiền tay thêm. Pending batch chặn ghi riêng/sửa/cọc/trả phòng liên quan.
+- Tạo link payOS gặp timeout/5xx/phản hồi không chắc chắn thì attempt **giữ Pending**; không suy ra hủy từ lỗi provider. Ngoại lệ duy nhất (`PayOsService.IsExpiredUnlinkedOrderNotFound`, chỉ ở luồng đối soát hóa đơn và gói Pro): attempt chưa từng có `CheckoutUrl/PaymentLinkId/QrCode`, đã quá `ExpiresAt`, và payOS trả HTTP 2xx `code == "101"` (PAYMENT_LINK_NOT_FOUND) với `data == null` → chuyển `Failed` để giải phóng giữ chỗ. Attempt đã có link luôn giữ hành vi cũ. Không nới điều kiện này sang mã lỗi khác.
+- Gói Pro chỉ dùng khóa payOS từ env `AdminPayOS:*` (hoặc `PAYOS_ADMIN_*`/`PAYOS_*`) hoặc `PaymentSettings` của tài khoản Admin Approved; thiếu cả hai thì từ chối checkout/webhook gói Pro, **không** fallback sang khóa của chủ trọ. Production (30/10/2026) đang dùng `PaymentSettings` của Admin được sao chép từ chủ trọ `anhquan050503@gmail.com`; bản sao không tự đồng bộ khi chủ trọ đó đổi khóa.
 - Manual VietQR chỉ tạo yêu cầu; chỉ owner xác nhận tiền thực nhận. Confirm kiểm toàn bộ allocation/balance và commit nguyên tử; stale request không được ghi một phần. Confirm replay không sinh receipts mới.
 - Panel yêu cầu VietQR chỉ liệt kê `ConfirmedAt == null && DismissedAt == null`; đánh giá lại dư nợ, occupancy, Issued lifecycle và reservation của toàn bộ allocation trên mỗi lần đọc/xác nhận. Yêu cầu cũ đã thu đủ/thay đổi/không còn khả dụng chỉ cho đối chiếu rồi bỏ khỏi danh sách qua `POST /api/manual-payments/{id}/dismiss`, không ghi receipt hay đánh dấu confirmed. Hạn 24 giờ là tái sử dụng QR/request, không phải hạn xác nhận tiền thực nhận hoặc bảo đảm ngân hàng ngừng nhận tiền.
 - Ảnh VietQR ở `img.vietqr.io` là dịch vụ ảnh bên ngoài, không dùng để xác minh tiền; không gửi tenant token trong URL ảnh, giữ `referrerPolicy=no-referrer` và CSP allowlist cụ thể.
@@ -145,153 +147,14 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Giờ gửi 07:00 đến trước 21:00 Việt Nam; cách ít nhất 5 giây/owner; cooldown 20 giờ kể cả kết quả Unknown. Không tự retry Unknown vì tin có thể đã gửi.
 - Gateway session + ledger AES-256-GCM, ghi nguyên tử/fsync. Một process gateway/một volume; không chia volume cho nhiều process. Khôi phục backup cũ có thể mất receipt mới: đối chiếu Zalo trước khi bật gửi lại.
 - Gateway Zalo (`zalo-gateway/` qua `zca-js`) và Gateway WhatsApp (`whatsapp-gateway/` qua `@whiskeysockets/baileys`) đều dùng kết nối QR cá nhân chạy song song độc lập (`/settings/zalo` và `/settings/whatsapp`), không phải ZNS/OA hay WhatsApp Cloud API trả phí; không coi test fake là nghiệm thu gửi thật.
-- Phân luồng kênh theo mã quốc gia (`shared/ui/PhoneInput.tsx`): số di động Việt Nam (`+84` / `0[35789]\d{8}`) **chỉ** gửi qua Zalo (`ZaloReminderService.NormalizePhone`); số quốc tế (E.164 `^\+[1-9]\d{6,14}# Roomie — hướng dẫn tiếp quản
+- Phân luồng kênh theo mã quốc gia (`shared/ui/PhoneInput.tsx`): số di động Việt Nam (`+84` / `0[35789]\d{8}`) **chỉ** gửi qua Zalo (`ZaloReminderService.NormalizePhone`); số quốc tế (E.164 `^\+[1-9]\d{6,14}$`, khác `+84`) mặc định gửi qua WhatsApp (`WhatsAppReminderService.NormalizePhone`).
+- Production (30/10/2026) chạy WhatsApp gateway ở container riêng `rehouse-whatsapp-1` khai báo trong Compose host (`/opt/rehouse/compose.yaml`), không nằm trong `deploy/compose.yaml` của repo; image app không còn đóng gói node/whatsapp-gateway. Không đổi mặc định `WhatsApp:Enabled` mà chưa đối chiếu host.
 
-Đọc file này trước khi sửa dự án. Đây là tài liệu bàn giao kỹ thuật chính; README chỉ hướng dẫn vào dự án, runbook trong `docs/` chỉ dành cho thao tác vận hành. Khi code đổi, sửa mục tương ứng ở đây thay vì tạo thêm báo cáo bàn giao theo ngày.
+### Chiến dịch Email Marketer
 
-Baseline rà soát: `e4fe403`, ngày 25/10/2026. Mô tả dưới đây dựa trên repository, không phải kết luận về phiên bản hay dữ liệu đang chạy trên VPS. Kiểm tra `git status`, `git log` và CI trước khi tiếp tục; không ghi đè thay đổi đang có của người dùng.
-
-## 1. Sản phẩm và các quyết định đang áp dụng
-
-Roomie (`https://roomie.io.vn`) quản lý nhà trọ cho nhiều chủ trọ: dãy/phòng, lượt thuê, chỉ số điện, hóa đơn, cọc, trả phòng, báo cáo Excel, thanh toán payOS hoặc xác nhận thủ công, nhắc hóa đơn qua Zalo. Admin quản lý chủ trọ, nhân sự Marketer và dashboard growth/revenue/operations. Marketer quản lý phễu tăng trưởng/doanh thu/chi phí chiến dịch (`/admin/monitoring`), mã khuyến mãi & link Auto-Promo (`/admin/promotions`), CRM & phân khúc chủ trọ (`/marketer/leads`), CMS Cẩm nang SEO & Banner (`/marketer/content`, `/huong-dan/:slug`) và chiến dịch Email theo phân khúc (`/marketer/emails`), nhưng bị chặn (`403 Forbidden`) khỏi toàn bộ dữ liệu vận hành hạ tầng (`Operations`, `Incidents`, `Maintenance`), duyệt/khóa chủ trọ và dữ liệu nhạy cảm của khách thuê/ngân hàng. Camera/OCR/AI chưa triển khai.
-
-- Đăng ký email OTP thành công tạo **Owner Approved**, gói Free (hoặc Pro có thời hạn nếu cấu hình `Promotions:NewUserProMonths > 0` hoặc đăng ký qua link Auto-Promo `/register?promo=CODE`). Đừng dựa vào README cũ nói mọi tài khoản mới phải chờ duyệt. Admin vẫn có thể đổi trạng thái Pending/Approved/Rejected/Suspended.
-- Sổ chi phí (`/expenses`) mở cho cả Free; lãi/lỗ, đối chiếu điện EVN, Excel hai báo cáo đó, chi định kỳ và chứng từ là Pro. Chi tiết bất biến ở mục 5 "Sổ chi phí, lãi/lỗ và chứng từ".
-- Free tối đa 5 phòng đang sử dụng; Pro có thời hạn hoặc vô thời hạn. Kiểm tra `AppUser.IsPro/MaxRooms` và endpoint subscription trước khi sửa quota.
-- Đăng nhập chỉ dùng mật khẩu. Các cột MFA cũ vẫn tồn tại để tương thích schema, không phải tính năng cần bật lại.
-- Mật khẩu mới 9–256 ký tự, không toàn khoảng trắng, không ép ký tự đặc biệt.
-- Tiền thuê tính **đủ tháng**, không chia theo ngày vào/ra. Ngày và kỳ nghiệp vụ theo Việt Nam (UTC+7).
-- Khoản thu thủ công mới phải bằng **toàn bộ dư nợ**; dữ liệu thanh toán một phần cũ vẫn hợp lệ. Không phục hồi UI nhập khoản thu một phần từ test/doc lịch sử.
-- Tin Zalo dẫn về **`/t/{token}`**, để khách xem hóa đơn rồi tự chọn thanh toán. Không gửi thẳng checkout, số tài khoản hay ảnh QR trong tin.
-- `frontend/public/robots.txt` cố ý chặn mọi bot (`User-agent: *`, `Disallow: /`) theo yêu cầu người dùng. Không tự mở crawl, gửi sitemap hay yêu cầu index.
-- Cẩm nang hướng dẫn (`/huong-dan` và `/huong-dan/:slug`) kết hợp danh mục hướng dẫn tĩnh với bài viết CMS xuất bản từ `MarketingArticle` (`/api/public/guides`). Đo bằng Search Console và telemetry nội bộ, không tự thêm GA4 hay hứa traffic/thứ hạng.
-- Logo đang dùng trong app: `frontend/src/shared/ui/RoomieMark.tsx`, `frontend/public/roomie-logo.svg`, `favicon.svg`; ảnh social `roomie-social.png/.svg`; email `backend/RoomRental.Api/Assets/roomie-email-logo.png`. Bản logo/cover Facebook mới nằm trong `output/facebook/`, chưa tự thay vào app.
-
-## 2. Bản đồ repository
-
-| Đường dẫn | Vai trò / điểm bắt đầu |
-| --- | --- |
-| `backend/RoomRental.Api/Program.cs` | DI, provider DB, workers, cookie, limiter, middleware, đăng ký routes, SPA fallback |
-| `backend/RoomRental.Api/Domain/` | Entities và DTO; monitoring, Zalo, manual payments, recovery, marketer CRM/content/emails có file riêng |
-| `backend/RoomRental.Api/Data/AppDbContext.cs` | Toàn bộ mapping, indexes, concurrency tokens, DbSets |
-| `backend/RoomRental.Api/Data/ProviderDbContexts.cs` | Context/factory PostgreSQL |
-| `backend/RoomRental.Api/Data/Migrations/Postgres/` | Migration, designer và snapshot cho PostgreSQL |
-| `backend/RoomRental.Api/Features/` | Endpoint/service chia theo Auth, Admin, Marketer, Properties, Billing, Payments, Reports, Zalo, Monitoring |
-| `backend/RoomRental.Api/Shared/` | Security, SEO, calendar, lookup owner/property, pagination, fingerprint, cleanup |
-| `compose.postgres-dev.yaml` | Compose PostgreSQL dev local (container `rehouse-pg-migration-db`, port 15432) |
-| `frontend/src/app/` | Entry React, routing, layout, CSS assembly, metadata và prerender entry |
-| `frontend/src/features/` | API, types, page, hook và CSS theo nghiệp vụ |
-| `frontend/src/shared/` | HTTP, i18n, analytics, format, theme, UI dùng chung |
-| `frontend/scripts/` | Build/check i18n, architecture, prerender và các test Node |
-| `frontend/e2e/` | Playwright với API giả lập; không phụ thuộc API vận hành |
-| `zalo-gateway/` | Node 24 + zca-js, đăng nhập Zalo QR, lưu phiên và ledger mã hóa |
-| `whatsapp-gateway/` | Node 24 + `@whiskeysockets/baileys`, đăng nhập WhatsApp QR (Linked Devices), lưu phiên và ledger mã hóa |
-| `tests/` | Console C# suites, HTTP Python harness, SMTP sink, tests backup/host collector |
-| `.github/workflows/ci-cd.yml` | Các cổng CI, image đã kiểm thử, GHCR và deploy theo digest |
-| `deploy/` | Production Compose, migration overlay, backup/restore, role DB, Caddy, firewall, host collector |
-| `scripts/` | Tiện ích webhook tunnel |
-| `rehouse-video/` | Dự án Remotion độc lập, mock quảng cáo dùng tên ReHouse cũ; không nằm trong runtime/build app |
-| `.agents/skills/ui-ux-pro-max/` | Skill UI/UX Pro Max từ nextlevelbuilder, thay skill ui-ux cũ; dữ liệu và công cụ tìm kiếm chạy local, tuân thủ stack/quy ước dự án |
-| `output/`, `artifacts/`, `out/` | Deliverables, bằng chứng QA hoặc bản sao công việc; không tự coi mọi file trong đây là rác |
-
-Tên assembly/namespace, cookie `phongtro.session`, image `ghcr.io/nhaq0505/rehouse`, path host `/opt/rehouse` vẫn giữ tên cũ. Đổi tên thương hiệu không có nghĩa được đổi những định danh này đồng loạt.
-
-## 3. Đọc code theo việc cần làm
-
-| Việc | Backend | Frontend / test chính |
-| --- | --- | --- |
-| Đăng ký, login, đổi/reset mật khẩu, hồ sơ chủ trọ (`/profile`) | `Features/Auth/`, `Shared/RequestSecurityMiddleware.cs` | `features/auth/` (`OwnerProfilePage.tsx`), `AuthSecurityHttpTests`, `RegistrationVerificationTests`, `PasswordRecoveryTests` |
-| Dãy, phòng, lượt thuê, cấp link | `Features/Properties/OwnerManagementEndpoints.*`, `TenantTokenService.cs` | `features/buildings`, `features/rooms`, `RoomTenantPage.tsx`, `RoomTenantLifecycleHttpTests`, `TenantLinkHttpTests` |
-| Hợp đồng thuê trọ, CT01, quét QR CCCD / Passport MRZ & ảnh giấy tờ | `Features/Properties/OwnerManagementEndpoints.Documents.cs` (`/api/rooms/{id}/documents/identity-photo`), `ContractWordGenerator.cs`, `Domain/ContractDocuments.cs`, `Domain/TenantPortalSubmissions.cs`, `Shared/VietnameseMoneyReader.cs` | `RoomDocumentsPage.tsx`, `ContractDocumentsDrawer.tsx`, `shared/ui/CccdQrScannerModal.tsx`, `shared/ui/cccdQr.ts`, `shared/i18n/legalTemplates.ts`, `ContractDocumentsAndMoneyTests.cs`, `test-cccd-qr.mjs`, `RoomTenantLifecycleHttpTests`, `landlord.spec.ts` |
-| Chốt điện, tạo/phát hành/sửa hóa đơn | `Features/Billing/BillingEndpoints.*`, `InvoiceService.cs` | `features/readings` (`ReadingsPage.tsx`), `features/invoices`, `AccountingBillingHttpTests`, `RoomTenantLifecycleHttpTests`, `landlord.spec.ts` |
-| Ghi thu, cọc, trả phòng | `ManualReceiptService.cs`, `DepositEndpoints.cs`, `Properties/MoveoutEndpoints.cs` | `DepositLedger.tsx`, `MoveoutDrawer.tsx`, `ManualReceiptTests` |
-| payOS, checkout gộp, webhook | `Features/Payments/PayOsService.*`, `PaymentEndpoints.cs`, `PaymentReservations.cs` | `features/tenant`, `PayOsPaymentTests`, `BatchPaymentTests`, `PayOsOperationsHttpTests` |
-| VietQR, xác nhận chuyển khoản | `ManualPaymentEndpoints.cs`, `PaymentPreferencesEndpoints.cs`, `Domain/ManualPayments.cs` | `ManualPaymentRequests.tsx`, `PaymentModeSettings.tsx`, `ManualPaymentPanel.tsx`, `test_payment_modes.py` |
-| Nâng cấp Pro & Khuyến mãi | `BillingEndpoints.Subscription.cs`, `PayOsService.Subscriptions.cs`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Promotions.cs`, `Features/Auth/RegistrationVerificationService.cs` | `features/subscription`, `features/admin/AdminPromotionsPage.tsx`, `PromotionsTests.cs`, `test_billing_upgrade.py`, `admin.spec.ts`, `landlord.spec.ts` |
-| Báo cáo/xuất Excel | `Features/Reports/ReportsEndpoints.*` | `features/reports`, `test_reports_archive.py` |
-| Sổ chi phí, chi định kỳ, chứng từ, lãi/lỗ, đối chiếu điện EVN | `Features/Expenses/` (`ExpenseEndpoints*.cs`, `RecurringExpenseEndpoints.cs`, `RecurringExpenseGenerator.cs`, `ExpenseSupport.cs`), `Domain/Expenses.cs`, `Features/Reports/ReportsEndpoints.ProfitLoss.cs` | `features/expenses`, `features/reports/ProfitLossPanel.tsx`, `ElectricityReconciliationPanel.tsx`, `shared/ui/ProUpsell.tsx`, `ExpenseLedgerHttpTests.cs`, `e2e/expenses.spec.ts` |
-| Nhắc Zalo & WhatsApp | `Features/Zalo/`, `Features/WhatsApp/`, `Domain/Zalo.cs`, `Domain/WhatsApp.cs` | `features/zalo`, `features/whatsapp`, `RoomRental.ZaloTests`, `test_zalo_http.py`, `zalo-gateway/test`, `whatsapp-gateway/test` |
-| Theo dõi growth/revenue & ROAS | `Features/Monitoring/MonitoringServices.cs`, interfaces/entities/DTO cùng nhóm | `features/admin/monitoring`, `shared/analytics`, `MonitoringBusinessTests`, `MarketerSuiteHttpTests` |
-| Marketer CRM, CMS SEO/Banner & Email | `Features/Marketer/`, `Features/Admin/AdminPromotionsEndpoints.cs`, `Domain/Marketer*.cs` | `features/marketer`, `features/marketing/GuideArticlePage.tsx`, `shared/ui/ActiveBannerStrip.tsx`, `MarketerSuiteHttpTests`, `admin.spec.ts` |
-| Host/API/worker monitoring | `Features/Monitoring/Operations/`, `deploy/monitoring/` | `OperationsTab.tsx`, `OperationsMonitoringTests`, `test_host_collector.py` |
-| Landing/SEO | `Shared/SeoMiddleware.cs` | `features/marketing`, `app/seo`, `scripts/prerender.mjs`, `SeoAndRoutingUnitTests.cs`, `test_seo_http.py`, `smoke.spec.ts` |
-
-API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoint trên; DTO ở `Domain/ApiDtos.cs`, `MonitoringDtos.cs`, `ReportDtos.cs`, `ManualPayments.cs`, `PasswordRecovery.cs`. Đối chiếu handler và DTO trước khi sửa consumer; không duy trì một bản liệt kê API thủ công tách rời code.
-
-## 4. Kiến trúc và quy ước sửa code
-
-### Frontend
-
-- React 19, TypeScript 5.8, Vite 6, React Router 7, TanStack Query 5, Ant Design 5; CSS thuần. Không tự đưa Tailwind/bộ UI khác vào chỉ để sửa một màn.
-- `app → features → shared`. Shared không import app/features. Feature không import app hoặc `src/api.ts`; giữa các feature dùng public `index.ts`, ngoại lệ phiên auth là `auth/session.ts`. `check:architecture` kiểm imports và vòng phụ thuộc runtime.
-- `frontend/src/api.ts` là facade tương thích cho consumer/test cũ, không phải nơi thêm logic nghiệp vụ. Không xóa vì thấy app không import trực tiếp.
-- Trang phức tạp dùng hook `use*Page` và component nhận dữ liệu/handler; giữ vòng đời idempotency key, query key và invalidation khi refactor.
-- HTTP qua `shared/http/client.ts`: same-origin cookie, Accept-Language, timeout, unwrap envelope, `ApiError`; mutation không retry tự động. Excel dùng `requestBlob`.
-- `app/styles.css` ghép CSS theo thứ tự có chủ đích. Giữ cascade khi di chuyển rule. Nền/brand nằm ở `shared/styles/foundation.css`, Ant token ở `shared/design/antdTheme.ts`; font toàn hệ thống Be Vietnam Pro (nội dung, tiêu đề, số liệu và Ant Design); giữ monospace cho mã/nội dung chuyển khoản.
-- Tiếng Việt là nguồn; `shared/i18n/source.json` và `translations.tsv` cùng các catalog en/zh/ko/hi. Dùng `t()`; sau đổi copy chạy `i18n:build`, `i18n:check`; đọc script trước khi sửa trực tiếp catalog sinh ra.
-- Routes private phải đồng bộ `app/App.tsx`, `app/seo/site.ts`, `Shared/SeoMiddleware.cs`. Router React không đủ để hard-refresh chạy trên server.
-- Prerender sinh HTML tĩnh cho bộ 4 trang công khai (`/` → `dist/index.html`, `/features` → `dist/features/index.html`, `/pricing` → `dist/pricing/index.html`, `/huong-dan` → `dist/huong-dan/index.html`), `app.html` cho SPA và `sitemap.xml`. Không xuất renderer build-only vào production. Trang lạ/API lạ phải trả 404 thật.
-- Bộ Landing page (`LandingPage.tsx`, `LandingVisuals.tsx`, `LandingSections.tsx`, `GuideArticlePage.tsx`, `LandingPage.css`) chia thành 4 trang trên thanh điều hướng: Trang chủ (`/`) ngắn gọn + thẻ khám phá, Tính năng & So sánh (`/features`), Bảng giá Free/Pro & FAQ `<details>/<summary>` (`/pricing`), và Cẩm nang hướng dẫn (`/huong-dan`, cùng trang chi tiết `/huong-dan/:slug`), dùng chung `LandingHeader` (gồm cả `.landing-subnav` mobile), `LandingCtaSection` và `LandingFooter`. Landing motion dùng IntersectionObserver/Web Animations; giữ nội dung nhìn được khi thiếu JS, Reduce Motion hoặc thiếu API; focus bàn phím phải hủy reveal đang che link.
-- Dashboard monitoring có Growth/Revenue/Operations, filter ngày Việt Nam, campaign costs và UTM link builder. `null`/Unknown phải hiển thị chưa có dữ liệu cùng lý do, không biến thành 0 hoặc 100%.
-
-### Backend
-
-- ASP.NET Core .NET 10 Minimal APIs, EF Core 10 + Npgsql, ClosedXML cho Excel, MailKit cho SMTP. Chỉ một API project; namespaces cũ `RoomRental.Api.Endpoints`/`Services` vẫn được dùng trong nhiều thư mục Features.
-- Middleware: trusted forwarded headers → latency → exception/security headers → SEO/static → routing/limiter → authentication → request security → authorization. Thứ tự ảnh hưởng đo lỗi, HTTPS, cookie và same-origin.
-- Mỗi query nghiệp vụ phải scope owner và occupancy đúng; `PropertyLookup` giữ kiểm tra owner/archive, `PaymentReservations.Pending` nhận diện cả thành viên batch và attempt đơn cũ.
-- Danh sách hóa đơn gộp `total`/ba tổng tiền/`draftCount` và Dashboard gộp 5 chỉ tiêu tiền trong một aggregate SQL trên toàn bộ query đã lọc; tập rỗng trả 0, tiền chỉ cộng Issued. Không đổi cách tính dư nợ `Total - Paid` hoặc response mảng cũ khi thiếu `page`. Regression và đếm SQL nằm trong `AccountingBillingHttpTests.InvoiceListSummaryAsync`.
-- Ngày/kỳ dùng `VietnamCalendar`/`ApiSupport.VietnamDate`, không dùng ngày UTC của máy để chốt tháng Việt Nam. Fingerprint qua `RequestFingerprint`; đổi serializer/chuẩn hóa có thể phá replay đã lưu.
-- Model change: tạo migration cho PostgresAppDbContext, commit Up/Down/designer/snapshot. Không chỉnh migration đã phát hành hoặc xóa lịch sử migration để “dọn code”.
-- Startup Development có thể migrate; Production chỉ kiểm tra pending migrations. Runner schema hiện tại là **API image với `Database__MigrateOnly=true`**, dùng `deploy/migrate.yaml` và role riêng trước khi thay app.
-
-## 5. Những bất biến không được làm mất
-
-### Auth và dữ liệu riêng tư
-
-- Cookie HttpOnly/SameSite=Lax, mặc định 12 giờ (hoặc 14 ngày khi chọn "Ghi nhớ đăng nhập" `RememberMe = true`), tự động gia hạn trượt (sliding) cả `AuthSessions.ExpiresAt` và cookie khi thời hạn còn lại ≤ một nửa; Production Secure. Session `sid` phải còn hiệu lực trong DB ở mỗi request. Rejected/Suspended bị chặn; Owner Pending chỉ đi auth/account flow.
-- Request ghi của phiên đã đăng nhập phải qua same-origin guard; webhook payOS có ngoại lệ riêng và xác minh chữ ký. Không bỏ guard để chữa test thiếu Origin.
-- Đổi mật khẩu giữ phiên hiện tại và thu hồi thiết bị khác; reset hoàn tất thu hồi tất cả. OTP không phải MFA login.
-- Đăng ký OTP: code 6 số/10 phút, challenge 30 phút, tối đa 5 lần sai, resend 60 giây, 5 email/giờ. Xác minh tạo user và consume bằng chứng nguyên tử. Đừng tạo user login được trước xác minh.
-- Recovery: forgot → verify OTP → grant reset dùng một lần/10 phút → complete; phản hồi email tồn tại/không tồn tại cùng dạng. Worker nhận mail trước SMTP; lỗi/dừng lúc gửi không tự retry, người dùng xin mã mới. SMTP accepted không chứng minh đã vào inbox.
-- DataProtection keys giải mã tenant tokens, payOS credentials và recovery code đang chờ. Mất keys có thể làm mất khả năng dùng dữ liệu dù DB vẫn còn; backup DB và key ring cùng recovery point.
-- Tenant token là bearer secret theo **lượt thuê**, hash để lookup, bản mã để chủ trọ chia sẻ lại. Rotate/thu hồi/trả phòng vô hiệu token cũ; không đổi sang token theo RoomId.
-- Cấp/hiện link mới yêu cầu Automatic có webhook Verified hoặc Manual có bank details hợp lệ; xem `TenantTokenService.CanShareAsync`. Bypass chỉ dùng fixture Development, không Production.
-- Chế độ nhận tiền mặc định của chủ trọ mới là `Manual` (VietQR thủ công). Lưu cấu hình payOS (`PUT /api/settings/payment`) tự chuyển `PaymentConfirmationMode` sang `Automatic`.
-- payOS cấu hình riêng từng owner: Client ID/API Key/Checksum Key lưu mã hóa, không trả secret về UI. Lưu và xác minh gọi `confirm-webhook` với origin HTTPS từ config server; đổi origin/khóa làm verification cũ hết hiệu lực. Manual lưu ngân hàng/tài khoản riêng, không xóa khóa payOS; pending attempt chặn đổi chế độ/thông tin nhận tiền.
-- Dashboard chủ trọ (`DashboardPage.tsx`) hiển thị trực tiếp 4 thẻ thống kê tháng, thống kê toàn thời gian, danh sách việc cần làm, tỷ lệ lấp đầy phòng và hóa đơn gần đây (đã bỏ khối Hướng dẫn bắt đầu nhanh và Thao tác nhanh theo yêu cầu).
-
-### Hóa đơn, tiền và trả phòng
-
-- Snapshot đơn giá, số người, meter, tên dãy/phòng/khách thuộc lịch sử hóa đơn. Sửa phòng/lượt thuê không được tính lại Issued invoice cũ bằng giá hiện tại.
-- Chỉ số điện và nước (khi phòng bật `WaterByMeter = true`) không lùi; kỳ/occupancy và trạng thái Draft/Issued phải được kiểm tra. Một Monthly/occupancy/period và một Deposit/occupancy theo unique indexes. Các ô nhập chỉ số điện và đồng hồ nước (`m³`) trên UI chỉ nhận số nguyên (`precision={0} step={1}`); chủ trọ có thể sửa `InitialReading`/`InitialWaterReading` trong `PATCH /api/rooms/{id}/occupancy` khi chưa có hóa đơn tháng Issued (hóa đơn Draft đầu kỳ chưa thu tiền tự tính lại).
-- Revision/version/request fingerprint/idempotency là hợp đồng chống stale write/replay, không phải trường dư. Giữ transaction bao toàn bộ ghi tiền và cập nhật trạng thái.
-- payOS chỉ ghi tiền từ bằng chứng server đã xác minh chữ ký, order, owner và số tiền chính xác. Return URL, QR hay provider status ở browser không đủ để đánh dấu Paid.
-- Một batch giữ allocation snapshot và reservation trên **mọi hóa đơn thành viên**. Webhook/reconcile phân bổ receipts trong cùng transaction, replay không cộng tiền lần nữa.
-- Manual receipt bằng toàn bộ dư nợ. Với pending payOS đơn: phải xác minh hủy an toàn; nếu provider đã Paid thì reconcile và không ghi tiền tay thêm. Pending batch chặn ghi riêng/sửa/cọc/trả phòng liên quan.
-- Manual VietQR chỉ tạo yêu cầu; chỉ owner xác nhận tiền thực nhận. Confirm kiểm toàn bộ allocation/balance và commit nguyên tử; stale request không được ghi một phần. Confirm replay không sinh receipts mới.
-- Panel yêu cầu VietQR chỉ liệt kê `ConfirmedAt == null && DismissedAt == null`; đánh giá lại dư nợ, occupancy, Issued lifecycle và reservation của toàn bộ allocation trên mỗi lần đọc/xác nhận. Yêu cầu cũ đã thu đủ/thay đổi/không còn khả dụng chỉ cho đối chiếu rồi bỏ khỏi danh sách qua `POST /api/manual-payments/{id}/dismiss`, không ghi receipt hay đánh dấu confirmed. Hạn 24 giờ là tái sử dụng QR/request, không phải hạn xác nhận tiền thực nhận hoặc bảo đảm ngân hàng ngừng nhận tiền.
-- Ảnh VietQR ở `img.vietqr.io` là dịch vụ ảnh bên ngoài, không dùng để xác minh tiền; không gửi tenant token trong URL ảnh, giữ `referrerPolicy=no-referrer` và CSP allowlist cụ thể.
-- Cọc và phần giữ/hoàn/khấu trừ là ledger riêng; Refund chỉ ghi nhận giao dịch bên ngoài, không tự chuyển tiền. Không tính cọc/credit cọc thành doanh thu thuê trọ.
-- Trả phòng yêu cầu xử lý nợ Issued, Draft và pending payment; lưu completion chống replay, thu hồi token, ngày kết thúc Việt Nam, nâng meter baseline. Không tự tạo hóa đơn cuối hoặc chuyển khoản hoàn cọc.
-- Báo cáo Excel giữ ô tiền kiểu số và chống formula injection từ tên/note người dùng.
-
-### Sổ chi phí, lãi/lỗ và chứng từ
-
-- Free được ghi/sửa/xóa khoản chi thủ công. Pro mới có: báo cáo lãi/lỗ, đối chiếu điện EVN (kể cả ghi trường `UtilityPeriod/UtilityKwh`), Excel của hai báo cáo này, chi định kỳ và tải chứng từ. Hết Pro: dữ liệu cũ vẫn xem/tải được, mẫu định kỳ ngừng sinh (`skipReason=ProRequired`), không tải chứng từ mới. Kiểm Pro ở server bằng `ExpenseSupport.IsProAsync` (cùng điều kiện `AppUser.IsPro`), không tin UI.
-- "Thực thu" của lãi/lỗ dùng **đúng** điều kiện `invoiceCash` của tab Thu tiền: receipt `Source != "Deposit"` của hóa đơn Issued `Kind != "Deposit"`, theo tháng Việt Nam của `Receipt.CreatedAt`. Không cộng tiền cọc/khấu trừ cọc vào thu; đổi định nghĩa phải đổi cả hai báo cáo.
-- Lọc theo dãy loại khoản chi chung (`BuildingId == null`) và trả `sharedExpensesExcluded`; không tự phân bổ chi chung. Khoảng báo cáo tối đa 24 tháng.
-- Khoản chi: tiền VND nguyên 1..10 tỷ, `ExpenseDate` không ở tương lai theo ngày Việt Nam, xóa mềm (`DeletedAt`) và xóa luôn chứng từ để giải phóng quota. Tạo có `Idempotency-Key` + fingerprint (unique `(OwnerId, IdempotencyKey)`), sửa/xóa bắt buộc `expectedVersion`. Liên kết mới vào dãy/phòng lưu trữ bị chặn; liên kết cũ không đổi vẫn sửa được.
-- Chi định kỳ: `RecurringExpenseWorker` (mỗi giờ, tắt bằng `EnableRecurringExpenses=false`) và lúc tạo/sửa/tiếp tục mẫu gọi `RecurringExpenseGenerator`; chỉ backfill tối đa 2 tháng, ngày 1–28. Chống trùng bằng unique `(RecurringExpenseId, RecurrencePeriod)` gồm cả dòng đã xóa mềm + `INSERT … ON CONFLICT DO NOTHING`: xóa khoản đã sinh thì không sinh lại. Sửa mẫu không sửa các tháng đã ghi.
-- Chứng từ lưu `bytea` trong PostgreSQL để backup `pg_dump` hiện có bao gồm luôn; không chuyển sang file system/volume nếu chưa sửa backup/restore. Chỉ nhận JPEG/PNG/WebP/PDF theo magic bytes, ≤2 MB/tệp, ≤5 tệp/khoản, ≤200 MB/owner; tải về có `nosniff`, `private, no-store`, CSP sandbox, PDF luôn `attachment`. List không bao giờ select cột `Content`.
-- Đối chiếu điện: kWh/tiền EVN lấy từ khoản chi `Electricity` có `UtilityPeriod`; kWh/tiền đã lập lấy từ snapshot `Invoice.Consumption/ElectricityAmount` của hóa đơn Issued không phải cọc. Thiếu hóa đơn EVN → `lossPercent = null` + `lossNullReason`, không hiển thị 0%; cảnh báo số hóa đơn nháp.
-
-### Zalo & WhatsApp
-
-- Invoice mới/phát hành Draft stage reminder **cùng transaction** với hóa đơn; không gọi Zalo trong request lưu hóa đơn và không sweep lịch sử để tự nhắc hóa đơn cũ khi nâng cấp.
-- Một slot DB/InvoiceId, lease dispatch theo owner, attempt id và ledger gateway chống gửi lặp qua restart. Có thể queue khi mất kết nối, nhưng dispatch phải kiểm lại tenant/payment/phone/owner/invoice.
-- Giờ gửi 07:00 đến trước 21:00 Việt Nam; cách ít nhất 5 giây/owner; cooldown 20 giờ kể cả kết quả Unknown. Không tự retry Unknown vì tin có thể đã gửi.
-- Gateway session + ledger AES-256-GCM, ghi nguyên tử/fsync. Một process gateway/một volume; không chia volume cho nhiều process. Khôi phục backup cũ có thể mất receipt mới: đối chiếu Zalo trước khi bật gửi lại.
-, khác `+84`) mặc định gửi qua WhatsApp (`WhatsAppReminderService.NormalizePhone`).
+- `POST /api/marketer/emails/{id}/send` khóa nguyên tử Draft/Failed → `Sending` (`ExecuteUpdate`, 409 nếu đang gửi/đã xong) rồi chạy vòng gửi nền độc lập request (`DispatchCampaignCoreAsync`, chỉ dừng theo `ApplicationStopping`). Request chờ tối đa 15 giây rồi trả DTO hiện tại (có thể vẫn `Sending`) hoặc 202; frontend tự poll khi còn chiến dịch `Sending`.
+- Mỗi người nhận lưu `MarketingEmailRecipientLog` ngay sau khi gửi bằng `CancellationToken.None` và cập nhật heartbeat `UpdatedAt`. Gửi lại chỉ bỏ qua log `Sent`; log `Failed` được gửi lại. Còn lỗi thì chiến dịch về `Failed` để Marketer bấm Gửi lại.
+- Chiến dịch kẹt `Sending` được đưa về `Failed` khi app khởi động hoặc khi quá `StaleSendingTimeout` (2 phút) không heartbeat và không còn task trong process; crash giữa SMTP accepted và lưu log có thể gửi trùng tối đa 1 người nhận. SMTP thiếu cấu hình trả 503 (`IMarketingEmailSender.EnsureConfigured`), không báo gửi thành công giả.
 
 ### Monitoring
 
@@ -537,4 +400,4 @@ npm --prefix whatsapp-gateway test`: **13/13 tests PASS**.
   4. **Chưa tự khởi chạy `whatsapp-gateway` khi thiếu cấu hình container rời**: Khi chạy local hoặc trên VPS (`rehouse-app-1`) chưa khai báo biến môi trường `WhatsApp__GatewayUrl`/`WhatsApp__GatewayToken` riêng, `WhatsAppGateway.Enabled` trả về `false`.
 - **Cách khắc phục**:
   - `whatsapp-gateway/src/whatsapp.mjs`, `gateway.mjs`, `server.mjs`: hỗ trợ giải nén đúng `makeWASocket`/`toDataURL` cho cả CommonJS namespace và ESM mock; tự động lấy `fetchLatestWaWebVersion()` / `fetchLatestBaileysVersion()` (kèm cache 6 giờ và fallback `[2, 3000, 1051697602]`); xử lý `isNewLogin` + tự mở lại socket khi gặp `515 restartRequired`; tắt log pino mặc định để không in khóa/payload ra stdout; `POST /owners/:id/connect` đợi tối đa 5 giây đến khi rời trạng thái `Connecting` để trả thẳng `QrReady` + `qrImage` về UI.
-  - `backend/RoomRental.Api/Features/WhatsApp/WhatsAppGateway.cs`, `Program.cs`, `Dockerfile`: bổ sung `WhatsAppLocalGatewayHost` tự động khởi chạy và giám sát tiến trình `whatsapp-gateway/src/server.mjs` nội bộ trên loopback khi không cấu hình `WhatsApp:GatewayUrl` ngoài (lưu khóa `.session-secret` và phiên mã hóa tại `/app/data/whatsapp-sessions` cùng volume với `DataProtection`), đồng thời đóng gói `node` và `whatsapp-gateway` vào `Dockerfile`.
+  - `backend/RoomRental.Api/Features/WhatsApp/WhatsAppGateway.cs`, `Program.cs`, `Dockerfile`: bổ sung `WhatsAppLocalGatewayHost` tự động khởi chạy và giám sát tiến trình `whatsapp-gateway/src/server.mjs` nội bộ trên loopback khi không cấu hình `WhatsApp:GatewayUrl` ngoài (lưu khóa `.session-secret` và phiên mã hóa tại `/app/data/whatsapp-sessions` cùng volume với `DataProtection`), đồng thời đóng gói `node` và `whatsapp-gateway` vào `Dockerfile`. *(Lỗi thời: commit `0471216` ngày 26/10/2026 đã bỏ stage này khỏi `Dockerfile`; host embedded chỉ còn dùng cho local. Production dùng container gateway riêng — xem mục 5 "Zalo & WhatsApp".)*

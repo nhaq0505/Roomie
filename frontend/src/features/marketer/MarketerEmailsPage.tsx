@@ -41,6 +41,9 @@ export default function MarketerEmailsPage() {
   const emailsQuery = useQuery({
     queryKey: ['marketer-emails'],
     queryFn: marketerApi.listEmails,
+    // The server dispatches campaigns in the background; keep polling while any is still sending.
+    refetchInterval: (query) =>
+      query.state.data?.some((item) => item.status === 'Sending') ? 3000 : false,
   });
 
   const leadCountsQuery = useQuery({
@@ -80,6 +83,21 @@ export default function MarketerEmailsPage() {
     mutationFn: (id: string) => marketerApi.sendEmailCampaign(id),
     onSuccess: async (res) => {
       await client.invalidateQueries({ queryKey: ['marketer-emails'] });
+      // 202 without a body or a "Sending" status means the background dispatch is still running.
+      if (!res || res.status === 'Sending') {
+        message.info(t("Chiến dịch đang được gửi nền. Kết quả sẽ tự cập nhật."));
+        return;
+      }
+      if (res.status === 'Failed' || res.failedCount > 0) {
+        message.warning(
+          t("Đã gửi tới {0}/{1} chủ trọ, {2} người nhận bị lỗi. Bấm Gửi lại để thử lại phần lỗi.", [
+            res.sentCount,
+            res.recipientCount,
+            res.failedCount,
+          ])
+        );
+        return;
+      }
       message.success(
         t("Đã gửi chiến dịch thành công tới {0}/{1} chủ trọ.", [res.sentCount, res.recipientCount])
       );
@@ -247,7 +265,7 @@ export default function MarketerEmailsPage() {
                   >
                     {t("Gửi thử")}
                   </Button>
-                  {r.status !== 'Completed' && (
+                  {r.status !== 'Completed' && r.status !== 'Sending' && (
                     <>
                       <Button
                         size="small"
@@ -272,7 +290,7 @@ export default function MarketerEmailsPage() {
                             sendCampaignMutation.variables === r.id
                           }
                         >
-                          {t("Phát hành")}
+                          {r.status === 'Failed' ? t("Gửi lại") : t("Phát hành")}
                         </Button>
                       </Popconfirm>
                     </>

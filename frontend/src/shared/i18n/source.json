@@ -1938,5 +1938,8 @@
   "Hoàn tất hướng dẫn",
   "Tất cả ({0})",
   "Đang thuê ({0})",
-  "Còn trống ({0})"
+  "Còn trống ({0})",
+  "Chiến dịch đang được gửi nền. Kết quả sẽ tự cập nhật.",
+  "Đã gửi tới {0}/{1} chủ trọ, {2} người nhận bị lỗi. Bấm Gửi lại để thử lại phần lỗi.",
+  "Gửi lại"
 ]
