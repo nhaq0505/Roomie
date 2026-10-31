@@ -1,5 +1,22 @@
 import { createHash } from 'node:crypto';
 
+const TRANSIENT_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
+const RESTORE_BACKOFF_BASE_MS = 5000;
+const RESTORE_BACKOFF_MAX_MS = 5 * 60 * 1000;
+
+// A restore failure caused by the network (DNS, reset, timeout) must not log the owner out:
+// keep the saved credentials and retry with backoff. Only other failures clear the session.
+export function isTransientRestoreError(error) {
+  if (!error) return false;
+  if (error.transient === true) return true;
+  if (error.transient === false) return false;
+  const codes = [error.code, error.cause?.code, error.errno].filter(Boolean).map(String);
+  if (codes.some(code => TRANSIENT_CODES.has(code))) return true;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
+  return error.name === 'TypeError' && /fetch failed|network/i.test(String(error.message ?? ''));
+}
+
 export class Gateway {
   constructor(store, createWhatsApp, now = Date.now) {
     this.store = store; this.createWhatsApp = createWhatsApp; this.now = now; this.sessions = new Map();
@@ -7,8 +24,17 @@ export class Gateway {
   }
   session(owner) {
     if (!this.sessions.has(owner)) {
-      const saved = this.store.read(owner) ?? { credentials: null, uid: null, attempts: {}, lastSendAt: 0 };
-      this.sessions.set(owner, { saved, status: 'Disconnected', api: null, qrImage: null, generation: 0 });
+      let saved = null;
+      let unreadable = false;
+      try { saved = this.store.read(owner); }
+      catch {
+        // One corrupt file or a wrong key must not crash every other owner's session at startup.
+        // Keep the file untouched until the owner explicitly reconnects; log only the owner id.
+        unreadable = true;
+        console.error(`Session file for owner ${owner} could not be read; starting disconnected.`);
+      }
+      saved ??= { credentials: null, uid: null, attempts: {}, lastSendAt: 0 };
+      this.sessions.set(owner, { saved, status: 'Disconnected', api: null, qrImage: null, generation: 0, unreadable, restoreFailures: 0, restoreRetryAt: 0 });
     }
     return this.sessions.get(owner);
   }
@@ -16,14 +42,22 @@ export class Gateway {
   view(s) { return { status: s.status, qrImage: s.qrImage }; }
   async status(owner) {
     const s = this.session(owner);
-    if (s.saved.credentials && !s.api && !s.login) {
+    if (s.saved.credentials && !s.api && !s.login && this.now() >= (s.restoreRetryAt ?? 0)) {
       s.status = 'Restoring';
       const generation = s.generation;
       s.login = this.createWhatsApp().login(s.saved.credentials).then(api => {
         if (generation !== s.generation) { api.listener.stop(); return; }
+        s.restoreFailures = 0; s.restoreRetryAt = 0;
         this.attach(owner, s, api);
-      }).catch(() => {
+      }).catch(error => {
         if (generation !== s.generation) return;
+        if (isTransientRestoreError(error)) {
+          s.restoreFailures = (s.restoreFailures ?? 0) + 1;
+          s.restoreRetryAt = this.now() + Math.min(RESTORE_BACKOFF_MAX_MS, RESTORE_BACKOFF_BASE_MS * 2 ** (s.restoreFailures - 1));
+          s.status = 'Restoring';
+          return;
+        }
+        s.restoreFailures = 0; s.restoreRetryAt = 0;
         s.saved.credentials = null; s.status = 'Disconnected'; this.persist(owner, s);
       }).finally(() => { if (generation === s.generation) s.login = null; });
     }

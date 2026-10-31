@@ -53,7 +53,7 @@ public sealed class RouteLatencyMiddleware
                 ?? 200;
 
             var method = context.Request.Method;
-            var routeTemplate = GetRouteTemplate(context);
+            var routeTemplate = GetRouteTemplate(context, statusCode);
             if (!string.IsNullOrWhiteSpace(routeTemplate))
             {
                 _aggregator.Record(routeTemplate, method, statusCode, elapsedMs);
@@ -61,7 +61,7 @@ public sealed class RouteLatencyMiddleware
         }
     }
 
-    private static string GetRouteTemplate(HttpContext context)
+    private static string GetRouteTemplate(HttpContext context, int statusCode)
     {
         var endpoint = context.GetEndpoint();
         if (endpoint is RouteEndpoint routeEndpoint && !string.IsNullOrWhiteSpace(routeEndpoint.RoutePattern.RawText))
@@ -71,7 +71,16 @@ public sealed class RouteLatencyMiddleware
             return pattern;
         }
 
-        var path = context.Request.Path.Value ?? "/";
-        return RouteLatencyAggregator.NormalizeRoute(path);
+        // Never key telemetry by a raw request path: anonymous callers could otherwise create
+        // unbounded in-memory and persisted buckets with random URLs. Unmatched requests share
+        // fixed buckets; static files served before routing share one bucket.
+        if (statusCode == StatusCodes.Status404NotFound || statusCode == StatusCodes.Status405MethodNotAllowed)
+        {
+            return context.Request.Path.StartsWithSegments("/api")
+                ? RouteLatencyAggregator.UnmatchedApiRoute
+                : RouteLatencyAggregator.UnmatchedRoute;
+        }
+
+        return RouteLatencyAggregator.StaticRoute;
     }
 }

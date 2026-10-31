@@ -2,6 +2,20 @@ import { EventEmitter } from 'node:events';
 
 const FALLBACK_WA_VERSION = [2, 3000, 1051697602];
 const noop = () => {};
+const RESTORE_TIMEOUT_MS = 60 * 1000;
+const RECONNECT_BASE_MS = 2000;
+const RECONNECT_MAX_MS = 5 * 60 * 1000;
+const KEY_PERSIST_DEBOUNCE_MS = 1000;
+// Baileys DisconnectReason codes that mean the saved session can never be used again.
+const TERMINAL_CODES = new Set([401, 403, 500]);
+
+export function reconnectDelayMs(attempt) {
+  return Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** Math.max(0, attempt));
+}
+
+function restoreError(message, transient) {
+  return Object.assign(new Error(message), { transient });
+}
 const silentLogger = {
   level: 'silent',
   info: noop,
@@ -80,7 +94,7 @@ export function createBaileysClient(baileys, qrcode) {
     void resolveVersion();
   }
 
-  function createAuthState(initial) {
+  function createAuthState(initial, onKeysChanged = noop) {
     const parsed = initial ? JSON.parse(JSON.stringify(initial), BufferJSON.reviver) : null;
     const creds = parsed?.creds ?? initAuthCreds();
     const keys = parsed?.keys ?? {};
@@ -100,6 +114,9 @@ export function createBaileysClient(baileys, qrcode) {
                 else delete keys[category][id];
               }
             }
+            // Signal sessions/pre-keys/sender-keys change without creds.update; persist them too,
+            // otherwise a restart reloads stale keys and messages can fail to decrypt.
+            onKeysChanged();
           }
         }
       },
@@ -140,18 +157,34 @@ export function createBaileysClient(baileys, qrcode) {
 
   return {
     login: (savedCredentials) => new Promise((resolve, reject) => {
-      const { state, snapshot } = createAuthState(savedCredentials);
+      let onKeys = noop;
+      const { state, snapshot } = createAuthState(savedCredentials, () => onKeys());
       const listener = new EventEmitter();
       let settled = false;
       let aborted = false;
       let currentSock = null;
       let reconnectTimer = null;
+      let persistTimer = null;
+      let reconnectAttempts = 0;
 
       const stop = () => {
         aborted = true;
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+        if (restoreTimer) { clearTimeout(restoreTimer); }
         try { currentSock?.end(); } catch { }
       };
+      onKeys = () => {
+        if (!settled || aborted || persistTimer) return;
+        persistTimer = setTimeout(() => { persistTimer = null; if (!aborted) listener.emit('credentials', snapshot()); }, KEY_PERSIST_DEBOUNCE_MS);
+      };
+      // A socket that never opens or closes must not leave the gateway stuck in "Restoring".
+      const restoreTimer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        stop();
+        reject(restoreError('Session restore timed out', true));
+      }, RESTORE_TIMEOUT_MS);
       listener.start = () => listener.emit('connected');
       listener.stop = stop;
 
@@ -172,32 +205,38 @@ export function createBaileysClient(baileys, qrcode) {
         sock.ev.on('connection.update', (update) => {
           if (aborted || currentSock !== sock) return;
           if (update.connection === 'open') {
-            if (!settled) { settled = true; resolve(wrapSocket(() => currentSock, listener, state)); }
+            reconnectAttempts = 0;
+            if (!settled) { settled = true; clearTimeout(restoreTimer); resolve(wrapSocket(() => currentSock, listener, state)); }
             else { listener.emit('credentials', snapshot()); listener.emit('connected'); }
           } else if (update.connection === 'close') {
             const code = update.lastDisconnect?.error?.output?.statusCode;
             const loggedOut = code === (DisconnectReason?.loggedOut ?? 401) || code === 401;
+            const terminal = loggedOut || TERMINAL_CODES.has(code);
             const restartRequired = code === (DisconnectReason?.restartRequired ?? 515) || code === 515;
             if (!settled) {
-              if (!loggedOut && restartRequired) {
+              if (!terminal && restartRequired) {
                 try { sock.end(); } catch { }
                 openSocket(version);
                 return;
               }
               settled = true;
-              reject(new Error('Session restore failed'));
+              clearTimeout(restoreTimer);
+              // Only a terminal code proves the saved session is unusable; anything else
+              // (network blip, 408/428/503) keeps the credentials for a later retry.
+              reject(restoreError('Session restore failed', !terminal));
               return;
             }
-            if (loggedOut) {
+            if (terminal) {
               listener.emit('closed');
             } else {
               listener.emit('disconnected');
               if (hasRemoteVersionFetcher && !aborted) {
                 if (reconnectTimer) clearTimeout(reconnectTimer);
+                const delay = reconnectDelayMs(reconnectAttempts++);
                 reconnectTimer = setTimeout(() => {
                   reconnectTimer = null;
                   openSocket(version);
-                }, 2000);
+                }, delay);
               }
             }
           }
@@ -211,18 +250,26 @@ export function createBaileysClient(baileys, qrcode) {
       }
     }),
     loginQR: (_, callback) => new Promise((resolve, reject) => {
-      const { state, snapshot } = createAuthState(null);
+      let onKeys = noop;
+      const { state, snapshot } = createAuthState(null, () => onKeys());
       const listener = new EventEmitter();
       let settled = false;
       let aborted = false;
       let paired = false;
       let currentSock = null;
       let reconnectTimer = null;
+      let persistTimer = null;
+      let reconnectAttempts = 0;
 
       const abort = () => {
         aborted = true;
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
         try { currentSock?.end(); } catch { }
+      };
+      onKeys = () => {
+        if (!settled || aborted || persistTimer) return;
+        persistTimer = setTimeout(() => { persistTimer = null; if (!aborted) listener.emit('credentials', snapshot()); }, KEY_PERSIST_DEBOUNCE_MS);
       };
       listener.start = () => listener.emit('connected');
       listener.stop = abort;
@@ -263,6 +310,7 @@ export function createBaileysClient(baileys, qrcode) {
           }
           if (update.connection === 'open') {
             paired = true;
+            reconnectAttempts = 0;
             const snap = snapshot();
             callback({ type: 4, data: snap, actions: { abort } });
             if (!settled) {
@@ -275,9 +323,10 @@ export function createBaileysClient(baileys, qrcode) {
           } else if (update.connection === 'close') {
             const code = update.lastDisconnect?.error?.output?.statusCode;
             const loggedOut = code === (DisconnectReason?.loggedOut ?? 401) || code === 401;
+            const terminal = loggedOut || TERMINAL_CODES.has(code);
             const restartRequired = code === (DisconnectReason?.restartRequired ?? 515) || code === 515;
             if (!settled) {
-              if (!loggedOut && (restartRequired || paired || Boolean(state.creds?.me?.id))) {
+              if (!terminal && (restartRequired || paired || Boolean(state.creds?.me?.id))) {
                 try { sock.end(); } catch { }
                 openSocket(version);
                 return;
@@ -287,16 +336,17 @@ export function createBaileysClient(baileys, qrcode) {
               reject(new Error('QR login closed'));
               return;
             }
-            if (loggedOut) {
+            if (terminal) {
               listener.emit('closed');
             } else {
               listener.emit('disconnected');
               if (hasRemoteVersionFetcher && !aborted) {
                 if (reconnectTimer) clearTimeout(reconnectTimer);
+                const delay = reconnectDelayMs(reconnectAttempts++);
                 reconnectTimer = setTimeout(() => {
                   reconnectTimer = null;
                   openSocket(version);
-                }, 2000);
+                }, delay);
               }
             }
           }

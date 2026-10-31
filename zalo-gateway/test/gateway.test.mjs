@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Gateway } from '../src/gateway.mjs';
+import { Gateway, isTransientRestoreError } from '../src/gateway.mjs';
 import { EncryptedStore } from '../src/store.mjs';
 
 const owner = '11111111-1111-1111-1111-111111111111';
@@ -145,4 +145,55 @@ test('QR intermediate events, expiry abort, listener reconnect and send input va
   await assert.rejects(() => f.gateway.send(owner, { ...valid, phone: '091234567' }), /Invalid message/);
   await assert.rejects(() => f.gateway.send(owner, { ...valid, message: 'x'.repeat(6001) }), /Invalid message/);
   assert.throws(() => new EncryptedStore(f.dir, 'short-key'), /32 bytes/);
+});
+
+test('transient restore failure keeps credentials and retries with backoff; other failures clear them', async t => {
+  const f = fixture(t); await connect(f);
+  let mode = 'network', calls = 0;
+  const flaky = () => ({
+    login: async () => {
+      calls++;
+      if (mode === 'network') throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+      throw new Error('fixture invalid session');
+    },
+    loginQR: f.factory().loginQR
+  });
+  let now = Date.parse('2026-10-20T01:00:00Z');
+  const restarted = new Gateway(f.store, flaky, () => now);
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  assert.equal((await restarted.status(owner)).status, 'Restoring'); await tick();
+  assert.equal(calls, 1);
+  assert.notEqual(f.store.read(owner).credentials, null, 'network failure must not clear saved credentials');
+  assert.equal((await restarted.status(owner)).status, 'Restoring'); await tick();
+  assert.equal(calls, 1, 'no retry before the backoff elapses');
+  now += 5000; await restarted.status(owner); await tick();
+  assert.equal(calls, 2, 'retries after the first backoff');
+  now += 9999; await restarted.status(owner); await tick();
+  assert.equal(calls, 2, 'backoff doubles after each transient failure');
+  mode = 'auth'; now += 1; await restarted.status(owner); await tick();
+  assert.equal(calls, 3);
+  assert.equal(f.store.read(owner).credentials, null, 'a non-transient failure clears the session');
+  assert.equal((await restarted.status(owner)).status, 'Disconnected');
+});
+
+test('restore error classification honours explicit flags and network codes', () => {
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { transient: true })), true);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { transient: false, code: 'ECONNRESET' })), false);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })), true);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { name: 'AbortError' })), true);
+  assert.equal(isTransientRestoreError(new Error('invalid cookie')), false);
+  assert.equal(isTransientRestoreError(null), false);
+});
+
+test('an unreadable session file does not crash startup or affect other owners', async t => {
+  const f = fixture(t); await connect(f);
+  t.mock.method(console, 'error', () => {});
+  const garbage = Buffer.from('not-an-encrypted-session-file-0123456789abcdef');
+  fs.writeFileSync(f.store.file(other), garbage);
+  const restarted = new Gateway(f.store, f.factory);
+  assert.equal((await restarted.status(other)).status, 'Disconnected');
+  assert.deepEqual(fs.readFileSync(f.store.file(other)), garbage, 'the unreadable file is left untouched');
+  assert.equal((await restarted.status(owner)).status, 'Restoring');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await restarted.status(owner)).status, 'Connected');
 });

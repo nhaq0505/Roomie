@@ -105,6 +105,11 @@ public sealed partial class WhatsAppReminderService(AppDbContext db, IWhatsAppGa
 
     public async Task<int> QueueScheduledAsync(Guid ownerId, CancellationToken ct)
     {
+        // Cheap unlocked pre-check: the worker calls this every few seconds per owner, and
+        // opening a Serializable transaction + row lock (a write) when nothing is due creates
+        // constant WAL/dead tuples. The locked path below re-checks before queuing.
+        var snapshot = await db.WhatsAppSettings.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == ownerId, ct);
+        if (snapshot is null || !ScheduleDue(snapshot, clock.GetUtcNow())) return 0;
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         // Lock the same owner row used by manual enqueue before reading the monthly marker.
         await db.WhatsAppSettings.Where(x => x.OwnerId == ownerId)
@@ -166,6 +171,9 @@ public sealed partial class WhatsAppReminderService(AppDbContext db, IWhatsAppGa
     {
         var now = clock.GetUtcNow().ToUnixTimeMilliseconds();
         if (!gateway.Enabled || !InSendWindow(clock.GetUtcNow())) return;
+        // Skip the lease write, payment/approval checks and gateway status call when there is
+        // nothing to send. "Sending" rows still need the lease path to be marked Unknown.
+        if (!await db.WhatsAppReminders.AsNoTracking().AnyAsync(x => x.OwnerId == ownerId && (x.Status == "Pending" || x.Status == "Sending"), ct)) return;
         // A database lease serializes sends per owner across API instances, not just in this process.
         var claimed = await db.WhatsAppSettings.Where(x => x.OwnerId == ownerId && x.DispatchLeaseUntilMs <= now && x.NextSendAtMs <= now)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.DispatchLeaseUntilMs, now + 120_000), ct);

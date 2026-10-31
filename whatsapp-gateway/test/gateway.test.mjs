@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { Gateway } from '../src/gateway.mjs';
+import { Gateway, isTransientRestoreError } from '../src/gateway.mjs';
 import { EncryptedStore } from '../src/store.mjs';
-import { createBaileysClient } from '../src/whatsapp.mjs';
+import { createBaileysClient, reconnectDelayMs } from '../src/whatsapp.mjs';
 
 const owner = '11111111-1111-1111-1111-111111111111';
 const other = '22222222-2222-2222-2222-222222222222';
@@ -258,4 +258,115 @@ test('gateway send accepts international E.164 phone numbers', async t => {
   const res = await f.gateway.send(owner, { ...f.body(), phone: '+821012345678' });
   assert.equal(res.status, 'Sent');
   assert.equal(f.sends(), 1);
+});
+
+test('transient restore failure keeps credentials and retries with backoff; other failures clear them', async t => {
+  const f = fixture(t); await connect(f);
+  let mode = 'network', calls = 0;
+  const flaky = () => ({
+    login: async () => {
+      calls++;
+      if (mode === 'network') throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+      throw new Error('fixture invalid session');
+    },
+    loginQR: f.factory().loginQR
+  });
+  let now = Date.parse('2026-10-20T01:00:00Z');
+  const restarted = new Gateway(f.store, flaky, () => now);
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  assert.equal((await restarted.status(owner)).status, 'Restoring'); await tick();
+  assert.equal(calls, 1);
+  assert.notEqual(f.store.read(owner).credentials, null, 'network failure must not clear saved credentials');
+  assert.equal((await restarted.status(owner)).status, 'Restoring'); await tick();
+  assert.equal(calls, 1, 'no retry before the backoff elapses');
+  now += 5000; await restarted.status(owner); await tick();
+  assert.equal(calls, 2, 'retries after the first backoff');
+  now += 9999; await restarted.status(owner); await tick();
+  assert.equal(calls, 2, 'backoff doubles after each transient failure');
+  mode = 'auth'; now += 1; await restarted.status(owner); await tick();
+  assert.equal(calls, 3);
+  assert.equal(f.store.read(owner).credentials, null, 'a non-transient failure clears the session');
+  assert.equal((await restarted.status(owner)).status, 'Disconnected');
+});
+
+test('restore error classification honours explicit flags and network codes', () => {
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { transient: true })), true);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { transient: false, code: 'ECONNRESET' })), false);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { code: 'ETIMEDOUT' })), true);
+  assert.equal(isTransientRestoreError(Object.assign(new Error('x'), { name: 'AbortError' })), true);
+  assert.equal(isTransientRestoreError(new Error('invalid cookie')), false);
+  assert.equal(isTransientRestoreError(null), false);
+});
+
+test('an unreadable session file does not crash startup or affect other owners', async t => {
+  const f = fixture(t); await connect(f);
+  t.mock.method(console, 'error', () => {});
+  const garbage = Buffer.from('not-an-encrypted-session-file-0123456789abcdef');
+  fs.writeFileSync(f.store.file(other), garbage);
+  const restarted = new Gateway(f.store, f.factory);
+  assert.equal((await restarted.status(other)).status, 'Disconnected');
+  assert.deepEqual(fs.readFileSync(f.store.file(other)), garbage, 'the unreadable file is left untouched');
+  assert.equal((await restarted.status(owner)).status, 'Restoring');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await restarted.status(owner)).status, 'Connected');
+});
+
+function fakeBaileys() {
+  const sockets = [];
+  const makeWASocket = (options) => {
+    const ev = new EventEmitter();
+    const sock = { ev, auth: options.auth, user: { id: '84901234567:2@s.whatsapp.net' },
+      onWhatsApp: async (jid) => [{ exists: true, jid }], sendMessage: async () => ({ key: { id: 'm' } }), end: () => {} };
+    sockets.push(sock);
+    return sock;
+  };
+  const baileys = { makeWASocket, initAuthCreds: () => ({}), BufferJSON: { replacer: (_, v) => v, reviver: (_, v) => v },
+    DisconnectReason: { loggedOut: 401, restartRequired: 515 } };
+  const qr = { toDataURL: async () => 'data:image/png;base64,AA==' };
+  return { sockets, client: createBaileysClient(baileys, qr) };
+}
+const savedSession = { creds: { me: { id: '84901234567:2@s.whatsapp.net' } }, keys: {} };
+const closeWith = (sock, statusCode) => sock.ev.emit('connection.update', { connection: 'close', lastDisconnect: { error: { output: { statusCode } } } });
+
+test('Baileys restore rejects as transient on network close and as terminal on logout', async () => {
+  const a = fakeBaileys();
+  const transient = a.client.login(savedSession);
+  closeWith(a.sockets[0], 408);
+  await assert.rejects(transient, e => e.transient === true);
+  const b = fakeBaileys();
+  const terminal = b.client.login(savedSession);
+  closeWith(b.sockets[0], 401);
+  await assert.rejects(terminal, e => e.transient === false);
+  const c = fakeBaileys();
+  const banned = c.client.login(savedSession);
+  closeWith(c.sockets[0], 403);
+  await assert.rejects(banned, e => e.transient === false);
+});
+
+test('Baileys signal key updates are persisted (debounced) and terminal codes close the session', async () => {
+  const { sockets, client } = fakeBaileys();
+  const loginPromise = client.login(savedSession);
+  sockets[0].ev.emit('connection.update', { connection: 'open' });
+  const api = await loginPromise;
+  const saved = [];
+  api.listener.on('credentials', snap => saved.push(snap));
+  await sockets[0].auth.keys.set({ session: { 'peer.0': { record: 'R1' } } });
+  await sockets[0].auth.keys.set({ 'pre-key': { 7: { k: 'P7' } } });
+  assert.equal(saved.length, 0, 'key writes are debounced');
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  assert.equal(saved.length, 1, 'a burst of key writes produces one persisted snapshot');
+  assert.deepEqual(saved[0].keys.session['peer.0'], { record: 'R1' });
+  assert.deepEqual(saved[0].keys['pre-key']['7'], { k: 'P7' });
+  let closed = false;
+  api.listener.on('closed', () => { closed = true; });
+  closeWith(sockets[0], 500);
+  assert.equal(closed, true, 'badSession (500) is terminal');
+  api.listener.stop();
+});
+
+test('reconnect delay grows exponentially and is capped', () => {
+  assert.equal(reconnectDelayMs(0), 2000);
+  assert.equal(reconnectDelayMs(1), 4000);
+  assert.equal(reconnectDelayMs(3), 16000);
+  assert.equal(reconnectDelayMs(50), 5 * 60 * 1000);
 });

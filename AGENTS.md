@@ -146,6 +146,8 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Một slot DB/InvoiceId, lease dispatch theo owner, attempt id và ledger gateway chống gửi lặp qua restart. Có thể queue khi mất kết nối, nhưng dispatch phải kiểm lại tenant/payment/phone/owner/invoice.
 - Giờ gửi 07:00 đến trước 21:00 Việt Nam; cách ít nhất 5 giây/owner; cooldown 20 giờ kể cả kết quả Unknown. Không tự retry Unknown vì tin có thể đã gửi.
 - Gateway session + ledger AES-256-GCM, ghi nguyên tử/fsync. Một process gateway/một volume; không chia volume cho nhiều process. Khôi phục backup cũ có thể mất receipt mới: đối chiếu Zalo trước khi bật gửi lại.
+- Khôi phục phiên gateway: lỗi mạng (`isTransientRestoreError`: mã ECONNRESET/ENOTFOUND/ETIMEDOUT…, `TypeError: fetch failed`, cờ `transient` từ adapter) **giữ credentials**, trạng thái `Restoring` và thử lại với backoff 5 giây → tối đa 5 phút; chỉ lỗi khác mới xóa phiên. WhatsApp: đóng kết nối trước khi mở với mã 401/403/500 là terminal (xóa phiên), mã khác là transient; restore quá 60 giây bị hủy; reconnect sau khi đã mở dùng backoff 2 giây → 5 phút; `keys.set` (Signal session/pre-key) lưu snapshot debounce 1 giây. File phiên không đọc được chỉ làm owner đó `Disconnected`, không sửa file, không làm crash gateway.
+- Worker nhắc Zalo/WhatsApp (mỗi 5 giây) chỉ lấy owner Approved trong một query; `QueueScheduledAsync` kiểm `ScheduleDue` không khóa trước khi mở transaction Serializable; `DispatchAsync` bỏ qua lease/kiểm thanh toán/gọi gateway khi owner không có job `Pending`/`Sending`.
 - Gateway Zalo (`zalo-gateway/` qua `zca-js`) và Gateway WhatsApp (`whatsapp-gateway/` qua `@whiskeysockets/baileys`) đều dùng kết nối QR cá nhân chạy song song độc lập (`/settings/zalo` và `/settings/whatsapp`), không phải ZNS/OA hay WhatsApp Cloud API trả phí; không coi test fake là nghiệm thu gửi thật.
 - Phân luồng kênh theo mã quốc gia (`shared/ui/PhoneInput.tsx`): số di động Việt Nam (`+84` / `0[35789]\d{8}`) **chỉ** gửi qua Zalo (`ZaloReminderService.NormalizePhone`); số quốc tế (E.164 `^\+[1-9]\d{6,14}$`, khác `+84`) mặc định gửi qua WhatsApp (`WhatsAppReminderService.NormalizePhone`).
 - Production (30/10/2026) chạy WhatsApp gateway ở container riêng `rehouse-whatsapp-1` khai báo trong Compose host (`/opt/rehouse/compose.yaml`), không nằm trong `deploy/compose.yaml` của repo; image app không còn đóng gói node/whatsapp-gateway. Không đổi mặc định `WhatsApp:Enabled` mà chưa đối chiếu host.
@@ -163,6 +165,7 @@ API thực tế được khai báo bằng `MapGet/MapPost/...` trong các endpoi
 - Actor Owner/System/Admin ảnh hưởng active-owner metrics. Lưu đúng actor/thời điểm publish/paid trong transaction + milestone outbox; telemetry lỗi không rollback sản phẩm.
 - Chỉ acknowledge outbox khi milestone đã tồn tại bền vững trong DB. Giữ Pending/Failed để đối chiếu; chỉ prune Completed theo retention.
 - Growth/CAC/retention có cohort, attribution, maturity và null reasons. Không thay dữ liệu thiếu bằng số ước đoán hoặc áp filter bằng cách materialize toàn bộ owner IDs trước query.
+- Telemetry độ trễ không bao giờ dùng path thô làm khóa: request không khớp endpoint ghi vào `/api/(unmatched)` hoặc `/(unmatched)` (404/405), file tĩnh vào `/(static)`; method ngoài GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS thành `OTHER`; tối đa `MaxKeysPerMinute` (512) khóa/phút, phần vượt cộng vào `/(overflow)`.
 - Host collector chạy ngoài app, chỉ mount thư mục JSON public `:ro`; tuyệt đối không mount Docker socket/private collector state vào app. Backup-watchdog có authority ở host, không tạo alert trùng trong app.
 
 ## 6. Chạy local có kiểm soát
@@ -287,7 +290,7 @@ Không chạy `unittest discover -s tests` tùy tiện: các module HTTP có th�
 
 ## 9. Triển khai, dữ liệu cần giữ và tài liệu còn lại
 
-Push `main` kích hoạt CI/CD, publish và deploy nếu các cổng thành công; chỉ push khi người dùng yêu cầu. Repo GitHub là `nhaq0505/Roomie`, image vẫn `ghcr.io/nhaq0505/rehouse`.
+Push `main` kích hoạt CI/CD, publish và deploy nếu các cổng thành công; chỉ push khi người dùng yêu cầu. Chỉ run của pull request bị hủy khi có push mới; run trên `main` xếp hàng (không `cancel-in-progress`) và job deploy có concurrency `production-deploy` riêng, để không bao giờ hủy giữa lúc migrate/recreate. Repo GitHub là `nhaq0505/Roomie`, image vẫn `ghcr.io/nhaq0505/rehouse`.
 
 - [Triển khai / rollback](docs/deployment.md): identity, digest, host paths, migration overlay, Caddy, SMTP.
 - [Truy cập VPS chính và tải đọc live](docs/vps-access.md): dùng `roomie-ops` + sudo với key hiện có; root bị chặn SSH bởi hardening. Ngày 22/10/2026 đo owner riêng biệt, profile 3 API reads/10 giây: 200 owner/48.000 hóa đơn giữ 120 giây đạt p95 348 ms; tiếp đó fixture 400 owner/96.000 hóa đơn xác định 225 owner đồng thời giữ 120 giây đạt 67,45 RPS, p95 413 ms, 0 lỗi; 250 dừng vì p95 cửa sổ gần nhất 1013 ms. Ngưỡng theo bước 25, chưa đo 226–249 hoặc tải ghi/soak dài hạn. Login limiter nâng tạm theo yêu cầu và khôi phục 10/phút trước tải GET, fixture đã dọn. Runbook giữ cả lần đo 8 tài khoản trước đó và bằng chứng riêng từng lần.

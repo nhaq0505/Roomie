@@ -48,6 +48,7 @@ public static class OperationsMonitoringTests
         await TestSmtpIncidentNotifierAsync();
         await TestProductionDiAlertTransportAsync();
         await TestRouteLatencyMiddlewareRealHttpPipelineAsync();
+        TestRouteLatencyCardinalityCap();
         TestWorkerStartVsSuccessRegressions();
         await TestOperationsAndIncidentsHttpEndpointsAsync();
     }
@@ -787,9 +788,24 @@ public static class OperationsMonitoringTests
         var resp404 = await client.GetAsync("/api/totally-nonexistent-path");
         Assert(resp404.StatusCode == HttpStatusCode.NotFound, "Real HTTP pipeline returned 404 NotFound");
         snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
-        var snap404 = snaps.Single(s => s.RouteTemplate == "/api/totally-nonexistent-path");
-        Assert(snap404.RequestCount == 1, "/api/totally-nonexistent-path recorded 1 request");
-        Assert(snap404.Status5xxCount == 0, "/api/totally-nonexistent-path recorded 0 5xx");
+        var snap404 = snaps.Single(s => s.RouteTemplate == RouteLatencyAggregator.UnmatchedApiRoute);
+        Assert(snap404.RequestCount == 1, "Unmatched API path recorded 1 request under the fixed unmatched bucket");
+        Assert(snap404.Status5xxCount == 0, "Unmatched API path recorded 0 5xx");
+        Assert(!snaps.Any(s => s.RouteTemplate.Contains("totally-nonexistent", StringComparison.Ordinal)), "Raw unmatched path is never used as a telemetry key");
+
+        // 7b. Random unmatched paths and arbitrary methods share fixed buckets (no cardinality growth)
+        for (var i = 0; i < 25; i++)
+        {
+            await client.GetAsync($"/api/random-{Guid.NewGuid():N}-{i}x");
+            await client.GetAsync($"/x{i}-{Guid.NewGuid():N}.php");
+            await client.SendAsync(new HttpRequestMessage(new HttpMethod($"FOO{i}"), "/api/test-ok"));
+        }
+        snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        Assert(snaps.Single(s => s.RouteTemplate == RouteLatencyAggregator.UnmatchedApiRoute && s.HttpMethod == "GET").RequestCount == 26, "Random unmatched API paths collapse into one bucket");
+        Assert(snaps.Single(s => s.RouteTemplate == RouteLatencyAggregator.UnmatchedRoute && s.HttpMethod == "GET").RequestCount == 25, "Random unmatched file paths collapse into one bucket");
+        Assert(!snaps.Any(s => s.HttpMethod.StartsWith("FOO", StringComparison.Ordinal)), "Arbitrary HTTP methods are normalized to OTHER");
+        Assert(snaps.Where(s => s.HttpMethod == "OTHER").Sum(s => s.RequestCount) == 25, "All arbitrary-method requests are still counted under OTHER");
+        Assert(snaps.Count <= 12, $"Random paths/methods keep the distinct key count small (got {snaps.Count})");
 
         // 8. Drain buckets and verify actual recorded status codes for each pipeline request
         fakeClock.Advance(TimeSpan.FromMinutes(2));
@@ -802,7 +818,22 @@ public static class OperationsMonitoringTests
         Assert(!buckets.Any(b => b.RouteTemplate == "/api/test-unhandled-500" && b.StatusCode == 200), "Never recorded 200 for unhandled 500 exception");
         Assert(buckets.Any(b => b.RouteTemplate == "/api/test-auth-challenge" && b.StatusCode == 401), "Recorded status 401 for /api/test-auth-challenge");
         Assert(buckets.Any(b => b.RouteTemplate == "/api/test-admin-forbidden" && b.StatusCode == 403), "Recorded status 403 for /api/test-admin-forbidden");
-        Assert(buckets.Any(b => b.RouteTemplate == "/api/totally-nonexistent-path" && b.StatusCode == 404), "Recorded status 404 for /api/totally-nonexistent-path");
+        Assert(buckets.Any(b => b.RouteTemplate == RouteLatencyAggregator.UnmatchedApiRoute && b.StatusCode == 404), "Recorded status 404 under the unmatched API bucket");
+    }
+
+    private static void TestRouteLatencyCardinalityCap()
+    {
+        var fakeClock = new TestTimeProvider(DateTimeOffset.Parse("2026-10-20T16:00:00Z"));
+        var aggregator = new RouteLatencyAggregator(fakeClock);
+        for (var i = 0; i < RouteLatencyAggregator.MaxKeysPerMinute + 300; i++)
+            aggregator.Record($"/api/generated-route-{i}/x", "GET", 200, 10);
+        Assert(RouteLatencyAggregator.NormalizeMethod("get") == "GET", "Known methods are upper-cased");
+        Assert(RouteLatencyAggregator.NormalizeMethod("PROPFIND") == "OTHER", "Unknown methods collapse to OTHER");
+        var snaps = aggregator.GetRouteSnapshots(TimeSpan.FromHours(1));
+        Assert(snaps.Count <= RouteLatencyAggregator.MaxKeysPerMinute + 1, "Distinct keys per minute are capped");
+        var overflow = snaps.Single(s => s.RouteTemplate == RouteLatencyAggregator.OverflowRoute);
+        Assert(overflow.RequestCount == 300, "Requests beyond the key cap are counted in the overflow bucket");
+        Assert(snaps.Sum(s => s.RequestCount) == RouteLatencyAggregator.MaxKeysPerMinute + 300, "No request is dropped when the key cap is reached");
     }
 
     private static void TestWorkerStartVsSuccessRegressions()

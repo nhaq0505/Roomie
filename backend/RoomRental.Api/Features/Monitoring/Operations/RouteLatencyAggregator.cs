@@ -45,6 +45,18 @@ public interface IRouteLatencyAggregator
 
 public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 {
+    public const string UnmatchedApiRoute = "/api/(unmatched)";
+    public const string UnmatchedRoute = "/(unmatched)";
+    public const string StaticRoute = "/(static)";
+    public const string OverflowRoute = "/(overflow)";
+    // Hard cap on distinct (route, method, status) keys per minute so no caller can grow RAM or
+    // RouteMinuteBuckets rows without bound; real route templates stay far below this.
+    public const int MaxKeysPerMinute = 512;
+    private static readonly HashSet<string> KnownMethods = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+    };
+
     private readonly TimeProvider _clock;
     // ponytail: one process, up to 24h since restart; use persisted buckets for cross-restart/multi-replica views.
     private readonly ConcurrentDictionary<long, MinuteBucketCollection> _minuteBuckets = new();
@@ -60,7 +72,7 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         var now = _clock.GetUtcNow();
         var minuteEpoch = now.ToUnixTimeSeconds() / 60;
         var normalizedRoute = NormalizeRoute(routeTemplate);
-        var normalizedMethod = httpMethod.ToUpperInvariant();
+        var normalizedMethod = NormalizeMethod(httpMethod);
 
         var collection = _minuteBuckets.GetOrAdd(minuteEpoch, _ => new MinuteBucketCollection(minuteEpoch));
         collection.Record(normalizedRoute, normalizedMethod, statusCode, latencyMs);
@@ -221,6 +233,11 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
         }
     }
 
+    public static string NormalizeMethod(string? httpMethod) =>
+        !string.IsNullOrWhiteSpace(httpMethod) && KnownMethods.Contains(httpMethod)
+            ? httpMethod.ToUpperInvariant()
+            : "OTHER";
+
     public static string NormalizeRoute(string rawPath)
     {
         if (string.IsNullOrWhiteSpace(rawPath)) return "/";
@@ -254,7 +271,10 @@ public sealed partial class RouteLatencyAggregator : IRouteLatencyAggregator
 
         public void Record(string route, string method, int statusCode, double latencyMs)
         {
-            var acc = _byRouteStatus.GetOrAdd((route, method, statusCode), _ => new RouteHistogramAccumulator());
+            var key = (route, method, statusCode);
+            if (!_byRouteStatus.ContainsKey(key) && _byRouteStatus.Count >= MaxKeysPerMinute)
+                key = (OverflowRoute, method, statusCode);
+            var acc = _byRouteStatus.GetOrAdd(key, _ => new RouteHistogramAccumulator());
             acc.Add(statusCode, latencyMs);
         }
 

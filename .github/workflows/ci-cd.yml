@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 
+# Only pull-request runs may be cancelled by a newer push. Runs on main publish and deploy to
+# production; cancelling them mid-deploy can kill the remote migration/recreate step, so a
+# newer main run waits (GitHub keeps only the newest pending run) instead of cancelling.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-and-typecheck:
@@ -28,7 +31,7 @@ jobs:
         run: mkdir -p "$HOME/.npm"
 
       - name: Cache npm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
@@ -42,7 +45,7 @@ jobs:
           --volume "$GITHUB_WORKSPACE/frontend:/workspace"
           --workdir /workspace
           node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
-          sh -ec 'npm ci && npm run build && npm run i18n:check && npm run check:architecture && npm run test:api && npm run test:http'
+          sh -ec 'npm ci && npm run build && npm run i18n:check && npm run check:architecture && npm run test:api && npm run test:http && npm run test:analytics && npm run test:dates && npm run test:cccd-qr'
 
   test-zalo-gateway:
     name: Zalo gateway tests (no provider calls)
@@ -92,7 +95,7 @@ jobs:
         run: mkdir -p "$HOME/.nuget/packages"
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('backend/**/*.csproj', 'tests/**/*.csproj') }}
@@ -164,7 +167,7 @@ jobs:
         run: mkdir -p "$HOME/.npm"
 
       - name: Cache npm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
@@ -293,6 +296,10 @@ jobs:
     needs: publish
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
+    # Serialize production deploys across runs/workflow_dispatch and never cancel one in flight.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: read

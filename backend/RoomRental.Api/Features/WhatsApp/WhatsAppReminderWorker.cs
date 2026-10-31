@@ -17,7 +17,11 @@ public sealed class WhatsAppReminderWorker(IServiceScopeFactory scopes, TimeProv
                 if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("whatsapp", isEnabled: true, status: "Running", errorMessage: null, stoppingToken);
 
                 var db = listScope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var owners = await db.WhatsAppSettings.AsNoTracking().Select(x => x.OwnerId).ToListAsync(stoppingToken);
+                // Only Approved owners are eligible; filter in one query instead of a lookup per owner.
+                var owners = await (from s in db.WhatsAppSettings.AsNoTracking()
+                                    join u in db.Users.AsNoTracking() on s.OwnerId equals u.Id
+                                    where u.Role == UserRole.Owner && u.Status == OwnerStatus.Approved
+                                    select s.OwnerId).ToListAsync(stoppingToken);
                 foreach (var owner in owners)
                 {
                     try
@@ -25,8 +29,6 @@ public sealed class WhatsAppReminderWorker(IServiceScopeFactory scopes, TimeProv
                         using var scope = scopes.CreateScope();
                         var ownerDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                         var reminders = scope.ServiceProvider.GetRequiredService<WhatsAppReminderService>();
-                        var approved = await ownerDb.Users.AnyAsync(x => x.Id == owner && x.Role == UserRole.Owner && x.Status == OwnerStatus.Approved, stoppingToken);
-                        if (!approved) continue;
                         await reminders.QueueScheduledAsync(owner, stoppingToken);
                         ownerDb.ChangeTracker.Clear();
                         await reminders.DispatchAsync(owner, stoppingToken);
@@ -45,7 +47,7 @@ public sealed class WhatsAppReminderWorker(IServiceScopeFactory scopes, TimeProv
                 {
                     using var errScope = scopes.CreateScope();
                     var tracker = errScope.ServiceProvider.GetService<RoomRental.Api.Features.Monitoring.IWorkerStateTracker>();
-                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("whatsapp", isEnabled: true, status: "Failed", errorMessage: ex.Message, stoppingToken);
+                    if (tracker != null) await tracker.RecordWorkerHeartbeatAsync("whatsapp", isEnabled: true, status: "Failed", errorMessage: ex.GetType().Name, stoppingToken);
                 }
                 catch { }
             }
